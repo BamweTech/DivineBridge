@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Divine Bridge - Uniting Hearts in Global Prayer</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f7fa;
+            color: #333;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 40px 0;
+            background: linear-gradient(135deg, #0066cc 0%, #004499 100%);
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 36px;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+
+        .verse-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 40px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .verse-title {
+            color: #0066cc;
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .verse-text {
+            font-size: 16px;
+            line-height: 1.8;
+            white-space: pre-line;
+            text-align: center;
+            font-style: italic;
+        }
+
+        .verse-reference {
+            font-size: 14px;
+            color: #666;
+            text-align: right;
+            margin-top: 15px;
+        }
+
+        .subscribe-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .subscribe-title {
+            color: #0066cc;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        .subscribe-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            text-align: left;
+        }
+
+        label {
+            font-weight: 500;
+            color: #444;
+        }
+
+        input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        button {
+            background: #0066cc;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background: #004499;
+        }
+
+        .error-message {
+            color: #dc3545;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .success-message {
+            color: #28a745;
+            font-size: 16px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 14px;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Divine Bridge</h1>
+            <p class="subtitle">Uniting Hearts in Global Prayer</p>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="verse-section">
+            <h2 class="verse-title">Daily Verse</h2>
+            <div class="verse-text" id="verse-text">
+                Loading verse...
+            </div>
+            <div class="verse-reference" id="verse-reference"></div>
+        </section>
+
+        <section class="subscribe-section">
+            <h2 class="subscribe-title">Join Our Prayer Community</h2>
+            <form class="subscribe-form" id="subscribe-form">
+                <div class="form-group">
+                    <label for="first-name">First Name</label>
+                    <input type="text" id="first-name" name="firstName" required>
+                    <div class="error-message" id="first-name-error"></div>
+                </div>
+                <div class="form-group">
+                    <label for="last-name">Last Name</label>
+                    <input type="text" id="last-name" name="lastName" required>
+                    <div class="error-message" id="last-name-error"></div>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" required>
+                    <div class="error-message" id="email-error"></div>
+                </div>
+                <button type="submit">Join Prayer Community</button>
+                <div class="success-message" id="success-message"></div>
+            </form>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 Divine Bridge. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Get daily verse
+        fetch('/verse')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('verse-text').textContent = data.verse;
+                    document.getElementById('verse-reference').textContent = data.reference;
+                } else {
+                    document.getElementById('verse-text').textContent = 'Error loading verse. Please try again later.';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('verse-text').textContent = 'Error loading verse. Please try again later.';
+            });
+
+        // Handle form submission
+        document.getElementById('subscribe-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Reset error messages
+            document.querySelectorAll('.error-message').forEach(el => el.style.display = 'none');
+            document.getElementById('success-message').style.display = 'none';
+            
+            // Get form data
+            const firstName = document.getElementById('first-name').value.trim();
+            const lastName = document.getElementById('last-name').value.trim();
+            const email = document.getElementById('email').value.trim();
+            
+            // Validate form
+            let isValid = true;
+            
+            if (!firstName) {
+                document.getElementById('first-name-error').textContent = 'First name is required';
+                document.getElementById('first-name-error').style.display = 'block';
+                isValid = false;
+            }
+            
+            if (!lastName) {
+                document.getElementById('last-name-error').textContent = 'Last name is required';
+                document.getElementById('last-name-error').style.display = 'block';
+                isValid = false;
+            }
+            
+            if (!email) {
+                document.getElementById('email-error').textContent = 'Email is required';
+                document.getElementById('email-error').style.display = 'block';
+                isValid = false;
+            } else if (!isValidEmail(email)) {
+                document.getElementById('email-error').textContent = 'Please enter a valid email address';
+                document.getElementById('email-error').style.display = 'block';
+                isValid = false;
+            }
+            
+            if (!isValid) return;
+            
+            // Send subscription request
+            fetch('/subscribe', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    firstName: firstName,
+                    lastName: lastName,
+                    email: email
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('success-message').textContent = 'Thank you for joining our prayer community!';
+                    document.getElementById('success-message').style.display = 'block';
+                    document.getElementById('subscribe-form').reset();
+                } else {
+                    document.getElementById('email-error').textContent = data.message || 'An error occurred. Please try again.';
+                    document.getElementById('email-error').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('email-error').textContent = 'An error occurred. Please try again.';
+                document.getElementById('email-error').style.display = 'block';
+            });
+        });
+
+        // Email validation helper
+        function isValidEmail(email) {
+            const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+            return re.test(String(email).toLowerCase());
+        }
+    </script>
+</body>
+</html> 
