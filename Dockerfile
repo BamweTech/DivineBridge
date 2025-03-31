@@ -13,11 +13,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application
 COPY . .
 
-# Create directories for prayers and verses
-RUN mkdir -p prayers verses
+# Create necessary directories
+RUN mkdir -p logs prayers
 
 # Set environment variables
 ENV PORT=8080
+ENV PYTHONUNBUFFERED=1
 
-# Run the application with Gunicorn
-CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 app:app 
+# Expose the port
+EXPOSE 8080
+
+# Run the application
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"] 
