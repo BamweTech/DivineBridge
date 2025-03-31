@@ -13,13 +13,14 @@ from welcome_email import send_welcome_email
 from dotenv import load_dotenv
 import threading
 from prayer_generator import PrayerGenerator
-
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+from logging_config import setup_logging
 
 # Load environment variables
 load_dotenv()
+
+# Set up logging
+loggers = setup_logging()
+logger = loggers['app']
 
 app = Flask(__name__)
 sheet_handler = SheetHandler('divinebridge-676c7c0963dd.json')

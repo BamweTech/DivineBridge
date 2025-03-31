@@ -7,6 +7,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
+env/
 build/
 develop-eggs/
 dist/
@@ -24,8 +25,6 @@ wheels/
 *.egg
 
 # Virtual Environment
-.venv
-env/
 venv/
 ENV/
 
@@ -41,7 +40,13 @@ credentials.json
 *.key
 
 # Logs
+logs/
 *.log
 prayers/
 verses/
 divinebridge-676c7c0963dd.json 
+divinebridge-db42f07139c5.json
+
+# Service Account Keys
+*.json
+!static/bible_verses.json
