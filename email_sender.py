@@ -63,7 +63,7 @@ class EmailSender:
 
                 <div style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); padding: 25px; border-radius: 15px; margin: 30px 0; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
                     <h2 style="color: #0066cc; font-size: 20px; margin-bottom: 15px; text-align: left;">Let's Pray!</h2>
-                    <p style="font-size: 16px; line-height: 1.8; color: #444; white-space: pre-line;">{prayer_text}</p>
+                    <p style="font-size: 16px; line-height: 1.8; color: #777; white-space: pre-line;">{prayer_text}</p>
                 </div>
 
                 <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee;">

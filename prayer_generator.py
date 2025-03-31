@@ -1,6 +1,8 @@
 from perplexipy import PerplexityClient
 import os
 import logging
+from datetime import datetime
+from storage_handler import StorageHandler
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -12,9 +14,10 @@ class PrayerGenerator:
         try:
             self.client = PerplexityClient(key=os.getenv("PERPLEXITY_API_KEY"))
             self.client.model = "sonar-pro"
-            logger.debug("Successfully initialized Perplexity client")
+            self.storage = StorageHandler(os.getenv("GOOGLE_CLOUD_BUCKET"))
+            logger.debug("Successfully initialized Perplexity client and StorageHandler")
         except Exception as e:
-            logger.error(f"Error initializing Perplexity client: {e}")
+            logger.error(f"Error initializing PrayerGenerator: {e}")
             raise
     
     def generate_prayer(self):
@@ -66,6 +69,10 @@ class PrayerGenerator:
 
             Compose a prayer (maximum 500 words) based on the affected regions and people.
 
+            Always start the prayer with praise and worship to God in the first paragraph.
+
+            Always address the breaking news in the second paragraph of the prayer.
+
             The prayer should only contain the prayer text—no explanations or reasoning process.
 
             Begin the prayer with: "Dear Heavenly Father"
@@ -86,7 +93,30 @@ class PrayerGenerator:
             if "Dear Heavenly Father" in response:
                 response = response[response.index("Dear Heavenly Father"):]
             
+            # Save the generated prayer to Cloud Storage
+            if self.storage.save_prayer(response):
+                logger.info("Successfully saved prayer to Cloud Storage")
+            else:
+                logger.error("Failed to save prayer to Cloud Storage")
+            
             return response
         except Exception as e:
             logger.error(f"Error generating prayer: {e}")
+            raise
+
+    def get_prayer(self, date=None):
+        """Retrieve a prayer for a specific date or today's prayer if no date is provided"""
+        try:
+            if date is None:
+                date = datetime.now().strftime("%Y-%m-%d")
+            
+            prayer = self.storage.get_prayer(date)
+            if prayer:
+                logger.info(f"Successfully retrieved prayer for {date}")
+                return prayer
+            else:
+                logger.warning(f"No prayer found for {date}, generating new prayer")
+                return self.generate_prayer()
+        except Exception as e:
+            logger.error(f"Error retrieving prayer: {e}")
             raise 

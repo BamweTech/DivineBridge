@@ -12,6 +12,7 @@ import atexit
 from welcome_email import send_welcome_email
 from dotenv import load_dotenv
 import threading
+from prayer_generator import PrayerGenerator
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -23,11 +24,17 @@ load_dotenv()
 app = Flask(__name__)
 sheet_handler = SheetHandler('divinebridge-676c7c0963dd.json')
 email_sender = EmailSender()
-prayer_scheduler = PrayerScheduler()
 
-# Initialize and start the prayer scheduler in a background thread
-scheduler_thread = threading.Thread(target=prayer_scheduler.run, daemon=True)
-scheduler_thread.start()
+# Initialize components
+prayer_generator = PrayerGenerator()
+
+# Initialize and start scheduler in a separate thread
+# Only start the scheduler in the main process, not in the reloader
+if not os.environ.get('WERKZEUG_RUN_MAIN'):
+    scheduler = PrayerScheduler(prayer_generator=prayer_generator, email_sender=email_sender)
+    scheduler_thread = threading.Thread(target=scheduler.run)
+    scheduler_thread.daemon = True
+    scheduler_thread.start()
 
 def load_bible_verses():
     try:
@@ -134,4 +141,4 @@ def get_verse():
         }), 500
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(debug=True, port=5001) 
