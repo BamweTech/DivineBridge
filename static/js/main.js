@@ -31,15 +31,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (data.success) {
                 // Show success message
-                messageDiv.textContent = 'Thank you for subscribing! Please check your email.';
-                messageDiv.className = 'alert alert-success';
+                messageDiv.textContent = 'Welcome to Divine Bridge! We\'re so glad you\'ve joined our prayer community. Your first prayer will arrive in your inbox shortly.';
+                messageDiv.className = 'success-message show';
+                messageDiv.style.display = 'block';
                 
                 // Reset form
                 form.reset();
             } else {
                 // Show error message
                 messageDiv.textContent = data.message || 'An error occurred. Please try again.';
-                messageDiv.className = 'alert alert-error';
+                messageDiv.className = 'error-message';
+                messageDiv.style.display = 'block';
             }
         } catch (error) {
             // Show error message

@@ -1,107 +1,74 @@
 import logging
 from datetime import datetime
-from email_templates import get_welcome_email_template
 import os
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.utils import formataddr
-from dotenv import load_dotenv
+from email_sender import EmailSender
+from storage_handler import StorageHandler
+from prayer_generator import PrayerGenerator
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Load environment variables
-load_dotenv()
-
-def get_todays_prayer():
+def get_today_prayer():
+    """Get today's prayer from Google Cloud Storage or generate a new one if not available."""
     try:
+        # Initialize storage handler
+        storage = StorageHandler()
+        
+        # Get today's date
         today = datetime.now().strftime('%Y-%m-%d')
-        prayer_file = f'prayers/{today}.txt'
         
-        if not os.path.exists(prayer_file):
-            logger.error(f"Prayer file for today ({prayer_file}) not found")
-            return "Our prayer for today is being prepared. Please check back later."
-        
-        with open(prayer_file, 'r') as file:
-            prayer = file.read().strip()
+        # First try to get existing prayer from storage
+        prayer = storage.get_prayer(today)
+        if prayer:
+            logger.info(f"Found existing prayer for {today}")
             return prayer
+            
+        # If no prayer exists, generate a new one
+        logger.info(f"No prayer found for {today}, generating new prayer")
+        prayer_generator = PrayerGenerator()
+        new_prayer = prayer_generator.generate_prayer()
+        
+        if new_prayer:
+            logger.info(f"Successfully generated new prayer for {today}")
+            return new_prayer
+        else:
+            logger.error("Failed to generate new prayer")
+            return None
+            
     except Exception as e:
-        logger.error(f"Error reading today's prayer: {e}")
-        return "Our prayer for today is being prepared. Please check back later."
+        logger.error(f"Error in get_today_prayer: {str(e)}")
+        return None
 
-def send_welcome_email(first_name, recipient_email):
+def send_welcome_email(subscriber_email, subscriber_name):
     """
-    Send a welcome email to a new subscriber.
-    
-    Args:
-        first_name: Subscriber's first name
-        recipient_email: Subscriber's email address
+    Send a welcome email to a new subscriber with today's prayer.
     """
     try:
-        logger.debug(f"Preparing to send welcome email to: {recipient_email}")
-        
-        # Get email configuration from environment variables
-        sender_email = os.getenv('EMAIL_USER')
-        sender_password = os.getenv('EMAIL_PASSWORD')
-        smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
-        smtp_port = int(os.getenv('SMTP_PORT', '587'))
-        
-        if not all([sender_email, sender_password]):
-            raise ValueError("Email credentials not found in environment variables")
+        # Initialize email sender
+        email_sender = EmailSender()
         
         # Get today's prayer
-        prayer = get_todays_prayer()
+        prayer = get_today_prayer()
         
-        # Create message
-        msg = MIMEMultipart()
-        msg['From'] = formataddr(("Divine Bridge", sender_email))
-        msg['To'] = recipient_email
-        msg['Subject'] = "Welcome to Divine Bridge!"
+        if not prayer:
+            logger.error("No prayer found or generated for today")
+            return False
+
+        # Send the email using send_welcome_email
+        success = email_sender.send_welcome_email(
+            recipient_email=subscriber_email,
+            first_name=subscriber_name,
+            prayer_text=prayer
+        )
         
-        # Create email body with styling
-        html_body = f"""
-        <html>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
-            <div style="text-align: left; margin-bottom: 20px;">
-                <h1 style="color: #0066cc; font-size: 28px; margin-bottom: 6px;">Divine Bridge</h1>
-                <p style="color: #666; font-size: 12px;">Uniting Hearts in Global Prayer</p>
-            </div>
-
-            <div style="margin-bottom: 30px;">
-                <p style="font-size: 16px; line-height: 1.6;">Dear {first_name},</p>
-                <p style="font-size: 16px; line-height: 1.6;">Welcome to Divine Bridge! We are delighted to have you join our global prayer community.</p>
-                <p style="font-size: 16px; line-height: 1.6; font-style: italic; margin-top: 10px;">As we unite our hearts in faith, we lift up those affected by global events, seeking God's comfort, healing, and divine intervention.</p>
-            </div>
-
-            <div style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); padding: 25px; border-radius: 15px; margin: 30px 0; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-                <h2 style="color: #0066cc; font-size: 20px; margin-bottom: 15px; text-align: left;">Today's Prayer</h2>
-                <p style="font-size: 16px; line-height: 1.8; color: #444; white-space: pre-line;">{prayer}</p>
-            </div>
-
-            <div style="margin-top: 30px;">
-                <p style="font-size: 16px; line-height: 1.6;">Thank you for being part of our global prayer community.</p>
-            </div>
-
-            <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee;">
-                <p style="font-size: 16px; line-height: 1.6; color: #666;">Blessings,<br>The Divine Bridge team</p>
-                <p style="font-size: 14px; color: #999; margin-top: 20px;">If you have any questions, please contact us at <a href="mailto:{sender_email}" style="color: #0066cc; text-decoration: none;">{sender_email}</a></p>
-            </div>
-        </body>
-        </html>
-        """
-        
-        msg.attach(MIMEText(html_body, 'html'))
-        
-        # Send email
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(sender_email, sender_password)
-            server.send_message(msg)
+        if success:
+            logger.info(f"Welcome email sent successfully to {subscriber_email}")
+            return True
+        else:
+            logger.error(f"Failed to send welcome email to {subscriber_email}")
+            return False
             
-        logger.debug(f"Welcome email sent successfully to: {recipient_email}")
-        
     except Exception as e:
-        logger.error(f"Error sending welcome email to {recipient_email}: {e}")
-        raise 
+        logger.error(f"Error sending welcome email: {str(e)}")
+        return False 

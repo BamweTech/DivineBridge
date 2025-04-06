@@ -1,21 +1,37 @@
 from google.cloud import storage
-import os
 import logging
 from datetime import datetime
 import json
 import random
+from config import get_config
+import os
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
 class StorageHandler:
-    def __init__(self, bucket_name):
-        """Initialize the storage handler with a bucket name"""
+    def __init__(self):
+        """Initialize the storage handler with appropriate configuration"""
         try:
-            self.client = storage.Client()
-            self.bucket = self.client.bucket(bucket_name)
+            config = get_config()
+            
+            # Handle service account info based on environment
+            if isinstance(config.PRAYER_SERVICE_ACCOUNT, dict):
+                # Local environment - using service account info
+                service_account_info = config.PRAYER_SERVICE_ACCOUNT
+            else:
+                # Production environment - parse service account JSON from string
+                try:
+                    service_account_info = json.loads(config.PRAYER_SERVICE_ACCOUNT)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse service account JSON: {e}")
+                    raise
+            
+            # Initialize the Google Cloud Storage client with prayer service account
+            self.client = storage.Client.from_service_account_info(service_account_info)
+            self.bucket = self.client.bucket(config.GOOGLE_CLOUD_BUCKET)
             self.verses = self._load_verses()
-            logger.info(f"StorageHandler initialized successfully with bucket: {bucket_name}")
+            logger.info(f"Successfully initialized StorageHandler with bucket: {config.GOOGLE_CLOUD_BUCKET}")
         except Exception as e:
             logger.error(f"Error initializing StorageHandler: {e}")
             raise
@@ -30,12 +46,11 @@ class StorageHandler:
             logger.error(f"Error loading verses: {e}")
             return []
 
-    def save_prayer(self, prayer_text):
+    def save_prayer(self, date, prayer_text):
         """Save a prayer to Cloud Storage"""
         try:
-            # Create a filename with today's date
-            today = datetime.now().strftime("%Y-%m-%d")
-            filename = f"prayers/prayer_{today}.txt"
+            # Create a filename with the provided date
+            filename = f"prayers/{date}.txt"
             
             # Create a blob and upload the prayer
             blob = self.bucket.blob(filename)
@@ -50,7 +65,7 @@ class StorageHandler:
     def get_prayer(self, date):
         """Retrieve a prayer from Cloud Storage by date"""
         try:
-            filename = f"prayers/prayer_{date}.txt"
+            filename = f"prayers/{date}.txt"
             blob = self.bucket.blob(filename)
             
             if not blob.exists():

@@ -1,2 +1,4 @@
 Do not modify any of the existing structure or code unless well explained.
 Go through the existing code to make sure there is not an existing or simpler implimentation
+Always check for today's prayer in storage before generating a new one
+Always review recent changes and deployment history before suggesting deployment

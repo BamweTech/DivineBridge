@@ -14,7 +14,7 @@ class PrayerGenerator:
         try:
             self.client = PerplexityClient(key=os.getenv("PERPLEXITY_API_KEY"))
             self.client.model = "sonar-pro"
-            self.storage = StorageHandler(os.getenv("GOOGLE_CLOUD_BUCKET"))
+            self.storage = StorageHandler()
             logger.debug("Successfully initialized Perplexity client and StorageHandler")
         except Exception as e:
             logger.error(f"Error initializing PrayerGenerator: {e}")
@@ -37,13 +37,19 @@ class PrayerGenerator:
 
             Human rights violations
 
+            Homocides
+
+            Poverty
+
+            Hunger
+
             Other major tragedies
 
             Information Gathering:
 
-            Search the web for the latest updates worldwide.
+            Search the web for the latest news worldwide.
 
-            Use at least 20 sources from each continent to ensure a comprehensive overview.
+            Use at least 20 sources from each continent and languages to ensure a comprehensive overview.
 
             Include news from diverse sources, including reports in local languages.
 
@@ -51,7 +57,7 @@ class PrayerGenerator:
 
             Verification Process:
 
-            Confirm Recency: Only include events that occurred in the last 7 days.
+            Confirm Recency: Only include events that occurred in the last 48 hours.
 
             Check Timestamps: Ensure all sources are up-to-date and reliable.
 
@@ -94,7 +100,8 @@ class PrayerGenerator:
                 response = response[response.index("Dear Heavenly Father"):]
             
             # Save the generated prayer to Cloud Storage
-            if self.storage.save_prayer(response):
+            today = datetime.now().strftime('%Y-%m-%d')
+            if self.storage.save_prayer(today, response):
                 logger.info("Successfully saved prayer to Cloud Storage")
             else:
                 logger.error("Failed to save prayer to Cloud Storage")

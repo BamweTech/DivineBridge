@@ -17,68 +17,71 @@
         .container {
             max-width: 800px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 15px;
         }
 
         header {
             text-align: center;
-            padding: 40px 0;
+            padding: 15px 0;
             background: linear-gradient(135deg, #0066cc 0%, #004499 100%);
             color: white;
-            margin-bottom: 40px;
+            margin-bottom: 25px;
         }
 
         h1 {
-            font-size: 36px;
-            margin-bottom: 10px;
+            font-size: 24px;
+            margin-bottom: 3px;
         }
 
         .subtitle {
-            font-size: 18px;
+            font-size: 14px;
             opacity: 0.9;
+            margin: 0;
         }
 
         .verse-section {
             background: white;
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 40px;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
         .verse-title {
             color: #0066cc;
-            font-size: 24px;
-            margin-bottom: 20px;
+            font-size: 18px;
+            margin-bottom: 15px;
             text-align: center;
         }
 
         .verse-text {
-            font-size: 16px;
-            line-height: 1.8;
+            font-size: 15px;
+            line-height: 1.7;
             white-space: pre-line;
             text-align: center;
             font-style: italic;
+            margin: 0;
+            padding: 10px 0;
         }
 
         .verse-reference {
-            font-size: 14px;
+            font-size: 13px;
             color: #666;
             text-align: right;
-            margin-top: 15px;
+            margin-top: 12px;
         }
 
         .subscribe-section {
             background: white;
-            border-radius: 15px;
-            padding: 30px;
+            border-radius: 12px;
+            padding: 25px;
             text-align: center;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
         .subscribe-title {
             color: #0066cc;
-            font-size: 24px;
+            font-size: 18px;
             margin-bottom: 20px;
         }
 
@@ -88,6 +91,7 @@
             gap: 15px;
             max-width: 400px;
             margin: 0 auto;
+            padding: 0 10px;
         }
 
         .form-group {
@@ -100,24 +104,26 @@
         label {
             font-weight: 500;
             color: #444;
+            font-size: 14px;
         }
 
         input {
-            padding: 10px;
+            padding: 12px;
             border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 16px;
+            border-radius: 8px;
+            font-size: 15px;
         }
 
         button {
             background: #0066cc;
             color: white;
             border: none;
-            padding: 12px 24px;
-            border-radius: 5px;
-            font-size: 16px;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 15px;
             cursor: pointer;
             transition: background-color 0.3s;
+            margin-top: 5px;
         }
 
         button:hover {
@@ -126,15 +132,27 @@
 
         .error-message {
             color: #dc3545;
-            font-size: 14px;
+            font-size: 13px;
             margin-top: 5px;
             display: none;
         }
 
         .success-message {
-            color: #28a745;
-            font-size: 16px;
-            margin-top: 15px;
+            color: #0066cc;
+            font-size: 18px;
+            margin: 20px 0;
+            text-align: center;
+            line-height: 1.6;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        .success-message.show {
+            opacity: 1;
+            display: block !important;
+        }
+
+        .subscribe-form.hidden {
             display: none;
         }
 
@@ -142,10 +160,165 @@
             text-align: center;
             padding: 20px;
             color: #666;
-            font-size: 14px;
-            margin-top: 40px;
+            font-size: 13px;
+            margin-top: 25px;
+        }
+
+        .loading-spinner {
+            display: none;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #0066cc;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .button-container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 12px;
+            }
+
+            header {
+                padding: 12px 0;
+            }
+
+            h1 {
+                font-size: 22px;
+            }
+
+            .verse-section, .subscribe-section {
+                padding: 20px;
+            }
+
+            input {
+                font-size: 16px; /* Prevents zoom on mobile */
+            }
+        }
+
+        /* Handwriting Animation Styles */
+        .handwriting-container {
+            position: relative;
+            min-height: 200px;
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .handwriting-text {
+            font-family: 'Parisienne', cursive;
+            font-size: 2rem;
+            color: #333;
+            opacity: 1;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            min-height: 100vh;
+            width: 100%;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background: white;
+            z-index: 1000;
+            transition: opacity 1s ease-in-out;
+            padding: 2rem 4rem;
+            line-height: 1.4;
+            box-sizing: border-box;
+        }
+
+        .word-span {
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            margin-right: 0.5em;
+            margin-bottom: 0.2em;
+        }
+
+        .word-span.visible {
+            opacity: 1;
+        }
+
+        .verse-reference {
+            font-family: 'Dancing Script', cursive;
+            font-size: 1.5rem;
+            color: #666;
+            margin-top: 1rem;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        .verse-reference.visible {
+            opacity: 1;
+        }
+
+        .handwriting-text.fade-out {
+            opacity: 0;
+        }
+
+        .handwriting-cursor {
+            position: absolute;
+            width: 2px;
+            height: 24px;
+            background-color: #0066cc;
+            opacity: 0;
+            transform: translateY(-50%);
+            transition: left 0.2s ease-out;
+        }
+
+        .verse-reference {
+            font-family: 'Roboto', sans-serif;
+            font-size: 16px;
+            color: #666;
+            margin-top: 20px;
+            opacity: 0;
+            transition: opacity 0.5s ease-in;
+        }
+        
+        .word-span {
+            opacity: 0;
+            margin: 0 4px;
+            display: inline-block;
+            transition: opacity 0.3s ease-in;
+        }
+        
+        .word-span.visible {
+            opacity: 1;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        
+        .handwriting-cursor.animate {
+            animation: blink 1s infinite;
+            opacity: 1;
         }
     </style>
+    <link href="https://fonts.googleapis.com/css2?family=Shelby:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Parisienne&display=swap" rel="stylesheet">
 </head>
 <body>
     <header>
@@ -158,10 +331,11 @@
     <main class="container">
         <section class="verse-section">
             <h2 class="verse-title">Daily Verse</h2>
-            <div class="verse-text" id="verse-text">
-                Loading verse...
+            <div class="handwriting-container">
+                <div class="handwriting-text" id="verseText"></div>
+                <div class="handwriting-cursor" id="cursor"></div>
             </div>
-            <div class="verse-reference" id="verse-reference"></div>
+            <div class="verse-reference" id="verseReference"></div>
         </section>
 
         <section class="subscribe-section">
@@ -182,34 +356,107 @@
                     <input type="email" id="email" name="email" required>
                     <div class="error-message" id="email-error"></div>
                 </div>
-                <button type="submit">Join Prayer Community</button>
-                <div class="success-message" id="success-message"></div>
+                <div class="button-container">
+                    <button type="submit" id="submit-button">Join Prayer Community</button>
+                </div>
+                <div class="loading-spinner" id="loading-spinner"></div>
+                <div class="success-message" id="success-message">
+                    <h3>Welcome to Divine Bridge!</h3>
+                    <p>Thank you for joining our prayer community. Please check your email for today's prayer.</p>
+                </div>
             </form>
         </section>
     </main>
 
     <footer>
         <div class="container">
-            <p>&copy; 2024 Divine Bridge. All rights reserved.</p>
+            <p>&copy; 2025 Divine Bridge. All rights reserved.</p>
         </div>
     </footer>
 
     <script>
-        // Get daily verse
-        fetch('/verse')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('verse-text').textContent = data.verse;
-                    document.getElementById('verse-reference').textContent = data.reference;
-                } else {
-                    document.getElementById('verse-text').textContent = 'Error loading verse. Please try again later.';
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('verse-text').textContent = 'Error loading verse. Please try again later.';
-            });
+        document.addEventListener('DOMContentLoaded', function() {
+            const verseText = document.getElementById('verseText');
+            const verseReference = document.getElementById('verseReference');
+            const cursor = document.getElementById('cursor');
+            
+            fetch('/api/today-verse')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.verse) {
+                        animateVerse(data.verse, data.reference);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching verse:', error);
+                    verseText.textContent = 'Loading today\'s verse...';
+                });
+            
+            function animateVerse(verse, reference) {
+                const verseText = document.getElementById('verseText');
+                const verseReference = document.getElementById('verseReference');
+                
+                // Clear previous content and reset styles
+                verseText.innerHTML = '';
+                verseText.style.position = 'fixed';
+                verseText.style.minHeight = '100vh';
+                verseText.style.background = 'white';
+                verseText.style.opacity = '1';
+                verseText.classList.remove('fade-out');
+                
+                verseReference.textContent = reference;
+                verseReference.classList.remove('visible');
+                verseReference.classList.remove('fade-out');
+                
+                // Split verse into words
+                const words = verse.split(' ');
+                
+                // Create spans for each word
+                words.forEach((word, index) => {
+                    const span = document.createElement('span');
+                    span.className = 'word-span';
+                    span.textContent = word;
+                    verseText.appendChild(span);
+                });
+                
+                // Show words one by one
+                let currentIndex = 0;
+                const showNextWord = () => {
+                    if (currentIndex < words.length) {
+                        const word = words[currentIndex];
+                        const span = verseText.children[currentIndex];
+                        
+                        // Add visible class to show the word
+                        span.classList.add('visible');
+                        
+                        // Determine delay based on punctuation
+                        const delay = word.endsWith('.') ? 600 : 300;
+                        
+                        currentIndex++;
+                        setTimeout(showNextWord, delay);
+                    } else {
+                        // Show reference after verse is complete
+                        verseReference.classList.add('visible');
+                        
+                        // Wait 2 seconds then fade out
+                        setTimeout(() => {
+                            verseText.classList.add('fade-out');
+                            verseReference.classList.add('fade-out');
+                            
+                            // After fade out, remove the fixed positioning
+                            setTimeout(() => {
+                                verseText.style.position = 'relative';
+                                verseText.style.minHeight = 'auto';
+                                verseText.style.background = 'transparent';
+                            }, 1000);
+                        }, 2000);
+                    }
+                };
+                
+                // Start animation after a short delay
+                setTimeout(showNextWord, 500);
+            }
+        });
 
         // Handle form submission
         document.getElementById('subscribe-form').addEventListener('submit', function(e) {
@@ -217,7 +464,6 @@
             
             // Reset error messages
             document.querySelectorAll('.error-message').forEach(el => el.style.display = 'none');
-            document.getElementById('success-message').style.display = 'none';
             
             // Get form data
             const firstName = document.getElementById('first-name').value.trim();
@@ -251,6 +497,15 @@
             
             if (!isValid) return;
             
+            // Show loading spinner and disable button
+            const submitButton = document.getElementById('submit-button');
+            const loadingSpinner = document.getElementById('loading-spinner');
+            const form = document.getElementById('subscribe-form');
+            const successMessage = document.getElementById('success-message');
+            
+            submitButton.disabled = true;
+            loadingSpinner.style.display = 'block';
+            
             // Send subscription request
             fetch('/subscribe', {
                 method: 'POST',
@@ -266,18 +521,33 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    document.getElementById('success-message').textContent = 'Thank you for joining our prayer community!';
-                    document.getElementById('success-message').style.display = 'block';
-                    document.getElementById('subscribe-form').reset();
+                    // Hide form and show success message
+                    form.classList.add('hidden');
+                    successMessage.style.display = 'block';
+                    setTimeout(() => {
+                        successMessage.classList.add('show');
+                    }, 100);
+                    
+                    // Hide success message after 5 seconds
+                    setTimeout(() => {
+                        successMessage.classList.remove('show');
+                        setTimeout(() => {
+                            successMessage.style.display = 'none';
+                        }, 500);
+                    }, 5000);
                 } else {
                     document.getElementById('email-error').textContent = data.message || 'An error occurred. Please try again.';
                     document.getElementById('email-error').style.display = 'block';
+                    submitButton.disabled = false;
+                    loadingSpinner.style.display = 'none';
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
                 document.getElementById('email-error').textContent = 'An error occurred. Please try again.';
                 document.getElementById('email-error').style.display = 'block';
+                submitButton.disabled = false;
+                loadingSpinner.style.display = 'none';
             });
         });
 

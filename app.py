@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect
 from sheet_handler import SheetHandler
 from email_sender import EmailSender
 from scheduler import PrayerScheduler
@@ -10,20 +10,21 @@ from datetime import datetime
 import os
 import atexit
 from welcome_email import send_welcome_email
-from dotenv import load_dotenv
 import threading
 from prayer_generator import PrayerGenerator
 from logging_config import setup_logging
-
-# Load environment variables
-load_dotenv()
+from config import get_config
+from verse_cache import verse_cache
 
 # Set up logging
 loggers = setup_logging()
 logger = loggers['app']
 
+# Get configuration
+config = get_config()
+
 app = Flask(__name__)
-sheet_handler = SheetHandler('divinebridge-676c7c0963dd.json')
+sheet_handler = SheetHandler()
 email_sender = EmailSender()
 
 # Initialize components
@@ -32,56 +33,39 @@ prayer_generator = PrayerGenerator()
 # Initialize and start scheduler in a separate thread
 # Only start the scheduler in the main process, not in the reloader
 if not os.environ.get('WERKZEUG_RUN_MAIN'):
-    scheduler = PrayerScheduler(prayer_generator=prayer_generator, email_sender=email_sender)
-    scheduler_thread = threading.Thread(target=scheduler.run)
-    scheduler_thread.daemon = True
-    scheduler_thread.start()
-
-def load_bible_verses():
     try:
-        with open('static/bible_verses.json', 'r') as file:
-            data = json.load(file)
-            return data['verses']
+        logger.info("Initializing prayer scheduler")
+        scheduler = PrayerScheduler(prayer_generator=prayer_generator, email_sender=email_sender)
+        scheduler_thread = threading.Thread(target=scheduler.run)
+        scheduler_thread.daemon = True
+        scheduler_thread.start()
+        logger.info("Prayer scheduler thread started")
+        
+        # Register cleanup function
+        def cleanup():
+            logger.info("Cleaning up prayer scheduler")
+            scheduler.scheduler.shutdown()
+        atexit.register(cleanup)
     except Exception as e:
-        logger.error(f"Error loading Bible verses: {e}")
-        return []
-
-def get_daily_verse():
-    verses = load_bible_verses()
-    if not verses:
-        return {
-            "text": "Do you not know that you are God's temple and that God's Spirit dwells in you?",
-            "reference": "1 Corinthians 3:16"
-        }
-    
-    # Use the day of the year as a seed for consistent daily selection
-    day_of_year = datetime.now().timetuple().tm_yday
-    random.seed(day_of_year)
-    verse = random.choice(verses)
-    random.seed()  # Reset the seed
-    return verse
+        logger.error(f"Failed to initialize prayer scheduler: {e}")
 
 @app.route('/')
 def index():
-    daily_verse = get_daily_verse()
-    return render_template('index.html', verse=daily_verse)
+    return render_template('index.html')
 
 @app.route('/prayer')
 def get_prayer():
     try:
-        # Get today's prayer
+        # Get today's prayer from Cloud Storage
         today = datetime.now().strftime('%Y-%m-%d')
-        prayer_file = f'prayers/{today}.txt'
+        prayer = prayer_generator.storage.get_prayer(today)
         
-        if not os.path.exists(prayer_file):
-            logger.error(f"Prayer file for today ({prayer_file}) not found")
+        if not prayer:
+            logger.error(f"Prayer not found for today ({today})")
             return jsonify({
                 'success': False,
                 'message': 'Prayer not found'
             }), 404
-            
-        with open(prayer_file, 'r') as file:
-            prayer = file.read().strip()
             
         return jsonify({
             'success': True,
@@ -117,7 +101,7 @@ def subscribe():
         sheet_handler.add_subscriber(email, first_name, last_name)
         
         # Send welcome email
-        send_welcome_email(first_name, email)
+        send_welcome_email(email, first_name)
         
         return jsonify({'success': True, 'message': 'Successfully subscribed!'})
         
@@ -125,21 +109,81 @@ def subscribe():
         logger.error(f"Error in subscribe route: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
-@app.route('/verse')
-def get_verse():
+@app.route('/unsubscribe', methods=['GET', 'POST'])
+def unsubscribe_page():
+    """Show unsubscribe page with email input form."""
     try:
-        verse = get_daily_verse()
-        return jsonify({
-            'success': True,
-            'verse': verse['text'],
-            'reference': verse['reference']
-        })
+        if request.method == 'POST':
+            email = request.form.get('email')
+            if not email:
+                return render_template('unsubscribe.html', 
+                                     error="Please enter your email address",
+                                     sender_email=config.EMAIL_USER)
+            
+            # Redirect to confirm-unsubscribe with the email
+            return redirect(f'/confirm-unsubscribe?email={email}')
+            
+        # Get email from URL parameter for GET requests
+        email = request.args.get('email')
+        return render_template('unsubscribe.html', 
+                             email=email,
+                             sender_email=config.EMAIL_USER)
     except Exception as e:
-        logger.error(f"Error getting daily verse: {e}")
+        logger.error(f"Error showing unsubscribe page: {e}")
+        return redirect('/')
+
+@app.route('/confirm-unsubscribe', methods=['GET', 'POST'])
+def confirm_unsubscribe():
+    """Handle unsubscribe confirmation."""
+    try:
+        if request.method == 'POST':
+            email = request.form.get('email')
+        else:
+            email = request.args.get('email')
+            
+        if not email:
+            return redirect('/unsubscribe')
+            
+        # Unsubscribe the user
+        sheet_handler = SheetHandler()
+        success = sheet_handler.unsubscribe(email)
+        
+        if success:
+            # Send confirmation email
+            email_sender = EmailSender()
+            email_sender.send_unsubscribe_confirmation(email)
+            return render_template('unsubscribe_confirmation.html',
+                                 sender_email=config.EMAIL_USER)
+        else:
+            return render_template('unsubscribe.html',
+                                 error="Email not found. Please check your email address and try again.",
+                                 sender_email=config.EMAIL_USER)
+            
+    except Exception as e:
+        logger.error(f"Error processing unsubscribe confirmation: {e}")
+        return redirect('/unsubscribe')
+
+@app.route('/api/today-verse')
+def get_today_verse():
+    """API endpoint to get today's verse from cache."""
+    try:
+        verse = verse_cache.get_today_verse()
+        if verse:
+            return jsonify({
+                'verse': verse['text'],
+                'reference': verse['reference'],
+                'success': True
+            })
         return jsonify({
-            'success': False,
-            'message': 'Error getting daily verse'
+            'error': 'No verse available for today',
+            'success': False
+        }), 404
+    except Exception as e:
+        logger.error(f"Error in get_today_verse: {str(e)}")
+        return jsonify({
+            'error': 'Internal server error',
+            'success': False
         }), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001) 
+    app.run(debug=config.DEBUG, port=5001) 

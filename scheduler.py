@@ -1,5 +1,4 @@
 import os
-import schedule
 import time
 import logging
 from datetime import datetime
@@ -7,6 +6,8 @@ from email_sender import EmailSender
 from prayer_generator import PrayerGenerator
 from dotenv import load_dotenv
 from sheet_handler import SheetHandler
+from apscheduler.schedulers.background import BackgroundScheduler
+from config import get_config
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -18,40 +19,57 @@ load_dotenv()
 class PrayerScheduler:
     def __init__(self, prayer_generator, email_sender):
         """Initialize the scheduler with prayer generator and email sender"""
-        self.prayer_generator = prayer_generator
-        self.email_sender = email_sender
-        self.sheet_handler = SheetHandler('divinebridge-676c7c0963dd.json')  # Initialize SheetHandler with credentials
-        self.scheduler = schedule.Scheduler()
-        
-        # Schedule daily prayer
-        self.scheduler.every().day.at("22:25").do(self.generate_and_send_prayers)
-        
-        # For testing: run immediately and then every 5 minutes
-        # self.scheduler.every(5).minutes.do(self.generate_and_send_prayers)
-        # self.generate_and_send_prayers()  # Run immediately for testing
-        
-        logger.info("PrayerScheduler initialized successfully")
+        try:
+            self.prayer_generator = prayer_generator
+            self.email_sender = email_sender
+            self.sheet_handler = SheetHandler()  # Initialize SheetHandler without credentials
+            
+            # Initialize the scheduler
+            self.scheduler = BackgroundScheduler()
+            
+            # Add the daily prayer job
+            logger.info("Adding daily prayer job")
+            self.scheduler.add_job(
+                self.generate_and_send_prayers,
+                'cron',
+                hour=15,
+                minute=30,
+                id='daily_prayer_job',
+                replace_existing=True
+            )
+            
+            logger.info("Successfully initialized PrayerScheduler")
+        except Exception as e:
+            logger.error(f"Error initializing PrayerScheduler: {e}")
+            raise
 
     def generate_and_send_prayers(self):
         """Generate and send prayers to all subscribers"""
         try:
+            logger.info("Starting prayer generation and sending process")
+            
+            # Create a new SheetHandler instance for this operation
+            sheet_handler = SheetHandler()
+            
             # Get all subscribers
-            subscribers = self.sheet_handler.get_subscribers()
+            subscribers = sheet_handler.get_subscribers()
+            logger.info(f"Found {len(subscribers)} subscribers")
             
             # Generate prayer text
+            logger.info("Generating prayer text")
             prayer_text = self.prayer_generator.generate_prayer()
             
-            # Save prayer text to file
+            # Save prayer to Cloud Storage
             today = datetime.now().strftime("%Y-%m-%d")
-            prayer_file = f"prayers/{today}.txt"
-            os.makedirs("prayers", exist_ok=True)
-            with open(prayer_file, "w") as f:
-                f.write(prayer_text)
-            logger.info(f"Saved prayer to {prayer_file}")
+            if self.prayer_generator.storage.save_prayer(today, prayer_text):
+                logger.info(f"Saved prayer to Cloud Storage for {today}")
+            else:
+                logger.error(f"Failed to save prayer to Cloud Storage for {today}")
             
             # Send to each subscriber
             for subscriber in subscribers:
                 try:
+                    logger.info(f"Sending prayer to subscriber: {subscriber['email']}")
                     self.email_sender.send_daily_prayer(
                         recipient_email=subscriber['email'],
                         first_name=subscriber['first_name'],
@@ -61,25 +79,32 @@ class PrayerScheduler:
                 except Exception as e:
                     logger.error(f"Failed to send prayer to {subscriber['email']}: {str(e)}")
                     continue
+            
+            logger.info("Completed prayer generation and sending process")
                     
         except Exception as e:
             logger.error(f"Error in generate_and_send_prayers: {str(e)}")
 
     def run(self):
-        """
-        Run the prayer scheduler.
-        """
+        """Start the scheduler and log job information"""
         try:
-            logger.info("Prayer scheduler started")
-            logger.info(f"Next prayer will be sent at: {self.scheduler.next_run}")
+            self.scheduler.start()
+            logger.info("Scheduler started successfully")
             
-            while True:
-                self.scheduler.run_pending()
-                current_time = datetime.now().strftime("%H:%M:%S")
-                logger.debug(f"Current time: {current_time}, Next run: {self.scheduler.next_run}")
-                print(self.scheduler.jobs)
-                time.sleep(60)
-                
+            # Log the next run time after scheduler is started
+            daily_job = self.scheduler.get_job('daily_prayer_job')
+            
+            if daily_job:
+                logger.info(f"Daily prayer job next run at: {daily_job.next_run_time}")
+            else:
+                logger.warning("Daily prayer job not found")
+            
+            # Keep the scheduler running
+            try:
+                while True:
+                    time.sleep(1)
+            except (KeyboardInterrupt, SystemExit):
+                pass
         except Exception as e:
-            logger.error(f"Error running prayer scheduler: {e}")
+            logger.error(f"Error starting scheduler: {e}")
             raise 
