@@ -39,6 +39,12 @@ def setup_logging():
         # Configure root logger
         root_logger = logging.getLogger()
         root_logger.setLevel(logging.INFO)
+        
+        # Remove any existing handlers
+        for handler in root_logger.handlers[:]:
+            root_logger.removeHandler(handler)
+            
+        # Add handlers to root logger
         root_logger.addHandler(file_handler)
         root_logger.addHandler(console_handler)
         root_logger.addHandler(cloud_handler)
@@ -53,6 +59,13 @@ def setup_logging():
         # Set up component-specific loggers
         for logger_name, logger in loggers.items():
             logger.setLevel(logging.INFO)
+            logger.propagate = False  # Prevent propagation to root logger
+            
+            # Remove any existing handlers
+            for handler in logger.handlers[:]:
+                logger.removeHandler(handler)
+                
+            # Add handlers
             logger.addHandler(file_handler)
             logger.addHandler(console_handler)
             logger.addHandler(cloud_handler)

@@ -5,6 +5,7 @@ from email_sender import EmailSender
 from datetime import datetime
 from sheet_handler import SheetHandler
 import logging
+from storage_handler import StorageHandler
 
 # Set up logging
 logging.basicConfig(
@@ -18,7 +19,8 @@ def main():
     try:
         # Initialize components
         # scanner = NewsScanner()
-        generator = PrayerGenerator()
+        storage = StorageHandler()
+        generator = PrayerGenerator(storage)
         emailer = EmailSender()
         sheet = SheetHandler('divinebridge-676c7c0963dd.json')
         

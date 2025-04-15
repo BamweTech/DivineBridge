@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Divine Bridge - Uniting Hearts in Global Prayer</title>
+    <meta property="og:image" content="https://storage.googleapis.com/divinebridge-assets/og-image.png">
+    <meta name="twitter:image" content="https://storage.googleapis.com/divinebridge-assets/og-image.png">
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
@@ -316,6 +318,41 @@
             animation: blink 1s infinite;
             opacity: 1;
         }
+
+        .service-unavailable {
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            display: none;
+        }
+
+        .service-unavailable.show {
+            display: block;
+        }
+
+        .service-status {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .logo {
+            height: 80px;
+            width: auto;
+            margin-bottom: 10px;
+        }
+
+        .header-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 0;
+        }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Shelby:wght@400;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Parisienne&display=swap" rel="stylesheet">
@@ -323,8 +360,10 @@
 <body>
     <header>
         <div class="container">
-            <h1>Divine Bridge</h1>
-            <p class="subtitle">Uniting Hearts in Global Prayer</p>
+            <div class="header-content">
+                <img src="https://storage.googleapis.com/divinebridge-assets/divineBridgeLogo.png?v=2" alt="Divine Bridge Logo" class="logo">
+                <p class="subtitle">Uniting Hearts in Global Prayer</p>
+            </div>
         </div>
     </header>
 
@@ -339,6 +378,10 @@
         </section>
 
         <section class="subscribe-section">
+            <div class="service-unavailable" id="serviceUnavailable">
+                <p>We're currently experiencing technical difficulties with our subscription service. Please try again later.</p>
+                <div class="service-status">Last checked: <span id="lastChecked">Never</span></div>
+            </div>
             <h2 class="subscribe-title">Join Our Prayer Community</h2>
             <form class="subscribe-form" id="subscribe-form">
                 <div class="form-group">
@@ -456,6 +499,26 @@
                 // Start animation after a short delay
                 setTimeout(showNextWord, 500);
             }
+
+            // Check service status
+            function checkServiceStatus() {
+                fetch('/health')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'healthy') {
+                            // Service is healthy, no action needed
+                        } else {
+                            console.error('Service is not healthy:', data);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error checking service status:', error);
+                    });
+            }
+
+            // Check status immediately and then every 5 minutes
+            checkServiceStatus();
+            setInterval(checkServiceStatus, 300000);
         });
 
         // Handle form submission
@@ -521,20 +584,17 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Hide form and show success message
-                    form.classList.add('hidden');
+                    // Hide form elements
+                    form.style.display = 'none';
+                    submitButton.style.display = 'none';
+                    loadingSpinner.style.display = 'none';
+                    
+                    // Show success message
                     successMessage.style.display = 'block';
+                    // Let CSS handle the opacity transition
                     setTimeout(() => {
                         successMessage.classList.add('show');
-                    }, 100);
-                    
-                    // Hide success message after 5 seconds
-                    setTimeout(() => {
-                        successMessage.classList.remove('show');
-                        setTimeout(() => {
-                            successMessage.style.display = 'none';
-                        }, 500);
-                    }, 5000);
+                    }, 10);
                 } else {
                     document.getElementById('email-error').textContent = data.message || 'An error occurred. Please try again.';
                     document.getElementById('email-error').style.display = 'block';
@@ -557,5 +617,6 @@
             return re.test(String(email).toLowerCase());
         }
     </script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html> 

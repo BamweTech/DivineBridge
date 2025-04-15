@@ -1,89 +1,164 @@
 import os
 import time
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from email_sender import EmailSender
 from prayer_generator import PrayerGenerator
 from dotenv import load_dotenv
 from sheet_handler import SheetHandler
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.jobstores.memory import MemoryJobStore
 from config import get_config
+from google.api_core import retry
+import requests
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_MISSED
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+logger.propagate = False  # Prevent duplicate logs
+if not logger.handlers:  # Only add handler if none exists
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
 
 # Load environment variables
 load_dotenv()
 
 class PrayerScheduler:
-    def __init__(self, prayer_generator, email_sender):
-        """Initialize the scheduler with prayer generator and email sender"""
+    def __init__(self, prayer_generator, email_service):
+        """Initialize the scheduler with prayer generator and email service"""
         try:
             self.prayer_generator = prayer_generator
-            self.email_sender = email_sender
-            self.sheet_handler = SheetHandler()  # Initialize SheetHandler without credentials
+            self.email_service = email_service
             
-            # Initialize the scheduler
-            self.scheduler = BackgroundScheduler()
+            # Initialize sheet handler with error handling
+            try:
+                self.sheet_handler = SheetHandler()
+                logger.info("Successfully initialized SheetHandler in scheduler")
+            except Exception as e:
+                logger.error(f"Failed to initialize SheetHandler in scheduler: {e}")
+                self.sheet_handler = None
+            
+            # Get timezone from environment or use UTC
+            self.timezone = os.getenv('TIMEZONE', 'UTC')
+            
+            # Initialize the scheduler with memory job store
+            self.scheduler = BackgroundScheduler(
+                jobstores={'default': MemoryJobStore()},
+                timezone=self.timezone
+            )
+            
+            # Add error handler for job execution
+            self.scheduler.add_listener(
+                self._handle_job_error,
+                EVENT_JOB_ERROR | EVENT_JOB_MISSED
+            )
             
             # Add the daily prayer job
             logger.info("Adding daily prayer job")
             self.scheduler.add_job(
                 self.generate_and_send_prayers,
                 'cron',
-                hour=15,
-                minute=30,
+                hour=16,
+                minute=00,
                 id='daily_prayer_job',
-                replace_existing=True
+                replace_existing=True,
+                misfire_grace_time=3600,  # Allow job to run up to 1 hour late
+                coalesce=True,  # Combine multiple missed runs into one
+                timezone=self.timezone
             )
             
             logger.info("Successfully initialized PrayerScheduler")
+            
+            # Check if today's prayer needs to be sent
+            self._check_todays_prayer()
+            
         except Exception as e:
             logger.error(f"Error initializing PrayerScheduler: {e}")
-            raise
+            # Don't raise the exception, allow the scheduler to start with degraded functionality
+            pass
 
+    def _handle_job_error(self, event):
+        """Handle job execution errors"""
+        if event.exception:
+            logger.error(f"Job {event.job_id} failed with error: {event.exception}")
+            logger.error(f"Traceback: {event.traceback}")
+            
+            # Attempt to recover by checking if prayer exists
+            if event.job_id == 'daily_prayer_job':
+                self._check_todays_prayer()
+        else:
+            logger.warning(f"Job {event.job_id} missed its scheduled time")
+            
+    def _check_todays_prayer(self):
+        """Check if today's prayer has been sent and send if needed"""
+        try:
+            today = datetime.now().strftime("%Y-%m-%d")
+            prayer_text = self.prayer_generator.storage.get_prayer(today)
+            
+            if not prayer_text:
+                logger.info("Today's prayer not found, generating and sending now")
+                self.generate_and_send_prayers()
+            else:
+                logger.info("Today's prayer already exists")
+        except Exception as e:
+            logger.error(f"Error checking today's prayer: {e}")
+            # Attempt to generate new prayer as fallback
+            try:
+                self.generate_and_send_prayers()
+            except Exception as fallback_error:
+                logger.error(f"Fallback prayer generation failed: {fallback_error}")
+
+    @retry.Retry(
+        predicate=retry.if_exception_type(
+            (requests.exceptions.SSLError, requests.exceptions.ConnectionError,
+             requests.exceptions.Timeout, requests.exceptions.ReadTimeout)
+        ),
+        initial=1.0,
+        maximum=60.0,
+        multiplier=2,
+        deadline=300.0
+    )
     def generate_and_send_prayers(self):
         """Generate and send prayers to all subscribers"""
         try:
-            logger.info("Starting prayer generation and sending process")
+            # Generate today's prayer
+            prayer = self.prayer_generator.generate_prayer()
+            if not prayer:
+                logger.error("Failed to generate prayer")
+                return
             
-            # Create a new SheetHandler instance for this operation
-            sheet_handler = SheetHandler()
+            # Get subscribers if sheet handler is available
+            subscribers = []
+            if self.sheet_handler:
+                try:
+                    subscribers = self.sheet_handler.get_subscribers()
+                except Exception as e:
+                    logger.error(f"Failed to get subscribers: {e}")
             
-            # Get all subscribers
-            subscribers = sheet_handler.get_subscribers()
-            logger.info(f"Found {len(subscribers)} subscribers")
-            
-            # Generate prayer text
-            logger.info("Generating prayer text")
-            prayer_text = self.prayer_generator.generate_prayer()
-            
-            # Save prayer to Cloud Storage
-            today = datetime.now().strftime("%Y-%m-%d")
-            if self.prayer_generator.storage.save_prayer(today, prayer_text):
-                logger.info(f"Saved prayer to Cloud Storage for {today}")
-            else:
-                logger.error(f"Failed to save prayer to Cloud Storage for {today}")
-            
-            # Send to each subscriber
+            # Send prayer to subscribers
             for subscriber in subscribers:
                 try:
-                    logger.info(f"Sending prayer to subscriber: {subscriber['email']}")
-                    self.email_sender.send_daily_prayer(
-                        recipient_email=subscriber['email'],
-                        first_name=subscriber['first_name'],
-                        prayer_text=prayer_text
+                    self.email_service.send_prayer(
+                        subscriber['email'],
+                        subscriber['first_name'],
+                        prayer
                     )
-                    logger.info(f"Successfully sent prayer to {subscriber['email']}")
+                    logger.info(f"Sent prayer to {subscriber['email']}")
                 except Exception as e:
-                    logger.error(f"Failed to send prayer to {subscriber['email']}: {str(e)}")
-                    continue
+                    logger.error(f"Failed to send prayer to {subscriber['email']}: {e}")
             
-            logger.info("Completed prayer generation and sending process")
-                    
+            # Store the prayer in storage
+            try:
+                self.prayer_generator.storage.save_prayer(prayer)
+                logger.info("Successfully stored prayer")
+            except Exception as e:
+                logger.error(f"Failed to store prayer: {e}")
+                
         except Exception as e:
-            logger.error(f"Error in generate_and_send_prayers: {str(e)}")
+            logger.error(f"Error in generate_and_send_prayers: {e}")
 
     def run(self):
         """Start the scheduler and log job information"""
@@ -104,7 +179,8 @@ class PrayerScheduler:
                 while True:
                     time.sleep(1)
             except (KeyboardInterrupt, SystemExit):
-                pass
+                logger.info("Cleaning up prayer scheduler")
+                self.scheduler.shutdown()
         except Exception as e:
             logger.error(f"Error starting scheduler: {e}")
             raise 

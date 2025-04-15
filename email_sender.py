@@ -7,7 +7,6 @@ import json
 from datetime import datetime
 import logging
 from dotenv import load_dotenv
-from sheet_handler import SheetHandler
 from config import get_config
 
 # Set up logging
@@ -106,11 +105,19 @@ To unsubscribe, please visit: https://divinebridge.io/unsubscribe
                 <div style="text-align: left; margin-bottom: 20px;">
                     <h1 style="color: #0066cc; font-size: 28px; margin-bottom: 6px;">Divine Bridge</h1>
                     <p style="color: #666; font-size: 12px;">Uniting Hearts in Global Prayer</p>
+                    <p style="color: #666; font-size: 16px;">Greetings in Christ, {first_name},</p>
+                    <p style="color: #666; font-size: 16px;">Thank you for being part of our global prayer community. May this prayer deepen your connection with Christ, our source of hope and peace.</p>
                 </div>
 
-                <div style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); padding: 25px; border-radius: 15px; margin: 30px 0; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                <div style="background: #f5f7fa; padding: 25px; border-radius: 15px; margin: 30px 0;">
                     <h2 style="color: #0066cc; font-size: 20px; margin-bottom: 15px; text-align: left;">Today's Prayer</h2>
                     <p style="font-size: 16px; line-height: 1.8; color: #444; white-space: pre-line;">{prayer_text}</p>
+                </div>
+
+                <div style="background: #f0f7ff; padding: 20px; border-radius: 10px; margin: 30px 0; border-left: 4px solid #0066cc;">
+                    <p style="font-size: 16px; line-height: 1.6; color: #444; margin-bottom: 15px;">For daily verses, visit our website.</p>
+                    <p style="font-size: 16px; line-height: 1.6; color: #444;">Help us grow our globalprayer community by sharing Divine Bridge with friends and family.</p>
+                    <p style="margin-top: 15px;"><a href="https://divinebridge.io" style="background-color: #0066cc; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Visit Divine Bridge</a></p>
                 </div>
 
                 <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee;">
@@ -146,12 +153,13 @@ To unsubscribe, please visit: https://divinebridge.io/unsubscribe
             logger.error(f"Error sending prayer to {recipient_email}: {e}")
             raise
 
-    def send_unsubscribe_confirmation(self, recipient_email):
+    def send_unsubscribe_confirmation(self, recipient_email, first_name):
         """
         Send confirmation email to unsubscribed user.
         
         Args:
             recipient_email: Email address of the unsubscribed user
+            first_name: First name of the unsubscribed user
         """
         try:
             logger.debug(f"Preparing to send unsubscribe confirmation to: {recipient_email}")
@@ -193,6 +201,8 @@ The Divine Bridge team
                 <div style="text-align: left; margin-bottom: 20px;">
                     <h1 style="color: #0066cc; font-size: 28px; margin-bottom: 6px;">Divine Bridge</h1>
                     <p style="color: #666; font-size: 12px;">Uniting Hearts in Global Prayer</p>
+                    <p style="color: #666; font-size: 16px;">Greetings in Christ, {first_name},</p>
+                    <p style="color: #666; font-size: 16px;">Thank you for being part of our global prayer community. May this prayer deepen your connection with Christ, our source of hope and peace.</p>
                 </div>
 
                 <div style="margin-bottom: 30px;">
@@ -272,14 +282,21 @@ To unsubscribe, please visit: https://divinebridge.io/unsubscribe
             <html>
             <body style="font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
                 <div style="text-align: left; margin-bottom: 20px;">
-                    <h1 style="color: #0066cc; font-size: 28px; margin-bottom: 6px;">Welcome to Divine Bridge</h1>
-                    <p style="color: #666; font-size: 16px;">Dear {first_name},</p>
-                    <p style="color: #666; font-size: 16px;">Thank you for joining our prayer community.</p>
+                    <h1 style="color: #0066cc; font-size: 28px; margin-bottom: 6px;">Divine Bridge</h1>
+                    <p style="color: #666; font-size: 12px;">Uniting Hearts in Global Prayer</p>
+                    <p style="color: #666; font-size: 16px;">Greetings in Christ, {first_name},</p>
+                    <p style="color: #666; font-size: 16px;">Thank you for being part of our global prayer community. May this prayer deepen your connection with Christ, our source of hope and peace.</p>
                 </div>
 
                 <div style="background: #f5f7fa; padding: 25px; border-radius: 15px; margin: 30px 0;">
                     <h2 style="color: #0066cc; font-size: 20px; margin-bottom: 15px; text-align: left;">Today's Prayer</h2>
                     <p style="font-size: 16px; line-height: 1.8; color: #444; white-space: pre-line;">{prayer_text}</p>
+                </div>
+                
+                <div style="background: #f0f7ff; padding: 20px; border-radius: 10px; margin: 30px 0; border-left: 4px solid #0066cc;">
+                    <p style="font-size: 16px; line-height: 1.6; color: #444; margin-bottom: 15px;">For daily verses, visit our website.</p>
+                    <p style="font-size: 16px; line-height: 1.6; color: #444;">Help us grow our globalprayer community by sharing Divine Bridge with friends and family.</p>
+                    <p style="margin-top: 15px;"><a href="https://divinebridge.io" style="background-color: #0066cc; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Visit Divine Bridge</a></p>
                 </div>
 
                 <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee;">

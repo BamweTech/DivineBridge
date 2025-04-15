@@ -1,0 +1,34 @@
+from setuptools import setup, find_packages
+
+setup(
+    name="divinebridge",
+    version="0.1.0",
+    packages=find_packages(),
+    install_requires=[
+        "Flask==2.0.1",
+        "Werkzeug==2.0.1",
+        "python-dotenv==0.19.0",
+        "apscheduler==3.10.4",
+        "google-cloud-storage==2.1.0",
+        "google-cloud-logging==3.9.0",
+        "perplexipy==1.2.0",
+        "google-api-python-client==2.31.0",
+        "google-auth-httplib2==0.1.1",
+        "google-auth-oauthlib==0.4.6",
+        "google-auth==2.3.3",
+        "gunicorn==20.1.0",
+        "requests==2.26.0",
+        "beautifulsoup4==4.9.3",
+        "schedule==1.1.0",
+        "redis==4.1.0"
+    ],
+    extras_require={
+        "dev": [
+            "pytest==7.4.3",
+            "pytest-cov==4.1.0",
+            "pytest-mock==3.12.0",
+            "black==23.11.0",
+            "flake8==6.1.0"
+        ]
+    }
+) 
