@@ -2,3 +2,10 @@ Do not modify any of the existing structure or code unless well explained.
 Go through the existing code to make sure there is not an existing or simpler implimentation
 Always check for today's prayer in storage before generating a new one
 Always review recent changes and deployment history before suggesting deployment
+
+# Development Guidelines
+- No deployments until changes are reviewed and approved
+- Focus on refactoring existing code for improvements
+- Only create new classes/methods when absolutely necessary
+- Prioritize improving overall codebase structure
+- All changes must be tested and validated before deployment

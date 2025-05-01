@@ -27,6 +27,7 @@ def initialize_firebase():
             logger.debug(f"Firebase project ID: {cred.project_id}")
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse Firebase credentials: {e}")
+            logger.error(f"Credentials content: {config.FIREBASE_CREDENTIALS[:100]}...")  # Log first 100 chars
             return False
             
         # Initialize Firebase
@@ -34,7 +35,16 @@ def initialize_firebase():
             firebase_admin.initialize_app(cred)
             logger.info("Firebase Admin SDK initialized successfully")
             logger.debug("Firebase Admin SDK version: %s", firebase_admin.__version__)
-            return True
+            
+            # Verify initialization by attempting to list users
+            try:
+                users = auth.list_users(max_results=1)
+                logger.info("Successfully verified Firebase connection by listing users")
+                return True
+            except Exception as e:
+                logger.error(f"Failed to verify Firebase connection: {e}")
+                return False
+                
         except Exception as e:
             logger.error(f"Failed to initialize Firebase Admin SDK: {e}")
             return False

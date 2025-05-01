@@ -25,6 +25,13 @@ class Config:
         self.env = os.getenv('FLASK_ENV', 'development')
         logger.info(f"Running in {self.env} environment")
         
+        # CORS Configuration
+        self.CORS_ORIGINS = os.getenv('CORS_ORIGINS', '*').split(',')
+        self.CORS_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+        self.CORS_ALLOW_HEADERS = ['Content-Type', 'Authorization']
+        self.CORS_SUPPORTS_CREDENTIALS = True
+        self.CORS_MAX_AGE = 3600
+        
         # Initialize Secret Manager client
         try:
             self.secret_manager = secretmanager.SecretManagerServiceClient()
@@ -87,6 +94,14 @@ class Config:
     def _load_secrets(self):
         """Load secrets from environment variables or Secret Manager"""
         try:
+            # Load Firebase credentials from Secret Manager
+            try:
+                self.FIREBASE_CREDENTIALS = self._get_secret('FIREBASE_CREDENTIALS')
+                logger.info("Successfully loaded Firebase credentials from Secret Manager")
+            except Exception as e:
+                logger.error(f"Failed to load Firebase credentials from Secret Manager: {e}")
+                raise
+                
             # Email configuration
             self.EMAIL_SERVICE_ACCOUNT = self._get_secret('EMAIL_SERVICE_ACCOUNT')
             self.EMAIL_USER = self._get_secret('EMAIL_USER')
@@ -120,6 +135,7 @@ class Config:
         # First try environment variables
         value = os.getenv(key)
         if value:
+            logger.info(f"Retrieved {key} from environment variables")
             return value
             
         # If Secret Manager is available, try to get from Secret Manager
@@ -130,6 +146,7 @@ class Config:
                     raise ValueError("GOOGLE_CLOUD_PROJECT environment variable not set")
                     
                 secret_name = f"projects/{project_id}/secrets/{key}/versions/latest"
+                logger.info(f"Attempting to retrieve secret {key} from Secret Manager at {secret_name}")
                 response = self.secret_manager.access_secret_version(request={"name": secret_name})
                 value = response.payload.data.decode("UTF-8")
                 logger.info(f"Successfully retrieved secret {key} from Secret Manager")
@@ -138,25 +155,33 @@ class Config:
                 if key.endswith('_SERVICE_ACCOUNT') or key == 'FIREBASE_CREDENTIALS':
                     try:
                         json.loads(value)  # Validate JSON format
+                        logger.info(f"Successfully validated JSON format for {key}")
                     except json.JSONDecodeError as e:
                         logger.error(f"Invalid JSON format for {key}: {e}")
+                        logger.error(f"First 100 characters of {key}: {value[:100]}")
                         raise ValueError(f"Invalid JSON format for {key}")
                 
                 return value
             except Exception as e:
                 logger.error(f"Error accessing secret {key} from Secret Manager: {e}")
+                if hasattr(e, 'details'):
+                    logger.error(f"Error details: {e.details}")
                 raise ValueError(f"Failed to get secret {key} from Secret Manager: {str(e)}")
         
         # If we get here, the secret was not found
+        logger.error(f"Secret {key} not found in environment variables or Secret Manager")
         raise ValueError(f"Missing required secret: {key}")
 
 class DevelopmentConfig(Config):
     """Development configuration."""
-    pass
+    CORS_ORIGINS = ['*']
+    CORS_SUPPORTS_CREDENTIALS = False
 
 class TestingConfig(Config):
     """Testing configuration."""
     TESTING = True
+    CORS_ORIGINS = ['*']
+    CORS_SUPPORTS_CREDENTIALS = False
     
     def __init__(self):
         # Skip loading environment variables and secrets in testing
@@ -168,12 +193,19 @@ class TestingConfig(Config):
         self.EMAIL_USER = 'test@example.com'
         self.EMAIL_PASSWORD = 'test-password'
         self.PRAYER_SERVICE_ACCOUNT = '{"type": "service_account", "project_id": "test-project"}'
+        self.GOOGLE_CLOUD_CREDENTIALS = '{"type": "service_account", "project_id": "test-project"}'
         self.secret_manager = None
         self.SKIP_ACCESS_VERIFICATION = True
 
 class ProductionConfig(Config):
     """Production configuration."""
     DEBUG = False
+    CORS_ORIGINS = [
+        'https://divinebridge.io',
+        'https://www.divinebridge.io',
+        'https://api.divinebridge.io'
+    ]
+    CORS_SUPPORTS_CREDENTIALS = True
 
 def get_config():
     """Get the appropriate configuration based on environment"""

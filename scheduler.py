@@ -61,8 +61,8 @@ class PrayerScheduler:
             self.scheduler.add_job(
                 self.generate_and_send_prayers,
                 'cron',
-                hour=16,
-                minute=00,
+                hour=11,
+                minute=30,
                 id='daily_prayer_job',
                 replace_existing=True,
                 misfire_grace_time=3600,  # Allow job to run up to 1 hour late

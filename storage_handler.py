@@ -16,6 +16,7 @@ from google.auth.exceptions import RefreshError
 from google.oauth2 import service_account
 import io
 import tempfile
+import uuid
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -33,19 +34,12 @@ class StorageHandler:
         Initialize the StorageHandler with Google Cloud Storage credentials.
         """
         try:
-            service_account_info = os.getenv('PRAYER_SERVICE_ACCOUNT')
-            if not service_account_info:
-                raise ValueError("PRAYER_SERVICE_ACCOUNT environment variable not set")
-            
-            # Write the service account info to a temporary file
-            with tempfile.NamedTemporaryFile(mode='w', delete=False) as temp_file:
-                temp_file.write(service_account_info)
-                temp_file_path = temp_file.name
-            
+            # Get the service account credentials from Secret Manager
+            config = get_config()
             try:
-                # Create credentials from the temporary file
-                credentials = service_account.Credentials.from_service_account_file(
-                    temp_file_path,
+                # Create credentials from the JSON string
+                credentials = service_account.Credentials.from_service_account_info(
+                    json.loads(config.GOOGLE_CLOUD_CREDENTIALS),
                     scopes=['https://www.googleapis.com/auth/devstorage.read_write']
                 )
                 
@@ -58,14 +52,11 @@ class StorageHandler:
                 if not self.verses:
                     logger.warning("No verses loaded from bible_verses.json")
                 
-                logger.info("StorageHandler initialized successfully")
+                logger.info("Successfully initialized StorageHandler with credentials from Secret Manager")
                 
-            finally:
-                # Clean up the temporary file
-                try:
-                    os.unlink(temp_file_path)
-                except Exception as e:
-                    logging.warning(f"Failed to delete temporary file {temp_file_path}: {e}")
+            except Exception as e:
+                logger.error(f"Error creating credentials: {str(e)}")
+                raise
             
         except Exception as e:
             logger.error(f"Error initializing StorageHandler: {e}")
@@ -164,18 +155,39 @@ class StorageHandler:
             logger.error(f"Error getting or creating bucket: {e}")
             raise
 
-    def save_prayer(self, prayer_text: str, date: str) -> bool:
-        """Save prayer to Cloud Storage with robust retry logic."""
+    def save_prayer(self, prayer_data: dict, date: str = None) -> bool:
+        """Save prayer to Cloud Storage with robust retry logic.
+        
+        Args:
+            prayer_data: The prayer content and metadata
+            date: Optional date string in YYYY-MM-DD format. If not provided, current date is used.
+            
+        Returns:
+            bool: True if prayer was saved successfully, False otherwise
+        """
         try:
-            # Ensure the date is properly formatted and sanitized
-            blob_name = f"prayers/{date}.txt"
+            # Use provided date or current date
+            if date is None:
+                date = datetime.now().strftime('%Y-%m-%d')
+            
+            # Generate a unique ID for the prayer
+            prayer_id = str(uuid.uuid4())
+            blob_name = f"prayers/{date}/{prayer_id}.json"
+            
+            # Ensure prayer_data is a dictionary
+            if isinstance(prayer_data, str):
+                prayer_data = {
+                    'content': prayer_data,
+                    'date': date,
+                    'created_at': datetime.now().isoformat()
+                }
             
             def _upload_with_retry():
                 try:
                     blob = self.bucket.blob(blob_name)
-                    # Ensure the prayer text is encoded as UTF-8
-                    encoded_prayer = prayer_text.encode('utf-8')
-                    blob.upload_from_string(prayer_text, content_type='text/plain; charset=utf-8')
+                    # Convert prayer data to JSON and upload
+                    prayer_json = json.dumps(prayer_data)
+                    blob.upload_from_string(prayer_json, content_type='application/json')
                     return True
                 except Exception as e:
                     logger.error(f"Error in upload operation: {str(e)}")
@@ -197,28 +209,72 @@ class StorageHandler:
 
             success = _retry_upload()
             if success:
-                logger.info(f"Successfully saved prayer for {date}")
+                logger.info(f"Successfully saved prayer with ID: {prayer_id} for date: {date}")
                 return True
             
-            logger.error(f"Failed to save prayer for {date} after retries")
+            logger.error(f"Failed to save prayer after retries")
             return False
 
         except Exception as e:
             logger.error(f"Unexpected error saving prayer: {str(e)}")
             return False
 
-    def get_prayer(self, date):
-        """Get a prayer from Cloud Storage"""
+    def get_prayers(self, limit: int = 50) -> list:
+        """Get recent prayers from Cloud Storage"""
         try:
-            blob = self.bucket.blob(f'prayers/{date}.txt')
-            if not blob.exists():
-                logger.warning(f"Prayer not found for date: {date}")
+            prayers = []
+            blobs = self.bucket.list_blobs(prefix='prayers/')
+            
+            # Sort blobs by creation time (newest first)
+            sorted_blobs = sorted(blobs, key=lambda x: x.time_created, reverse=True)
+            
+            # Get the most recent prayers up to the limit
+            for blob in sorted_blobs[:limit]:
+                try:
+                    prayer_json = blob.download_as_text()
+                    prayer_data = json.loads(prayer_json)
+                    prayers.append(prayer_data)
+                except Exception as e:
+                    logger.error(f"Error processing prayer blob {blob.name}: {e}")
+                    continue
+            
+            return prayers
+        except Exception as e:
+            logger.error(f"Error getting prayers: {e}")
+            return []
+
+    def get_prayer(self, date: str = None) -> dict:
+        """Get a prayer from Cloud Storage for a specific date.
+        
+        Args:
+            date: Optional date string in YYYY-MM-DD format. If not provided, current date is used.
+            
+        Returns:
+            dict: The prayer data if found, None otherwise
+        """
+        try:
+            if date is None:
+                date = datetime.now().strftime('%Y-%m-%d')
+                
+            # List all prayers for the given date
+            prefix = f"prayers/{date}/"
+            blobs = list(self.bucket.list_blobs(prefix=prefix))
+            
+            if not blobs:
+                logger.warning(f"No prayers found for date: {date}")
                 return None
-            return self._retry_operation(
-                lambda: blob.download_as_text(),
-                max_retries=3,
-                base_delay=1
-            )
+                
+            # Get the most recent prayer
+            latest_blob = max(blobs, key=lambda x: x.time_created)
+            
+            try:
+                prayer_json = latest_blob.download_as_text()
+                prayer_data = json.loads(prayer_json)
+                return prayer_data
+            except Exception as e:
+                logger.error(f"Error processing prayer blob {latest_blob.name}: {e}")
+                return None
+                
         except Exception as e:
             logger.error(f"Error getting prayer: {e}")
             return None

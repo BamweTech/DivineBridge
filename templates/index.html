@@ -4,619 +4,698 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Divine Bridge - Uniting Hearts in Global Prayer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Parisienne&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Montserrat:wght@500;600&display=swap" rel="stylesheet">
     <meta property="og:image" content="https://storage.googleapis.com/divinebridge-assets/og-image.png">
     <meta name="twitter:image" content="https://storage.googleapis.com/divinebridge-assets/og-image.png">
     <style>
+        :root {
+            --navy: #0F1B2B;
+            --cream: #F5E6D3;
+            --gold: #E6B17E;
+            --light-navy: #1a2937;
+            --dark-cream: #E6D5C3;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif;
+            font-family: 'Montserrat', sans-serif;
             line-height: 1.6;
             margin: 0;
             padding: 0;
-            background-color: #f5f7fa;
-            color: #333;
+            color: var(--cream);
+            background: linear-gradient(to bottom, var(--navy) 0%, var(--light-navy) 100%);
+            min-height: 100vh;
         }
 
-        .container {
-            max-width: 800px;
+        /* Header Styles */
+        .header {
+            background: transparent;
+            border-bottom: 1px solid rgba(230, 177, 126, 0.1);  /* Subtle gold border */
+            padding: 1.5rem 0;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+
+        .header.scrolled {
+            background: var(--navy);
+            border-bottom: 1px solid var(--gold);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-container {
+            max-width: 1200px;
             margin: 0 auto;
-            padding: 15px;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        header {
-            text-align: center;
-            padding: 15px 0;
-            background: linear-gradient(135deg, #0066cc 0%, #004499 100%);
-            color: white;
-            margin-bottom: 25px;
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--gold);
+            text-decoration: none;
+            font-family: 'Playfair Display', serif;
+            font-weight: 600;
+            font-size: 1.8rem;
+            letter-spacing: 0.05em;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
-        h1 {
-            font-size: 24px;
-            margin-bottom: 3px;
+        .nav-links {
+            display: flex;
+            gap: 2.5rem;
         }
 
-        .subtitle {
-            font-size: 14px;
-            opacity: 0.9;
-            margin: 0;
+        .nav-links a {
+            color: var(--cream);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            position: relative;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 2px;
+            bottom: -4px;
+            left: 0;
+            background-color: var(--gold);
+            transition: width 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            color: var(--gold);
+        }
+
+        .nav-links a:hover::after {
+            width: 100%;
+        }
+
+        /* Verse Section */
         .verse-section {
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 25px;
+            position: relative;
+            background-color: #0F1B2B;  /* Dark navy blue */
+            color: #F5E6D3;  /* Cream color */
+            padding: 3rem;
+            border-radius: 0;
+            width: 100%;
+            max-width: 600px;
+            aspect-ratio: 1;  /* Square aspect ratio */
+            margin: 8rem auto 4rem;  /* Increased top margin */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
         .verse-title {
-            color: #0066cc;
-            font-size: 18px;
-            margin-bottom: 15px;
-            text-align: center;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 600;
+            letter-spacing: 0.2em;
+            margin-bottom: 3rem;
+            text-transform: uppercase;
         }
 
-        .verse-text {
-            font-size: 15px;
-            line-height: 1.7;
-            white-space: pre-line;
-            text-align: center;
-            font-style: italic;
-            margin: 0;
-            padding: 10px 0;
-        }
-
-        .verse-reference {
-            font-size: 13px;
-            color: #666;
-            text-align: right;
-            margin-top: 12px;
-        }
-
-        .subscribe-section {
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            text-align: center;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        .subscribe-title {
-            color: #0066cc;
-            font-size: 18px;
-            margin-bottom: 20px;
-        }
-
-        .subscribe-form {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            max-width: 400px;
-            margin: 0 auto;
-            padding: 0 10px;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-            text-align: left;
-        }
-
-        label {
-            font-weight: 500;
-            color: #444;
-            font-size: 14px;
-        }
-
-        input {
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 15px;
-        }
-
-        button {
-            background: #0066cc;
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 8px;
-            font-size: 15px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-            margin-top: 5px;
-        }
-
-        button:hover {
-            background: #004499;
-        }
-
-        .error-message {
-            color: #dc3545;
-            font-size: 13px;
-            margin-top: 5px;
-            display: none;
-        }
-
-        .success-message {
-            color: #0066cc;
-            font-size: 18px;
-            margin: 20px 0;
-            text-align: center;
-            line-height: 1.6;
-            opacity: 0;
-            transition: opacity 0.5s ease-in-out;
-        }
-
-        .success-message.show {
-            opacity: 1;
-            display: block !important;
-        }
-
-        .subscribe-form.hidden {
-            display: none;
-        }
-
-        footer {
-            text-align: center;
-            padding: 20px;
-            color: #666;
-            font-size: 13px;
-            margin-top: 25px;
-        }
-
-        .loading-spinner {
-            display: none;
-            width: 30px;
-            height: 30px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #0066cc;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .button-container {
-            position: relative;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-top: 10px;
-        }
-
-        button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
-
-        @media (max-width: 480px) {
-            .container {
-                padding: 12px;
-            }
-
-            header {
-                padding: 12px 0;
-            }
-
-            h1 {
-                font-size: 22px;
-            }
-
-            .verse-section, .subscribe-section {
-                padding: 20px;
-            }
-
-            input {
-                font-size: 16px; /* Prevents zoom on mobile */
-            }
-        }
-
-        /* Handwriting Animation Styles */
         .handwriting-container {
             position: relative;
-            min-height: 200px;
-            margin: 20px 0;
-            padding: 20px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 0 2rem;
+            margin: 1rem 0;
+        }
+
+        .quote-marks {
+            font-family: 'Playfair Display', serif;
+            font-size: 4rem;
+            line-height: 1;
+            position: absolute;
+            color: #F5E6D3;
+            opacity: 0.8;
+        }
+
+        .quote-left {
+            top: -2rem;
+            left: 0;
+        }
+
+        .quote-right {
+            bottom: -2rem;
+            right: 0;
+            transform: rotate(180deg);
         }
 
         .handwriting-text {
-            font-family: 'Parisienne', cursive;
+            font-family: 'Playfair Display', serif;
             font-size: 2rem;
-            color: #333;
-            opacity: 1;
+            line-height: 1.4;
+            margin: 0;
+            min-height: 150px; /* Add minimum height to prevent layout shift */
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
             align-items: center;
-            text-align: center;
-            min-height: 100vh;
-            width: 100%;
-            position: fixed;
-            top: 0;
-            left: 0;
-            background: white;
-            z-index: 1000;
-            transition: opacity 1s ease-in-out;
-            padding: 2rem 4rem;
-            line-height: 1.4;
-            box-sizing: border-box;
         }
 
         .word-span {
             opacity: 0;
-            transition: opacity 0.3s ease-in-out;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             margin-right: 0.5em;
             margin-bottom: 0.2em;
+            transform: translateY(10px);
+            display: inline-block;
         }
 
         .word-span.visible {
             opacity: 1;
+            transform: translateY(0);
         }
 
         .verse-reference {
-            font-family: 'Dancing Script', cursive;
-            font-size: 1.5rem;
-            color: #666;
-            margin-top: 1rem;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 500;
+            margin-top: 3rem;
+            letter-spacing: 0.05em;
             opacity: 0;
-            transition: opacity 0.5s ease-in-out;
+            transition: opacity 0.5s ease;
         }
 
         .verse-reference.visible {
             opacity: 1;
         }
 
-        .handwriting-text.fade-out {
-            opacity: 0;
-        }
-
-        .handwriting-cursor {
+        .download-button {
             position: absolute;
-            width: 2px;
-            height: 24px;
-            background-color: #0066cc;
+            top: 2rem;  /* Increased from 1rem */
+            right: 2rem;  /* Increased from 1rem */
+            background: transparent;
+            border: none;
+            color: #F5E6D3;
+            cursor: pointer;
             opacity: 0;
-            transform: translateY(-50%);
-            transition: left 0.2s ease-out;
+            transition: opacity 0.3s ease;
+            padding: 0.8rem;  /* Increased padding */
         }
 
-        .verse-reference {
-            font-family: 'Roboto', sans-serif;
-            font-size: 16px;
-            color: #666;
-            margin-top: 20px;
-            opacity: 0;
-            transition: opacity 0.5s ease-in;
-        }
-        
-        .word-span {
-            opacity: 0;
-            margin: 0 4px;
-            display: inline-block;
-            transition: opacity 0.3s ease-in;
-        }
-        
-        .word-span.visible {
-            opacity: 1;
-        }
-        
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0; }
-        }
-        
-        .handwriting-cursor.animate {
-            animation: blink 1s infinite;
-            opacity: 1;
+        .download-button:hover {
+            opacity: 0.8;
         }
 
-        .service-unavailable {
-            background-color: #fff3cd;
-            border: 1px solid #ffeeba;
-            color: #856404;
-            padding: 15px;
+        .download-button svg {
+            width: 28px;  /* Increased from 24px */
+            height: 28px;  /* Increased from 24px */
+        }
+
+        /* Mission Section */
+        .mission {
+            padding: 6rem 2rem;
+            background: var(--light-navy);
+            color: var(--cream);
+        }
+
+        .mission-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 3rem;
+        }
+
+        .mission-card {
+            background: var(--navy);
+            padding: 3rem;  /* Increased padding */
             border-radius: 8px;
-            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .mission-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .mission-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.4rem;  /* Increased from 1.8rem */
+            color: var(--gold);
+            margin-bottom: 2rem;  /* Increased margin */
+            line-height: 1.2;  /* Added for better readability */
+        }
+
+        .mission-text {
+            color: var(--cream);
+            font-size: 1.3rem;  /* Increased from 1.1rem */
+            line-height: 1.7;  /* Increased line height */
+            margin-bottom: 1.5rem;
+        }
+
+        /* Section Title */
+        .section-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 3rem;  /* Added larger size for section title */
+            color: var(--gold);
             text-align: center;
-            display: none;
+            margin-bottom: 4rem;
+            line-height: 1.2;
         }
 
-        .service-unavailable.show {
-            display: block;
+        /* Prayer Room Section */
+        .prayer-room-section {
+            background: linear-gradient(135deg, var(--white) 0%, #f8f9fa 100%);
+            padding: 4rem 2rem;
+            text-align: center;
+            margin: 4rem 0;
         }
 
-        .service-status {
-            font-size: 12px;
-            color: #666;
-            margin-top: 5px;
+        .prayer-room-content {
+            max-width: 800px;
+            margin: 0 auto;
         }
 
-        .logo {
-            height: 80px;
-            width: auto;
-            margin-bottom: 10px;
+        .prayer-room-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 2.5rem;
+            color: var(--black);
+            margin-bottom: 1.5rem;
         }
 
-        .header-content {
+        .prayer-room-description {
+            font-size: 1.2rem;
+            color: var(--black);
+            opacity: 0.8;
+            margin-bottom: 2rem;
+            line-height: 1.8;
+        }
+
+        .auth-buttons {
             display: flex;
-            flex-direction: column;
-            align-items: center;
+            gap: 1rem;
             justify-content: center;
-            padding: 20px 0;
+        }
+
+        .auth-button {
+            padding: 1rem 2rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: transform 0.3s ease;
+        }
+
+        .login-button {
+            background: var(--blue);
+            color: var(--white);
+        }
+
+        .signup-button {
+            background: var(--gold);
+            color: var(--black);
+        }
+
+        .auth-button:hover {
+            transform: translateY(-2px);
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--navy);
+            color: var(--cream);
+            padding: 4rem 2rem;
+            border-top: 1px solid var(--gold);
+        }
+
+        .footer-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 3rem;
+        }
+
+        .footer-section h3 {
+            font-family: 'Playfair Display', serif;
+            color: var(--gold);
+            margin-bottom: 1.5rem;
+            font-size: 1.4rem;
+        }
+
+        .footer-links {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .footer-links li {
+            margin-bottom: 1rem;
+        }
+
+        .footer-links a {
+            color: var(--cream);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            color: var(--gold);
+        }
+
+        /* Add watermark styles */
+        .watermark {
+            position: absolute;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            width: 30px;
+            height: 30px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .watermark svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .watermark svg path {
+            fill: var(--cream) !important;
+            opacity: 0.6;
+        }
+
+        @media (max-width: 768px) {
+            .verse-section {
+                margin: 6rem 1rem 2rem;
+                padding: 2rem;
+            }
+            
+            .verse-title {
+                font-size: 1.4rem;
+                margin-bottom: 2rem;
+            }
+            
+            .handwriting-text {
+                font-size: 1.6rem;
+            }
+            
+            .verse-reference {
+                font-size: 1.2rem;
+                margin-top: 2rem;
+            }
+            
+            .download-button {
+                top: 1.5rem;
+                right: 1.5rem;
+            }
+
+            .nav-container {
+                padding: 0 1rem;
+            }
+
+            .logo {
+                font-size: 1.4rem;
+            }
+
+            .nav-links {
+                gap: 1.5rem;
+            }
+
+            .nav-links a {
+                font-size: 1rem;
+            }
+
+            .mission {
+                padding: 4rem 1rem;
+            }
+            
+            .mission-card {
+                padding: 2rem;
+            }
+            
+            .mission-title {
+                font-size: 2rem;  /* Adjusted for mobile */
+                margin-bottom: 1.5rem;
+            }
+            
+            .mission-text {
+                font-size: 1.2rem;
+            }
+            
+            .section-title {
+                font-size: 2.4rem;
+                margin-bottom: 3rem;
+            }
         }
     </style>
-    <link href="https://fonts.googleapis.com/css2?family=Shelby:wght@400;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Parisienne&display=swap" rel="stylesheet">
 </head>
 <body>
-    <header>
-        <div class="container">
-            <div class="header-content">
-                <img src="https://storage.googleapis.com/divinebridge-assets/divineBridgeLogo.png?v=2" alt="Divine Bridge Logo" class="logo">
-                <p class="subtitle">Uniting Hearts in Global Prayer</p>
+    <!-- Header -->
+    <header class="header">
+        <nav class="nav-container">
+            <a href="/" class="logo">
+                <span>Divine Bridge</span>
+            </a>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/about">About</a>
+                <a href="/prayers">Prayers</a>
+                <a href="/login">Login</a>
+                <a href="/signup">Sign Up</a>
             </div>
-        </div>
+        </nav>
     </header>
 
-    <main class="container">
-        <section class="verse-section">
-            <h2 class="verse-title">Daily Verse</h2>
-            <div class="handwriting-container">
-                <div class="handwriting-text" id="verseText"></div>
-                <div class="handwriting-cursor" id="cursor"></div>
-            </div>
-            <div class="verse-reference" id="verseReference"></div>
-        </section>
+    <!-- Verse Section -->
+    <div class="verse-section">
+        <h2 class="verse-title">DAILY VERSE</h2>
+        <div class="handwriting-container">
+            <span class="quote-marks quote-left">"</span>
+            <div class="handwriting-text"></div>
+            <span class="quote-marks quote-right">"</span>
+        </div>
+        <p class="verse-reference"></p>
+        <button class="download-button" title="Download verse image">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+        </button>
+        <div class="watermark">
+            <svg width="41.34218" height="45.052022" viewBox="0 0 41.34218 45.052022" version="1.1" xmlns="http://www.w3.org/2000/svg">
+                <g transform="translate(-69.531391,-70.903428)">
+                    <path d="M 83.488159,98.975444 H 69.531388 V 115.95545 H 90.26604 c 2.485261,0 5.257993,-0.40936 8.318355,-1.22886 2.238785,-0.59414 4.333645,-1.78274 6.284885,-3.56516 1.95124,-1.80291 3.47135,-4.02543 4.55993,-6.66833 0.70925,-1.70314 1.18872,-2.93472 1.44436,-5.517656 H 96.830497 c -0.174322,1.375766 -0.440514,1.573216 -0.803051,2.413456 -0.698338,1.59803 -1.664104,2.72507 -2.896464,3.38067 -1.232361,0.63512 -3.306806,0.9524 -6.223393,0.9524 h -3.41943 z"/>
+                    <path d="m 69.531388,70.903424 v 15.37016 h 13.956771 v -5.16716 h 3.481442 c 3.614925,0 6.202876,0.8808 7.763867,2.64273 0.735039,0.82966 1.293423,1.02256 1.680001,2.52443 h 14.162441 c -0.15907,-0.91803 -0.35436,-0.8424 -0.59221,-1.72551 -0.73942,-2.74534 -1.9308,-5.15254 -3.57394,-7.22178 -1.64315,-2.06925 -3.72754,-3.65669 -6.25388,-4.76302 -2.505805,-1.10633 -5.80251,-1.65985 -9.88984,-1.65985 z"/>
+                </g>
+            </svg>
+        </div>
+    </div>
 
-        <section class="subscribe-section">
-            <div class="service-unavailable" id="serviceUnavailable">
-                <p>We're currently experiencing technical difficulties with our subscription service. Please try again later.</p>
-                <div class="service-status">Last checked: <span id="lastChecked">Never</span></div>
+    <!-- Mission Section -->
+    <section class="mission">
+        <h2 class="section-title">Our Mission</h2>
+        <div class="mission-container">
+            <div class="mission-card">
+                <h3 class="mission-title">Unite in Prayer</h3>
+                <p class="mission-text">Bringing together believers from around the world to share in daily prayer and spiritual reflection, creating a global community of faith and support.</p>
             </div>
-            <h2 class="subscribe-title">Join Our Prayer Community</h2>
-            <form class="subscribe-form" id="subscribe-form">
-                <div class="form-group">
-                    <label for="first-name">First Name</label>
-                    <input type="text" id="first-name" name="firstName" required>
-                    <div class="error-message" id="first-name-error"></div>
-                </div>
-                <div class="form-group">
-                    <label for="last-name">Last Name</label>
-                    <input type="text" id="last-name" name="lastName" required>
-                    <div class="error-message" id="last-name-error"></div>
-                </div>
-                <div class="form-group">
-                    <label for="email">Email Address</label>
-                    <input type="email" id="email" name="email" required>
-                    <div class="error-message" id="email-error"></div>
-                </div>
-                <div class="button-container">
-                    <button type="submit" id="submit-button">Join Prayer Community</button>
-                </div>
-                <div class="loading-spinner" id="loading-spinner"></div>
-                <div class="success-message" id="success-message">
-                    <h3>Welcome to Divine Bridge!</h3>
-                    <p>Thank you for joining our prayer community. Please check your email for today's prayer.</p>
-                </div>
-            </form>
-        </section>
-    </main>
+            <div class="mission-card">
+                <h3 class="mission-title">Share God's Word</h3>
+                <p class="mission-text">Spreading the message of hope and love through carefully selected daily verses, making Scripture accessible and meaningful to everyone.</p>
+            </div>
+            <div class="mission-card">
+                <h3 class="mission-title">Build Bridges</h3>
+                <p class="mission-text">Creating connections across cultures and denominations, fostering understanding and unity in our shared faith journey.</p>
+            </div>
+        </div>
+    </section>
 
-    <footer>
-        <div class="container">
-            <p>&copy; 2025 Divine Bridge. All rights reserved.</p>
+    <!-- Prayer Room Section -->
+    <section class="prayer-room-section">
+        <div class="prayer-room-content">
+            <h2 class="prayer-room-title">Join Our Prayer Room</h2>
+            <p class="prayer-room-description">
+                Step into our sacred space where hearts unite in prayer. Share your requests, 
+                lift others up in prayer, and experience the power of collective faith. 
+                Together, we create a bridge of divine connection.
+            </p>
+            <div class="auth-buttons">
+                <a href="/login" class="auth-button login-button">Log In</a>
+                <a href="/signup" class="auth-button signup-button">Sign Up</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-about">
+                <div class="footer-logo">Divine Bridge</div>
+                <p>Uniting hearts in global prayer.</p>
+            </div>
+            <div class="footer-links">
+                <h3>Quick Links</h3>
+                <a href="/about">About</a>
+                <a href="/prayers">Prayers</a>
+                <a href="/privacy">Privacy Policy</a>
+            </div>
+            <div class="footer-newsletter">
+                <h3>Stay Connected</h3>
+                <form class="newsletter-form">
+                    <input type="email" placeholder="Your email" class="newsletter-input" required>
+                    <button type="submit" class="newsletter-button">Subscribe</button>
+                </form>
+            </div>
         </div>
     </footer>
 
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const verseText = document.getElementById('verseText');
-            const verseReference = document.getElementById('verseReference');
-            const cursor = document.getElementById('cursor');
+            const header = document.querySelector('.header');
+            let lastScroll = 0;
             
+            window.addEventListener('scroll', () => {
+                const currentScroll = window.pageYOffset;
+                
+                if (currentScroll > 50) {
+                    header.classList.add('scrolled');
+                } else {
+                    header.classList.remove('scrolled');
+                }
+                
+                lastScroll = currentScroll;
+            });
+
             fetch('/api/today-verse')
                 .then(response => response.json())
-                .then(data => {
-                    if (data.verse) {
-                        animateVerse(data.verse, data.reference);
+                .then(response => {
+                    if (response.success && response.data) {
+                        animateVerse(response.data.verse, response.data.reference);
+                    } else {
+                        console.error('Error fetching verse:', response.error);
+                        document.querySelector('.handwriting-text').textContent = 'Unable to load today\'s verse. Please try again later.';
                     }
                 })
                 .catch(error => {
-                    console.error('Error fetching verse:', error);
-                    verseText.textContent = 'Loading today\'s verse...';
+                    console.error('Error:', error);
+                    document.querySelector('.handwriting-text').textContent = 'Unable to load today\'s verse. Please try again later.';
                 });
-            
-            function animateVerse(verse, reference) {
-                const verseText = document.getElementById('verseText');
-                const verseReference = document.getElementById('verseReference');
-                
-                // Clear previous content and reset styles
-                verseText.innerHTML = '';
-                verseText.style.position = 'fixed';
-                verseText.style.minHeight = '100vh';
-                verseText.style.background = 'white';
-                verseText.style.opacity = '1';
-                verseText.classList.remove('fade-out');
-                
-                verseReference.textContent = reference;
-                verseReference.classList.remove('visible');
-                verseReference.classList.remove('fade-out');
-                
-                // Split verse into words
-                const words = verse.split(' ');
-                
-                // Create spans for each word
-                words.forEach((word, index) => {
-                    const span = document.createElement('span');
-                    span.className = 'word-span';
-                    span.textContent = word;
-                    verseText.appendChild(span);
-                });
-                
-                // Show words one by one
-                let currentIndex = 0;
-                const showNextWord = () => {
-                    if (currentIndex < words.length) {
-                        const word = words[currentIndex];
-                        const span = verseText.children[currentIndex];
-                        
-                        // Add visible class to show the word
-                        span.classList.add('visible');
-                        
-                        // Determine delay based on punctuation
-                        const delay = word.endsWith('.') ? 600 : 300;
-                        
-                        currentIndex++;
-                        setTimeout(showNextWord, delay);
-                    } else {
-                        // Show reference after verse is complete
-                        verseReference.classList.add('visible');
-                        
-                        // Wait 2 seconds then fade out
-                        setTimeout(() => {
-                            verseText.classList.add('fade-out');
-                            verseReference.classList.add('fade-out');
-                            
-                            // After fade out, remove the fixed positioning
-                            setTimeout(() => {
-                                verseText.style.position = 'relative';
-                                verseText.style.minHeight = 'auto';
-                                verseText.style.background = 'transparent';
-                            }, 1000);
-                        }, 2000);
-                    }
-                };
-                
-                // Start animation after a short delay
-                setTimeout(showNextWord, 500);
-            }
-
-            // Check service status
-            function checkServiceStatus() {
-                fetch('/health')
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status === 'healthy') {
-                            // Service is healthy, no action needed
-                        } else {
-                            console.error('Service is not healthy:', data);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error checking service status:', error);
-                    });
-            }
-
-            // Check status immediately and then every 5 minutes
-            checkServiceStatus();
-            setInterval(checkServiceStatus, 300000);
         });
 
-        // Handle form submission
-        document.getElementById('subscribe-form').addEventListener('submit', function(e) {
-            e.preventDefault();
+        function animateVerse(verse, reference) {
+            const verseElement = document.querySelector('.handwriting-text');
+            const referenceElement = document.querySelector('.verse-reference');
             
-            // Reset error messages
-            document.querySelectorAll('.error-message').forEach(el => el.style.display = 'none');
+            // Clear previous content
+            verseElement.innerHTML = '';
             
-            // Get form data
-            const firstName = document.getElementById('first-name').value.trim();
-            const lastName = document.getElementById('last-name').value.trim();
-            const email = document.getElementById('email').value.trim();
+            // Split verse into words
+            const words = verse.split(' ');
             
-            // Validate form
-            let isValid = true;
-            
-            if (!firstName) {
-                document.getElementById('first-name-error').textContent = 'First name is required';
-                document.getElementById('first-name-error').style.display = 'block';
-                isValid = false;
-            }
-            
-            if (!lastName) {
-                document.getElementById('last-name-error').textContent = 'Last name is required';
-                document.getElementById('last-name-error').style.display = 'block';
-                isValid = false;
-            }
-            
-            if (!email) {
-                document.getElementById('email-error').textContent = 'Email is required';
-                document.getElementById('email-error').style.display = 'block';
-                isValid = false;
-            } else if (!isValidEmail(email)) {
-                document.getElementById('email-error').textContent = 'Please enter a valid email address';
-                document.getElementById('email-error').style.display = 'block';
-                isValid = false;
-            }
-            
-            if (!isValid) return;
-            
-            // Show loading spinner and disable button
-            const submitButton = document.getElementById('submit-button');
-            const loadingSpinner = document.getElementById('loading-spinner');
-            const form = document.getElementById('subscribe-form');
-            const successMessage = document.getElementById('success-message');
-            
-            submitButton.disabled = true;
-            loadingSpinner.style.display = 'block';
-            
-            // Send subscription request
-            fetch('/subscribe', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    firstName: firstName,
-                    lastName: lastName,
-                    email: email
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Hide form elements
-                    form.style.display = 'none';
-                    submitButton.style.display = 'none';
-                    loadingSpinner.style.display = 'none';
-                    
-                    // Show success message
-                    successMessage.style.display = 'block';
-                    // Let CSS handle the opacity transition
-                    setTimeout(() => {
-                        successMessage.classList.add('show');
-                    }, 10);
-                } else {
-                    document.getElementById('email-error').textContent = data.message || 'An error occurred. Please try again.';
-                    document.getElementById('email-error').style.display = 'block';
-                    submitButton.disabled = false;
-                    loadingSpinner.style.display = 'none';
+            // Create spans for each word
+            words.forEach((word, index) => {
+                const span = document.createElement('span');
+                span.className = 'word-span';
+                span.textContent = word;
+                verseElement.appendChild(span);
+                
+                // Add space after each word except the last one
+                if (index < words.length - 1) {
+                    verseElement.appendChild(document.createTextNode(' '));
                 }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('email-error').textContent = 'An error occurred. Please try again.';
-                document.getElementById('email-error').style.display = 'block';
-                submitButton.disabled = false;
-                loadingSpinner.style.display = 'none';
+                
+                setTimeout(() => {
+                    span.classList.add('visible');
+                    
+                    // Show reference and download button after last word
+                    if (index === words.length - 1) {
+                        setTimeout(() => {
+                            referenceElement.textContent = reference;
+                            referenceElement.classList.add('visible');
+                            
+                            const downloadButton = document.querySelector('.download-button');
+                            downloadButton.style.display = 'block';
+                            setTimeout(() => {
+                                downloadButton.style.opacity = '1';
+                            }, 100);
+                        }, 300);
+                    }
+                }, index * 100);
+            });
+        }
+
+        async function downloadVerseImage() {
+            const verseSection = document.querySelector('.verse-section');
+            const downloadButton = document.querySelector('.download-button');
+            const watermark = document.querySelector('.watermark');
+            
+            // Temporarily hide download button and show watermark
+            downloadButton.style.display = 'none';
+            watermark.style.opacity = '1';
+            
+            try {
+                const canvas = await html2canvas(verseSection, {
+                    backgroundColor: '#0F1B2B',
+                    scale: 2, // Higher quality
+                    logging: false,
+                    useCORS: true
+                });
+                
+                // Create download link
+                const link = document.createElement('a');
+                link.download = 'daily-verse.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            } catch (error) {
+                console.error('Error generating image:', error);
+            } finally {
+                // Restore original state
+                downloadButton.style.display = 'block';
+                watermark.style.opacity = '0';
+            }
+        }
+
+        // Add click event listener to download button
+        document.addEventListener('DOMContentLoaded', function() {
+            const downloadButton = document.querySelector('.download-button');
+            downloadButton.addEventListener('click', downloadVerseImage);
+            
+            // Rest of the existing DOMContentLoaded code...
+            fetch('/api/today-verse')
+                .then(response => response.json())
+                .then(response => {
+                    if (response.success && response.data) {
+                        animateVerse(response.data.verse, response.data.reference);
+                    } else {
+                        console.error('Error fetching verse:', response.error);
+                        document.querySelector('.handwriting-text').textContent = 'Unable to load today\'s verse. Please try again later.';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.querySelector('.handwriting-text').textContent = 'Unable to load today\'s verse. Please try again later.';
+                });
+        });
+
+        // Add smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
             });
         });
-
-        // Email validation helper
-        function isValidEmail(email) {
-            const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-            return re.test(String(email).toLowerCase());
-        }
     </script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html> 

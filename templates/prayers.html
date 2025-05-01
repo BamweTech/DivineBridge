@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prayer Room - Divine Bridge</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --gold: #D4AF37;
+            --blue: #1E3A8A;
+            --black: #1A1A1A;
+            --white: #FFFFFF;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            color: var(--black);
+            min-height: 100vh;
+        }
+
+        /* Header Styles */
+        .header {
+            background: var(--white);
+            border-bottom: 1px solid var(--gold);
+            padding: 1rem 0;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            transition: background 0.3s ease;
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--gold);
+            text-decoration: none;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            font-size: 1.5rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: var(--black);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            color: var(--gold);
+        }
+
+        /* Prayer Requests Section */
+        .prayer-requests-section {
+            flex: 1;
+            padding: 8rem 2rem 4rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .prayer-requests-content {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .prayer-requests-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 3rem;
+            color: var(--black);
+            margin-bottom: 1rem;
+        }
+
+        .prayer-requests-subtitle {
+            font-size: 1.2rem;
+            color: var(--black);
+            opacity: 0.8;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Prayer Grid */
+        .prayers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 4rem;
+        }
+
+        /* Prayer Card */
+        .prayer-card {
+            background: linear-gradient(135deg, var(--white) 0%, #f8f9fa 100%);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .prayer-counter {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(245, 197, 66, 0.1);
+            padding: 0.5rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            color: var(--gold);
+            transition: all 0.3s ease;
+            z-index: 1;
+        }
+
+        .prayer-counter:hover {
+            background: rgba(245, 197, 66, 0.2);
+            transform: scale(1.05);
+        }
+
+        .prayer-counter i {
+            font-size: 1rem;
+            animation: pray 1.5s infinite;
+        }
+
+        .prayer-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 0 30px 30px 0;
+            border-color: transparent var(--gold) transparent transparent;
+            transition: all 0.3s ease;
+        }
+
+        .prayer-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .prayer-card:hover::before {
+            border-color: transparent var(--blue) transparent transparent;
+        }
+
+        .prayer-preview {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.1rem;
+            color: var(--black);
+            margin-bottom: 1rem;
+            line-height: 1.4;
+            padding: 1rem;
+            background: rgba(245, 197, 66, 0.05);
+            border-radius: 8px;
+            border-left: 4px solid var(--gold);
+            font-style: italic;
+        }
+
+        .prayer-details {
+            display: none;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+            animation: unfold 0.5s ease forwards;
+        }
+
+        .prayer-details.active {
+            display: block;
+        }
+
+        .prayer-details p {
+            font-size: 1rem;
+            line-height: 1.6;
+            color: var(--black);
+            margin-bottom: 1.5rem;
+            white-space: pre-wrap;
+        }
+
+        @keyframes unfold {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .prayer-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            color: var(--black);
+            opacity: 0.8;
+            margin-top: 1rem;
+        }
+
+        .prayer-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .prayer-button {
+            background: none;
+            border: none;
+            color: var(--blue);
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+        }
+
+        .prayer-button:hover {
+            color: var(--gold);
+            background: rgba(245, 197, 66, 0.1);
+        }
+
+        .prayer-button.praying {
+            animation: pray 1s ease;
+            color: var(--gold);
+        }
+
+        @keyframes pray {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        .prayer-button i {
+            font-size: 1.1rem;
+        }
+
+        /* New Prayer Form */
+        .new-prayer {
+            background: linear-gradient(135deg, var(--white) 0%, #f8f9fa 100%);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 4rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .new-prayer-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.5rem;
+            color: var(--black);
+            margin-bottom: 1.5rem;
+        }
+
+        .prayer-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .form-group label {
+            font-weight: 500;
+            color: var(--black);
+        }
+
+        .form-group textarea {
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            min-height: 100px;
+            resize: vertical;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--gold);
+        }
+
+        .submit-button {
+            background: linear-gradient(to right, var(--blue), var(--gold));
+            color: var(--white);
+            border: none;
+            padding: 1rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s ease, background 0.3s ease;
+            align-self: flex-end;
+        }
+
+        .submit-button:hover {
+            transform: translateY(-2px);
+            background: linear-gradient(to right, var(--gold), var(--blue));
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--black);
+            color: var(--white);
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .footer-logo {
+            color: var(--gold);
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .footer-links a {
+            color: var(--white);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            color: var(--gold);
+        }
+
+        .copyright {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 768px) {
+            .prayer-requests-section {
+                padding: 6rem 1rem 2rem;
+            }
+
+            .prayer-requests-title {
+                font-size: 2rem;
+            }
+
+            .prayer-requests-subtitle {
+                font-size: 1rem;
+            }
+
+            .prayers-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .nav-links {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <nav class="nav-container">
+            <a href="/" class="logo">
+                <span>Divine Bridge</span>
+            </a>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/about">About</a>
+                <a href="/prayers">Prayer Room</a>
+                <a href="/login">Login</a>
+                <a href="/signup">Sign Up</a>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Prayer Room Section -->
+    <section class="prayer-requests-section">
+        <div class="prayer-requests-content">
+            <h2 class="prayer-requests-title">Prayer Room</h2>
+            <p class="prayer-requests-subtitle">A sacred space for sharing and lifting up prayers</p>
+            
+            <!-- New Prayer Form -->
+            <div class="new-prayer-form">
+                <textarea id="prayer-content" placeholder="Share your prayer request..." rows="4"></textarea>
+                <button class="submit-prayer" onclick="submitPrayer()">Submit Prayer</button>
+            </div>
+
+            <!-- Prayer Grid -->
+            <div class="prayers-grid" id="prayers-grid">
+                <!-- Prayer cards will be dynamically added here -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-logo">Divine Bridge</div>
+        <div class="footer-links">
+            <a href="/about">About</a>
+            <a href="/prayers">Prayers</a>
+            <a href="/privacy">Privacy Policy</a>
+        </div>
+        <div class="copyright">
+            &copy; 2025 Divine Bridge. All rights reserved.
+        </div>
+    </footer>
+
+    <script>
+        // Check authentication status
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/auth/status');
+                const data = await response.json();
+                if (!data.authenticated) {
+                    // Redirect to login page
+                    window.location.href = '/login?redirect=/prayers';
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                console.error('Error checking auth status:', error);
+                window.location.href = '/login?redirect=/prayers';
+                return false;
+            }
+        }
+
+        // Load prayers when page loads
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Check authentication first
+            const isAuthenticated = await checkAuth();
+            if (!isAuthenticated) return;
+
+            try {
+                const response = await fetch('/api/prayers');
+                if (response.status === 401) {
+                    window.location.href = '/login?redirect=/prayers';
+                    return;
+                }
+                
+                const data = await response.json();
+                if (data.success) {
+                    // Add each prayer to the grid
+                    data.prayers.forEach(prayer => {
+                        addPrayerToGrid(prayer);
+                    });
+                } else {
+                    console.error('Failed to load prayers:', data.message);
+                }
+            } catch (error) {
+                console.error('Error loading prayers:', error);
+            }
+        });
+
+        // Add scroll-based header effect
+        window.addEventListener('scroll', function() {
+            const header = document.querySelector('.header');
+            if (window.scrollY > 50) {
+                header.style.background = 'rgba(255, 255, 255, 0.95)';
+            } else {
+                header.style.background = 'var(--white)';
+            }
+        });
+
+        // Prayer card interaction
+        document.querySelectorAll('.prayer-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const details = this.querySelector('.prayer-details');
+                details.classList.toggle('active');
+            });
+        });
+
+        // Submit prayer function
+        async function submitPrayer() {
+            // Check authentication first
+            const isAuthenticated = await checkAuth();
+            if (!isAuthenticated) return;
+
+            const content = document.getElementById('prayer-content').value.trim();
+            if (!content) {
+                alert('Please enter your prayer request');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/prayers', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ content })
+                });
+
+                if (response.status === 401) {
+                    window.location.href = '/login?redirect=/prayers';
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Clear the form
+                    document.getElementById('prayer-content').value = '';
+                    
+                    // Add the new prayer to the grid
+                    addPrayerToGrid(data.prayer);
+                    
+                    // Show success message
+                    alert('Prayer submitted successfully!');
+                } else {
+                    alert(data.message || 'Failed to submit prayer');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while submitting your prayer');
+            }
+        }
+
+        // Function to add a new prayer to the grid
+        function addPrayerToGrid(prayer) {
+            const grid = document.getElementById('prayers-grid');
+            const prayerCard = document.createElement('div');
+            prayerCard.className = 'prayer-card';
+            prayerCard.innerHTML = `
+                <div class="prayer-counter">
+                    <i class="fas fa-praying-hands"></i>
+                    <span>${prayer.prayer_count || 0}</span>
+                </div>
+                <div class="prayer-preview">${prayer.summary || prayer.content.substring(0, 100) + '...'}</div>
+                <div class="prayer-details">
+                    <p>${prayer.content}</p>
+                    <div class="prayer-meta">
+                        <span>Posted by ${prayer.user_name}</span>
+                        <span>${new Date(prayer.timestamp).toLocaleString()}</span>
+                    </div>
+                    <div class="prayer-actions">
+                        <button class="prayer-button" onclick="incrementPrayerCount(this)">
+                            <i class="fas fa-praying-hands"></i>
+                            Pray
+                        </button>
+                        <button class="prayer-button">
+                            <i class="fas fa-comment"></i>
+                            Comment
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Add click event for the new card
+            prayerCard.addEventListener('click', function(e) {
+                // Don't toggle if clicking on buttons
+                if (e.target.closest('.prayer-button')) {
+                    return;
+                }
+                const details = this.querySelector('.prayer-details');
+                details.classList.toggle('active');
+            });
+            
+            // Add the new card at the beginning of the grid
+            grid.insertBefore(prayerCard, grid.firstChild);
+        }
+
+        // Function to increment prayer count
+        async function incrementPrayerCount(button) {
+            const card = button.closest('.prayer-card');
+            const counter = card.querySelector('.prayer-counter span');
+            const currentCount = parseInt(counter.textContent);
+            counter.textContent = currentCount + 1;
+            
+            // Add animation class
+            button.classList.add('praying');
+            setTimeout(() => {
+                button.classList.remove('praying');
+            }, 1000);
+        }
+    </script>
+</body>
+</html> 

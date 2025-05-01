@@ -48,66 +48,31 @@ class SheetHandler:
                 if isinstance(service_account_info, str):
                     service_account_info = json.loads(service_account_info)
                 logger.info("Successfully parsed service account JSON")
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse service account JSON: {e}")
-                raise ValueError("Invalid service account JSON format")
-
-            # Create credentials
-            try:
+                
+                # Initialize the service
                 credentials = service_account.Credentials.from_service_account_info(
                     service_account_info,
                     scopes=['https://www.googleapis.com/auth/spreadsheets']
                 )
-                logger.info("Successfully created credentials")
-            except Exception as e:
-                logger.error(f"Failed to create credentials: {e}")
-                raise ValueError("Failed to create service account credentials")
-
-            # Initialize the Sheets API
-            try:
                 self.service = build('sheets', 'v4', credentials=credentials)
-                logger.info("Successfully initialized Sheets API")
-            except Exception as e:
-                logger.error(f"Failed to initialize Sheets API: {e}")
-                raise ValueError("Failed to initialize Sheets API")
-
-            # Get sheet ID from environment
-            self.sheet_id = os.getenv('SHEET_ID')
-            if not self.sheet_id:
-                raise ValueError("SHEET_ID environment variable not set")
-            logger.info("Found SHEET_ID environment variable")
-
-            # Test sheet access
-            try:
-                self._test_sheet_access()
-                logger.info("Successfully tested sheet access")
-            except Exception as e:
-                logger.error(f"Failed to access sheet: {e}")
-                raise ValueError(f"Sheet access failed: {str(e)}")
-
-            # Initialize storage handler after successful service initialization
-            try:
-                self.storage = StorageHandler()
-                logger.info("StorageHandler initialized successfully")
-            except Exception as e:
-                logger.error(f"Error initializing StorageHandler: {e}")
-                self.storage = None
-
-            # Initialize email service
-            try:
-                from email_sender import EmailSender
-                self.email_service = EmailSender()
-                logger.info("EmailSender initialized successfully")
-            except Exception as e:
-                logger.error(f"Error initializing EmailSender: {e}")
-                self.email_service = None
-            
-            logger.info("SheetHandler initialized successfully")
-            
+                
+                # Get sheet ID from config
+                config = get_config()
+                self.sheet_id = config.SHEET_ID
+                
+                # Verify sheet access unless skipped for testing
+                if not getattr(config, 'SKIP_ACCESS_VERIFICATION', False):
+                    if not self._verify_sheet_access():
+                        raise PermissionError("Failed to verify read/write access to Google Sheet")
+                
+                logger.info("Successfully initialized SheetHandler with verified access")
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"Error parsing service account JSON: {e}")
+                raise
+                
         except Exception as e:
-            # Clean up resources if initialization fails
-            self.__del__()
-            logger.error(f"Error initializing SheetHandler: {str(e)}")
+            logger.error(f"Error initializing SheetHandler: {e}")
             raise
 
     def __del__(self):
@@ -555,3 +520,47 @@ class SheetHandler:
                     raise ValueError(f"Error accessing sheet: {str(e)}")
         
         _test_sheet_access() 
+
+    def _verify_sheet_access(self):
+        """
+        Verify both read and write access to the Google Sheet.
+        Returns True if both read and write access are available, False otherwise.
+        """
+        try:
+            logger.info("Verifying sheet access permissions...")
+            
+            # Test write access
+            test_data = {
+                'values': [['Test Write', 'Test', 'Access', datetime.now().strftime('%Y-%m-%d %H:%M:%S')]]
+            }
+            
+            try:
+                # Attempt to write
+                self.service.spreadsheets().values().append(
+                    spreadsheetId=self.sheet_id,
+                    range='Subscribers!A:D',
+                    valueInputOption='RAW',
+                    insertDataOption='INSERT_ROWS',
+                    body=test_data
+                ).execute()
+                logger.info("Write access verified")
+            except Exception as e:
+                logger.error(f"Write access verification failed: {e}")
+                return False
+            
+            # Test read access
+            try:
+                # Attempt to read
+                result = self.service.spreadsheets().values().get(
+                    spreadsheetId=self.sheet_id,
+                    range='Subscribers!A:D'
+                ).execute()
+                logger.info("Read access verified")
+                return True
+            except Exception as e:
+                logger.error(f"Read access verification failed: {e}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error verifying sheet access: {e}")
+            return False 

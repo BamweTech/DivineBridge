@@ -1,6 +1,5 @@
 import logging
 import os
-from google.cloud import logging as google_logging
 from datetime import datetime
 
 def setup_logging():
@@ -27,15 +26,6 @@ def setup_logging():
         )
         console_handler.setFormatter(console_formatter)
 
-        # Set up Google Cloud Logging
-        client = google_logging.Client()
-        cloud_handler = client.get_default_handler()
-        cloud_handler.setLevel(logging.INFO)
-        cloud_formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        cloud_handler.setFormatter(cloud_formatter)
-
         # Configure root logger
         root_logger = logging.getLogger()
         root_logger.setLevel(logging.INFO)
@@ -47,7 +37,6 @@ def setup_logging():
         # Add handlers to root logger
         root_logger.addHandler(file_handler)
         root_logger.addHandler(console_handler)
-        root_logger.addHandler(cloud_handler)
 
         # Create loggers for different components
         loggers = {
@@ -68,7 +57,6 @@ def setup_logging():
             # Add handlers
             logger.addHandler(file_handler)
             logger.addHandler(console_handler)
-            logger.addHandler(cloud_handler)
 
         logging.info("Logging configuration completed successfully")
         return loggers

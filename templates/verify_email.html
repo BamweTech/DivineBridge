@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Email - Divine Bridge</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        .verify-email-container {
+            max-width: 500px;
+            margin: var(--spacing-md) auto;
+            padding: var(--spacing-md);
+            background: var(--color-white);
+            border-radius: 8px;
+            box-shadow: var(--shadow-medium);
+        }
+
+        .verify-email-header {
+            text-align: center;
+            margin-bottom: var(--spacing-md);
+            padding-bottom: var(--spacing-sm);
+            border-bottom: 1px solid var(--color-gray-light);
+        }
+
+        .verify-email-header h1 {
+            color: var(--color-blue);
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .verify-email-header p {
+            color: var(--color-gray);
+        }
+
+        .verify-email-form {
+            margin-top: var(--spacing-md);
+        }
+
+        .form-group {
+            position: relative;
+        }
+
+        .form-group input {
+            padding: var(--spacing-sm);
+            background: var(--color-gray-light);
+            border: 2px solid transparent;
+            transition: all var(--transition-fast);
+        }
+
+        .form-group input:focus {
+            background: var(--color-white);
+            border-color: var(--color-blue);
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: var(--spacing-sm);
+            background: linear-gradient(135deg, var(--color-blue), var(--color-blue-dark));
+            color: var(--color-white);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-medium);
+        }
+
+        .back-to-login {
+            text-align: center;
+            margin-top: var(--spacing-md);
+            padding-top: var(--spacing-sm);
+            border-top: 1px solid var(--color-gray-light);
+        }
+
+        .back-to-login a {
+            color: var(--color-blue);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color var(--transition-fast);
+        }
+
+        .back-to-login a:hover {
+            color: var(--color-blue-dark);
+        }
+
+        .error {
+            color: var(--color-error);
+            font-size: var(--font-size-small);
+            margin-top: var(--spacing-xs);
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .success-message {
+            color: var(--color-success);
+            font-size: var(--font-size-body);
+            text-align: center;
+            margin-bottom: var(--spacing-sm);
+            padding: var(--spacing-sm);
+            background: rgba(40, 167, 69, 0.1);
+            border-radius: 4px;
+            display: none;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
+        .instructions {
+            color: var(--color-gray);
+            font-size: var(--font-size-small);
+            margin-bottom: var(--spacing-md);
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .verify-email-container {
+                margin: var(--spacing-sm);
+                padding: var(--spacing-sm);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="verify-email-container fade-in">
+        <div class="verify-email-header">
+            <h1>Verify Your Email</h1>
+            <p>Please verify your email address to complete your registration</p>
+        </div>
+
+        {% if success %}
+        <div class="success-message show">
+            Verification email has been sent. Please check your inbox.
+        </div>
+        {% endif %}
+        
+        <form id="verifyEmailForm" class="verify-email-form">
+            <div class="instructions">
+                Enter your email address to receive a verification link. If you don't see the email, check your spam folder.
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" required>
+                <div class="error" id="emailError"></div>
+            </div>
+            
+            <button type="submit" class="btn-submit">Send Verification Email</button>
+        </form>
+        
+        <div class="back-to-login">
+            Already verified? <a href="/login">Back to login</a>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('verifyEmailForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Reset error messages
+            document.querySelectorAll('.error').forEach(el => {
+                el.classList.remove('show');
+            });
+            
+            // Get form values
+            const email = document.getElementById('email').value;
+            
+            try {
+                const response = await fetch('/verify-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Show success message
+                    const successMessage = document.createElement('div');
+                    successMessage.className = 'success-message show';
+                    successMessage.textContent = 'Verification email has been sent. Please check your inbox.';
+                    document.querySelector('.verify-email-form').insertAdjacentElement('beforebegin', successMessage);
+                    
+                    // Clear form
+                    document.getElementById('email').value = '';
+                } else {
+                    // Display error message
+                    const errorElement = document.getElementById(data.field + 'Error');
+                    if (errorElement) {
+                        errorElement.textContent = data.message;
+                        errorElement.classList.add('show');
+                    }
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                const errorElement = document.getElementById('emailError');
+                errorElement.textContent = 'An error occurred. Please try again.';
+                errorElement.classList.add('show');
+            }
+        });
+    </script>
+</body>
+</html> 

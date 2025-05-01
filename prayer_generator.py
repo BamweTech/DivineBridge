@@ -5,6 +5,11 @@ from datetime import datetime
 from storage_handler import StorageHandler
 from google.api_core import retry
 from google.api_core.exceptions import ServiceUnavailable
+from config import get_config
+import json
+import requests
+import random
+from google.cloud.storage import Client
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -19,7 +24,7 @@ class PrayerGenerator:
                 raise ValueError("PERPLEXITY_API_KEY environment variable not set")
                 
             self.client = PerplexityClient(key=api_key)
-            self.client.model = "sonar-pro"
+            self.client.model = "sonar-reasoning-pro"
             self.storage = storage or StorageHandler()
             self._load_prompt()
             logger.debug("Successfully initialized Perplexity client and StorageHandler")
@@ -123,8 +128,21 @@ class PrayerGenerator:
         return response
         
     def generate_prayer(self):
+        """Generate a new prayer and save it to storage.
+        
+        Returns:
+            dict: The generated prayer data if successful, None otherwise
+        """
         logger.debug("Generating prayer based on global news")
         try:
+            # First check if we already have a prayer for today
+            today = datetime.now().strftime('%Y-%m-%d')
+            existing_prayer = self.storage.get_prayer(today)
+            if existing_prayer:
+                logger.info(f"Using existing prayer for {today}")
+                return existing_prayer
+            
+            # Generate new prayer
             response = self.client.query(self.prompt)
             logger.debug("Successfully generated prayer")
             
@@ -135,20 +153,30 @@ class PrayerGenerator:
             if "Dear Heavenly Father" in response:
                 response = response[response.index("Dear Heavenly Father"):]
             
-            # Save the generated prayer to Cloud Storage with retry logic
-            today = datetime.now().strftime('%Y-%m-%d')
-            try:
-                if self.storage.save_prayer(response, today):
-                    logger.info("Successfully saved prayer to Cloud Storage")
-                else:
-                    logger.warning("Failed to save prayer to Cloud Storage, but continuing with prayer generation")
-            except Exception as e:
-                logger.warning(f"Error saving prayer to Cloud Storage: {e}, but continuing with prayer generation")
+            # Create prayer data structure
+            prayer_data = {
+                'content': response,
+                'date': today,
+                'created_at': datetime.now().isoformat(),
+                'source': 'generated'
+            }
             
-            return response
+            # Save the generated prayer to Cloud Storage
+            try:
+                if self.storage.save_prayer(prayer_data, today):
+                    logger.info("Successfully saved prayer to Cloud Storage")
+                    return prayer_data
+                else:
+                    logger.error("Failed to save prayer to Cloud Storage")
+                    return None
+            except Exception as e:
+                logger.error(f"Error saving prayer to Cloud Storage: {e}")
+                # Return the prayer data even if storage fails
+                return prayer_data
+                
         except Exception as e:
             logger.error(f"Error generating prayer: {e}")
-            raise
+            return None
 
     def get_prayer(self, date=None):
         """Retrieve a prayer for a specific date or today's prayer if no date is provided"""

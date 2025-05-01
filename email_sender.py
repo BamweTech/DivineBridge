@@ -323,3 +323,6 @@ To unsubscribe, please visit: https://divinebridge.io/unsubscribe
         except Exception as e:
             logger.error(f"Error sending welcome email to {recipient_email}: {e}")
             return False 
+
+# Create an alias for EmailSender to maintain backward compatibility with tests
+EmailService = EmailSender 
