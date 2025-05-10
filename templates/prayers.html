@@ -440,7 +440,7 @@
         // Check authentication status
         async function checkAuth() {
             try {
-                const response = await fetch('/api/auth/status');
+                const response = await fetch('/auth/status');
                 const data = await response.json();
                 if (!data.authenticated) {
                     // Redirect to login page

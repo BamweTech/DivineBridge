@@ -25,13 +25,6 @@ class Config:
         self.env = os.getenv('FLASK_ENV', 'development')
         logger.info(f"Running in {self.env} environment")
         
-        # CORS Configuration
-        self.CORS_ORIGINS = os.getenv('CORS_ORIGINS', '*').split(',')
-        self.CORS_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
-        self.CORS_ALLOW_HEADERS = ['Content-Type', 'Authorization']
-        self.CORS_SUPPORTS_CREDENTIALS = True
-        self.CORS_MAX_AGE = 3600
-        
         # Initialize Secret Manager client
         try:
             self.secret_manager = secretmanager.SecretManagerServiceClient()
@@ -49,21 +42,6 @@ class Config:
         # Set other configuration values
         self.DEBUG = self.env == 'development'
         self.TESTING = self.env == 'testing'
-        
-        # Firebase Configuration
-        try:
-            firebase_creds = self._get_secret('FIREBASE_CREDENTIALS')
-            if firebase_creds:
-                # Clean the credentials string
-                firebase_creds = firebase_creds.replace('\r\n', '\n').replace('\r', '\n')
-                firebase_creds = ''.join(char for char in firebase_creds if char >= ' ' or char in '\n\t')
-                self.FIREBASE_CREDENTIALS = firebase_creds
-            else:
-                self.FIREBASE_CREDENTIALS = None
-                logger.warning("Firebase credentials not found")
-        except Exception as e:
-            logger.error(f"Error loading Firebase credentials: {e}")
-            self.FIREBASE_CREDENTIALS = None
         
     def validate_config(self):
         """Validate all required configuration values"""
@@ -100,6 +78,14 @@ class Config:
                 logger.info("Successfully loaded Firebase credentials from Secret Manager")
             except Exception as e:
                 logger.error(f"Failed to load Firebase credentials from Secret Manager: {e}")
+                raise
+                
+            # Load Firebase client configuration
+            try:
+                self.FIREBASE_CLIENT_CONFIG = json.loads(self._get_secret('FIREBASE_CLIENT_CONFIG'))
+                logger.info("Successfully loaded Firebase client configuration")
+            except Exception as e:
+                logger.error(f"Failed to load Firebase client configuration: {e}")
                 raise
                 
             # Email configuration

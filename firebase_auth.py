@@ -4,53 +4,59 @@ from flask import current_app
 import logging
 import json
 from config import get_config
+import time
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+import os
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def initialize_firebase():
-    """Initialize Firebase Admin SDK"""
+    """Initialize Firebase Admin SDK with retry logic."""
     try:
         # Check if Firebase is already initialized
         if firebase_admin._apps:
             logger.info("Firebase Admin SDK already initialized")
             return True
-            
+
+        # Get configuration
         config = get_config()
-        if not config.FIREBASE_CREDENTIALS:
-            logger.error("Firebase credentials not found in configuration")
-            return False
-            
-        # Parse credentials from config
-        try:
-            cred = credentials.Certificate(json.loads(config.FIREBASE_CREDENTIALS))
-            logger.info("Successfully parsed Firebase credentials")
-            logger.debug(f"Firebase project ID: {cred.project_id}")
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse Firebase credentials: {e}")
-            logger.error(f"Credentials content: {config.FIREBASE_CREDENTIALS[:100]}...")  # Log first 100 chars
-            return False
-            
-        # Initialize Firebase
-        try:
-            firebase_admin.initialize_app(cred)
-            logger.info("Firebase Admin SDK initialized successfully")
-            logger.debug("Firebase Admin SDK version: %s", firebase_admin.__version__)
-            
-            # Verify initialization by attempting to list users
+        
+        # Get Firebase credentials from config
+        creds_json = config.FIREBASE_CREDENTIALS
+        if isinstance(creds_json, str):
             try:
-                users = auth.list_users(max_results=1)
-                logger.info("Successfully verified Firebase connection by listing users")
+                creds_json = json.loads(creds_json)
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse Firebase credentials JSON: {e}")
+                return False
+
+        # Initialize Firebase with retry logic
+        max_retries = 3
+        retry_delay = 1
+        
+        for attempt in range(max_retries):
+            try:
+                # Initialize Firebase with credentials and project ID
+                firebase_admin.initialize_app(
+                    credentials.Credentials.from_service_account_info(creds_json),
+                    options={'projectId': os.getenv('FIREBASE_PROJECT_ID')}
+                )
+                logger.info("Firebase initialized successfully")
                 return True
             except Exception as e:
-                logger.error(f"Failed to verify Firebase connection: {e}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Failed to initialize Firebase Admin SDK: {e}")
-            return False
-            
+                logger.error(f"Attempt {attempt + 1}/{max_retries} failed to initialize Firebase: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                else:
+                    logger.error("All attempts to initialize Firebase failed")
+                    return False
+                    
     except Exception as e:
-        logger.error(f"Unexpected error during Firebase initialization: {e}")
+        logger.error(f"Error initializing Firebase: {e}")
         return False
 
 def create_user(email, password, first_name, last_name):
@@ -73,12 +79,12 @@ def create_user(email, password, first_name, last_name):
         return None
 
 def verify_token(id_token):
-    """Verify Firebase ID token"""
+    """Verify Firebase ID token."""
     try:
         decoded_token = auth.verify_id_token(id_token)
         return decoded_token
     except Exception as e:
-        logger.error(f"Failed to verify token: {e}")
+        logger.error(f"Token verification failed: {str(e)}")
         return None
 
 def get_user(uid):

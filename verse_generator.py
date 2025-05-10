@@ -2,7 +2,6 @@ import json
 import logging
 from datetime import datetime
 import os
-from flask import current_app
 from pathlib import Path
 
 # Set up logging
@@ -20,6 +19,11 @@ class VerseGenerator:
         self._verses = None
         self._last_load_time = None
         self._reload_interval = 3600  # Reload verses every hour
+        self._static_folder = None
+        
+    def set_static_folder(self, static_folder):
+        """Set the static folder path."""
+        self._static_folder = static_folder
         
     def _should_reload(self):
         """Check if we should reload the verses."""
@@ -31,9 +35,9 @@ class VerseGenerator:
     def _load_verses(self):
         """Load verses from the JSON file."""
         try:
-            # Try to get the path from Flask's static folder first
-            if current_app:
-                json_path = os.path.join(current_app.static_folder, 'bible_verses.json')
+            # Try to get the path from the static folder if set
+            if self._static_folder:
+                json_path = os.path.join(self._static_folder, 'bible_verses.json')
             else:
                 # Fallback to a relative path from the current file
                 current_dir = Path(__file__).parent
@@ -82,7 +86,10 @@ class VerseGenerator:
             verse = self._verses[verse_index]
             
             logger.info(f"Selected verse for day {day_of_year}: {verse['reference']}")
-            return verse
+            return {
+                'verse': verse['text'],
+                'reference': verse['reference']
+            }
             
         except Exception as e:
             logger.error(f"Error getting daily verse: {str(e)}")

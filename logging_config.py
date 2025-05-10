@@ -1,66 +1,76 @@
 import logging
+import logging.config
+import json
 import os
 from datetime import datetime
 
-def setup_logging():
-    """Set up logging configuration for both local and Google Cloud"""
-    try:
-        # Create logs directory if it doesn't exist
-        if not os.path.exists('logs'):
-            os.makedirs('logs')
-
-        # Set up local file logging
-        log_filename = f'logs/app_{datetime.now().strftime("%Y%m%d")}.log'
-        file_handler = logging.FileHandler(log_filename)
-        file_handler.setLevel(logging.INFO)
-        file_formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        file_handler.setFormatter(file_formatter)
-
-        # Set up console logging
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        console_formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        console_handler.setFormatter(console_formatter)
-
-        # Configure root logger
-        root_logger = logging.getLogger()
-        root_logger.setLevel(logging.INFO)
-        
-        # Remove any existing handlers
-        for handler in root_logger.handlers[:]:
-            root_logger.removeHandler(handler)
-            
-        # Add handlers to root logger
-        root_logger.addHandler(file_handler)
-        root_logger.addHandler(console_handler)
-
-        # Create loggers for different components
-        loggers = {
-            'prayer_generator': logging.getLogger('prayer_generator'),
-            'storage_handler': logging.getLogger('storage_handler'),
-            'app': logging.getLogger('app')
+class CloudRunFormatter(logging.Formatter):
+    def format(self, record):
+        """Format log records in a Cloud Run friendly format"""
+        log_entry = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'severity': record.levelname,
+            'message': record.getMessage(),
+            'logger': record.name,
+            'function': record.funcName,
+            'line': record.lineno,
         }
-
-        # Set up component-specific loggers
-        for logger_name, logger in loggers.items():
-            logger.setLevel(logging.INFO)
-            logger.propagate = False  # Prevent propagation to root logger
+        
+        if hasattr(record, 'request_id'):
+            log_entry['request_id'] = record.request_id
             
-            # Remove any existing handlers
-            for handler in logger.handlers[:]:
-                logger.removeHandler(handler)
-                
-            # Add handlers
-            logger.addHandler(file_handler)
-            logger.addHandler(console_handler)
+        if record.exc_info:
+            log_entry['error'] = self.formatException(record.exc_info)
+            
+        return json.dumps(log_entry)
 
-        logging.info("Logging configuration completed successfully")
-        return loggers
-
-    except Exception as e:
-        print(f"Error setting up logging: {e}")
-        raise 
+def setup_logging():
+    """Configure logging for the application"""
+    config = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'cloud_run': {
+                '()': CloudRunFormatter,
+            },
+            'standard': {
+                'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            }
+        },
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'cloud_run' if os.getenv('ENV') == 'production' else 'standard',
+                'stream': 'ext://sys.stdout'
+            }
+        },
+        'loggers': {
+            'app': {
+                'handlers': ['console'],
+                'level': 'INFO',
+                'propagate': False
+            },
+            'firebase_auth': {
+                'handlers': ['console'],
+                'level': 'INFO',
+                'propagate': False
+            },
+            'storage_handler': {
+                'handlers': ['console'],
+                'level': 'INFO',
+                'propagate': False
+            }
+        },
+        'root': {
+            'level': 'INFO',
+            'handlers': ['console']
+        }
+    }
+    
+    logging.config.dictConfig(config)
+    
+    return {
+        'app': logging.getLogger('app'),
+        'firebase_auth': logging.getLogger('firebase_auth'),
+        'storage_handler': logging.getLogger('storage_handler')
+    } 

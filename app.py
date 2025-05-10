@@ -13,7 +13,7 @@ import threading
 from prayer_generator import PrayerGenerator
 from logging_config import setup_logging
 from config import get_config
-from verse_cache import verse_cache
+from verse_cache import verse_cache  # Import the singleton instance
 from dotenv import load_dotenv
 from storage_handler import StorageHandler
 from welcome_email import send_welcome_email
@@ -25,6 +25,7 @@ from flask_cors import CORS
 from functools import wraps
 import re
 from firebase_auth import initialize_firebase
+from verse_generator import verse_generator
 
 def login_required(f):
     @wraps(f)
@@ -49,7 +50,27 @@ def create_app():
     app = Flask(__name__)
     
     # Load configuration
-    app.config.from_object(config)
+    app.config.from_object('config.Config')
+    
+    # Email configuration
+    app.config['SMTP_SERVER'] = 'smtp.gmail.com'
+    app.config['SMTP_PORT'] = 587
+    app.config['SENDER_EMAIL'] = 'noreply@divinebridge.com'
+    
+    # Validate required environment variables
+    required_vars = [
+        'GOOGLE_CLOUD_PROJECT'
+    ]
+    
+    # Add Firebase variables if Firebase is being initialized
+    if app.config.get('ENV') == 'production':
+        required_vars.extend(['FIREBASE_PROJECT_ID'])
+    
+    missing_vars = [var for var in required_vars if not os.getenv(var)]
+    if missing_vars and app.config['ENV'] == 'production':
+        raise RuntimeError(f"Missing required environment variables: {', '.join(missing_vars)}")
+    elif missing_vars:
+        logger.warning(f"Missing environment variables in development: {', '.join(missing_vars)}")
     
     # Initialize logging
     logging.basicConfig(level=logging.INFO)
@@ -88,8 +109,11 @@ def create_app():
         app.storage_handler = StorageHandler()
         logger.info("Storage handler initialized")
         
-        # Initialize verse cache
-        app.verse_cache = VerseCache()
+        # Set static folder for verse generator
+        verse_generator.set_static_folder(app.static_folder)
+        
+        # Use the singleton verse cache instance
+        app.verse_cache = verse_cache
         logger.info("Verse cache initialized")
         
         # Register blueprints
@@ -108,6 +132,61 @@ def create_app():
 
 # Create the Flask application
 app = create_app()
+
+@app.route('/')
+def index():
+    """Serve the main index page"""
+    return render_template('index.html')
+
+@app.route('/login')
+def login():
+    """Serve the login page"""
+    return render_template('login.html')
+
+@app.route('/signup')
+def signup():
+    """Serve the signup page"""
+    return render_template('signup.html')
+
+@app.route('/prayers')
+def prayers():
+    """Serve the prayers page"""
+    return render_template('prayers.html')
+
+@app.route('/about')
+def about():
+    """Serve the about page"""
+    return render_template('about.html')
+
+@app.route('/forgot-password')
+def forgot_password():
+    """Serve the forgot password page"""
+    return render_template('forgot_password.html')
+
+@app.route('/reset-password')
+def reset_password():
+    """Serve the reset password page"""
+    return render_template('reset_password.html')
+
+@app.route('/verify-email')
+def verify_email():
+    """Serve the verify email page"""
+    return render_template('verify_email.html')
+
+@app.route('/unsubscribe')
+def unsubscribe():
+    """Serve the unsubscribe page"""
+    return render_template('unsubscribe.html')
+
+@app.route('/_ah/health')
+def health_check():
+    """Health check endpoint for Cloud Run"""
+    status = {
+        'status': 'healthy',
+        'timestamp': datetime.utcnow().isoformat(),
+        'firebase_initialized': getattr(app, 'firebase_initialized', False)
+    }
+    return jsonify(status), 200
 
 if __name__ == '__main__':
     app.run(debug=config.DEBUG, port=5001) 
