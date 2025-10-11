@@ -1012,17 +1012,32 @@
     
     // Load user's prayed prayers cache from backend
     async function loadUserPrayedPrayersCache(userId) {
-        if (!userId) return;
+        if (!userId) {
+            console.log('⚠️ loadUserPrayedPrayersCache: No userId provided');
+            return;
+        }
+        
+        console.log(`🔄 Loading prayed prayers cache for user: ${userId}`);
         
         try {
-            const response = await fetch(`/api/prayer/user/${userId}/prayed-prayers`);
+            const url = `/api/prayer/user/${userId}/prayed-prayers`;
+            console.log(`📡 Fetching from: ${url}`);
+            
+            const response = await fetch(url);
+            console.log(`📥 Response status: ${response.status}`);
+            
             if (response.ok) {
                 const data = await response.json();
                 userPrayedPrayersCache = data.prayer_ids || [];
-                console.log(`📖 Loaded ${userPrayedPrayersCache.length} prayed prayers from backend`);
+                console.log(`✅ Cache loaded successfully!`);
+                console.log(`📊 Number of prayed prayers: ${userPrayedPrayersCache.length}`);
+                console.log(`📋 Prayer IDs in cache:`, userPrayedPrayersCache);
+            } else {
+                console.error(`❌ Failed to load cache. Status: ${response.status}`);
+                userPrayedPrayersCache = [];
             }
         } catch (error) {
-            console.error('Error loading prayed prayers cache:', error);
+            console.error('❌ Error loading prayed prayers cache:', error);
             userPrayedPrayersCache = [];
         }
     }
@@ -1039,20 +1054,54 @@
         return `${year}-${month}-${day}`;
     }
 
+    // Show completion message when all prayers are prayed for
+    function showCompletionMessage() {
+        const prayersList = document.getElementById('prayers-list');
+        prayersList.style.display = 'block'; // Change from grid to block for centered content
+        prayersList.innerHTML = `
+            <div style="text-align: center; padding: 4rem 2rem; background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin: 2rem auto; max-width: 600px;">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">🙏</div>
+                <h2 style="color: var(--blue); font-size: 2rem; margin-bottom: 1rem; font-weight: 700;">Amazing!</h2>
+                <p style="color: #333; font-size: 1.2rem; margin-bottom: 2rem; line-height: 1.6;">
+                    You've prayed for all the prayer requests in our community.<br>
+                    Your prayers make a difference!
+                </p>
+                <button onclick="location.reload()" style="padding: 1rem 2rem; background: linear-gradient(135deg, var(--blue), #2c5282); color: white; border: none; border-radius: 50px; font-size: 1rem; font-weight: 600; cursor: pointer; box-shadow: 0 4px 15px rgba(31, 60, 136, 0.3); transition: all 0.3s ease;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                    Refresh to See New Requests
+                </button>
+            </div>
+        `;
+    }
+
     // Load prayers with user filtering
     async function loadInitialPrayers() {
         const clientDate = getClientLocalDate();
+        console.log('═══════════════════════════════════════');
+        console.log('🚀 loadInitialPrayers STARTED');
+        console.log('═══════════════════════════════════════');
         console.log('Loading prayers for client date:', clientDate);
         
         // Get user ID and load their prayed prayers cache first
         const userId = currentUser ? currentUser.uid : getCachedUserId();
+        console.log('🔍 User ID:', userId);
+        console.log('🔍 currentUser:', currentUser ? 'exists' : 'null');
+        console.log('🔍 Cache before load:', userPrayedPrayersCache);
+        
         if (userId) {
+            console.log('📥 Loading prayed prayers cache from backend...');
             await loadUserPrayedPrayersCache(userId);
+            console.log('✅ Cache loaded. Prayed prayers:', userPrayedPrayersCache ? userPrayedPrayersCache.length : 0);
+            console.log('✅ Cache content:', userPrayedPrayersCache);
+        } else {
+            console.log('⚠️ No user ID - cannot load cache');
         }
         
-        fetch(`/api/prayer/prayers?client_date=${clientDate}`)
-            .then(response => response.json())
-            .then(data => {
+        // Now fetch prayers after cache is loaded
+        try {
+            const response = await fetch(`/api/prayer/prayers?client_date=${clientDate}`);
+            const data = await response.json();
+            
+            if (data.prayers) {
                 const prayersList = document.getElementById('prayers-list');
                 if (prayersList && data.prayers) {
                     // Only show prayer requests (exclude daily prayer - has no title and is generated)
@@ -1062,20 +1111,23 @@
                     const userId = currentUser ? currentUser.uid : getCachedUserId();
                     console.log('Initial load - User ID:', userId);
                     
-                    // Check localStorage for prayed prayers
-                    if (userId) {
-                        const prayedForKey = `divinebridge_prayed_for_${userId}`;
-                        const prayedList = localStorage.getItem(prayedForKey);
-                        console.log('localStorage key:', prayedForKey);
-                        console.log('Prayed for prayers:', prayedList);
+                    // Check backend cache status
+                    console.log('🔍 FILTERING CHECK:');
+                    console.log(`   Total prayer requests: ${prayerRequests.length}`);
+                    console.log(`   User ID: ${userId}`);
+                    console.log(`   Cache loaded: ${userPrayedPrayersCache !== null}`);
+                    console.log(`   Prayers in cache: ${userPrayedPrayersCache ? userPrayedPrayersCache.length : 0}`);
+                    if (userPrayedPrayersCache && userPrayedPrayersCache.length > 0) {
+                        console.log(`   Prayer IDs in cache:`, userPrayedPrayersCache);
                     }
                     
-                    // Filter out prayers user has already prayed for
+                    // Filter out prayers user has already prayed for (using backend cache)
                     const availablePrayers = userId 
                         ? prayerRequests.filter(p => {
                             const hasPrayed = hasUserPrayedForPrayerSync(userId, p.id);
+                            console.log(`   Checking prayer "${p.title}" (ID: ${p.id}): ${hasPrayed ? '❌ SKIP' : '✅ INCLUDE'}`);
                             if (hasPrayed) {
-                                console.log(`✅ Filtering out prayer: ${p.title} (ID: ${p.id})`);
+                                console.log(`      → Found in cache! Will filter out.`);
                             }
                             return !hasPrayed;
                           })
@@ -1090,20 +1142,8 @@
                     
                     // Check if no prayers available
                     if (displayPrayers.length === 0) {
-                        prayersList.innerHTML = `
-                            <div style="grid-column: 1 / -1; text-align: center; padding: 4rem 2rem;">
-                                <div style="font-size: 4rem; margin-bottom: 1rem;">🙏</div>
-                                <h2 style="color: var(--blue); font-size: 2rem; margin-bottom: 1rem; font-weight: 700;">Amazing!</h2>
-                                <p style="color: var(--gray); font-size: 1.2rem; margin-bottom: 2rem; line-height: 1.6;">
-                                    You've prayed for all the prayer requests in our community.<br>
-                                    Your prayers make a difference!
-                                </p>
-                                <button onclick="location.reload()" style="padding: 1rem 2rem; background: var(--gold); color: var(--black); border: none; border-radius: 50px; font-size: 1rem; font-weight: 600; cursor: pointer; box-shadow: 0 4px 15px rgba(245, 197, 66, 0.3); transition: all 0.3s ease;">
-                                    Refresh to See New Requests
-                                </button>
-                            </div>
-                        `;
-                        prayersList.style.display = 'grid';
+                        console.log('⭐ No prayers available - showing completion message');
+                        showCompletionMessage();
                         return;
                     }
                     
@@ -1121,23 +1161,23 @@
                                     <span class="stat-item"><span class="stat-value">${analytics.views}</span> views</span>
                                     <span class="stat-item"><span class="stat-value">${analytics.prayers}</span> prayers</span>
                                 </div>
-                                    <div class="prayer-meta">
+            <div class="prayer-meta">
                                     <span class="prayer-date">${new Date(prayer.created_at).toLocaleDateString()}</span>
-                                    </div>
+            </div>
                                 <span class="expand-hint">↗</span>
                                 <button class="pray-button" style="display: none;" onclick="prayForThis(event, '${prayer.id}')">
                                     I Prayed for This
-                                </button>
+                </button>
                             </div>
                         `;
                     }).join('');
                     
                     prayersList.style.display = 'grid';
                 }
-            })
-            .catch(error => {
-                console.error('Error loading prayers:', error);
-            });
+            }
+        } catch (error) {
+            console.error('Error loading prayers:', error);
+        }
     }
     
     // Don't load prayers immediately - wait for Firebase auth to be ready
@@ -1481,15 +1521,16 @@
     // Show completion message when all prayers are prayed for
     function showCompletionMessage() {
         const prayersList = document.getElementById('prayers-list');
+        prayersList.style.display = 'block'; // Change from grid to block for centered content
         prayersList.innerHTML = `
-            <div style="grid-column: 1 / -1; text-align: center; padding: 4rem 2rem;">
+            <div style="text-align: center; padding: 4rem 2rem; background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin: 2rem auto; max-width: 600px;">
                 <div style="font-size: 4rem; margin-bottom: 1rem;">🙏</div>
                 <h2 style="color: var(--blue); font-size: 2rem; margin-bottom: 1rem; font-weight: 700;">Amazing!</h2>
-                <p style="color: var(--gray); font-size: 1.2rem; margin-bottom: 2rem; line-height: 1.6;">
+                <p style="color: #333; font-size: 1.2rem; margin-bottom: 2rem; line-height: 1.6;">
                     You've prayed for all the prayer requests in our community.<br>
                     Your prayers make a difference!
                 </p>
-                <button onclick="location.reload()" style="padding: 1rem 2rem; background: var(--gold); color: var(--black); border: none; border-radius: 50px; font-size: 1rem; font-weight: 600; cursor: pointer; box-shadow: 0 4px 15px rgba(245, 197, 66, 0.3); transition: all 0.3s ease;">
+                <button onclick="location.reload()" style="padding: 1rem 2rem; background: linear-gradient(135deg, var(--blue), #2c5282); color: white; border: none; border-radius: 50px; font-size: 1rem; font-weight: 600; cursor: pointer; box-shadow: 0 4px 15px rgba(31, 60, 136, 0.3); transition: all 0.3s ease;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
                     Refresh to See New Requests
                 </button>
             </div>
@@ -1555,36 +1596,48 @@
     function initializePrayerPage() {
         updateDebug('initializePrayerPage called. Checking Firebase...');
         
-        // Check if Firebase is available
-        if (typeof firebase !== 'undefined' && firebase.auth) {
-            updateDebug('Firebase found! Setting up auth listener...');
-            setupAuthListener();
-        } else {
-            updateDebug('Firebase not found, waiting for firebase-loaded event...');
-            // Wait for Firebase to load
-            window.addEventListener('firebase-loaded', function() {
-                updateDebug('firebase-loaded event received!');
-                setupAuthListener();
-            });
-        }
+        // Simple approach: Just call setupAuthListener
+        // Firebase auth listener will wait until Firebase is ready
+        setupAuthListener();
         
-        updateDebug('Waiting for Firebase auth...');
+        updateDebug('Auth listener setup initiated...');
     }
 
     function setupAuthListener() {
         updateDebug('Auth listener setup started...');
-        // Note: currentUser is set by base.html auth listener
-        // We just need to update UI based on auth state
-        firebase.auth().onAuthStateChanged(function(user) {
-            updateDebug(`Auth state changed! User: ${user ? user.email : 'Not logged in'}`);
-            // currentUser is already set by base.html listener, no need to set it again
-            console.log('Prayer Room auth check. User:', user ? user.email : 'Not logged in');
-            // Always show prayers, whether logged in or not
-            showPrayersContent();
-            updateDebug('showPrayersContent called, now loading prayers...');
-            // Use loadInitialPrayers which has user filtering
-            loadInitialPrayers();
-        });
+        
+        // Ensure Firebase is initialized before setting up listener
+        if (typeof firebase === 'undefined' || !firebase.auth) {
+            updateDebug('Firebase not ready, retrying in 100ms...');
+            setTimeout(setupAuthListener, 100);
+            return;
+        }
+        
+        try {
+            updateDebug('Setting up Firebase auth listener...');
+            // Note: currentUser is set by base.html auth listener
+            // We just need to update UI based on auth state
+            firebase.auth().onAuthStateChanged(function(user) {
+                updateDebug(`Auth state changed! User: ${user ? user.email : 'Not logged in'}`);
+                console.log('Prayer Room auth check. User:', user ? user.email : 'Not logged in');
+                console.log('Prayer Room user object:', user);
+                
+                // Set currentUser if not already set by base.html
+                if (user && !currentUser) {
+                    currentUser = user;
+                    console.log('✅ Set currentUser from auth listener');
+                }
+                
+                // Always show prayers, whether logged in or not
+                showPrayersContent();
+                updateDebug('showPrayersContent called, now loading prayers...');
+                // Use loadInitialPrayers which has user filtering
+                loadInitialPrayers();
+            });
+        } catch (error) {
+            updateDebug(`Error setting up auth listener: ${error.message}. Retrying...`);
+            setTimeout(setupAuthListener, 100);
+        }
     }
 
     function showPrayersContent() {
@@ -1611,8 +1664,12 @@
             
             // Load user's prayed prayers cache first
             const userId = currentUser ? currentUser.uid : getCachedUserId();
-            if (userId && !userPrayedPrayersCache) {
+            if (userId) {
+                console.log('loadPrayers - Loading cache for user:', userId);
                 await loadUserPrayedPrayersCache(userId);
+                console.log('loadPrayers - Cache loaded:', userPrayedPrayersCache ? userPrayedPrayersCache.length : 0);
+            } else {
+                console.log('loadPrayers - No user ID, skipping cache load');
             }
             
             // Show skeleton loaders for better UX
@@ -1658,20 +1715,19 @@
         const userId = currentUser ? currentUser.uid : getCachedUserId();
         console.log('displayPrayers - User ID:', userId);
         
-        // Check localStorage
-        if (userId) {
-            const prayedForKey = `divinebridge_prayed_for_${userId}`;
-            const prayedList = localStorage.getItem(prayedForKey);
-            console.log('displayPrayers - localStorage key:', prayedForKey);
-            console.log('displayPrayers - Prayed for prayers:', prayedList);
+        // Check backend cache status
+        console.log('displayPrayers - Cache loaded:', userPrayedPrayersCache !== null);
+        console.log('displayPrayers - Prayed prayers in cache:', userPrayedPrayersCache ? userPrayedPrayersCache.length : 0);
+        if (userPrayedPrayersCache && userPrayedPrayersCache.length > 0) {
+            console.log('displayPrayers - Prayer IDs:', userPrayedPrayersCache);
         }
         
-        // Filter out prayers user has already prayed for
+        // Filter out prayers user has already prayed for (using backend cache)
         const availablePrayers = userId 
             ? prayerRequests.filter(p => {
                 const hasPrayed = hasUserPrayedForPrayerSync(userId, p.id);
                 if (hasPrayed) {
-                    console.log(`displayPrayers - Filtering: ${p.title} (ID: ${p.id})`);
+                    console.log(`displayPrayers - ❌ FILTERING: ${p.title} (ID: ${p.id})`);
                 }
                 return !hasPrayed;
               })
@@ -1924,7 +1980,9 @@
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', () => {
         checkFirstVisit();
-        loadPrayers();
+        // Don't call loadPrayers() here - let Firebase auth listener handle it
+        // to ensure user ID is available before loading cache
+        console.log('DOM loaded, waiting for Firebase auth...');
         // Modal already initialized above
     });
 </script>
