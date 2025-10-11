@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}Divine Bridge - Privacy Policy{% endblock %}
+
+{% block extra_css %}
+<style>
+    .privacy-section {
+        padding: 8rem 2rem 4rem;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .privacy-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 2.5rem;
+        color: var(--black);
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+
+    .privacy-content {
+        background: var(--white);
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .privacy-section-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 1.8rem;
+        color: var(--black);
+        margin: 2rem 0 1rem;
+    }
+
+    .privacy-section-title:first-child {
+        margin-top: 0;
+    }
+
+    .privacy-text {
+        color: var(--black);
+        opacity: 0.8;
+        line-height: 1.8;
+        margin-bottom: 1.5rem;
+    }
+
+    .privacy-list {
+        list-style: disc;
+        margin-left: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .privacy-list li {
+        color: var(--black);
+        opacity: 0.8;
+        line-height: 1.8;
+        margin-bottom: 0.5rem;
+    }
+
+    .last-updated {
+        color: var(--black);
+        opacity: 0.6;
+        font-size: 0.9rem;
+        text-align: center;
+        margin-top: 2rem;
+    }
+
+    @media (max-width: 768px) {
+        .privacy-section {
+            padding: 6rem 1rem 2rem;
+        }
+
+        .privacy-title {
+            font-size: 2rem;
+        }
+
+        .privacy-content {
+            padding: 1.5rem;
+        }
+
+        .privacy-section-title {
+            font-size: 1.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="privacy-section">
+    <h1 class="privacy-title">Privacy Policy</h1>
+    <div class="privacy-content">
+        <h2 class="privacy-section-title">Introduction</h2>
+        <p class="privacy-text">
+            At Divine Bridge, we take your privacy seriously. This Privacy Policy explains how we collect, use, disclose, 
+            and safeguard your information when you use our prayer platform. Please read this privacy policy carefully. 
+            If you do not agree with the terms of this privacy policy, please do not access the site.
+        </p>
+
+        <h2 class="privacy-section-title">Information We Collect</h2>
+        <p class="privacy-text">
+            We collect information that you provide directly to us, including:
+        </p>
+        <ul class="privacy-list">
+            <li>Name and email address when you create an account</li>
+            <li>Prayer requests and comments you submit</li>
+            <li>Profile information you choose to share</li>
+            <li>Communications with us</li>
+        </ul>
+
+        <h2 class="privacy-section-title">How We Use Your Information</h2>
+        <p class="privacy-text">
+            We use the information we collect to:
+        </p>
+        <ul class="privacy-list">
+            <li>Provide and maintain our services</li>
+            <li>Process your prayer requests and comments</li>
+            <li>Send you important updates and notifications</li>
+            <li>Improve our platform and user experience</li>
+            <li>Protect against unauthorized access</li>
+        </ul>
+
+        <h2 class="privacy-section-title">Information Sharing</h2>
+        <p class="privacy-text">
+            We do not sell, trade, or otherwise transfer your personal information to third parties. We may share your 
+            information only in the following circumstances:
+        </p>
+        <ul class="privacy-list">
+            <li>With your consent</li>
+            <li>To comply with legal obligations</li>
+            <li>To protect our rights and safety</li>
+        </ul>
+
+        <h2 class="privacy-section-title">Data Security</h2>
+        <p class="privacy-text">
+            We implement appropriate security measures to protect your personal information. However, no method of 
+            transmission over the Internet is 100% secure, and we cannot guarantee absolute security.
+        </p>
+
+        <h2 class="privacy-section-title">Your Rights</h2>
+        <p class="privacy-text">
+            You have the right to:
+        </p>
+        <ul class="privacy-list">
+            <li>Access your personal information</li>
+            <li>Correct inaccurate information</li>
+            <li>Request deletion of your information</li>
+            <li>Opt-out of communications</li>
+        </ul>
+
+        <h2 class="privacy-section-title">Contact Us</h2>
+        <p class="privacy-text">
+            If you have any questions about this Privacy Policy, please contact us at:
+            <br>
+            Email: privacy@divinebridge.com
+        </p>
+
+        <p class="last-updated">Last updated: March 15, 2024</p>
+    </div>
+</section>
+{% endblock %} 

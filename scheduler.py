@@ -56,18 +56,18 @@ class PrayerScheduler:
                 EVENT_JOB_ERROR | EVENT_JOB_MISSED
             )
             
-            # Add the daily prayer job
-            logger.info("Adding daily prayer job")
+            # Add the daily prayer job - runs at UTC midnight
+            logger.info("Adding daily prayer job (UTC midnight)")
             self.scheduler.add_job(
                 self.generate_and_send_prayers,
                 'cron',
-                hour=11,
-                minute=30,
+                hour=0,
+                minute=0,
                 id='daily_prayer_job',
                 replace_existing=True,
                 misfire_grace_time=3600,  # Allow job to run up to 1 hour late
                 coalesce=True,  # Combine multiple missed runs into one
-                timezone=self.timezone
+                timezone='UTC'  # Always use UTC for consistent global generation
             )
             
             logger.info("Successfully initialized PrayerScheduler")

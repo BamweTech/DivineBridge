@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Prayer Debug Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .info-box {
+            background: #f0f0f0;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .prayer-content {
+            background: #e3f2fd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+    </style>
+</head>
+<body>
+    <h1>🙏 Prayer Debug Test</h1>
+    
+    <div class="info-box">
+        <strong>System Date:</strong> <span id="system-date"></span>
+    </div>
+    
+    <div class="info-box">
+        <strong>Client Local Date (YYYY-MM-DD):</strong> <span id="client-date"></span>
+    </div>
+    
+    <div class="info-box">
+        <strong>API URL:</strong> <span id="api-url"></span>
+    </div>
+    
+    <div class="info-box">
+        <strong>Total Prayers Returned:</strong> <span id="total-prayers"></span>
+    </div>
+    
+    <div class="info-box">
+        <strong>Daily Prayer Found:</strong> <span id="prayer-found"></span>
+    </div>
+    
+    <div class="info-box">
+        <strong>Daily Prayer Date:</strong> <span id="prayer-date"></span>
+    </div>
+    
+    <div class="prayer-content">
+        <strong>Prayer Content:</strong><br><br>
+        <span id="prayer-content"></span>
+    </div>
+    
+    <h2>All API Response:</h2>
+    <pre id="api-response" style="background: #f5f5f5; padding: 15px; overflow: auto; max-height: 400px;"></pre>
+
+    <script>
+        // Helper function to get client's local date in YYYY-MM-DD format
+        function getClientLocalDate() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // Display system date
+        const now = new Date();
+        document.getElementById('system-date').textContent = now.toString();
+        
+        // Display client date
+        const clientDate = getClientLocalDate();
+        document.getElementById('client-date').textContent = clientDate;
+        
+        // Display API URL
+        const apiUrl = `/api/prayer/prayers?client_date=${clientDate}`;
+        document.getElementById('api-url').textContent = apiUrl;
+
+        // Fetch and display prayer data
+        async function testPrayer() {
+            try {
+                console.log('Fetching from:', apiUrl);
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+                
+                console.log('API Response:', data);
+                
+                // Display total prayers
+                document.getElementById('total-prayers').textContent = data.prayers.length;
+                
+                // Display full API response
+                document.getElementById('api-response').textContent = JSON.stringify(data, null, 2);
+                
+                // Find today's daily prayer
+                const dailyPrayer = data.prayers.find(p => {
+                    console.log('Checking prayer:', {
+                        source: p.source,
+                        title: p.title,
+                        hasTitle: !!p.title,
+                        isGenerated: p.source === 'generated',
+                        noTitle: !p.title,
+                        match: p.source === 'generated' && !p.title
+                    });
+                    return p.source === 'generated' && !p.title;
+                });
+                
+                if (dailyPrayer) {
+                    document.getElementById('prayer-found').textContent = '✅ YES';
+                    document.getElementById('prayer-found').parentElement.classList.add('success');
+                    document.getElementById('prayer-date').textContent = dailyPrayer.date;
+                    document.getElementById('prayer-content').textContent = dailyPrayer.content;
+                } else {
+                    document.getElementById('prayer-found').textContent = '❌ NO';
+                    document.getElementById('prayer-found').parentElement.classList.add('error');
+                    document.getElementById('prayer-date').textContent = 'N/A';
+                    document.getElementById('prayer-content').textContent = 'No daily prayer found!';
+                    
+                    console.error('Daily prayer not found. Prayers in response:', data.prayers.map(p => ({
+                        source: p.source,
+                        title: p.title,
+                        date: p.date
+                    })));
+                }
+            } catch (error) {
+                console.error('Error fetching prayer:', error);
+                document.getElementById('prayer-found').textContent = '❌ ERROR';
+                document.getElementById('prayer-found').parentElement.classList.add('error');
+                document.getElementById('prayer-content').textContent = `Error: ${error.message}`;
+            }
+        }
+
+        // Run test
+        testPrayer();
+    </script>
+</body>
+</html>
+

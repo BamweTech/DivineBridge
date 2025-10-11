@@ -17,6 +17,7 @@ from google.oauth2 import service_account
 import io
 import tempfile
 import uuid
+from typing import Optional
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ class StorageHandler:
             try:
                 # Create credentials from the JSON string
                 credentials = service_account.Credentials.from_service_account_info(
-                    json.loads(config.GOOGLE_CLOUD_CREDENTIALS),
+                    json.loads(config.google_credentials),
                     scopes=['https://www.googleapis.com/auth/devstorage.read_write']
                 )
                 
@@ -354,4 +355,397 @@ class StorageHandler:
             return True
         except Exception as e:
             logger.error(f"Error recording welcome email sent to {email} on {date}: {e}")
-            return False 
+            return False
+
+    def save_prayer_request(self, prayer_request_data: dict) -> bool:
+        """Save prayer request to Cloud Storage with robust retry logic.
+        
+        Args:
+            prayer_request_data: The prayer request content and metadata
+            
+        Returns:
+            bool: True if prayer request was saved successfully, False otherwise
+        """
+        try:
+            # Generate a unique ID for the prayer request
+            prayer_request_id = str(uuid.uuid4())
+            date = prayer_request_data.get('date', datetime.now().strftime('%Y-%m-%d'))
+            blob_name = f"prayer_requests/{date}/{prayer_request_id}.json"
+            
+            def _upload_with_retry():
+                try:
+                    blob = self.bucket.blob(blob_name)
+                    # Convert prayer request data to JSON and upload
+                    prayer_request_json = json.dumps(prayer_request_data)
+                    blob.upload_from_string(prayer_request_json, content_type='application/json')
+                    return True
+                except Exception as e:
+                    logger.error(f"Error in upload operation: {str(e)}")
+                    return False
+
+            # Use the retry decorator with specific retry conditions
+            @retry.Retry(
+                predicate=retry.if_exception_type(
+                    (ServiceUnavailable, requests.exceptions.SSLError, 
+                     requests.exceptions.ConnectionError)
+                ),
+                initial=1.0,
+                maximum=60.0,
+                multiplier=2,
+                deadline=300.0
+            )
+            def _retry_upload():
+                return _upload_with_retry()
+
+            success = _retry_upload()
+            if success:
+                logger.info(f"Successfully saved prayer request with ID: {prayer_request_id}")
+                return True
+            
+            logger.error(f"Failed to save prayer request after retries")
+            return False
+
+        except Exception as e:
+            logger.error(f"Unexpected error saving prayer request: {str(e)}")
+            return False
+
+    def get_prayer_requests(self, limit: int = 50) -> list:
+        """Get recent prayer requests from Cloud Storage"""
+        try:
+            prayer_requests = []
+            blobs = self.bucket.list_blobs(prefix='prayer_requests/')
+            
+            # Sort blobs by creation time (newest first)
+            sorted_blobs = sorted(blobs, key=lambda x: x.time_created, reverse=True)
+            
+            # Get the most recent prayer requests up to the limit
+            for blob in sorted_blobs[:limit]:
+                try:
+                    prayer_request_json = blob.download_as_text()
+                    prayer_request_data = json.loads(prayer_request_json)
+                    # Add the request ID from the blob name
+                    request_id = blob.name.split('/')[-1].replace('.json', '')
+                    prayer_request_data['id'] = request_id
+                    prayer_requests.append(prayer_request_data)
+                except Exception as e:
+                    logger.error(f"Error processing prayer request blob {blob.name}: {e}")
+                    continue
+            
+            return prayer_requests
+        except Exception as e:
+            logger.error(f"Error getting prayer requests: {e}")
+            return []
+    
+    def get_prayer_request_by_id(self, request_id: str) -> Optional[dict]:
+        """
+        Get a specific prayer request by ID
+        
+        Args:
+            request_id: UUID of the prayer request
+        
+        Returns:
+            Prayer request data or None
+        """
+        try:
+            # Search for the prayer request across all dates
+            blobs = self.bucket.list_blobs(prefix='prayer_requests/')
+            
+            for blob in blobs:
+                if request_id in blob.name:
+                    prayer_data = json.loads(blob.download_as_text())
+                    prayer_data['id'] = request_id
+                    prayer_data['_blob_name'] = blob.name  # Store for updates
+                    return prayer_data
+            
+            logger.warning(f"Prayer request not found: {request_id}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting prayer request {request_id}: {e}")
+            return None
+    
+    def get_user_prayed_prayers(self, user_id: str) -> list:
+        """
+        Get list of prayer IDs that a user has prayed for
+        
+        Args:
+            user_id: Firebase user ID
+        
+        Returns:
+            List of prayer IDs
+        """
+        try:
+            blob_path = f'user_interactions/{user_id}/prayed_for.json'
+            data = self.get_json_from_storage(blob_path)
+            if data:
+                return data.get('prayer_ids', [])
+            return []
+        except Exception as e:
+            logger.error(f"Error getting user prayed prayers: {e}")
+            return []
+    
+    def add_user_prayed_prayer(self, user_id: str, prayer_id: str) -> bool:
+        """
+        Add a prayer ID to user's prayed-for list
+        
+        Args:
+            user_id: Firebase user ID
+            prayer_id: Prayer request ID
+        
+        Returns:
+            True if successful
+        """
+        try:
+            blob_path = f'user_interactions/{user_id}/prayed_for.json'
+            
+            # Get existing data
+            data = self.get_json_from_storage(blob_path) or {'prayer_ids': [], 'updated_at': None}
+            prayer_ids = data.get('prayer_ids', [])
+            
+            # Add if not already there
+            if prayer_id not in prayer_ids:
+                prayer_ids.append(prayer_id)
+                data['prayer_ids'] = prayer_ids
+                data['updated_at'] = datetime.now().isoformat()
+                
+                # Save back
+                self.save_json_to_storage(blob_path, data)
+                logger.info(f"Added prayer {prayer_id} to user {user_id}'s prayed-for list")
+                return True
+            
+            return True  # Already exists, still success
+            
+        except Exception as e:
+            logger.error(f"Error adding user prayed prayer: {e}")
+            return False
+    
+    def get_user_stats(self, user_id: str) -> dict:
+        """
+        Get user statistics (synced across devices)
+        
+        Args:
+            user_id: Firebase user ID
+        
+        Returns:
+            Dictionary with user stats
+        """
+        try:
+            # Get basic stats
+            blob_path = f'user_interactions/{user_id}/stats.json'
+            data = self.get_json_from_storage(blob_path) or {}
+            
+            stats = {
+                'prayersRead': data.get('prayersRead', 0),
+                'requestsSubmitted': data.get('requestsSubmitted', 0),
+                'updated_at': data.get('updated_at')
+            }
+            
+            # Calculate "People you prayed for" - count of unique prayers in prayed_for list
+            prayed_for_list = self.get_user_prayed_prayers(user_id)
+            stats['peopleYouPrayedFor'] = len(prayed_for_list)
+            
+            # Calculate "People who prayed for you" - sum of prayers on user's submitted requests
+            try:
+                # Get all prayer requests submitted by this user
+                all_requests = self.get_prayer_requests(limit=200)
+                user_requests = [r for r in all_requests if r.get('user_id') == user_id]
+                
+                # Sum up all prayers received
+                total_prayers_received = 0
+                for request in user_requests:
+                    analytics = request.get('analytics', {})
+                    total_prayers_received += analytics.get('prayers', 0)
+                
+                stats['peopleWhoPrayedForYou'] = total_prayers_received
+                logger.info(f"User {user_id} has {len(user_requests)} requests with {total_prayers_received} total prayers")
+                
+            except Exception as e:
+                logger.error(f"Error calculating received prayers: {e}")
+                stats['peopleWhoPrayedForYou'] = 0
+            
+            return stats
+            
+        except Exception as e:
+            logger.error(f"Error getting user stats: {e}")
+            return {
+                'prayersRead': 0,
+                'requestsSubmitted': 0,
+                'peopleYouPrayedFor': 0,
+                'peopleWhoPrayedForYou': 0,
+                'updated_at': None
+            }
+    
+    def increment_user_stat(self, user_id: str, stat_name: str) -> bool:
+        """
+        Increment a user statistic (synced across devices)
+        
+        Args:
+            user_id: Firebase user ID
+            stat_name: Name of stat to increment (e.g., 'prayersRead', 'requestsSubmitted')
+        
+        Returns:
+            True if successful
+        """
+        try:
+            blob_path = f'user_interactions/{user_id}/stats.json'
+            
+            # Get existing data
+            data = self.get_json_from_storage(blob_path) or {}
+            
+            # Increment stat
+            data[stat_name] = data.get(stat_name, 0) + 1
+            data['updated_at'] = datetime.now().isoformat()
+            
+            # Save back
+            self.save_json_to_storage(blob_path, data)
+            logger.info(f"Incremented {stat_name} for user {user_id}: {data[stat_name]}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error incrementing user stat: {e}")
+            return False
+    
+    def update_prayer_request(self, request_id: str, prayer_data: dict) -> bool:
+        """
+        Update a prayer request (e.g., increment analytics)
+        
+        Args:
+            request_id: UUID of the prayer request
+            prayer_data: Updated prayer request data
+        
+        Returns:
+            True if successful
+        """
+        try:
+            # Get blob name from prayer data or search for it
+            blob_name = prayer_data.get('_blob_name')
+            
+            if not blob_name:
+                # Search for the blob
+                blobs = self.bucket.list_blobs(prefix='prayer_requests/')
+                for blob in blobs:
+                    if request_id in blob.name:
+                        blob_name = blob.name
+                        break
+            
+            if not blob_name:
+                logger.error(f"Could not find blob for prayer request: {request_id}")
+                return False
+            
+            # Remove internal fields before saving
+            save_data = {k: v for k, v in prayer_data.items() if not k.startswith('_')}
+            
+            # Update the blob
+            blob = self.bucket.blob(blob_name)
+            blob.upload_from_string(
+                json.dumps(save_data),
+                content_type='application/json'
+            )
+            
+            logger.debug(f"Updated prayer request: {request_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error updating prayer request {request_id}: {e}")
+            return False
+    
+    def save_json_to_storage(self, file_path: str, data: dict) -> bool:
+        """
+        Save JSON data to Cloud Storage
+        
+        Args:
+            file_path: Path in bucket (e.g., 'user_locations/user123.json')
+            data: Dictionary to save as JSON
+        
+        Returns:
+            True if successful
+        """
+        try:
+            blob = self.bucket.blob(file_path)
+            json_data = json.dumps(data, indent=2)
+            blob.upload_from_string(json_data, content_type='application/json')
+            logger.debug(f"Saved JSON to {file_path}")
+            return True
+        except Exception as e:
+            logger.error(f"Error saving JSON to {file_path}: {e}")
+            return False
+    
+    def get_json_from_storage(self, file_path: str) -> Optional[dict]:
+        """
+        Retrieve JSON data from Cloud Storage
+        
+        Args:
+            file_path: Path in bucket
+        
+        Returns:
+            Dictionary if found, None otherwise
+        """
+        try:
+            blob = self.bucket.blob(file_path)
+            if blob.exists():
+                json_data = blob.download_as_text()
+                return json.loads(json_data)
+            return None
+        except Exception as e:
+            logger.debug(f"Error getting JSON from {file_path}: {e}")
+            return None
+    
+    def upload_logo(self, file_path: str, logo_data: bytes) -> Optional[str]:
+        """
+        Upload logo image to Cloud Storage and generate signed URL
+        
+        Args:
+            file_path: Path in bucket (e.g., 'organization_logos/org-name.png')
+            logo_data: Binary image data
+        
+        Returns:
+            Signed URL of the uploaded logo (valid for 7 days) or None
+        """
+        try:
+            blob = self.bucket.blob(file_path)
+            
+            # Upload with correct content type
+            blob.upload_from_string(
+                logo_data,
+                content_type='image/png'
+            )
+            
+            # Generate a signed URL (valid for 7 days)
+            from datetime import timedelta
+            signed_url = blob.generate_signed_url(
+                version="v4",
+                expiration=timedelta(days=7),
+                method="GET"
+            )
+            
+            logger.debug(f"Uploaded logo to {file_path}, generated signed URL (valid 7 days)")
+            return signed_url
+            
+        except Exception as e:
+            logger.error(f"Error uploading logo to {file_path}: {e}")
+            return None
+    
+    def get_public_url(self, file_path: str) -> Optional[str]:
+        """
+        Get signed URL of a file in Cloud Storage if it exists
+        
+        Args:
+            file_path: Path in bucket
+        
+        Returns:
+            Signed URL (valid for 7 days) if file exists, None otherwise
+        """
+        try:
+            blob = self.bucket.blob(file_path)
+            if blob.exists():
+                from datetime import timedelta
+                signed_url = blob.generate_signed_url(
+                    version="v4",
+                    expiration=timedelta(days=7),
+                    method="GET"
+                )
+                return signed_url
+            return None
+        except Exception as e:
+            logger.debug(f"Error checking file existence for {file_path}: {e}")
+            return None 

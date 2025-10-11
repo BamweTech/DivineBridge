@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Divine Bridge - Edit Profile{% endblock %}
+
+{% block extra_css %}
+<style>
+    .edit-profile-section {
+        padding: 8rem 2rem 4rem;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .edit-profile-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 2.5rem;
+        color: var(--black);
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+
+    .edit-profile-form {
+        background: var(--white);
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 500;
+        color: var(--black);
+        margin-bottom: 0.5rem;
+    }
+
+    .form-group input {
+        width: 100%;
+        padding: 0.8rem;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 1rem;
+    }
+
+    .form-group input:focus {
+        outline: none;
+        border-color: var(--gold);
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+
+    .form-button {
+        flex: 1;
+        padding: 1rem;
+        border: none;
+        border-radius: 6px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+    }
+
+    .save-button {
+        background: var(--gold);
+        color: var(--black);
+    }
+
+    .cancel-button {
+        background: #6c757d;
+        color: var(--white);
+    }
+
+    .form-button:hover {
+        transform: translateY(-2px);
+    }
+
+    .error-message {
+        color: #dc3545;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+
+    .success-message {
+        color: #28a745;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+
+    @media (max-width: 768px) {
+        .edit-profile-section {
+            padding: 6rem 1rem 2rem;
+        }
+
+        .edit-profile-title {
+            font-size: 2rem;
+        }
+
+        .edit-profile-form {
+            padding: 1.5rem;
+        }
+
+        .form-actions {
+            flex-direction: column;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="edit-profile-section">
+    <h1 class="edit-profile-title">Edit Profile</h1>
+    {% if error %}
+    <div class="error-message">{{ error }}</div>
+    {% endif %}
+    {% if success %}
+    <div class="success-message">{{ success }}</div>
+    {% endif %}
+    <form class="edit-profile-form" method="POST" action="{{ url_for('auth.edit_profile') }}">
+        <div class="form-group">
+            <label for="name">Full Name</label>
+            <input type="text" id="name" name="name" value="{{ current_user.name }}" required>
+        </div>
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" value="{{ current_user.email }}" required>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="form-button save-button">Save Changes</button>
+            <a href="{{ url_for('auth.profile') }}" class="form-button cancel-button">Cancel</a>
+        </div>
+    </form>
+</section>
+{% endblock %} 

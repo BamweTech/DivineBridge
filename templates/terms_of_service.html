@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Divine Bridge - Terms of Service{% endblock %}
+
+{% block extra_css %}
+<style>
+    .terms-section {
+        padding: 8rem 2rem 4rem;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .terms-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 2.5rem;
+        color: var(--black);
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+
+    .terms-content {
+        background: var(--white);
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .terms-section-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 1.8rem;
+        color: var(--black);
+        margin: 2rem 0 1rem;
+    }
+
+    .terms-section-title:first-child {
+        margin-top: 0;
+    }
+
+    .terms-text {
+        color: var(--black);
+        opacity: 0.8;
+        line-height: 1.8;
+        margin-bottom: 1.5rem;
+    }
+
+    .terms-list {
+        list-style: disc;
+        margin-left: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .terms-list li {
+        color: var(--black);
+        opacity: 0.8;
+        line-height: 1.8;
+        margin-bottom: 0.5rem;
+    }
+
+    .last-updated {
+        color: var(--black);
+        opacity: 0.6;
+        font-size: 0.9rem;
+        text-align: center;
+        margin-top: 2rem;
+    }
+
+    @media (max-width: 768px) {
+        .terms-section {
+            padding: 6rem 1rem 2rem;
+        }
+
+        .terms-title {
+            font-size: 2rem;
+        }
+
+        .terms-content {
+            padding: 1.5rem;
+        }
+
+        .terms-section-title {
+            font-size: 1.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="terms-section">
+    <h1 class="terms-title">Terms of Service</h1>
+    <div class="terms-content">
+        <h2 class="terms-section-title">Agreement to Terms</h2>
+        <p class="terms-text">
+            By accessing and using Divine Bridge, you agree to be bound by these Terms of Service and all applicable 
+            laws and regulations. If you do not agree with any of these terms, you are prohibited from using or 
+            accessing this site.
+        </p>
+
+        <h2 class="terms-section-title">Use License</h2>
+        <p class="terms-text">
+            Permission is granted to temporarily access Divine Bridge for personal, non-commercial use. This is the 
+            grant of a license, not a transfer of title, and under this license you may not:
+        </p>
+        <ul class="terms-list">
+            <li>Modify or copy the materials</li>
+            <li>Use the materials for any commercial purpose</li>
+            <li>Attempt to decompile or reverse engineer any software</li>
+            <li>Remove any copyright or other proprietary notations</li>
+            <li>Transfer the materials to another person</li>
+        </ul>
+
+        <h2 class="terms-section-title">User Conduct</h2>
+        <p class="terms-text">
+            As a user of Divine Bridge, you agree to:
+        </p>
+        <ul class="terms-list">
+            <li>Provide accurate and complete information</li>
+            <li>Maintain the security of your account</li>
+            <li>Not use the service for any illegal purposes</li>
+            <li>Not harass or harm other users</li>
+            <li>Not post inappropriate or offensive content</li>
+        </ul>
+
+        <h2 class="terms-section-title">Content Guidelines</h2>
+        <p class="terms-text">
+            When posting prayer requests or comments, you agree to:
+        </p>
+        <ul class="terms-list">
+            <li>Respect the privacy of others</li>
+            <li>Not share personal information</li>
+            <li>Not post spam or advertisements</li>
+            <li>Not post content that promotes hate or discrimination</li>
+            <li>Not post content that infringes on others' rights</li>
+        </ul>
+
+        <h2 class="terms-section-title">Disclaimer</h2>
+        <p class="terms-text">
+            The materials on Divine Bridge are provided on an 'as is' basis. We make no warranties, expressed or 
+            implied, and hereby disclaim and negate all other warranties including, without limitation, implied 
+            warranties or conditions of merchantability, fitness for a particular purpose, or non-infringement of 
+            intellectual property or other violation of rights.
+        </p>
+
+        <h2 class="terms-section-title">Limitations</h2>
+        <p class="terms-text">
+            In no event shall Divine Bridge or its suppliers be liable for any damages (including, without limitation, 
+            damages for loss of data or profit, or due to business interruption) arising out of the use or inability 
+            to use the materials on Divine Bridge.
+        </p>
+
+        <h2 class="terms-section-title">Revisions</h2>
+        <p class="terms-text">
+            We may revise these terms of service at any time without notice. By using Divine Bridge, you agree to be 
+            bound by the current version of these terms of service.
+        </p>
+
+        <h2 class="terms-section-title">Contact Us</h2>
+        <p class="terms-text">
+            If you have any questions about these Terms of Service, please contact us at:
+            <br>
+            Email: terms@divinebridge.com
+        </p>
+
+        <p class="last-updated">Last updated: March 15, 2024</p>
+    </div>
+</section>
+{% endblock %} 

@@ -11,10 +11,20 @@ class VerseCache:
         self.cache = {}
         self.cache_expiry = datetime.now() + timedelta(hours=24)
         
-    def get_today_verse(self):
-        """Get today's verse from cache or generate a new one."""
+    def get_today_verse(self, day_of_year=None):
+        """Get today's verse from cache or generate a new one.
+        
+        Args:
+            day_of_year: Optional day of year (1-366) to use instead of server's date
+        """
         try:
-            today = datetime.now().strftime('%Y-%m-%d')
+            # If day_of_year is provided, use it; otherwise use server's day
+            if day_of_year is not None:
+                today = f"day-{day_of_year}"  # Cache key based on day number
+                logger.info(f"Using client's day of year: {day_of_year}")
+            else:
+                today = datetime.now().strftime('%Y-%m-%d')
+                day_of_year = datetime.now().timetuple().tm_yday
             
             # Check if cache is expired
             if datetime.now() > self.cache_expiry:
@@ -27,7 +37,7 @@ class VerseCache:
                 return self.cache[today]
             
             # If not in cache, get a new verse
-            verse = verse_generator.get_daily_verse()
+            verse = verse_generator.get_daily_verse(day_of_year=day_of_year)
             if verse:
                 # Store in cache
                 self.cache[today] = verse

@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block title %}Divine Bridge - Contact Us{% endblock %}
+
+{% block extra_css %}
+<style>
+    .contact-section {
+        padding: 8rem 2rem 4rem;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .contact-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 2.5rem;
+        color: var(--black);
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+
+    .contact-content {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4rem;
+        background: var(--white);
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .contact-info {
+        padding-right: 2rem;
+    }
+
+    .contact-info-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 1.8rem;
+        color: var(--black);
+        margin-bottom: 1.5rem;
+    }
+
+    .contact-text {
+        color: var(--black);
+        opacity: 0.8;
+        line-height: 1.8;
+        margin-bottom: 2rem;
+    }
+
+    .contact-details {
+        margin-bottom: 2rem;
+    }
+
+    .contact-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .contact-icon {
+        font-size: 1.5rem;
+        color: var(--gold);
+        margin-right: 1rem;
+    }
+
+    .contact-item-text {
+        color: var(--black);
+        opacity: 0.8;
+    }
+
+    .contact-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .form-label {
+        color: var(--black);
+        font-weight: 600;
+    }
+
+    .form-input,
+    .form-textarea {
+        padding: 0.8rem;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 1rem;
+        transition: border-color 0.3s ease;
+    }
+
+    .form-input:focus,
+    .form-textarea:focus {
+        outline: none;
+        border-color: var(--gold);
+    }
+
+    .form-textarea {
+        min-height: 150px;
+        resize: vertical;
+    }
+
+    .submit-button {
+        padding: 1rem;
+        background: var(--gold);
+        color: var(--black);
+        border: none;
+        border-radius: 6px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+    }
+
+    .submit-button:hover {
+        transform: translateY(-2px);
+    }
+
+    .success-message {
+        background: #d4edda;
+        color: #155724;
+        padding: 1rem;
+        border-radius: 6px;
+        margin-bottom: 1.5rem;
+        display: none;
+    }
+
+    .error-message {
+        background: #f8d7da;
+        color: #721c24;
+        padding: 1rem;
+        border-radius: 6px;
+        margin-bottom: 1.5rem;
+        display: none;
+    }
+
+    @media (max-width: 768px) {
+        .contact-section {
+            padding: 6rem 1rem 2rem;
+        }
+
+        .contact-title {
+            font-size: 2rem;
+        }
+
+        .contact-content {
+            grid-template-columns: 1fr;
+            gap: 2rem;
+            padding: 1.5rem;
+        }
+
+        .contact-info {
+            padding-right: 0;
+        }
+
+        .contact-info-title {
+            font-size: 1.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="contact-section">
+    <h1 class="contact-title">Contact Us</h1>
+    <div class="contact-content">
+        <div class="contact-info">
+            <h2 class="contact-info-title">Get in Touch</h2>
+            <p class="contact-text">
+                We'd love to hear from you! Whether you have questions about our services, need support, 
+                or want to share your feedback, our team is here to help.
+            </p>
+            <div class="contact-details">
+                <div class="contact-item">
+                    <span class="contact-icon"></span>
+                    <span class="contact-item-text">123 Prayer Street, Faith City, FC 12345</span>
+                </div>
+                <div class="contact-item">
+                    <span class="contact-icon"></span>
+                    <span class="contact-item-text">+1 (555) 123-4567</span>
+                </div>
+                <div class="contact-item">
+                    <span class="contact-icon"></span>
+                    <span class="contact-item-text">support@divinebridge.com</span>
+                </div>
+            </div>
+            <p class="contact-text">
+                Our support team is available Monday through Friday, 9:00 AM to 5:00 PM EST.
+            </p>
+        </div>
+        <form class="contact-form" method="POST" action="{{ url_for('main.contact') }}">
+            <div id="success-message" class="success-message">
+                Thank you for your message! We'll get back to you soon.
+            </div>
+            <div id="error-message" class="error-message">
+                There was an error sending your message. Please try again.
+            </div>
+            <div class="form-group">
+                <label for="name" class="form-label">Name</label>
+                <input type="text" id="name" name="name" class="form-input" required>
+            </div>
+            <div class="form-group">
+                <label for="email" class="form-label">Email</label>
+                <input type="email" id="email" name="email" class="form-input" required>
+            </div>
+            <div class="form-group">
+                <label for="subject" class="form-label">Subject</label>
+                <input type="text" id="subject" name="subject" class="form-input" required>
+            </div>
+            <div class="form-group">
+                <label for="message" class="form-label">Message</label>
+                <textarea id="message" name="message" class="form-textarea" required></textarea>
+            </div>
+            <button type="submit" class="submit-button">Send Message</button>
+        </form>
+    </div>
+</section>
+
+<script>
+    document.querySelector('.contact-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData.entries());
+        
+        fetch('/contact', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('success-message').style.display = 'block';
+                document.getElementById('error-message').style.display = 'none';
+                this.reset();
+            } else {
+                document.getElementById('error-message').style.display = 'block';
+                document.getElementById('success-message').style.display = 'none';
+            }
+        })
+        .catch(error => {
+            document.getElementById('error-message').style.display = 'block';
+            document.getElementById('success-message').style.display = 'none';
+        });
+    });
+</script>
+{% endblock %} 

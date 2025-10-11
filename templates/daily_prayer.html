@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}Divine Bridge - Daily Prayer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .daily-prayer-page {
+        min-height: calc(100vh - 200px);
+        padding: 6rem 2rem 4rem;
+        background: linear-gradient(135deg, rgba(31, 60, 136, 0.03) 0%, rgba(44, 82, 130, 0.03) 100%);
+    }
+
+    .prayer-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    .prayer-header-section {
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+
+    .prayer-page-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 2.5rem;
+        color: var(--blue);
+        margin-bottom: 0.5rem;
+    }
+
+    .prayer-date {
+        font-size: 1.2rem;
+        color: #555;
+        font-weight: 500;
+        margin-bottom: 1rem;
+    }
+
+    .prayer-content-card {
+        background: white;
+        padding: 3rem;
+        border-radius: 16px;
+        border-left: 5px solid var(--gold);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        margin-bottom: 2rem;
+    }
+
+    .prayer-text {
+        white-space: pre-line;
+        line-height: 2;
+        font-size: 1.2rem;
+        color: #333;
+        font-family: 'Georgia', serif;
+    }
+
+    .prayer-actions {
+        text-align: center;
+        margin-top: 2rem;
+    }
+
+    .back-button {
+        display: inline-block;
+        padding: 1rem 2.5rem;
+        background: linear-gradient(135deg, var(--blue), #2c5282);
+        color: white;
+        text-decoration: none;
+        border-radius: 50px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(31, 60, 136, 0.3);
+    }
+
+    .back-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(31, 60, 136, 0.4);
+    }
+
+    .loading-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: var(--gray);
+    }
+
+    .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid var(--blue);
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+        .prayer-page-title {
+            font-size: 2rem;
+        }
+
+        .prayer-content-card {
+            padding: 2rem 1.5rem;
+        }
+
+        .prayer-text {
+            font-size: 1.1rem;
+            line-height: 1.8;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="daily-prayer-page">
+    <div class="prayer-container">
+        <!-- Loading State -->
+        <div id="loading-state" class="loading-state">
+            <div class="spinner"></div>
+            <p>Loading today's prayer...</p>
+        </div>
+
+        <!-- Prayer Content (hidden until loaded) -->
+        <div id="prayer-content-section" style="display: none;">
+            <div class="prayer-header-section">
+                <h1 class="prayer-page-title">Today's Prayer</h1>
+                <p class="prayer-date" id="prayer-date">Loading...</p>
+            </div>
+
+            <div class="prayer-content-card">
+                <div class="prayer-text" id="prayer-text">
+                    Loading prayer content...
+                </div>
+            </div>
+
+            <div class="prayer-actions">
+                <a href="/prayers" class="back-button">Back to Prayer Room</a>
+            </div>
+        </div>
+
+        <!-- Error State -->
+        <div id="error-state" style="display: none; text-align: center; padding: 4rem 2rem;">
+            <h2 style="color: var(--gray); margin-bottom: 1rem;">No Prayer Available</h2>
+            <p style="color: var(--gray); margin-bottom: 2rem;">
+                There is no daily prayer available for today. Please check back later.
+            </p>
+            <a href="/prayers" class="back-button">Back to Prayer Room</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Helper function to get client's local date
+    function getClientLocalDate() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    // Load today's daily prayer
+    async function loadDailyPrayer() {
+        const loadingState = document.getElementById('loading-state');
+        const contentSection = document.getElementById('prayer-content-section');
+        const errorState = document.getElementById('error-state');
+        const prayerText = document.getElementById('prayer-text');
+        const prayerDate = document.getElementById('prayer-date');
+
+        try {
+            // Send client's local date
+            const clientDate = getClientLocalDate();
+            console.log('Loading prayer for client date:', clientDate);
+            
+            const response = await fetch(`/api/prayer/prayers?client_date=${clientDate}`);
+            
+            if (response.ok) {
+                const data = await response.json();
+                
+                // Find today's daily prayer
+                const dailyPrayer = data.prayers.find(p => 
+                    p.source === 'generated' && !p.title
+                );
+                
+                if (dailyPrayer) {
+                    // Display prayer
+                    prayerText.textContent = dailyPrayer.content;
+                    
+                    const date = new Date(dailyPrayer.created_at);
+                    prayerDate.textContent = date.toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
+                    
+                    // Show content, hide loading
+                    loadingState.style.display = 'none';
+                    contentSection.style.display = 'block';
+                } else {
+                    // No prayer found
+                    loadingState.style.display = 'none';
+                    errorState.style.display = 'block';
+                }
+            } else {
+                // API error
+                loadingState.style.display = 'none';
+                errorState.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Error loading daily prayer:', error);
+            loadingState.style.display = 'none';
+            errorState.style.display = 'block';
+        }
+    }
+
+    // Load prayer when page loads
+    document.addEventListener('DOMContentLoaded', loadDailyPrayer);
+</script>
+{% endblock %}
+

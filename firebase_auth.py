@@ -9,10 +9,24 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import os
+import sys
+from google.cloud import secretmanager
+import traceback
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def get_secret(secret_id):
+    """Get a secret from Secret Manager."""
+    try:
+        client = secretmanager.SecretManagerServiceClient()
+        name = f"projects/divinebridge/secrets/{secret_id}/versions/latest"
+        response = client.access_secret_version(request={"name": name})
+        return response.payload.data.decode("UTF-8")
+    except Exception as e:
+        logger.error(f"Failed to get secret {secret_id}: {e}")
+        return None
 
 def initialize_firebase():
     """Initialize Firebase Admin SDK with retry logic."""
@@ -25,38 +39,68 @@ def initialize_firebase():
         # Get configuration
         config = get_config()
         
-        # Get Firebase credentials from config
+        # Get Firebase credentials
         creds_json = config.FIREBASE_CREDENTIALS
-        if isinstance(creds_json, str):
-            try:
-                creds_json = json.loads(creds_json)
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse Firebase credentials JSON: {e}")
-                return False
+        if not creds_json:
+            error_message = "Failed to get Firebase credentials from Secret Manager"
+            logger.error(error_message)
+            print(f"STDERR_DEBUG: {error_message}", file=sys.stderr)
+            return False
+
+        try:
+            # Parse the credentials JSON
+            creds_dict = json.loads(creds_json)
+            logger.info("Successfully parsed Firebase credentials JSON")
+            logger.info(f"Project ID from credentials: {creds_dict.get('project_id')}")
+        except json.JSONDecodeError as e:
+            error_message = f"Failed to parse Firebase credentials JSON: {e}"
+            logger.error(error_message)
+            print(f"STDERR_DEBUG: {error_message}", file=sys.stderr)
+            return False
+
+        # Use project_id from credentials if needed
+        firebase_project_id = creds_dict.get('project_id')
+        if not firebase_project_id:
+            error_message = "project_id not found in Firebase credentials JSON."
+            logger.error(error_message)
+            print(f"STDERR_DEBUG: {error_message}", file=sys.stderr)
+            return False
 
         # Initialize Firebase with retry logic
         max_retries = 3
         retry_delay = 1
-        
         for attempt in range(max_retries):
             try:
-                # Initialize Firebase with credentials and project ID
-                firebase_admin.initialize_app(
-                    credentials.Credentials.from_service_account_info(creds_json),
-                    options={'projectId': os.getenv('FIREBASE_PROJECT_ID')}
-                )
+                logger.info(f"Attempt {attempt + 1}/{max_retries} to initialize Firebase with project ID: {firebase_project_id}")
+                print(f"STDERR_DEBUG: Attempt {attempt + 1}/{max_retries} to initialize Firebase with project ID: {firebase_project_id}", file=sys.stderr)
+                
+                # Create credentials object
+                cred = credentials.Certificate(creds_dict)
+                
+                # Initialize app with explicit options
+                firebase_admin.initialize_app(cred, {
+                    'projectId': firebase_project_id,
+                    'storageBucket': f"{firebase_project_id}.appspot.com"
+                })
+                
                 logger.info("Firebase initialized successfully")
+                print("STDERR_DEBUG: Firebase initialized successfully", file=sys.stderr)
                 return True
             except Exception as e:
-                logger.error(f"Attempt {attempt + 1}/{max_retries} failed to initialize Firebase: {e}")
+                error_message = f"Attempt {attempt + 1}/{max_retries} failed to initialize Firebase. Exception type: {type(e).__name__}, Error: {str(e)}, Args: {e.args}"
+                logger.error(error_message)
+                print(f"STDERR_DEBUG: {error_message}", file=sys.stderr)
                 if attempt < max_retries - 1:
                     time.sleep(retry_delay)
                 else:
-                    logger.error("All attempts to initialize Firebase failed")
+                    final_error_message = "All attempts to initialize Firebase failed"
+                    logger.error(final_error_message)
+                    print(f"STDERR_DEBUG: {final_error_message}", file=sys.stderr)
                     return False
-                    
     except Exception as e:
-        logger.error(f"Error initializing Firebase: {e}")
+        error_message = f"Critical error during Firebase initialization setup: Exception type: {type(e).__name__}, Error: {str(e)}, Args: {e.args}"
+        logger.error(error_message)
+        print(f"STDERR_DEBUG: {error_message}", file=sys.stderr)
         return False
 
 def create_user(email, password, first_name, last_name):
@@ -81,10 +125,82 @@ def create_user(email, password, first_name, last_name):
 def verify_token(id_token):
     """Verify Firebase ID token."""
     try:
-        decoded_token = auth.verify_id_token(id_token)
-        return decoded_token
+        if not id_token:
+            logger.error("No ID token provided for verification")
+            return None
+            
+        logger.info(f"Token length: {len(id_token)}")
+        logger.info(f"Token prefix: {id_token[:20]}...")
+            
+        # Ensure Firebase is initialized
+        if not initialize_firebase():
+            logger.error("Firebase not initialized, cannot verify token")
+            return None
+            
+        logger.info("Attempting to verify ID token...")
+        try:
+            logger.info("Calling auth.verify_id_token...")
+            # Add check for token format
+            if not isinstance(id_token, str):
+                logger.error(f"Invalid token type: {type(id_token)}")
+                return None
+                
+            if len(id_token.split('.')) != 3:
+                logger.error("Invalid token format: not a valid JWT")
+                return None
+                
+            logger.info("Token format validation passed")
+            logger.info("Attempting to verify token with Firebase...")
+            
+            try:
+                decoded_token = auth.verify_id_token(id_token)
+                logger.info(f"Token verified successfully for user: {decoded_token.get('uid')}")
+                logger.info(f"Decoded token claims: {decoded_token}")
+                logger.info(f"Token expiration: {decoded_token.get('exp')}")
+                logger.info(f"Token issued at: {decoded_token.get('iat')}")
+                logger.info(f"Token issuer: {decoded_token.get('iss')}")
+                return decoded_token
+            except auth.InvalidIdTokenError as e:
+                logger.error(f"Invalid ID token: {str(e)}")
+                logger.error(f"Error type: {type(e)}")
+                logger.error(f"Error args: {e.args}")
+                logger.error(f"Error traceback: {traceback.format_exc()}")
+                return None
+            except auth.ExpiredIdTokenError as e:
+                logger.error(f"Expired ID token: {str(e)}")
+                logger.error(f"Error type: {type(e)}")
+                logger.error(f"Error args: {e.args}")
+                logger.error(f"Error traceback: {traceback.format_exc()}")
+                return None
+            except auth.RevokedIdTokenError as e:
+                logger.error(f"Revoked ID token: {str(e)}")
+                logger.error(f"Error type: {type(e)}")
+                logger.error(f"Error args: {e.args}")
+                logger.error(f"Error traceback: {traceback.format_exc()}")
+                return None
+            except auth.UserDisabledError as e:
+                logger.error(f"User is disabled: {str(e)}")
+                logger.error(f"Error type: {type(e)}")
+                logger.error(f"Error args: {e.args}")
+                logger.error(f"Error traceback: {traceback.format_exc()}")
+                return None
+            except Exception as e:
+                logger.error(f"Token verification failed with unexpected error: {str(e)}")
+                logger.error(f"Error type: {type(e)}")
+                logger.error(f"Error args: {e.args}")
+                logger.error(f"Error traceback: {traceback.format_exc()}")
+                return None
+        except Exception as e:
+            logger.error(f"Error in token verification process: {str(e)}")
+            logger.error(f"Error type: {type(e)}")
+            logger.error(f"Error args: {e.args}")
+            logger.error(f"Error traceback: {traceback.format_exc()}")
+            return None
     except Exception as e:
-        logger.error(f"Token verification failed: {str(e)}")
+        logger.error(f"Error in verify_token: {str(e)}")
+        logger.error(f"Error type: {type(e)}")
+        logger.error(f"Error args: {e.args}")
+        logger.error(f"Error traceback: {traceback.format_exc()}")
         return None
 
 def get_user(uid):
@@ -129,7 +245,6 @@ def create_password_reset_token(email):
 def reset_password_with_token(token, new_password):
     """Reset password using the provided token"""
     try:
-        from firebase_admin import auth
         # Verify the custom token
         decoded_token = auth.verify_id_token(token)
         uid = decoded_token['uid']

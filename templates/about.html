@@ -1,356 +1,688 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>About - Divine Bridge</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --gold: #f5c542;
-            --blue: #1f3c88;
-            --black: #1e1e1e;
-            --white: #ffffff;
-        }
+{% extends "base.html" %}
 
-        body {
-            font-family: 'Inter', sans-serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 0;
-            color: var(--black);
-            background: linear-gradient(to bottom right, var(--white), #e6f0ff);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
+{% block title %}Divine Bridge - About{% endblock %}
 
-        /* Header Styles */
-        .header {
-            background: var(--white);
-            border-bottom: 1px solid var(--gold);
-            padding: 1rem 0;
-            position: fixed;
-            width: 100%;
-            top: 0;
-            z-index: 1000;
-        }
+{% block extra_css %}
+<style>
+    .about-container {
+        min-height: 100vh;
+        padding-top: 80px;
+        background: transparent;
+    }
 
-        .nav-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+    /* Hero Section */
+    .about-hero {
+        text-align: center;
+        padding: 6rem 2rem 4rem;
+        background: linear-gradient(135deg, var(--blue) 0%, #2c5282 100%);
+        color: var(--white);
+        position: relative;
+        overflow: hidden;
+    }
 
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: var(--gold);
-            text-decoration: none;
-            font-family: 'Poppins', sans-serif;
-            font-weight: 600;
-            font-size: 1.5rem;
-        }
+    .about-hero::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+        pointer-events: none;
+    }
 
-        .nav-links {
-            display: flex;
-            gap: 2rem;
-        }
+    .about-hero-content {
+        position: relative;
+        z-index: 1;
+        max-width: 800px;
+        margin: 0 auto;
+    }
 
-        .nav-links a {
-            color: var(--black);
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.3s ease;
-        }
+    .about-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 3.5rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+        animation: fadeInUp 0.8s ease;
+    }
 
-        .nav-links a:hover {
-            color: var(--gold);
-        }
+    .about-subtitle {
+        font-size: 1.3rem;
+        opacity: 0.95;
+        line-height: 1.8;
+        animation: fadeInUp 1s ease;
+    }
 
-        /* About Section */
-        .about-section {
-            flex: 1;
-            padding: 8rem 2rem 4rem;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
+    /* Stats Section - Hidden for now, will be enabled when we have substantial numbers */
+    .stats-section {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        padding: 3rem 2rem;
+        margin: 0 2rem;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        transform: translateY(-50px);
+        position: relative;
+        z-index: 10;
+        display: none; /* Hidden until we have substantial numbers */
+    }
 
-        .about-header {
-            text-align: center;
-            margin-bottom: 4rem;
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 2rem;
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    .stat-item {
+        text-align: center;
+        padding: 1.5rem;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        transition: all 0.3s ease;
+    }
+
+    .stat-item:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    }
+
+    .stat-number {
+        font-family: 'Poppins', sans-serif;
+        font-size: 3rem;
+        font-weight: 700;
+        color: var(--blue);
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+
+    .stat-label {
+        color: var(--gray);
+        font-size: 1rem;
+        font-weight: 500;
+    }
+
+    /* Content Section */
+    .content-section {
+        max-width: 1200px;
+        margin: 2rem auto;
+        padding: 0 2rem 4rem;
+    }
+
+    .mission-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 3rem;
+        margin-bottom: 3rem;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        transition: all 0.4s ease;
+    }
+
+    .mission-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    }
+
+    .mission-header {
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 3px solid var(--gold);
+    }
+
+    .mission-icon {
+        width: 70px;
+        height: 70px;
+        background: linear-gradient(135deg, var(--gold) 0%, #f39c12 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        color: var(--black);
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    .mission-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 2.2rem;
+        font-weight: 600;
+        color: var(--black);
+        margin: 0;
+    }
+
+    .mission-text {
+        font-size: 1.15rem;
+        line-height: 1.9;
+        color: var(--gray);
+        margin-bottom: 1.5rem;
+    }
+
+    .mission-text:last-child {
+        margin-bottom: 0;
+    }
+
+    /* Values Grid */
+    .values-section {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 20px;
+        padding: 3rem;
+        margin-bottom: 3rem;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    }
+
+    .values-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--black);
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+
+    .values-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 2rem;
+    }
+
+    .value-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        border-left: 4px solid var(--gold);
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+    .value-card:hover {
+        transform: translateX(10px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+        border-left-width: 6px;
+    }
+
+    .value-number {
+        font-family: 'Poppins', sans-serif;
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--gold);
+        margin-bottom: 1rem;
+    }
+
+    .value-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 1.4rem;
+        font-weight: 600;
+        color: var(--black);
+        margin-bottom: 1rem;
+    }
+
+    .value-description {
+        color: var(--gray);
+        line-height: 1.7;
+        font-size: 1rem;
+    }
+
+    /* CTA Section */
+    .final-cta {
+        background: linear-gradient(135deg, var(--gold) 0%, #f39c12 100%);
+        border-radius: 20px;
+        padding: 4rem 3rem;
+        text-align: center;
+        color: var(--black);
+        box-shadow: 0 15px 50px rgba(245, 197, 66, 0.4);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .final-cta::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, transparent 70%);
+        animation: rotate 20s linear infinite;
+    }
+
+    .final-cta-content {
+        position: relative;
+        z-index: 1;
+    }
+
+    .final-cta h2 {
+        font-family: 'Poppins', sans-serif;
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+    }
+
+    .final-cta p {
+        font-size: 1.2rem;
+        margin-bottom: 2rem;
+        opacity: 0.9;
+    }
+
+    .cta-buttons {
+        display: flex;
+        gap: 1.5rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .cta-button {
+        display: inline-block;
+        background: var(--black);
+        color: var(--white);
+        padding: 1.2rem 3rem;
+        border-radius: 50px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    .cta-button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.4);
+    }
+
+    .cta-button.secondary {
+        background: var(--white);
+        color: var(--black);
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes rotate {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-20px); }
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+        .about-hero {
+            padding: 4rem 1.5rem 3rem;
         }
 
         .about-title {
-            font-family: 'Poppins', sans-serif;
-            font-size: 3rem;
-            color: var(--black);
-            margin-bottom: 1rem;
-            background: linear-gradient(to right, var(--blue), var(--gold));
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
+            font-size: 2.2rem;
         }
 
         .about-subtitle {
-            font-size: 1.2rem;
-            color: var(--black);
-            opacity: 0.8;
-            max-width: 600px;
-            margin: 0 auto;
+            font-size: 1.1rem;
         }
 
-        .about-content {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-bottom: 4rem;
+        .stats-section {
+            margin: 0 1rem;
+            padding: 2rem 1rem;
+            transform: translateY(-30px);
         }
 
-        .about-card {
-            background: var(--white);
-            border-radius: 12px;
+        .stats-grid {
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+        }
+
+        .content-section {
+            padding: 0 1rem 3rem;
+        }
+
+        .mission-card {
             padding: 2rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease;
         }
 
-        .about-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .card-title {
-            font-family: 'Poppins', sans-serif;
-            font-size: 1.5rem;
-            color: var(--black);
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .card-title i {
-            color: var(--gold);
-        }
-
-        .card-text {
-            color: var(--black);
-            opacity: 0.8;
-        }
-
-        .mission-section {
-            background: var(--white);
-            border-radius: 12px;
-            padding: 3rem;
-            margin-bottom: 4rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        .mission-header {
+            flex-direction: column;
+            text-align: center;
         }
 
         .mission-title {
-            font-family: 'Poppins', sans-serif;
-            font-size: 2rem;
-            color: var(--black);
-            margin-bottom: 2rem;
-            text-align: center;
+            font-size: 1.8rem;
         }
 
-        .mission-content {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 2rem;
+        .mission-text {
+            font-size: 1rem;
         }
 
-        .mission-item {
-            text-align: center;
-        }
-
-        .mission-item i {
-            font-size: 2.5rem;
-            color: var(--gold);
-            margin-bottom: 1rem;
-        }
-
-        .mission-item h3 {
-            font-family: 'Poppins', sans-serif;
-            font-size: 1.2rem;
-            color: var(--black);
-            margin-bottom: 1rem;
-        }
-
-        .mission-item p {
-            color: var(--black);
-            opacity: 0.8;
-        }
-
-        /* Footer */
-        .footer {
-            background: var(--black);
-            color: var(--white);
+        .values-section {
             padding: 2rem;
-            text-align: center;
         }
 
-        .footer-logo {
-            color: var(--gold);
-            font-family: 'Poppins', sans-serif;
-            font-size: 1.5rem;
-            margin-bottom: 1rem;
+        .values-title {
+            font-size: 2rem;
         }
 
-        .footer-links {
-            display: flex;
-            justify-content: center;
-            gap: 2rem;
-            margin-bottom: 1rem;
+        .values-grid {
+            grid-template-columns: 1fr;
         }
 
-        .footer-links a {
-            color: var(--white);
-            text-decoration: none;
-            transition: color 0.3s ease;
+        .value-card:hover {
+            transform: translateX(5px);
         }
 
-        .footer-links a:hover {
-            color: var(--gold);
+        .final-cta {
+            padding: 3rem 2rem;
         }
 
-        .copyright {
-            font-size: 0.9rem;
-            opacity: 0.8;
+        .final-cta h2 {
+            font-size: 2rem;
         }
 
-        @media (max-width: 768px) {
-            .about-section {
-                padding: 6rem 1rem 2rem;
-            }
-
-            .about-title {
-                font-size: 2rem;
-            }
-
-            .about-subtitle {
-                font-size: 1rem;
-            }
-
-            .mission-section {
-                padding: 2rem;
-            }
-
-            .nav-links {
-                display: none;
-            }
+        .final-cta p {
+            font-size: 1.1rem;
         }
-    </style>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-</head>
-<body>
-    <!-- Header -->
-    <header class="header">
-        <nav class="nav-container">
-            <a href="/" class="logo">
-                <span>Divine Bridge</span>
-            </a>
-            <div class="nav-links">
-                <a href="/">Home</a>
-                <a href="/about">About</a>
-                <a href="/prayers">Prayers</a>
-                <a href="/login">Login</a>
-                <a href="/signup">Sign Up</a>
-            </div>
-        </nav>
-    </header>
 
-    <!-- About Section -->
-    <section class="about-section">
-        <div class="about-header">
+        .cta-buttons {
+            flex-direction: column;
+        }
+
+        .cta-button {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="about-container">
+    <!-- Hero Section -->
+    <section class="about-hero">
+        <div class="about-hero-content">
             <h1 class="about-title">About Divine Bridge</h1>
-            <p class="about-subtitle">Connecting hearts through the power of prayer</p>
+            <p class="about-subtitle">
+                Connecting hearts across the globe through the transformative power of prayer.
+                Join thousands of believers in a unified mission of faith, hope, and spiritual growth.
+            </p>
         </div>
+    </section>
 
-        <div class="about-content">
-            <div class="about-card">
-                <h2 class="card-title">
-                    <i class="fas fa-praying-hands"></i>
-                    Our Vision
-                </h2>
-                <p class="card-text">
-                    To create a global community where people from all walks of life can come together in prayer, 
-                    sharing their hopes, dreams, and spiritual journeys.
-                </p>
+    <!-- Stats Section - Currently hidden via CSS, will be displayed when we have substantial numbers -->
+    <section class="stats-section">
+        <div class="stats-grid">
+            <div class="stat-item">
+                <span class="stat-number" data-target="1000">0</span>
+                <span class="stat-label">Active Members</span>
             </div>
-
-            <div class="about-card">
-                <h2 class="card-title">
-                    <i class="fas fa-heart"></i>
-                    Our Mission
-                </h2>
-                <p class="card-text">
-                    To provide a platform that fosters spiritual growth, encourages meaningful connections, 
-                    and spreads the message of hope and faith across the world.
-                </p>
+            <div class="stat-item">
+                <span class="stat-number" data-target="500">0</span>
+                <span class="stat-label">Daily Prayers</span>
             </div>
-
-            <div class="about-card">
-                <h2 class="card-title">
-                    <i class="fas fa-globe"></i>
-                    Our Impact
-                </h2>
-                <p class="card-text">
-                    Through our daily prayers and community initiatives, we've touched thousands of lives, 
-                    creating a ripple effect of positivity and spiritual awakening.
-                </p>
+            <div class="stat-item">
+                <span class="stat-number" data-target="50">0</span>
+                <span class="stat-label">Countries Reached</span>
             </div>
-        </div>
-
-        <div class="mission-section">
-            <h2 class="mission-title">Our Core Values</h2>
-            <div class="mission-content">
-                <div class="mission-item">
-                    <i class="fas fa-hands-helping"></i>
-                    <h3>Community</h3>
-                    <p>Building bridges between people through shared spiritual experiences</p>
-                </div>
-                <div class="mission-item">
-                    <i class="fas fa-lightbulb"></i>
-                    <h3>Inspiration</h3>
-                    <p>Sparking spiritual growth through meaningful content and connections</p>
-                </div>
-                <div class="mission-item">
-                    <i class="fas fa-shield-alt"></i>
-                    <h3>Integrity</h3>
-                    <p>Maintaining the highest standards of authenticity and trust</p>
-                </div>
+            <div class="stat-item">
+                <span class="stat-number" data-target="10000">0</span>
+                <span class="stat-label">Prayer Requests</span>
             </div>
         </div>
     </section>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="footer-logo">Divine Bridge</div>
-        <div class="footer-links">
-            <a href="/about">About</a>
-            <a href="/prayers">Prayers</a>
-            <a href="/privacy">Privacy Policy</a>
+    <!-- Content Section -->
+    <section class="content-section">
+        <!-- Mission Card -->
+        <div class="mission-card">
+            <div class="mission-header">
+                <div class="mission-icon">01</div>
+                <h2 class="mission-title">Our Mission</h2>
+            </div>
+            <p class="mission-text">
+                Divine Bridge is a global prayer community that connects people of faith across the world. 
+                We believe in the power of collective prayer to bring hope, healing, and positive change to our world.
+            </p>
+            <p class="mission-text">
+                Through our daily prayer service, we address the most pressing global challenges - from natural 
+                disasters and conflicts to poverty and mental health struggles - bringing them before God in unified prayer.
+            </p>
         </div>
-        <div class="copyright">
-            &copy; 2025 Divine Bridge. All rights reserved.
-        </div>
-    </footer>
 
-    <script>
-        // Add scroll-based header effect
-        window.addEventListener('scroll', function() {
-            const header = document.querySelector('.header');
-            if (window.scrollY > 50) {
-                header.style.background = 'rgba(255, 255, 255, 0.95)';
+        <!-- Vision Card -->
+        <div class="mission-card">
+            <div class="mission-header">
+                <div class="mission-icon">02</div>
+                <h2 class="mission-title">Our Vision</h2>
+            </div>
+            <p class="mission-text">
+                To create a world where people of faith are united in prayer, bringing hope and healing to every 
+                corner of the globe through the power of collective spiritual practice.
+            </p>
+            <p class="mission-text">
+                We envision a global community where believers support one another through prayer, share their 
+                spiritual journeys, and work together to make a positive impact on the world.
+            </p>
+        </div>
+
+        <!-- Impact Card -->
+        <div class="mission-card">
+            <div class="mission-header">
+                <div class="mission-icon">03</div>
+                <h2 class="mission-title">Global Impact</h2>
+            </div>
+            <p class="mission-text">
+                Our prayers are generated based on real-time global news and events, ensuring that we're addressing 
+                the most current and urgent needs of our world. We source information from diverse global perspectives 
+                to create comprehensive, inclusive prayers.
+            </p>
+            <p class="mission-text">
+                Every prayer is crafted with care, incorporating relevant Bible verses and calling upon Jesus Christ 
+                and the Holy Spirit to guide and strengthen our collective faith.
+            </p>
+        </div>
+
+        <!-- Values Section -->
+        <div class="values-section">
+            <h2 class="values-title">Our Core Values</h2>
+            <div class="values-grid">
+                <div class="value-card">
+                    <div class="value-number">01</div>
+                    <h3 class="value-title">Faith-Centered</h3>
+                    <p class="value-description">
+                        Every aspect of Divine Bridge is rooted in Christian faith, with prayers that honor 
+                        Jesus Christ and the Holy Spirit.
+                    </p>
+                </div>
+                <div class="value-card">
+                    <div class="value-number">02</div>
+                    <h3 class="value-title">Globally Inclusive</h3>
+                    <p class="value-description">
+                        We welcome believers from all corners of the world, creating a truly diverse and 
+                        inclusive prayer community.
+                    </p>
+                </div>
+                <div class="value-card">
+                    <div class="value-number">03</div>
+                    <h3 class="value-title">Real-Time Relevance</h3>
+                    <p class="value-description">
+                        Our prayers address current global events and challenges, ensuring we pray for what 
+                        matters most today.
+                    </p>
+                </div>
+                <div class="value-card">
+                    <div class="value-number">04</div>
+                    <h3 class="value-title">Community Support</h3>
+                    <p class="value-description">
+                        We foster a supportive environment where members can share prayer requests and receive 
+                        encouragement from fellow believers.
+                    </p>
+                </div>
+                <div class="value-card">
+                    <div class="value-number">05</div>
+                    <h3 class="value-title">Privacy & Security</h3>
+                    <p class="value-description">
+                        Your personal information and prayer requests are protected with the highest standards 
+                        of security and privacy.
+                    </p>
+                </div>
+                <div class="value-card">
+                    <div class="value-number">06</div>
+                    <h3 class="value-title">Always Free</h3>
+                    <p class="value-description">
+                        Divine Bridge is completely free to use, making spiritual connection and prayer 
+                        accessible to everyone, everywhere.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Final CTA - Hidden when user is logged in -->
+        <div class="final-cta" id="about-cta">
+            <div class="final-cta-content">
+                <h2>Join Our Global Prayer Community</h2>
+                <p>
+                    Be part of something bigger. Connect with believers worldwide and experience 
+                    the power of collective prayer.
+                </p>
+                <div class="cta-buttons">
+                    <a href="/signup" class="cta-button">Get Started</a>
+                    <a href="/prayers" class="cta-button secondary">Visit Prayer Room</a>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // This function will be called by base.html when auth state changes
+    function updateAboutPage(user) {
+        const ctaSection = document.getElementById('about-cta');
+        
+        if (user) {
+            // User is logged in - hide the CTA
+            if (ctaSection) {
+                ctaSection.style.display = 'none';
+            }
+        } else {
+            // User is not logged in - show the CTA
+            if (ctaSection) {
+                ctaSection.style.display = 'block';
+            }
+        }
+    }
+
+    // Check cached auth immediately on page load
+    function checkCachedAuthForAbout() {
+        const firebaseLocalStorage = Object.keys(localStorage).find(key => 
+            key.startsWith('firebase:authUser:')
+        );
+        
+        if (firebaseLocalStorage) {
+            try {
+                const cachedAuthData = JSON.parse(localStorage.getItem(firebaseLocalStorage));
+                if (cachedAuthData) {
+                    updateAboutPage(cachedAuthData);
+                }
+            } catch (e) {
+                console.error('Error reading cached auth in about:', e);
+            }
+        }
+    }
+
+    // Animated counter for stats
+    function animateCounter(element) {
+        const target = parseInt(element.getAttribute('data-target'));
+        const duration = 2000; // 2 seconds
+        const increment = target / (duration / 16); // 60fps
+        let current = 0;
+
+        const updateCounter = () => {
+            current += increment;
+            if (current < target) {
+                element.textContent = Math.floor(current).toLocaleString();
+                requestAnimationFrame(updateCounter);
             } else {
-                header.style.background = 'var(--white)';
+                element.textContent = target.toLocaleString();
+            }
+        };
+
+        updateCounter();
+    }
+
+    // Intersection Observer for animations
+    const observerOptions = {
+        threshold: 0.3,
+        rootMargin: '0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+                
+                // Animate counters when stats section is visible
+                if (entry.target.classList.contains('stats-section')) {
+                    const counters = entry.target.querySelectorAll('.stat-number');
+                    counters.forEach(counter => {
+                        if (counter.textContent === '0') {
+                            animateCounter(counter);
+                        }
+                    });
+                }
             }
         });
-    </script>
-</body>
-</html> 
+    }, observerOptions);
+
+    // Initialize animations on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        // Check cached auth immediately
+        checkCachedAuthForAbout();
+        
+        // Observe stats section
+        const statsSection = document.querySelector('.stats-section');
+        if (statsSection) {
+            observer.observe(statsSection);
+        }
+
+        // Observe all cards for fade-in animation
+        const cards = document.querySelectorAll('.mission-card, .value-card');
+        cards.forEach((card, index) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(30px)';
+            card.style.transition = 'all 0.6s ease';
+            card.style.transitionDelay = `${index * 0.1}s`;
+            observer.observe(card);
+        });
+
+        // Add hover effect to value cards
+        const valueCards = document.querySelectorAll('.value-card');
+        valueCards.forEach(card => {
+            card.addEventListener('click', () => {
+                card.style.transform = 'scale(1.02)';
+                setTimeout(() => {
+                    card.style.transform = '';
+                }, 200);
+            });
+        });
+    });
+</script>
+{% endblock %}

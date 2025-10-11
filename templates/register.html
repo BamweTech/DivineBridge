@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}Divine Bridge - Register{% endblock %}
+
+{% block extra_css %}
+<style>
+    .register-section {
+        padding: 8rem 2rem 4rem;
+        max-width: 400px;
+        margin: 0 auto;
+    }
+
+    .register-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 2.5rem;
+        color: var(--black);
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+
+    .register-form {
+        background: var(--white);
+        padding: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-label {
+        display: block;
+        color: var(--black);
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 0.8rem;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 1rem;
+        transition: border-color 0.3s ease;
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: var(--gold);
+    }
+
+    .form-error {
+        color: #dc3545;
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+    }
+
+    .submit-button {
+        width: 100%;
+        padding: 1rem;
+        background: var(--gold);
+        color: var(--black);
+        border: none;
+        border-radius: 6px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+    }
+
+    .submit-button:hover {
+        transform: translateY(-2px);
+    }
+
+    .form-footer {
+        text-align: center;
+        margin-top: 1.5rem;
+        color: var(--black);
+        opacity: 0.8;
+    }
+
+    .form-footer a {
+        color: var(--gold);
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .form-footer a:hover {
+        text-decoration: underline;
+    }
+
+    .social-register {
+        margin-top: 2rem;
+        text-align: center;
+    }
+
+    .social-register-title {
+        color: var(--black);
+        opacity: 0.8;
+        margin-bottom: 1rem;
+        position: relative;
+    }
+
+    .social-register-title::before,
+    .social-register-title::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        width: 30%;
+        height: 1px;
+        background: #ddd;
+    }
+
+    .social-register-title::before {
+        left: 0;
+    }
+
+    .social-register-title::after {
+        right: 0;
+    }
+
+    .social-buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+    }
+
+    .social-button {
+        padding: 0.8rem;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        background: var(--white);
+        cursor: pointer;
+        transition: transform 0.3s ease;
+    }
+
+    .social-button:hover {
+        transform: translateY(-2px);
+    }
+
+    .social-button img {
+        width: 24px;
+        height: 24px;
+    }
+
+    .terms-text {
+        font-size: 0.9rem;
+        color: var(--black);
+        opacity: 0.8;
+        text-align: center;
+        margin-top: 1rem;
+    }
+
+    .terms-text a {
+        color: var(--gold);
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .terms-text a:hover {
+        text-decoration: underline;
+    }
+
+    @media (max-width: 768px) {
+        .register-section {
+            padding: 6rem 1rem 2rem;
+        }
+
+        .register-title {
+            font-size: 2rem;
+        }
+
+        .register-form {
+            padding: 1.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="register-section">
+    <h1 class="register-title">Create Account</h1>
+    <form class="register-form" method="POST" action="{{ url_for('auth.register') }}">
+        <div class="form-group">
+            <label for="name" class="form-label">Full Name</label>
+            <input type="text" id="name" name="name" class="form-input" required>
+            {% if form.name.errors %}
+                <div class="form-error">{{ form.name.errors[0] }}</div>
+            {% endif %}
+        </div>
+        <div class="form-group">
+            <label for="email" class="form-label">Email</label>
+            <input type="email" id="email" name="email" class="form-input" required>
+            {% if form.email.errors %}
+                <div class="form-error">{{ form.email.errors[0] }}</div>
+            {% endif %}
+        </div>
+        <div class="form-group">
+            <label for="password" class="form-label">Password</label>
+            <input type="password" id="password" name="password" class="form-input" required>
+            {% if form.password.errors %}
+                <div class="form-error">{{ form.password.errors[0] }}</div>
+            {% endif %}
+        </div>
+        <div class="form-group">
+            <label for="confirm_password" class="form-label">Confirm Password</label>
+            <input type="password" id="confirm_password" name="confirm_password" class="form-input" required>
+            {% if form.confirm_password.errors %}
+                <div class="form-error">{{ form.confirm_password.errors[0] }}</div>
+            {% endif %}
+        </div>
+        <button type="submit" class="submit-button">Create Account</button>
+        <div class="form-footer">
+            <p>Already have an account? <a href="{{ url_for('auth.login') }}">Log In</a></p>
+        </div>
+    </form>
+    <div class="social-register">
+        <p class="social-register-title">Or sign up with</p>
+        <div class="social-buttons">
+            <button class="social-button" onclick="window.location.href='{{ url_for('auth.google_login') }}'">
+                <img src="{{ url_for('static', filename='images/google-icon.png') }}" alt="Google">
+            </button>
+            <button class="social-button" onclick="window.location.href='{{ url_for('auth.facebook_login') }}'">
+                <img src="{{ url_for('static', filename='images/facebook-icon.png') }}" alt="Facebook">
+            </button>
+            <button class="social-button" onclick="window.location.href='{{ url_for('auth.apple_login') }}'">
+                <img src="{{ url_for('static', filename='images/apple-icon.png') }}" alt="Apple">
+            </button>
+        </div>
+    </div>
+    <p class="terms-text">
+        By creating an account, you agree to our 
+        <a href="{{ url_for('main.terms') }}">Terms of Service</a> and 
+        <a href="{{ url_for('main.privacy') }}">Privacy Policy</a>
+    </p>
+</section>
+{% endblock %} 

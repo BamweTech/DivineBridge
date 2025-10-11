@@ -67,8 +67,12 @@ class VerseGenerator:
             logger.error(f"Error loading verses: {str(e)}")
             return []
             
-    def get_daily_verse(self):
-        """Get today's verse based on the day of the year."""
+    def get_daily_verse(self, day_of_year=None):
+        """Get today's verse based on the day of the year.
+        
+        Args:
+            day_of_year: Optional day of year (1-366) to use instead of server's date
+        """
         try:
             # Check if we need to reload verses
             if self._verses is None or self._should_reload():
@@ -78,8 +82,9 @@ class VerseGenerator:
                 logger.error("No verses available")
                 return None
                 
-            # Get day of year (1-366)
-            day_of_year = datetime.now().timetuple().tm_yday
+            # Get day of year (from parameter or server time)
+            if day_of_year is None:
+                day_of_year = datetime.now().timetuple().tm_yday
             
             # Use day of year to select verse (wrap around if needed)
             verse_index = (day_of_year - 1) % len(self._verses)

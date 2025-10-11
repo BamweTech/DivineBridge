@@ -10,6 +10,7 @@ import json
 import requests
 import random
 from google.cloud.storage import Client
+from typing import Optional, Dict
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -19,9 +20,11 @@ class PrayerGenerator:
     def __init__(self, storage=None):
         logger.debug("Initializing PrayerGenerator")
         try:
-            api_key = os.getenv("PERPLEXITY_API_KEY")
+            # Get API key from config instead of environment variable
+            config = get_config()
+            api_key = config.perplexity_api_key
             if not api_key:
-                raise ValueError("PERPLEXITY_API_KEY environment variable not set")
+                raise ValueError("Perplexity API key not found in config")
                 
             self.client = PerplexityClient(key=api_key)
             self.client.model = "sonar-reasoning-pro"
@@ -122,7 +125,7 @@ class PrayerGenerator:
         if "Dear Heavenly Father" not in response:
             raise ValueError("Response does not contain prayer format")
             
-        if len(response) > 2000:  # Arbitrary limit to prevent overly long responses
+        if len(response) > 5000:  # Allow longer prayers (increased from 2000)
             raise ValueError("Response exceeds maximum length")
             
         return response
@@ -161,10 +164,22 @@ class PrayerGenerator:
                 'source': 'generated'
             }
             
+            # Extract disaster metadata from prayer
+            try:
+                from disaster_extractor import get_disaster_extractor
+                extractor = get_disaster_extractor()
+                metadata = extractor.extract_disasters(response)
+                prayer_data['metadata'] = metadata
+                logger.info(f"Extracted {len(metadata.get('disasters', []))} disasters from prayer")
+            except Exception as e:
+                logger.error(f"Error extracting disaster metadata: {e}")
+                # Continue without metadata if extraction fails
+                prayer_data['metadata'] = {"disasters": [], "topics": [], "affected_regions": []}
+            
             # Save the generated prayer to Cloud Storage
             try:
                 if self.storage.save_prayer(prayer_data, today):
-                    logger.info("Successfully saved prayer to Cloud Storage")
+                    logger.info("Successfully saved prayer with metadata to Cloud Storage")
                     return prayer_data
                 else:
                     logger.error("Failed to save prayer to Cloud Storage")

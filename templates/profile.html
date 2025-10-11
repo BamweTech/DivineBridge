@@ -1,0 +1,873 @@
+{% extends "base.html" %}
+
+{% block title %}Divine Bridge - Profile{% endblock %}
+
+{% block extra_css %}
+<style>
+    .profile-section {
+        padding: 8rem 2rem 4rem;
+        max-width: 900px;
+        margin: 0 auto;
+        min-height: calc(100vh - 80px);
+    }
+
+    .profile-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 2.5rem;
+        color: var(--blue);
+        text-align: center;
+        margin-bottom: 3rem;
+        font-weight: 700;
+    }
+
+    .profile-container {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        padding: 2.5rem;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .profile-header {
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+        margin-bottom: 2.5rem;
+        padding-bottom: 2rem;
+        border-bottom: 2px solid rgba(245, 197, 66, 0.3);
+    }
+
+    .profile-avatar {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--gold) 0%, #f39c12 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        color: var(--black);
+        font-weight: 700;
+        box-shadow: 0 4px 20px rgba(245, 197, 66, 0.3);
+        position: relative;
+    }
+
+    .profile-avatar::after {
+        content: '';
+        position: absolute;
+        inset: -4px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--gold), #f39c12);
+        z-index: -1;
+        opacity: 0.3;
+        animation: pulse 2s infinite;
+    }
+
+    .profile-info {
+        flex: 1;
+    }
+
+    .profile-name {
+        font-family: 'Poppins', sans-serif;
+        font-size: 2rem;
+        color: var(--black);
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+    }
+
+    .profile-email {
+        color: var(--gray);
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .profile-joined {
+        color: var(--gray);
+        font-size: 0.9rem;
+    }
+
+    .profile-stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+        margin-bottom: 2.5rem;
+        max-width: 1200px;
+    }
+
+    .stat-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 1.5rem 1rem;
+        border-radius: 12px;
+        text-align: center;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        border-color: var(--gold);
+    }
+
+    .clickable-stat {
+        cursor: pointer !important;
+        position: relative;
+    }
+
+    .clickable-stat:hover {
+        border-color: var(--blue) !important;
+        background: linear-gradient(135deg, rgba(31, 60, 136, 0.05) 0%, rgba(44, 82, 130, 0.05) 100%);
+    }
+
+    .stat-icon {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-value {
+        font-family: 'Poppins', sans-serif;
+        font-size: 2rem;
+        color: var(--black);
+        margin-bottom: 0.4rem;
+        font-weight: 700;
+    }
+
+    .stat-label {
+        color: var(--black);
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 0.2rem;
+        line-height: 1.2;
+    }
+
+    .stat-sublabel {
+        color: var(--gray);
+        font-size: 0.7rem;
+        font-weight: 400;
+        font-style: italic;
+        opacity: 0.8;
+        line-height: 1.3;
+    }
+
+    .profile-section-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 1.5rem;
+        color: var(--black);
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid rgba(245, 197, 66, 0.3);
+    }
+
+    .profile-actions {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .profile-button {
+        padding: 0.75rem 1.75rem;
+        border: none;
+        border-radius: 50px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        text-align: center;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        letter-spacing: 0.3px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .profile-button::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.2);
+        transition: left 0.5s ease;
+    }
+
+    .profile-button:hover::before {
+        left: 100%;
+    }
+
+    .edit-button {
+        background: linear-gradient(135deg, var(--blue) 0%, #2c5282 100%);
+        color: var(--white);
+        box-shadow: 0 2px 8px rgba(31, 60, 136, 0.15);
+    }
+
+    .edit-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(31, 60, 136, 0.25);
+        background: linear-gradient(135deg, #2c5282 0%, var(--blue) 100%);
+    }
+
+    .edit-button:active {
+        transform: translateY(0);
+    }
+
+    .logout-button {
+        background: transparent;
+        color: var(--gray);
+        border: 2px solid #e5e7eb;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .logout-button:hover {
+        transform: translateY(-2px);
+        border-color: var(--gray);
+        background: rgba(107, 114, 128, 0.05);
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    }
+
+    .logout-button:active {
+        transform: translateY(0);
+    }
+
+    .settings-section {
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+    }
+
+    .setting-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .setting-item:last-child {
+        border-bottom: none;
+    }
+
+    .setting-label {
+        font-weight: 500;
+        color: var(--black);
+    }
+
+    .setting-value {
+        color: var(--gray);
+    }
+
+    .loading-spinner {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 400px;
+    }
+
+    .spinner {
+        width: 60px;
+        height: 60px;
+        border: 4px solid rgba(245, 197, 66, 0.2);
+        border-top-color: var(--gold);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    .error-message {
+        background: #f8d7da;
+        color: #721c24;
+        padding: 1.5rem;
+        border-radius: 8px;
+        text-align: center;
+        margin-bottom: 2rem;
+        border: 1px solid #f5c6cb;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: var(--gray);
+    }
+
+    .empty-state-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    @media (max-width: 768px) {
+        .profile-section {
+            padding: 6rem 1rem 2rem;
+        }
+
+        .profile-title {
+            font-size: 1.75rem;
+        }
+
+        .profile-container {
+            padding: 1.5rem;
+        }
+
+        .profile-header {
+            flex-direction: column;
+            text-align: center;
+            gap: 1rem;
+        }
+
+        .profile-avatar {
+            width: 100px;
+            height: 100px;
+            font-size: 2.5rem;
+        }
+
+        .profile-name {
+            font-size: 1.5rem;
+        }
+
+        .profile-email {
+            font-size: 1rem;
+        }
+
+        .profile-stats {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+
+        .stat-card {
+            padding: 1.25rem 0.75rem;
+        }
+
+        .stat-value {
+            font-size: 1.75rem;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+        }
+
+        .stat-sublabel {
+            font-size: 0.65rem;
+        }
+
+        .profile-actions {
+            grid-template-columns: 1fr;
+        }
+
+        .profile-section-title {
+            font-size: 1.25rem;
+        }
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 0.3; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(1.05); }
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="profile-section">
+    <h1 class="profile-title">My Profile</h1>
+    
+    <div id="loading-state" class="loading-spinner">
+        <div class="spinner"></div>
+    </div>
+
+    <div id="error-state" style="display: none;">
+        <div class="error-message">
+            Please <a href="/login" style="color: #721c24; text-decoration: underline;">log in</a> to view your profile.
+        </div>
+    </div>
+
+    <div id="profile-content" style="display: none;">
+        <div class="profile-container">
+            <div class="profile-header">
+                <div class="profile-avatar" id="profile-avatar">
+                    <span id="avatar-initials">?</span>
+                </div>
+                <div class="profile-info">
+                    <h2 class="profile-name" id="profile-name">Loading...</h2>
+                    <p class="profile-email" id="profile-email">Loading...</p>
+                    <p class="profile-joined" id="profile-joined">Member since ...</p>
+                </div>
+            </div>
+
+            <div class="profile-stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="prayers-count">0</div>
+                    <div class="stat-label">Prayers Read</div>
+                    <div class="stat-sublabel">Prayer cards opened</div>
+                </div>
+                <div class="stat-card clickable-stat" onclick="showMyPrayers()" style="cursor: pointer;">
+                    <div class="stat-value" id="requests-count">0</div>
+                    <div class="stat-label">My Prayers</div>
+                    <div class="stat-sublabel">Click to view your requests</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="prayed-for-count">0</div>
+                    <div class="stat-label">Prayers Given</div>
+                    <div class="stat-sublabel">People you prayed for</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="received-prayers-count">0</div>
+                    <div class="stat-label">Prayers Received</div>
+                    <div class="stat-sublabel">People who prayed for you</div>
+                </div>
+            </div>
+
+            <!-- My Prayer Requests Section (Hidden by default) -->
+            <div id="my-prayers-section" style="display: none; margin-bottom: 6rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 class="profile-section-title" style="margin-bottom: 0;">My Prayer Requests</h3>
+                    <button onclick="hideMyPrayers()" class="profile-button logout-button" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
+                        Close
+                    </button>
+                </div>
+                <div id="my-prayers-list" style="display: grid; gap: 1rem;">
+                    <!-- User's prayer requests will be loaded here -->
+                </div>
+                <div id="my-prayers-empty" style="display: none; text-align: center; padding: 3rem; color: var(--gray);">
+                    <p style="font-size: 1.1rem;">You haven't submitted any prayer requests yet.</p>
+                    <a href="/prayers" class="profile-button edit-button" style="margin-top: 1rem; display: inline-flex;">
+                        Submit Your First Prayer
+                    </a>
+                </div>
+            </div>
+
+            <h3 class="profile-section-title">Quick Actions</h3>
+            <div class="profile-actions">
+                <a href="/prayers" class="profile-button edit-button">
+                    Prayer Room
+                </a>
+                <button onclick="handleLogout()" class="profile-button logout-button">
+                    Logout
+                </button>
+            </div>
+
+            <h3 class="profile-section-title">Location Settings</h3>
+            <div class="settings-section" style="margin-bottom: 2rem;">
+                <div class="setting-item">
+                    <span class="setting-label">City</span>
+                    <span class="setting-value" id="user-city">Loading...</span>
+                </div>
+                <div class="setting-item">
+                    <span class="setting-label">Country</span>
+                    <span class="setting-value" id="user-country">Loading...</span>
+                </div>
+                <div class="setting-item">
+                    <span class="setting-label">Detection Method</span>
+                    <span class="setting-value" id="location-method">Loading...</span>
+                </div>
+                <button onclick="showLocationEditor()" class="profile-button edit-button" style="margin-top: 1rem; width: 100%;">
+                    Update Location
+                </button>
+            </div>
+
+            <!-- Location Editor (hidden by default) -->
+            <div id="location-editor" class="settings-section" style="display: none; margin-bottom: 2rem;">
+                <h4 style="margin-bottom: 1rem; color: var(--blue);">Update Your Location</h4>
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; color: var(--gray); font-weight: 600;">City</label>
+                        <input type="text" id="location-city-input" placeholder="Enter your city" style="width: 100%; padding: 0.75rem; border: 2px solid #e9ecef; border-radius: 8px; font-size: 1rem;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; color: var(--gray); font-weight: 600;">Country</label>
+                        <input type="text" id="location-country-input" placeholder="Enter your country" style="width: 100%; padding: 0.75rem; border: 2px solid #e9ecef; border-radius: 8px; font-size: 1rem;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 0.5rem; color: var(--gray); font-weight: 600;">Country Code (2 letters)</label>
+                        <input type="text" id="location-code-input" placeholder="US" maxlength="2" style="width: 100%; padding: 0.75rem; border: 2px solid #e9ecef; border-radius: 8px; font-size: 1rem; text-transform: uppercase;">
+                    </div>
+                    <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+                        <button onclick="saveLocation()" class="profile-button edit-button" style="flex: 1;">
+                            Save Location
+                        </button>
+                        <button onclick="cancelLocationEdit()" class="profile-button logout-button" style="flex: 1;">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // This function will be called by base.html when auth state changes
+    function updateProfilePage(user) {
+        const loadingState = document.getElementById('loading-state');
+        const errorState = document.getElementById('error-state');
+        const profileContent = document.getElementById('profile-content');
+
+        console.log('updateProfilePage called with user:', user ? user.email : 'null');
+
+        if (user) {
+            // User is logged in
+            console.log('User is logged in, showing profile');
+            loadingState.style.display = 'none';
+            errorState.style.display = 'none';
+            profileContent.style.display = 'block';
+
+            // Populate profile data
+            populateProfile(user);
+        } else {
+            // User is not logged in
+            console.log('User is not logged in, showing error');
+            loadingState.style.display = 'none';
+            errorState.style.display = 'block';
+            profileContent.style.display = 'none';
+        }
+    }
+
+    // Check cached auth immediately on page load
+    function checkCachedAuthForProfile() {
+        const firebaseLocalStorage = Object.keys(localStorage).find(key => 
+            key.startsWith('firebase:authUser:')
+        );
+        
+        if (firebaseLocalStorage) {
+            try {
+                const cachedAuthData = JSON.parse(localStorage.getItem(firebaseLocalStorage));
+                if (cachedAuthData) {
+                    console.log('Cached auth found in profile page, applying immediately');
+                    updateProfilePage(cachedAuthData);
+                }
+            } catch (e) {
+                console.error('Error reading cached auth in profile:', e);
+            }
+        }
+    }
+
+    // Initialize when page loads
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('Profile page loaded, checking for cached auth...');
+        checkCachedAuthForProfile();
+    });
+
+    function populateProfile(user) {
+        console.log('Populating profile for user:', user.email);
+        
+        try {
+            // Get display name or email
+            const displayName = user.displayName || user.email.split('@')[0];
+            const initials = getInitials(displayName);
+            console.log('Display name:', displayName, 'Initials:', initials);
+
+            // Update avatar
+            const avatarEl = document.getElementById('avatar-initials');
+            if (avatarEl) {
+                avatarEl.textContent = initials;
+                console.log('Avatar updated');
+            }
+
+            // Update profile info
+            const nameEl = document.getElementById('profile-name');
+            const emailEl = document.getElementById('profile-email');
+            if (nameEl) nameEl.textContent = displayName;
+            if (emailEl) emailEl.textContent = user.email;
+            console.log('Name and email updated');
+
+            // Calculate member since
+            const createdAt = user.metadata.creationTime;
+            const memberSince = formatDate(createdAt);
+            const joinedEl = document.getElementById('profile-joined');
+            if (joinedEl) joinedEl.textContent = `Member since ${memberSince}`;
+            console.log('Member since:', memberSince);
+
+            // Calculate days active
+            const daysActive = calculateDaysActive(createdAt);
+            const daysEl = document.getElementById('days-active');
+            if (daysEl) daysEl.textContent = daysActive;
+            console.log('Days active:', daysActive);
+
+            // Load user statistics from localStorage
+            loadUserStats(user.uid);
+            
+            // Load user location
+            loadUserLocation(user.uid);
+            
+            console.log('Profile population complete!');
+        } catch (error) {
+            console.error('Error populating profile:', error);
+        }
+    }
+    
+    async function loadUserLocation(userId) {
+        try {
+            const response = await fetch(`/api/nonprofit/location/${userId}`);
+            if (response.ok) {
+                const data = await response.json();
+                const location = data.location || {};
+                
+                document.getElementById('user-city').textContent = location.city || 'Not set';
+                document.getElementById('user-country').textContent = location.country || 'Not set';
+                
+                const method = location.detection_method === 'user_provided' ? 'Manual' : 
+                              location.detection_method === 'ip' ? 'Auto-detected' : 'Default';
+                document.getElementById('location-method').textContent = method;
+            } else {
+                document.getElementById('user-city').textContent = 'Not set';
+                document.getElementById('user-country').textContent = 'Not set';
+                document.getElementById('location-method').textContent = 'Not detected';
+            }
+        } catch (error) {
+            console.error('Error loading location:', error);
+            document.getElementById('user-city').textContent = 'Error loading';
+            document.getElementById('user-country').textContent = 'Error loading';
+        }
+    }
+    
+    function showLocationEditor() {
+        document.getElementById('location-editor').style.display = 'block';
+        
+        // Pre-fill with current values
+        const currentCity = document.getElementById('user-city').textContent;
+        const currentCountry = document.getElementById('user-country').textContent;
+        
+        if (currentCity !== 'Not set' && currentCity !== 'Loading...') {
+            document.getElementById('location-city-input').value = currentCity;
+        }
+        if (currentCountry !== 'Not set' && currentCountry !== 'Loading...') {
+            document.getElementById('location-country-input').value = currentCountry;
+        }
+    }
+    
+    function cancelLocationEdit() {
+        document.getElementById('location-editor').style.display = 'none';
+        // Clear inputs
+        document.getElementById('location-city-input').value = '';
+        document.getElementById('location-country-input').value = '';
+        document.getElementById('location-code-input').value = '';
+    }
+    
+    async function saveLocation() {
+        try {
+            const city = document.getElementById('location-city-input').value.trim();
+            const country = document.getElementById('location-country-input').value.trim();
+            const countryCode = document.getElementById('location-code-input').value.trim().toUpperCase();
+            
+            if (!city || !country || !countryCode) {
+                alert('Please fill in all location fields');
+                return;
+            }
+            
+            if (countryCode.length !== 2) {
+                alert('Country code must be 2 letters (e.g., US, PH, GB)');
+                return;
+            }
+            
+            const user = firebase.auth().currentUser;
+            if (!user) {
+                alert('Please log in first');
+                return;
+            }
+            
+            const response = await fetch('/api/nonprofit/location', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_id: user.uid,
+                    city: city,
+                    country: country,
+                    country_code: countryCode
+                })
+            });
+            
+            if (response.ok) {
+                // Update display
+                document.getElementById('user-city').textContent = city;
+                document.getElementById('user-country').textContent = country;
+                document.getElementById('location-method').textContent = 'Manual';
+                
+                // Hide editor
+                cancelLocationEdit();
+                
+                alert('Location updated successfully!');
+            } else {
+                alert('Failed to update location. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error saving location:', error);
+            alert('Error updating location. Please try again.');
+        }
+    }
+
+    function getInitials(name) {
+        if (!name) return '?';
+        const parts = name.split(' ');
+        if (parts.length >= 2) {
+            return (parts[0][0] + parts[1][0]).toUpperCase();
+        }
+        return name.substring(0, 2).toUpperCase();
+    }
+
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        const options = { year: 'numeric', month: 'long' };
+        return date.toLocaleDateString('en-US', options);
+    }
+
+    function calculateDaysActive(createdAt) {
+        const created = new Date(createdAt);
+        const now = new Date();
+        const diffTime = Math.abs(now - created);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays;
+    }
+
+    async function loadUserStats(userId) {
+        try {
+            // Load stats from backend (synced across devices)
+            const response = await fetch(`/api/prayer/user/${userId}/stats`);
+            if (response.ok) {
+                const stats = await response.json();
+                
+                // Basic stats
+                document.getElementById('prayers-count').textContent = stats.prayersRead || 0;
+                document.getElementById('requests-count').textContent = stats.requestsSubmitted || 0;
+                
+                // New metrics
+                document.getElementById('prayed-for-count').textContent = stats.peopleYouPrayedFor || 0;
+                document.getElementById('received-prayers-count').textContent = stats.peopleWhoPrayedForYou || 0;
+                
+                console.log('✅ Loaded user stats from backend:', stats);
+            } else {
+                // Fallback to 0
+                document.getElementById('prayers-count').textContent = 0;
+                document.getElementById('requests-count').textContent = 0;
+                document.getElementById('prayed-for-count').textContent = 0;
+                document.getElementById('received-prayers-count').textContent = 0;
+            }
+        } catch (error) {
+            console.error('Error loading user stats:', error);
+            document.getElementById('prayers-count').textContent = 0;
+            document.getElementById('requests-count').textContent = 0;
+            document.getElementById('prayed-for-count').textContent = 0;
+            document.getElementById('received-prayers-count').textContent = 0;
+        }
+    }
+
+    // Show user's prayer requests
+    async function showMyPrayers() {
+        const section = document.getElementById('my-prayers-section');
+        const list = document.getElementById('my-prayers-list');
+        const empty = document.getElementById('my-prayers-empty');
+        
+        try {
+            // Get current user
+            const user = firebase.auth().currentUser;
+            if (!user) return;
+            
+            // Show section and loading state
+            section.style.display = 'block';
+            list.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--gray);">Loading your prayers...</div>';
+            empty.style.display = 'none';
+            
+            // Smooth scroll to section
+            section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            
+            // Fetch user's prayer requests
+            const response = await fetch('/api/prayer/prayers');
+            if (response.ok) {
+                const data = await response.json();
+                const myPrayers = data.prayers.filter(p => 
+                    p.user_id === user.uid && p.title
+                );
+                
+                if (myPrayers.length > 0) {
+                    // Display prayer requests
+                    list.innerHTML = myPrayers.map(prayer => {
+                        const date = new Date(prayer.created_at).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                        });
+                        const analytics = prayer.analytics || {views: 0, prayers: 0};
+                        
+                        return `
+                            <div style="
+                                background: linear-gradient(135deg, 
+                                    rgba(255, 255, 255, 0.95) 0%, 
+                                    rgba(224, 242, 254, 0.95) 100%);
+                                padding: 1.5rem;
+                                border-radius: 12px;
+                                border-left: 4px solid var(--blue);
+                                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+                            ">
+                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.75rem;">
+                                    <h4 style="color: var(--blue); font-size: 1.1rem; margin: 0; flex: 1;">${prayer.title}</h4>
+                                    <span style="color: var(--gray); font-size: 0.85rem; white-space: nowrap; margin-left: 1rem;">${date}</span>
+                                </div>
+                                <p style="color: var(--gray); margin: 0.5rem 0; line-height: 1.6; white-space: pre-line;">${prayer.content}</p>
+                                <div style="display: flex; gap: 1.5rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(0, 0, 0, 0.1);">
+                                    <span style="color: var(--gray); font-size: 0.9rem;">
+                                        <strong style="color: var(--blue);">${analytics.views}</strong> views
+                                    </span>
+                                    <span style="color: var(--gray); font-size: 0.9rem;">
+                                        <strong style="color: var(--blue);">${analytics.prayers}</strong> prayers
+                                    </span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    list.innerHTML = '';
+                    empty.style.display = 'block';
+                }
+            } else {
+                list.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--gray);">Unable to load prayers. Please try again.</div>';
+            }
+        } catch (error) {
+            console.error('Error loading my prayers:', error);
+            list.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--gray);">Error loading prayers.</div>';
+        }
+    }
+
+    // Hide prayer requests section
+    function hideMyPrayers() {
+        document.getElementById('my-prayers-section').style.display = 'none';
+    }
+
+    async function handleLogout() {
+        try {
+            // Show confirmation
+            if (!confirm('Are you sure you want to logout?')) {
+                return;
+            }
+
+            // Sign out from Firebase
+            await firebase.auth().signOut();
+
+            // Clear any local storage
+            localStorage.removeItem('redirect_after_login');
+
+            // Redirect to home page
+            window.location.href = '/';
+        } catch (error) {
+            console.error('Logout error:', error);
+            alert('Failed to logout. Please try again.');
+        }
+    }
+
+    function showError() {
+        document.getElementById('loading-state').style.display = 'none';
+        document.getElementById('error-state').style.display = 'block';
+        document.getElementById('profile-content').style.display = 'none';
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Divine Bridge - Create Prayer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .create-prayer-section {
+        padding: 8rem 2rem 4rem;
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .create-prayer-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 2.5rem;
+        color: var(--black);
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+
+    .prayer-form {
+        background: var(--white);
+        padding: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 500;
+        color: var(--black);
+        margin-bottom: 0.5rem;
+    }
+
+    .form-group input,
+    .form-group textarea {
+        width: 100%;
+        padding: 0.8rem;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 1rem;
+        font-family: inherit;
+    }
+
+    .form-group textarea {
+        min-height: 200px;
+        resize: vertical;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: var(--gold);
+    }
+
+    .submit-button {
+        background: var(--gold);
+        color: var(--black);
+        padding: 1rem 2rem;
+        border: none;
+        border-radius: 6px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+        width: 100%;
+    }
+
+    .submit-button:hover {
+        transform: translateY(-2px);
+    }
+
+    .error-message {
+        color: #dc3545;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+
+    @media (max-width: 768px) {
+        .create-prayer-section {
+            padding: 6rem 1rem 2rem;
+        }
+
+        .create-prayer-title {
+            font-size: 2rem;
+        }
+
+        .prayer-form {
+            padding: 1.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="create-prayer-section">
+    <h1 class="create-prayer-title">Create Prayer Request</h1>
+    {% if error %}
+    <div class="error-message">{{ error }}</div>
+    {% endif %}
+    <form class="prayer-form" method="POST" action="{{ url_for('prayers.create') }}">
+        <div class="form-group">
+            <label for="title">Title</label>
+            <input type="text" id="title" name="title" required>
+        </div>
+        <div class="form-group">
+            <label for="content">Prayer Request</label>
+            <textarea id="content" name="content" required></textarea>
+        </div>
+        <button type="submit" class="submit-button">Submit Prayer</button>
+    </form>
+</section>
+{% endblock %} 

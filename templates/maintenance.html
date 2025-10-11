@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Divine Bridge - Maintenance{% endblock %}
+
+{% block extra_css %}
+<style>
+    .maintenance-section {
+        padding: 8rem 2rem 4rem;
+        max-width: 800px;
+        margin: 0 auto;
+        text-align: center;
+    }
+
+    .maintenance-icon {
+        font-size: 4rem;
+        color: var(--gold);
+        margin-bottom: 2rem;
+    }
+
+    .maintenance-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 2.5rem;
+        color: var(--black);
+        margin-bottom: 1.5rem;
+    }
+
+    .maintenance-message {
+        color: var(--black);
+        opacity: 0.8;
+        line-height: 1.8;
+        margin-bottom: 2rem;
+    }
+
+    .maintenance-info {
+        background: var(--white);
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 2rem;
+    }
+
+    .maintenance-details {
+        color: var(--black);
+        opacity: 0.8;
+        line-height: 1.8;
+    }
+
+    .maintenance-contact {
+        color: var(--black);
+        opacity: 0.8;
+        line-height: 1.8;
+    }
+
+    .maintenance-contact a {
+        color: var(--gold);
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .maintenance-contact a:hover {
+        text-decoration: underline;
+    }
+
+    @media (max-width: 768px) {
+        .maintenance-section {
+            padding: 6rem 1rem 2rem;
+        }
+
+        .maintenance-icon {
+            font-size: 3rem;
+        }
+
+        .maintenance-title {
+            font-size: 2rem;
+        }
+
+        .maintenance-info {
+            padding: 1.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="maintenance-section">
+    <div class="maintenance-icon">🔧</div>
+    <h1 class="maintenance-title">We're Under Maintenance</h1>
+    <p class="maintenance-message">
+        Divine Bridge is currently undergoing scheduled maintenance to improve your experience. 
+        We'll be back soon with exciting updates!
+    </p>
+    <div class="maintenance-info">
+        <p class="maintenance-details">
+            Expected duration: {{ maintenance_duration }}<br>
+            Scheduled completion: {{ completion_time }}
+        </p>
+    </div>
+    <p class="maintenance-contact">
+        If you have any questions, please contact us at 
+        <a href="mailto:support@divinebridge.com">support@divinebridge.com</a>
+    </p>
+</section>
+{% endblock %} 

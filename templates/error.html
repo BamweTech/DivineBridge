@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Divine Bridge - Error{% endblock %}
+
+{% block extra_css %}
+<style>
+    .error-section {
+        padding: 8rem 2rem 4rem;
+        max-width: 800px;
+        margin: 0 auto;
+        text-align: center;
+    }
+
+    .error-code {
+        font-family: 'Poppins', sans-serif;
+        font-size: 6rem;
+        color: var(--gold);
+        margin-bottom: 1rem;
+    }
+
+    .error-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 2.5rem;
+        color: var(--black);
+        margin-bottom: 1.5rem;
+    }
+
+    .error-message {
+        color: var(--black);
+        opacity: 0.8;
+        line-height: 1.8;
+        margin-bottom: 2rem;
+    }
+
+    .error-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+    }
+
+    .error-button {
+        padding: 1rem 2rem;
+        border: none;
+        border-radius: 6px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+        text-decoration: none;
+    }
+
+    .home-button {
+        background: var(--gold);
+        color: var(--black);
+    }
+
+    .back-button {
+        background: #6c757d;
+        color: var(--white);
+    }
+
+    .error-button:hover {
+        transform: translateY(-2px);
+    }
+
+    @media (max-width: 768px) {
+        .error-section {
+            padding: 6rem 1rem 2rem;
+        }
+
+        .error-code {
+            font-size: 4rem;
+        }
+
+        .error-title {
+            font-size: 2rem;
+        }
+
+        .error-actions {
+            flex-direction: column;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="error-section">
+    <div class="error-code">{{ error_code }}</div>
+    <h1 class="error-title">{{ error_title }}</h1>
+    <p class="error-message">{{ error_message }}</p>
+    <div class="error-actions">
+        <a href="{{ url_for('main.index') }}" class="error-button home-button">Go Home</a>
+        <button onclick="history.back()" class="error-button back-button">Go Back</button>
+    </div>
+</section>
+{% endblock %} 

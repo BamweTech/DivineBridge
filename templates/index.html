@@ -1,701 +1,1120 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Divine Bridge - Uniting Hearts in Global Prayer</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Parisienne&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Montserrat:wght@500;600&display=swap" rel="stylesheet">
-    <meta property="og:image" content="https://storage.googleapis.com/divinebridge-assets/og-image.png">
-    <meta name="twitter:image" content="https://storage.googleapis.com/divinebridge-assets/og-image.png">
-    <style>
-        :root {
-            --navy: #0F1B2B;
-            --cream: #F5E6D3;
-            --gold: #E6B17E;
-            --light-navy: #1a2937;
-            --dark-cream: #E6D5C3;
+{% extends "base.html" %}
+
+{% block title %}Divine Bridge - Home{% endblock %}
+
+{% block extra_css %}
+<style>
+    .hero-section {
+        padding: 8rem 2rem 4rem;
+        text-align: center;
+        background: linear-gradient(135deg, var(--blue), #2c5282);
+        color: var(--white);
+    }
+
+    .hero-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 3.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .hero-subtitle {
+        font-size: 1.5rem;
+        margin-bottom: 2rem;
+        opacity: 0.9;
+    }
+
+    .hero-buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+    }
+
+    .hero-button {
+        padding: 1rem 2rem;
+        border: none;
+        border-radius: 6px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+        text-decoration: none;
+    }
+
+    .primary-button {
+        background: var(--gold);
+        color: var(--black);
+    }
+
+    .secondary-button {
+        background: transparent;
+        color: var(--white);
+        border: 2px solid var(--white);
+    }
+
+    .hero-button:hover {
+        transform: translateY(-2px);
+    }
+
+    .features-section {
+        padding: 4rem 2rem;
+        background: var(--white);
+    }
+
+    .section-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 2.5rem;
+        color: var(--black);
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+
+    .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .feature-card {
+        background: var(--white);
+        padding: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        text-align: center;
+    }
+
+    .feature-icon {
+        font-size: 2.5rem;
+        color: var(--gold);
+        margin-bottom: 1rem;
+    }
+
+    .feature-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 1.5rem;
+        color: var(--black);
+        margin-bottom: 1rem;
+    }
+
+    .feature-text {
+        color: var(--black);
+        opacity: 0.8;
+        line-height: 1.6;
+    }
+
+    .cta-section {
+        padding: 4rem 2rem;
+        background: linear-gradient(135deg, var(--gold) 0%, #f39c12 100%);
+        text-align: center;
+        color: var(--black);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .cta-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="dots" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="1" fill="rgba(0,0,0,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23dots)"/></svg>');
+        pointer-events: none;
+    }
+
+    .cta-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        position: relative;
+        z-index: 1;
+    }
+
+    .cta-text {
+        font-size: 1.2rem;
+        margin-bottom: 2rem;
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+        line-height: 1.6;
+        position: relative;
+        z-index: 1;
+    }
+
+    .cta-button {
+        display: inline-block;
+        background: var(--black);
+        color: var(--white);
+        padding: 1rem 2.5rem;
+        border-radius: 50px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 1.1rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        position: relative;
+        z-index: 1;
+        border: 2px solid var(--black);
+    }
+
+    .cta-button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.3);
+        background: transparent;
+        color: var(--black);
+    }
+
+    .cta-button:active {
+        transform: translateY(-1px);
+    }
+
+    /* Prayer Preview Cards */
+    .preview-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        border-left: 4px solid var(--gold);
+    }
+
+    .preview-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .preview-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: var(--blue);
+        margin-bottom: 0.75rem;
+    }
+
+    .preview-content {
+        color: var(--black);
+        line-height: 1.6;
+        margin-bottom: 0.75rem;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    /* Show full content for daily prayers */
+    .preview-content-full {
+        display: block !important;
+        -webkit-line-clamp: unset !important;
+        -webkit-box-orient: unset !important;
+        overflow: visible !important;
+        white-space: pre-line;
+        line-height: 1.8;
+        font-size: 1.05rem;
+    }
+
+    /* Badge styling for preview cards */
+    .preview-badge {
+        display: inline-block;
+        padding: 0.4rem 0.8rem;
+        border-radius: 15px;
+        font-weight: 700;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.75rem;
+    }
+
+    .preview-badge.daily {
+        background: var(--gold);
+        color: var(--black);
+        box-shadow: 0 2px 6px rgba(245, 197, 66, 0.4);
+    }
+
+    .preview-badge.request {
+        background: var(--blue);
+        color: var(--white);
+        box-shadow: 0 2px 6px rgba(31, 60, 136, 0.4);
+    }
+
+    /* Special styling for daily prayer preview card */
+    .preview-card.daily-preview {
+        background: linear-gradient(135deg, rgba(245, 197, 66, 0.15), rgba(243, 156, 18, 0.05));
+        border-left: 4px solid var(--gold);
+        border: 3px solid var(--gold);
+        box-shadow: 0 6px 16px rgba(245, 197, 66, 0.3);
+    }
+
+    .preview-meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.85rem;
+        color: var(--gray);
+    }
+
+    .preview-loading {
+        text-align: center;
+        color: var(--white);
+        opacity: 0.8;
+        padding: 2rem;
+    }
+
+    /* Organization Cards */
+    .organizations-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .org-card {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .org-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    }
+
+    .org-card.local {
+        border-left: 5px solid #10b981;
+    }
+
+    .org-card.disaster {
+        border-left: 5px solid #f59e0b;
+    }
+
+    .org-card.general {
+        border-left: 5px solid var(--blue);
+    }
+
+    .org-badge {
+        display: inline-block;
+        padding: 0.4rem 0.9rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 1rem;
+        background: var(--gold);
+        color: var(--black);
+    }
+
+    .org-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .org-logo {
+        width: 60px;
+        height: 60px;
+        object-fit: contain;
+        border-radius: 8px;
+        background: #f8f9fa;
+        padding: 0.5rem;
+    }
+
+    .org-name {
+        font-family: 'Poppins', sans-serif;
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: var(--blue);
+        margin: 0;
+        flex: 1;
+    }
+
+    .org-description {
+        color: var(--black);
+        line-height: 1.6;
+        margin-bottom: 1rem;
+        font-size: 0.95rem;
+    }
+
+    .org-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+        font-size: 0.85rem;
+        color: var(--gray);
+    }
+
+    .org-focus, .org-location {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .org-actions {
+        display: flex;
+        gap: 1rem;
+    }
+
+    .org-btn {
+        flex: 1;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        text-decoration: none;
+        text-align: center;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+    }
+
+    .org-btn.learn-more {
+        background: transparent;
+        border: 2px solid var(--blue);
+        color: var(--blue);
+    }
+
+    .org-btn.learn-more:hover {
+        background: var(--blue);
+        color: white;
+    }
+
+    .org-btn.donate {
+        background: var(--gold);
+        color: var(--black);
+    }
+
+    .org-btn.donate:hover {
+        background: #e6b800;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(245, 197, 66, 0.4);
+    }
+
+    .daily-verse-section {
+        padding: 4rem 2rem;
+        background: linear-gradient(135deg, var(--blue) 0%, #2c5282 100%);
+        color: var(--white);
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .daily-verse-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.1"/><circle cx="10" cy="60" r="0.5" fill="white" opacity="0.1"/><circle cx="90" cy="40" r="0.5" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+        pointer-events: none;
+    }
+
+    .verse-container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(20px);
+        border-radius: 25px;
+        padding: 3rem;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        position: relative;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    }
+
+    .verse-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 2.2rem;
+        margin-bottom: 2rem;
+        color: var(--white);
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        position: relative;
+    }
+
+    .verse-title::after {
+        content: '';
+        position: absolute;
+        bottom: -0.5rem;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60px;
+        height: 3px;
+        background: var(--gold);
+        border-radius: 2px;
+    }
+
+    .verse-text {
+        font-size: 1.4rem;
+        line-height: 1.8;
+        margin-bottom: 2rem;
+        font-style: italic;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        position: relative;
+    }
+
+    .verse-text::before {
+        content: '"';
+        font-size: 3rem;
+        color: var(--gold);
+        position: absolute;
+        top: -1rem;
+        left: -1rem;
+        font-family: serif;
+    }
+
+    .verse-text::after {
+        content: '"';
+        font-size: 3rem;
+        color: var(--gold);
+        position: absolute;
+        bottom: -2rem;
+        right: -1rem;
+        font-family: serif;
+    }
+
+    .verse-reference {
+        font-size: 1.2rem;
+        opacity: 0.9;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.2);
+        padding: 0.75rem 1.5rem;
+        border-radius: 25px;
+        display: inline-block;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .verse-loading {
+        font-size: 1.2rem;
+        opacity: 0.8;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 0.6; }
+        50% { opacity: 1; }
+    }
+
+    /* Skeleton for verse loading */
+    .verse-skeleton {
+        background: linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.1) 0%,
+            rgba(255, 255, 255, 0.2) 50%,
+            rgba(255, 255, 255, 0.1) 100%
+        );
+        background-size: 200% 100%;
+        animation: skeleton-shimmer 1.5s ease-in-out infinite;
+        border-radius: 8px;
+        height: 20px;
+        margin-bottom: 8px;
+    }
+
+    @keyframes skeleton-shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+
+    @media (max-width: 768px) {
+        .hero-section {
+            padding: 6rem 1rem 3rem;
         }
 
-        body {
-            font-family: 'Montserrat', sans-serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 0;
-            color: var(--cream);
-            background: linear-gradient(to bottom, var(--navy) 0%, var(--light-navy) 100%);
-            min-height: 100vh;
+        .hero-title {
+            font-size: 2rem;
         }
 
-        /* Header Styles */
-        .header {
-            background: transparent;
-            border-bottom: 1px solid rgba(230, 177, 126, 0.1);  /* Subtle gold border */
-            padding: 1.5rem 0;
-            position: fixed;
-            width: 100%;
-            top: 0;
-            z-index: 1000;
-            transition: all 0.3s ease;
+        .hero-subtitle {
+            font-size: 1rem;
         }
 
-        .header.scrolled {
-            background: var(--navy);
-            border-bottom: 1px solid var(--gold);
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .nav-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: var(--gold);
-            text-decoration: none;
-            font-family: 'Playfair Display', serif;
-            font-weight: 600;
-            font-size: 1.8rem;
-            letter-spacing: 0.05em;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 2.5rem;
-        }
-
-        .nav-links a {
-            color: var(--cream);
-            text-decoration: none;
-            font-weight: 500;
-            font-size: 1.1rem;
-            transition: all 0.3s ease;
-            position: relative;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        .nav-links a::after {
-            content: '';
-            position: absolute;
-            width: 0;
-            height: 2px;
-            bottom: -4px;
-            left: 0;
-            background-color: var(--gold);
-            transition: width 0.3s ease;
-        }
-
-        .nav-links a:hover {
-            color: var(--gold);
-        }
-
-        .nav-links a:hover::after {
-            width: 100%;
-        }
-
-        /* Verse Section */
-        .verse-section {
-            position: relative;
-            background-color: #0F1B2B;  /* Dark navy blue */
-            color: #F5E6D3;  /* Cream color */
-            padding: 3rem;
-            border-radius: 0;
-            width: 100%;
-            max-width: 600px;
-            aspect-ratio: 1;  /* Square aspect ratio */
-            margin: 8rem auto 4rem;  /* Increased top margin */
-            display: flex;
+        .hero-buttons {
             flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .hero-button {
+            font-size: 0.95rem;
+            padding: 0.85rem 1.75rem;
+        }
+
+        .section-title {
+            font-size: 1.75rem;
+        }
+
+        .features-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .feature-title {
+            font-size: 1.25rem;
+        }
+
+        .feature-text {
+            font-size: 0.95rem;
+        }
+
+        .cta-title {
+            font-size: 1.75rem;
+        }
+
+        .cta-text {
+            font-size: 1rem;
+        }
+
+        .cta-button {
+            font-size: 0.95rem;
+            padding: 0.85rem 2rem;
         }
 
         .verse-title {
-            font-family: 'Montserrat', sans-serif;
-            font-size: 1.8rem;
-            font-weight: 600;
-            letter-spacing: 0.2em;
-            margin-bottom: 3rem;
-            text-transform: uppercase;
+            font-size: 1.5rem;
         }
 
-        .handwriting-container {
-            position: relative;
-            padding: 0 2rem;
-            margin: 1rem 0;
-        }
-
-        .quote-marks {
-            font-family: 'Playfair Display', serif;
-            font-size: 4rem;
-            line-height: 1;
-            position: absolute;
-            color: #F5E6D3;
-            opacity: 0.8;
-        }
-
-        .quote-left {
-            top: -2rem;
-            left: 0;
-        }
-
-        .quote-right {
-            bottom: -2rem;
-            right: 0;
-            transform: rotate(180deg);
-        }
-
-        .handwriting-text {
-            font-family: 'Playfair Display', serif;
-            font-size: 2rem;
-            line-height: 1.4;
-            margin: 0;
-            min-height: 150px; /* Add minimum height to prevent layout shift */
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .word-span {
-            opacity: 0;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            margin-right: 0.5em;
-            margin-bottom: 0.2em;
-            transform: translateY(10px);
-            display: inline-block;
-        }
-
-        .word-span.visible {
-            opacity: 1;
-            transform: translateY(0);
+        .verse-text {
+            font-size: 1rem;
+            line-height: 1.6;
         }
 
         .verse-reference {
-            font-family: 'Montserrat', sans-serif;
-            font-size: 1.4rem;
-            font-weight: 500;
-            margin-top: 3rem;
-            letter-spacing: 0.05em;
-            opacity: 0;
-            transition: opacity 0.5s ease;
-        }
-
-        .verse-reference.visible {
-            opacity: 1;
-        }
-
-        .download-button {
-            position: absolute;
-            top: 2rem;  /* Increased from 1rem */
-            right: 2rem;  /* Increased from 1rem */
-            background: transparent;
-            border: none;
-            color: #F5E6D3;
-            cursor: pointer;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            padding: 0.8rem;  /* Increased padding */
-        }
-
-        .download-button:hover {
-            opacity: 0.8;
-        }
-
-        .download-button svg {
-            width: 28px;  /* Increased from 24px */
-            height: 28px;  /* Increased from 24px */
-        }
-
-        /* Mission Section */
-        .mission {
-            padding: 6rem 2rem;
-            background: var(--light-navy);
-            color: var(--cream);
-        }
-
-        .mission-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 3rem;
-        }
-
-        .mission-card {
-            background: var(--navy);
-            padding: 3rem;  /* Increased padding */
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease;
-        }
-
-        .mission-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .mission-title {
-            font-family: 'Playfair Display', serif;
-            font-size: 2.4rem;  /* Increased from 1.8rem */
-            color: var(--gold);
-            margin-bottom: 2rem;  /* Increased margin */
-            line-height: 1.2;  /* Added for better readability */
-        }
-
-        .mission-text {
-            color: var(--cream);
-            font-size: 1.3rem;  /* Increased from 1.1rem */
-            line-height: 1.7;  /* Increased line height */
-            margin-bottom: 1.5rem;
-        }
-
-        /* Section Title */
-        .section-title {
-            font-family: 'Playfair Display', serif;
-            font-size: 3rem;  /* Added larger size for section title */
-            color: var(--gold);
-            text-align: center;
-            margin-bottom: 4rem;
-            line-height: 1.2;
-        }
-
-        /* Prayer Room Section */
-        .prayer-room-section {
-            background: linear-gradient(135deg, var(--white) 0%, #f8f9fa 100%);
-            padding: 4rem 2rem;
-            text-align: center;
-            margin: 4rem 0;
-        }
-
-        .prayer-room-content {
-            max-width: 800px;
-            margin: 0 auto;
-        }
-
-        .prayer-room-title {
-            font-family: 'Poppins', sans-serif;
-            font-size: 2.5rem;
-            color: var(--black);
-            margin-bottom: 1.5rem;
-        }
-
-        .prayer-room-description {
-            font-size: 1.2rem;
-            color: var(--black);
-            opacity: 0.8;
-            margin-bottom: 2rem;
-            line-height: 1.8;
-        }
-
-        .auth-buttons {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-        }
-
-        .auth-button {
-            padding: 1rem 2rem;
-            border-radius: 6px;
             font-size: 1rem;
-            font-weight: 600;
-            text-decoration: none;
-            transition: transform 0.3s ease;
         }
 
-        .login-button {
-            background: var(--blue);
-            color: var(--white);
+        .verse-container {
+            padding: 2rem;
         }
 
-        .signup-button {
-            background: var(--gold);
-            color: var(--black);
+        .preview-title {
+            font-size: 1.1rem;
         }
 
-        .auth-button:hover {
-            transform: translateY(-2px);
+        .preview-content {
+            font-size: 0.95rem;
         }
 
-        /* Footer */
-        .footer {
-            background: var(--navy);
-            color: var(--cream);
-            padding: 4rem 2rem;
-            border-top: 1px solid var(--gold);
+        .preview-meta {
+            font-size: 0.8rem;
         }
 
-        .footer-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 3rem;
+        .organizations-grid {
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
         }
 
-        .footer-section h3 {
-            font-family: 'Playfair Display', serif;
-            color: var(--gold);
-            margin-bottom: 1.5rem;
-            font-size: 1.4rem;
+        .org-card {
+            padding: 1.5rem;
         }
 
-        .footer-links {
-            list-style: none;
-            padding: 0;
-            margin: 0;
+        .org-name {
+            font-size: 1.1rem;
         }
 
-        .footer-links li {
-            margin-bottom: 1rem;
+        .org-description {
+            font-size: 0.9rem;
         }
 
-        .footer-links a {
-            color: var(--cream);
-            text-decoration: none;
-            transition: color 0.3s ease;
+        .org-actions {
+            flex-direction: column;
         }
 
-        .footer-links a:hover {
-            color: var(--gold);
-        }
-
-        /* Add watermark styles */
-        .watermark {
-            position: absolute;
-            bottom: 1.5rem;
-            right: 1.5rem;
-            width: 30px;
-            height: 30px;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s ease;
-        }
-
-        .watermark svg {
+        .org-btn {
             width: 100%;
-            height: 100%;
         }
 
-        .watermark svg path {
-            fill: var(--cream) !important;
-            opacity: 0.6;
-        }
+    }
 
-        @media (max-width: 768px) {
-            .verse-section {
-                margin: 6rem 1rem 2rem;
-                padding: 2rem;
-            }
-            
-            .verse-title {
-                font-size: 1.4rem;
-                margin-bottom: 2rem;
-            }
-            
-            .handwriting-text {
-                font-size: 1.6rem;
-            }
-            
-            .verse-reference {
-                font-size: 1.2rem;
-                margin-top: 2rem;
-            }
-            
-            .download-button {
-                top: 1.5rem;
-                right: 1.5rem;
-            }
+    /* Smooth scroll animation for daily prayer section */
+    .prayer-section-animate {
+        position: relative;
+        overflow: visible !important;
+    }
 
-            .nav-container {
-                padding: 0 1rem;
-            }
+    .prayer-container-animate {
+        opacity: 0;
+        transform: translateY(50px) scale(0.95);
+        transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1),
+                    transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        will-change: opacity, transform;
+    }
 
-            .logo {
-                font-size: 1.4rem;
-            }
+    .prayer-container-animate.visible {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 
-            .nav-links {
-                gap: 1.5rem;
-            }
+    /* Ensure smooth scrolling and prevent clipping */
+    html {
+        scroll-behavior: smooth;
+        overflow-x: hidden;
+    }
 
-            .nav-links a {
-                font-size: 1rem;
-            }
+    body {
+        overflow-x: hidden;
+    }
 
-            .mission {
-                padding: 4rem 1rem;
-            }
-            
-            .mission-card {
-                padding: 2rem;
-            }
-            
-            .mission-title {
-                font-size: 2rem;  /* Adjusted for mobile */
-                margin-bottom: 1.5rem;
-            }
-            
-            .mission-text {
-                font-size: 1.2rem;
-            }
-            
-            .section-title {
-                font-size: 2.4rem;
-                margin-bottom: 3rem;
-            }
-        }
-    </style>
-</head>
-<body>
-    <!-- Header -->
-    <header class="header">
-        <nav class="nav-container">
-            <a href="/" class="logo">
-                <span>Divine Bridge</span>
-            </a>
-            <div class="nav-links">
-                <a href="/">Home</a>
-                <a href="/about">About</a>
-                <a href="/prayers">Prayers</a>
-                <a href="/login">Login</a>
-                <a href="/signup">Sign Up</a>
-            </div>
-        </nav>
-    </header>
+    #daily-prayer-section {
+        overflow: visible !important;
+        padding-top: 6rem !important;
+        padding-bottom: 6rem !important;
+    }
 
-    <!-- Verse Section -->
-    <div class="verse-section">
-        <h2 class="verse-title">DAILY VERSE</h2>
-        <div class="handwriting-container">
-            <span class="quote-marks quote-left">"</span>
-            <div class="handwriting-text"></div>
-            <span class="quote-marks quote-right">"</span>
+    /* Smooth scrolling with fade-out buffer for prayer content */
+    #daily-prayer-content-home {
+        position: relative;
+        scroll-behavior: smooth;
+    }
+
+    #daily-prayer-content-home::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    #daily-prayer-content-home::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+
+    #daily-prayer-content-home::-webkit-scrollbar-thumb {
+        background: var(--gold);
+        border-radius: 10px;
+    }
+
+    #daily-prayer-content-home::-webkit-scrollbar-thumb:hover {
+        background: #d4a93a;
+    }
+
+    /* Firefox scrollbar */
+    #daily-prayer-content-home {
+        scrollbar-width: thin;
+        scrollbar-color: var(--gold) #f1f1f1;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="hero-section" id="hero-section">
+    <h1 class="hero-title" id="hero-title">Welcome to Divine Bridge</h1>
+    <p class="hero-subtitle">Connect with believers worldwide through the power of prayer</p>
+    <div class="hero-buttons" id="hero-buttons">
+        <!-- Buttons will be populated dynamically based on auth state -->
+        <a href="/signup" class="hero-button primary-button">Get Started</a>
+        <a href="/about" class="hero-button secondary-button">Learn More</a>
+    </div>
+</section>
+
+<section class="daily-verse-section" id="daily-verse-section">
+    <div class="verse-container">
+        <h2 class="verse-title">Daily Verse</h2>
+        <div id="verse-skeleton" style="display: flex; flex-direction: column; gap: 1rem;">
+            <div class="verse-skeleton" style="height: 24px; width: 90%;"></div>
+            <div class="verse-skeleton" style="height: 24px; width: 95%;"></div>
+            <div class="verse-skeleton" style="height: 24px; width: 70%;"></div>
+            <div class="verse-skeleton" style="height: 20px; width: 40%; margin: 1rem auto 0;"></div>
         </div>
-        <p class="verse-reference"></p>
-        <button class="download-button" title="Download verse image">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-            </svg>
-        </button>
-        <div class="watermark">
-            <svg width="41.34218" height="45.052022" viewBox="0 0 41.34218 45.052022" version="1.1" xmlns="http://www.w3.org/2000/svg">
-                <g transform="translate(-69.531391,-70.903428)">
-                    <path d="M 83.488159,98.975444 H 69.531388 V 115.95545 H 90.26604 c 2.485261,0 5.257993,-0.40936 8.318355,-1.22886 2.238785,-0.59414 4.333645,-1.78274 6.284885,-3.56516 1.95124,-1.80291 3.47135,-4.02543 4.55993,-6.66833 0.70925,-1.70314 1.18872,-2.93472 1.44436,-5.517656 H 96.830497 c -0.174322,1.375766 -0.440514,1.573216 -0.803051,2.413456 -0.698338,1.59803 -1.664104,2.72507 -2.896464,3.38067 -1.232361,0.63512 -3.306806,0.9524 -6.223393,0.9524 h -3.41943 z"/>
-                    <path d="m 69.531388,70.903424 v 15.37016 h 13.956771 v -5.16716 h 3.481442 c 3.614925,0 6.202876,0.8808 7.763867,2.64273 0.735039,0.82966 1.293423,1.02256 1.680001,2.52443 h 14.162441 c -0.15907,-0.91803 -0.35436,-0.8424 -0.59221,-1.72551 -0.73942,-2.74534 -1.9308,-5.15254 -3.57394,-7.22178 -1.64315,-2.06925 -3.72754,-3.65669 -6.25388,-4.76302 -2.505805,-1.10633 -5.80251,-1.65985 -9.88984,-1.65985 z"/>
-                </g>
-            </svg>
+        <p class="verse-text" style="display: none;">Loading verse...</p>
+        <p class="verse-reference" style="display: none;"><span class="verse-loading">Loading...</span></p>
+    </div>
+</section>
+
+<!-- Daily Prayer Section -->
+<section id="daily-prayer-section" class="prayer-section-animate" style="padding: 4rem 2rem; background: linear-gradient(135deg, rgba(31, 60, 136, 0.05) 0%, rgba(44, 82, 130, 0.05) 100%); overflow: visible;">
+    <div class="prayer-container-animate" style="max-width: 900px; margin: 0 auto;">
+        <h2 class="section-title" style="color: var(--blue); margin-bottom: 0.5rem; text-align: center;">
+            Today's Global Prayer
+        </h2>
+        <p style="text-align: center; color: #555; margin-bottom: 2rem; font-size: 1.1rem; font-weight: 500;" id="daily-prayer-date-home">
+            Loading...
+        </p>
+        
+        <!-- Prayer Content with Buffer -->
+        <div style="
+            position: relative;
+            background: white;
+            border-radius: 16px;
+            border-left: 5px solid var(--gold);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        ">
+            <!-- White buffer overlay at top -->
+            <div style="
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 60px;
+                background: white;
+                z-index: 10;
+                pointer-events: none;
+                border-top-left-radius: 16px;
+                border-top-right-radius: 16px;
+            "></div>
+            
+            <!-- Scrollable prayer content -->
+            <div id="daily-prayer-content-home" style="
+                white-space: pre-line; 
+                line-height: 1.9; 
+                font-size: 1.15rem; 
+                color: #333; 
+                padding: 3rem; 
+                padding-top: 5rem;
+                padding-bottom: 3rem;
+                max-height: 400px;
+                overflow-y: auto;
+                overflow-x: hidden;
+            ">
+                Loading today's prayer...
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 2rem;">
+            <a href="/prayers" class="cta-button" style="display: inline-block; padding: 1rem 2.5rem; background: linear-gradient(135deg, var(--blue), #2c5282); color: white; text-decoration: none; border-radius: 50px; font-weight: 600; transition: transform 0.3s ease; box-shadow: 0 4px 15px rgba(31, 60, 136, 0.3);">
+                Visit Prayer Room
+            </a>
         </div>
     </div>
+</section>
 
-    <!-- Mission Section -->
-    <section class="mission">
-        <h2 class="section-title">Our Mission</h2>
-        <div class="mission-container">
-            <div class="mission-card">
-                <h3 class="mission-title">Unite in Prayer</h3>
-                <p class="mission-text">Bringing together believers from around the world to share in daily prayer and spiritual reflection, creating a global community of faith and support.</p>
-            </div>
-            <div class="mission-card">
-                <h3 class="mission-title">Share God's Word</h3>
-                <p class="mission-text">Spreading the message of hope and love through carefully selected daily verses, making Scripture accessible and meaningful to everyone.</p>
-            </div>
-            <div class="mission-card">
-                <h3 class="mission-title">Build Bridges</h3>
-                <p class="mission-text">Creating connections across cultures and denominations, fostering understanding and unity in our shared faith journey.</p>
-            </div>
+<!-- Non-Profit Organizations Section -->
+<section class="organizations-section" id="organizations-section" style="padding: 4rem 2rem; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+    <div style="max-width: 1200px; margin: 0 auto;">
+        <h2 class="section-title" style="color: var(--blue); margin-bottom: 0.5rem;">Take Action: Organizations Making a Difference</h2>
+        <p id="org-subtitle" style="text-align: center; color: var(--gray); margin-bottom: 3rem; font-size: 1.1rem;">
+            Support organizations helping people in need
+        </p>
+        
+        <!-- Loading State -->
+        <div id="org-loading" style="text-align: center; padding: 3rem;">
+            <div class="spinner"></div>
+            <p style="color: var(--gray); margin-top: 1rem;">Finding organizations...</p>
         </div>
-    </section>
+        
+        <!-- Organizations Grid -->
+        <div id="organizations-container" class="organizations-grid" style="display: none;">
+            <!-- Organizations will be loaded here -->
+        </div>
+    </div>
+</section>
 
-    <!-- Prayer Room Section -->
-    <section class="prayer-room-section">
-        <div class="prayer-room-content">
-            <h2 class="prayer-room-title">Join Our Prayer Room</h2>
-            <p class="prayer-room-description">
-                Step into our sacred space where hearts unite in prayer. Share your requests, 
-                lift others up in prayer, and experience the power of collective faith. 
-                Together, we create a bridge of divine connection.
+<section class="features-section">
+    <h2 class="section-title">Our Features</h2>
+    <div class="features-grid">
+        <div class="feature-card">
+            <h3 class="feature-title">Daily Prayers</h3>
+            <p class="feature-text">
+                Access inspiring daily prayers to start your day with purpose and spiritual guidance.
             </p>
-            <div class="auth-buttons">
-                <a href="/login" class="auth-button login-button">Log In</a>
-                <a href="/signup" class="auth-button signup-button">Sign Up</a>
-            </div>
         </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="footer-container">
-            <div class="footer-about">
-                <div class="footer-logo">Divine Bridge</div>
-                <p>Uniting hearts in global prayer.</p>
-            </div>
-            <div class="footer-links">
-                <h3>Quick Links</h3>
-                <a href="/about">About</a>
-                <a href="/prayers">Prayers</a>
-                <a href="/privacy">Privacy Policy</a>
-            </div>
-            <div class="footer-newsletter">
-                <h3>Stay Connected</h3>
-                <form class="newsletter-form">
-                    <input type="email" placeholder="Your email" class="newsletter-input" required>
-                    <button type="submit" class="newsletter-button">Subscribe</button>
-                </form>
-            </div>
+        <div class="feature-card">
+            <h3 class="feature-title">Prayer Requests</h3>
+            <p class="feature-text">
+                Share your prayer requests and receive support from our global community of believers.
+            </p>
         </div>
-    </footer>
+        <div class="feature-card">
+            <h3 class="feature-title">Community Support</h3>
+            <p class="feature-text">
+                Connect with others on similar spiritual journeys and grow together in faith.
+            </p>
+        </div>
+    </div>
+</section>
 
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const header = document.querySelector('.header');
-            let lastScroll = 0;
-            
-            window.addEventListener('scroll', () => {
-                const currentScroll = window.pageYOffset;
-                
-                if (currentScroll > 50) {
-                    header.classList.add('scrolled');
-                } else {
-                    header.classList.remove('scrolled');
-                }
-                
-                lastScroll = currentScroll;
-            });
+<section class="cta-section" id="cta-section">
+    <h2 class="cta-title">Join Our Community Today</h2>
+    <p class="cta-text">
+        Experience the power of collective prayer and spiritual growth with believers from around the world. 
+        Start your journey with Divine Bridge today.
+    </p>
+    <a href="/signup" class="cta-button">Sign Up Now</a>
+</section>
+{% endblock %}
 
-            fetch('/api/today-verse')
-                .then(response => response.json())
-                .then(response => {
-                    if (response.success && response.data) {
-                        animateVerse(response.data.verse, response.data.reference);
-                    } else {
-                        console.error('Error fetching verse:', response.error);
-                        document.querySelector('.handwriting-text').textContent = 'Unable to load today\'s verse. Please try again later.';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    document.querySelector('.handwriting-text').textContent = 'Unable to load today\'s verse. Please try again later.';
-                });
-        });
-
-        function animateVerse(verse, reference) {
-            const verseElement = document.querySelector('.handwriting-text');
-            const referenceElement = document.querySelector('.verse-reference');
+{% block extra_js %}
+<script>
+    // Update hero buttons based on auth state
+    function updateHeroButtons(user) {
+        const heroSection = document.getElementById('hero-section');
+        const heroButtons = document.getElementById('hero-buttons');
+        const heroTitle = document.getElementById('hero-title');
+        const ctaSection = document.getElementById('cta-section');
+        const verseSection = document.getElementById('daily-verse-section');
+        
+        if (user) {
+            // User is logged in - Hide hero section and move verse to top
+            const displayName = user.displayName || user.email.split('@')[0];
             
-            // Clear previous content
-            verseElement.innerHTML = '';
+            // Hide hero section completely
+            if (heroSection) {
+                heroSection.style.display = 'none';
+            }
             
-            // Split verse into words
-            const words = verse.split(' ');
+            // Move verse section to the very top
+            if (verseSection) {
+                verseSection.style.marginTop = '0';
+                verseSection.style.paddingTop = '6rem'; // Account for fixed header
+            }
             
-            // Create spans for each word
-            words.forEach((word, index) => {
-                const span = document.createElement('span');
-                span.className = 'word-span';
-                span.textContent = word;
-                verseElement.appendChild(span);
-                
-                // Add space after each word except the last one
-                if (index < words.length - 1) {
-                    verseElement.appendChild(document.createTextNode(' '));
-                }
-                
-                setTimeout(() => {
-                    span.classList.add('visible');
-                    
-                    // Show reference and download button after last word
-                    if (index === words.length - 1) {
-                        setTimeout(() => {
-                            referenceElement.textContent = reference;
-                            referenceElement.classList.add('visible');
-                            
-                            const downloadButton = document.querySelector('.download-button');
-                            downloadButton.style.display = 'block';
-                            setTimeout(() => {
-                                downloadButton.style.opacity = '1';
-                            }, 100);
-                        }, 300);
-                    }
-                }, index * 100);
-            });
-        }
-
-        async function downloadVerseImage() {
-            const verseSection = document.querySelector('.verse-section');
-            const downloadButton = document.querySelector('.download-button');
-            const watermark = document.querySelector('.watermark');
+            // Hide CTA section
+            if (ctaSection) {
+                ctaSection.style.display = 'none';
+            }
+        } else {
+            // User is not logged in - Show hero section
+            if (heroSection) {
+                heroSection.style.display = 'block';
+            }
             
-            // Temporarily hide download button and show watermark
-            downloadButton.style.display = 'none';
-            watermark.style.opacity = '1';
+            // Reset verse section styling
+            if (verseSection) {
+                verseSection.style.marginTop = '';
+                verseSection.style.paddingTop = '4rem';
+            }
             
-            try {
-                const canvas = await html2canvas(verseSection, {
-                    backgroundColor: '#0F1B2B',
-                    scale: 2, // Higher quality
-                    logging: false,
-                    useCORS: true
-                });
-                
-                // Create download link
-                const link = document.createElement('a');
-                link.download = 'daily-verse.png';
-                link.href = canvas.toDataURL('image/png');
-                link.click();
-            } catch (error) {
-                console.error('Error generating image:', error);
-            } finally {
-                // Restore original state
-                downloadButton.style.display = 'block';
-                watermark.style.opacity = '0';
+            heroTitle.textContent = 'Welcome to Divine Bridge';
+            heroButtons.innerHTML = `
+                <a href="/signup" class="hero-button primary-button">Get Started</a>
+                <a href="/login" class="hero-button secondary-button">Sign In</a>
+            `;
+            if (ctaSection) {
+                ctaSection.style.display = 'block';
             }
         }
+    }
 
-        // Add click event listener to download button
-        document.addEventListener('DOMContentLoaded', function() {
-            const downloadButton = document.querySelector('.download-button');
-            downloadButton.addEventListener('click', downloadVerseImage);
+    // Load organizations
+    async function loadOrganizations() {
+        const container = document.getElementById('organizations-container');
+        const loading = document.getElementById('org-loading');
+        const subtitle = document.getElementById('org-subtitle');
+        
+        if (!container || !loading) return;
+        
+        try {
+            // Get current user ID if logged in
+            const userId = currentUser ? currentUser.uid : null;
+            const url = userId ? `/api/nonprofit/organizations?user_id=${userId}` : '/api/nonprofit/organizations';
             
-            // Rest of the existing DOMContentLoaded code...
-            fetch('/api/today-verse')
-                .then(response => response.json())
-                .then(response => {
-                    if (response.success && response.data) {
-                        animateVerse(response.data.verse, response.data.reference);
-                    } else {
-                        console.error('Error fetching verse:', response.error);
-                        document.querySelector('.handwriting-text').textContent = 'Unable to load today\'s verse. Please try again later.';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    document.querySelector('.handwriting-text').textContent = 'Unable to load today\'s verse. Please try again later.';
+            const response = await fetch(url);
+            
+            if (response.ok) {
+                const data = await response.json();
+                const orgs = data.organizations || [];
+                const userLocation = data.user_location || {};
+                const disasterContext = data.disaster_context || {};
+                
+                // Update subtitle with context
+                // Use "Global Organizations" if using default location or unable to detect
+                const isDefaultLocation = userLocation.detection_method === 'default' || 
+                                         userLocation.city === 'New York' ||
+                                         !userLocation.city;
+                const locationDisplay = isDefaultLocation ? 'Global Organizations' : userLocation.city;
+                
+                if (disasterContext.disasters && disasterContext.disasters.length > 0 && !isDefaultLocation) {
+                    const disasters = disasterContext.disasters.map(d => d.type).join(' and ');
+                    subtitle.textContent = `Supporting your community in ${locationDisplay} and those affected by ${disasters}`;
+                } else if (isDefaultLocation) {
+                    subtitle.textContent = `Supporting global organizations making a difference worldwide`;
+                } else {
+                    subtitle.textContent = `Supporting organizations in ${locationDisplay} and around the world`;
+                }
+                
+                if (orgs.length > 0) {
+                    displayOrganizations(orgs);
+                    loading.style.display = 'none';
+                    container.style.display = 'grid';
+                } else {
+                    loading.innerHTML = '<p style="color: var(--gray);">No organizations available at this time.</p>';
+                }
+            } else {
+                loading.innerHTML = '<p style="color: var(--gray);">Unable to load organizations.</p>';
+            }
+        } catch (error) {
+            console.error('Error loading organizations:', error);
+            loading.innerHTML = '<p style="color: var(--gray);">Unable to load organizations.</p>';
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text || '';
+        return div.innerHTML;
+    }
+
+    function displayOrganizations(orgs) {
+        const container = document.getElementById('organizations-container');
+        
+        container.innerHTML = orgs.map(org => `
+            <div class="org-card ${org.badge_type || 'general'}">
+                ${org.badge ? `<span class="org-badge">${org.badge}</span>` : ''}
+                <div class="org-header">
+                    ${org.logo_url ? `<img src="${org.logo_url}" alt="${escapeHtml(org.name)}" class="org-logo" onerror="this.style.display='none'">` : ''}
+                    <h3 class="org-name">${escapeHtml(org.name)}</h3>
+                </div>
+                <p class="org-description">${escapeHtml(org.description)}</p>
+                <div class="org-meta">
+                    ${org.focus_areas && org.focus_areas.length > 0 ? 
+                        `<span class="org-focus">${escapeHtml(org.focus_areas.slice(0, 3).join(', '))}</span>` : ''}
+                    ${org.location ? `<span class="org-location">${escapeHtml(org.location)}</span>` : ''}
+                </div>
+                <div class="org-actions">
+                    <a href="${escapeHtml(org.website)}" target="_blank" rel="noopener noreferrer" class="org-btn learn-more">Learn More</a>
+                    <a href="${escapeHtml(org.donation_url || org.website)}" target="_blank" rel="noopener noreferrer" class="org-btn donate">Donate Now</a>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Helper function to get client's local date in YYYY-MM-DD format
+    function getClientLocalDate() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    // Load daily prayer on home page
+    async function loadDailyPrayerHome() {
+        const contentEl = document.getElementById('daily-prayer-content-home');
+        const dateEl = document.getElementById('daily-prayer-date-home');
+        
+        if (!contentEl || !dateEl) return;
+        
+        try {
+            // Send client's local date to get the right prayer
+            const clientDate = getClientLocalDate();
+            console.log('🙏 [HOME] Client local date:', clientDate);
+            console.log('🙏 [HOME] API URL:', `/api/prayer/prayers?client_date=${clientDate}`);
+            
+            const response = await fetch(`/api/prayer/prayers?client_date=${clientDate}`);
+            const data = await response.json();
+            
+            console.log('🙏 [HOME] Total prayers received:', data.prayers.length);
+            console.log('🙏 [HOME] All prayers:', data.prayers.map(p => ({
+                date: p.date,
+                source: p.source,
+                title: p.title,
+                hasTitle: !!p.title
+            })));
+            
+            // Find today's daily prayer
+            const dailyPrayer = data.prayers.find(p => {
+                const match = p.source === 'generated' && !p.title;
+                console.log('🙏 [HOME] Checking prayer:', {
+                    source: p.source,
+                    hasTitle: !!p.title,
+                    date: p.date,
+                    matches: match
                 });
+                return match;
+            });
+            
+            console.log('🙏 [HOME] Daily prayer found:', !!dailyPrayer);
+            if (dailyPrayer) {
+                console.log('🙏 [HOME] Prayer date:', dailyPrayer.date);
+                console.log('🙏 [HOME] Prayer preview:', dailyPrayer.content.substring(0, 50));
+            }
+            
+            if (dailyPrayer) {
+                contentEl.textContent = dailyPrayer.content;
+                const date = new Date(dailyPrayer.created_at);
+                dateEl.textContent = date.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            } else {
+                contentEl.textContent = 'No daily prayer available for today. Please check back later.';
+                dateEl.textContent = '';
+            }
+        } catch (error) {
+            console.error('Error loading daily prayer:', error);
+            contentEl.textContent = 'Unable to load today\'s prayer. Please try again later.';
+            dateEl.textContent = '';
+        }
+    }
+
+    // Smooth scroll animation for daily prayer section
+    function initPrayerSectionAnimation() {
+        const prayerContainer = document.querySelector('.prayer-container-animate');
+        if (!prayerContainer) return;
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    // Add visible class with a slight delay for better effect
+                    setTimeout(() => {
+                        entry.target.classList.add('visible');
+                    }, 100);
+                    // Optionally unobserve after animation
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, {
+            threshold: 0.15, // Trigger when 15% of element is visible
+            rootMargin: '0px 0px -100px 0px' // Start animation 100px before bottom edge
         });
 
-        // Add smooth scrolling for navigation links
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                document.querySelector(this.getAttribute('href')).scrollIntoView({
-                    behavior: 'smooth'
-                });
-            });
-        });
-    </script>
-</body>
-</html> 
+        observer.observe(prayerContainer);
+    }
+
+    // Load daily verse when page loads
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Load daily prayer
+        loadDailyPrayerHome();
+        
+        // Initialize prayer section animation
+        initPrayerSectionAnimation();
+        
+        // Load organizations
+        loadOrganizations();
+
+        try {
+            // Send client's local date for timezone-aware verse
+            const clientDate = getClientLocalDate();
+            console.log('Loading verse for client date:', clientDate);
+            
+            const response = await fetch(`/api/today-verse?client_date=${clientDate}`);
+            if (response.ok) {
+                const data = await response.json();
+                
+                // Hide skeleton, show verse
+                document.getElementById('verse-skeleton').style.display = 'none';
+                document.querySelector('.verse-text').style.display = 'block';
+                document.querySelector('.verse-reference').style.display = 'block';
+                
+                if (data.data) {
+                    const verse = data.data;
+                    document.querySelector('.verse-text').textContent = verse.verse;
+                    document.querySelector('.verse-reference span').textContent = verse.reference;
+                } else {
+                    document.querySelector('.verse-text').textContent = 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.';
+                    document.querySelector('.verse-reference span').textContent = 'John 3:16';
+                }
+            } else {
+                // Hide skeleton, show fallback
+                document.getElementById('verse-skeleton').style.display = 'none';
+                document.querySelector('.verse-text').style.display = 'block';
+                document.querySelector('.verse-reference').style.display = 'block';
+                document.querySelector('.verse-text').textContent = 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.';
+                document.querySelector('.verse-reference span').textContent = 'John 3:16';
+            }
+        } catch (error) {
+            console.error('Error loading daily verse:', error);
+            // Hide skeleton, show fallback
+            document.getElementById('verse-skeleton').style.display = 'none';
+            document.querySelector('.verse-text').style.display = 'block';
+            document.querySelector('.verse-reference').style.display = 'block';
+            document.querySelector('.verse-text').textContent = 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.';
+            document.querySelector('.verse-reference span').textContent = 'John 3:16';
+        }
+    });
+</script>
+{% endblock %} 
