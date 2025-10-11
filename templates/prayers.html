@@ -1363,6 +1363,13 @@
     async function prayForThis(event, prayerId) {
         event.stopPropagation(); // Prevent card toggle
         
+        // Check if user is logged in
+        if (!currentUser) {
+            alert('Your prayers make a real difference. Sign in to track the lives you\'ve touched in our global community of believers.');
+            window.location.href = '/login';
+            return;
+        }
+        
         const button = event.target;
         const card = button.closest('.prayer-card');
         
@@ -1376,9 +1383,7 @@
                 const data = await response.json();
                 
                 // Mark this prayer as prayed for by this user (synced to backend)
-                if (currentUser) {
-                    await markPrayerAsPrayedFor(currentUser.uid, prayerId);
-                }
+                await markPrayerAsPrayedFor(currentUser.uid, prayerId);
                 
                 // Show success feedback
                 button.textContent = 'Thank You! 🙏';
