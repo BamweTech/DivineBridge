@@ -402,11 +402,6 @@
             </div>
 
             <div class="profile-stats">
-                <div class="stat-card">
-                    <div class="stat-value" id="prayers-count">0</div>
-                    <div class="stat-label">Prayers Read</div>
-                    <div class="stat-sublabel">Prayer cards opened</div>
-                </div>
                 <div class="stat-card clickable-stat" onclick="showMyPrayers()" style="cursor: pointer;">
                     <div class="stat-value" id="requests-count">0</div>
                     <div class="stat-label">My Prayers</div>
@@ -421,6 +416,11 @@
                     <div class="stat-value" id="received-prayers-count">0</div>
                     <div class="stat-label">Prayers Received</div>
                     <div class="stat-sublabel">People who prayed for you</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="days-active">0</div>
+                    <div class="stat-label">Days Active</div>
+                    <div class="stat-sublabel">Since joining the community</div>
                 </div>
             </div>
 
@@ -737,25 +737,20 @@
             if (response.ok) {
                 const stats = await response.json();
                 
-                // Basic stats
-                document.getElementById('prayers-count').textContent = stats.prayersRead || 0;
+                // Stats
                 document.getElementById('requests-count').textContent = stats.requestsSubmitted || 0;
-                
-                // New metrics
                 document.getElementById('prayed-for-count').textContent = stats.peopleYouPrayedFor || 0;
                 document.getElementById('received-prayers-count').textContent = stats.peopleWhoPrayedForYou || 0;
                 
                 console.log('✅ Loaded user stats from backend:', stats);
             } else {
                 // Fallback to 0
-                document.getElementById('prayers-count').textContent = 0;
                 document.getElementById('requests-count').textContent = 0;
                 document.getElementById('prayed-for-count').textContent = 0;
                 document.getElementById('received-prayers-count').textContent = 0;
             }
         } catch (error) {
             console.error('Error loading user stats:', error);
-            document.getElementById('prayers-count').textContent = 0;
             document.getElementById('requests-count').textContent = 0;
             document.getElementById('prayed-for-count').textContent = 0;
             document.getElementById('received-prayers-count').textContent = 0;
