@@ -23,6 +23,13 @@ logger = logging.getLogger(__name__)
 class NonprofitService:
     """Handle non-profit organization queries and caching"""
     
+    # Blacklist of organizations to exclude (incorrect info, scams, etc.)
+    ORGANIZATION_BLACKLIST = [
+        "moore angels inc",
+        "moore angels",
+        # Add more here as needed (lowercase)
+    ]
+    
     def __init__(self, storage_handler=None):
         """Initialize the NonprofitService"""
         try:
@@ -42,6 +49,25 @@ class NonprofitService:
         except Exception as e:
             logger.error(f"Error initializing NonprofitService: {e}")
             raise
+    
+    def _filter_blacklisted(self, organizations: List[Dict]) -> List[Dict]:
+        """
+        Remove blacklisted organizations from list
+        
+        Args:
+            organizations: List of organization dictionaries
+        
+        Returns:
+            Filtered list without blacklisted organizations
+        """
+        filtered = []
+        for org in organizations:
+            org_name_lower = org.get('name', '').lower()
+            if not any(blacklisted in org_name_lower for blacklisted in self.ORGANIZATION_BLACKLIST):
+                filtered.append(org)
+            else:
+                logger.warning(f"Filtered out blacklisted organization: {org.get('name')}")
+        return filtered
     
     def get_organizations_for_user(self, user_location: Dict, prayer_disasters: List[Dict], 
                                   date: str) -> List[Dict]:
@@ -132,11 +158,14 @@ class NonprofitService:
                     selected_orgs.extend(random.sample(remaining_fallback, min(needed, len(remaining_fallback))))
             
             # Add badges based on context
+            # Final blacklist filter before returning
+            selected_orgs = self._filter_blacklisted(selected_orgs)
+            
             for org in selected_orgs:
                 org['badge'] = self._determine_badge(org, user_location, prayer_disasters)
                 org['badge_type'] = 'local' if org.get('is_local') else 'disaster' if org.get('is_disaster_response') else 'general'
             
-            logger.info(f"Returning {len(selected_orgs)} total organizations")
+            logger.info(f"Returning {len(selected_orgs)} total organizations (after blacklist filter)")
             return selected_orgs[:5]
             
         except Exception as e:
@@ -168,6 +197,8 @@ class NonprofitService:
             if cached_data and self._is_cache_valid(cached_data, self.general_cache_days):
                 logger.info(f"Using cached general organizations for {location.get('city')}")
                 orgs = cached_data.get('organizations', [])
+                # Filter out blacklisted organizations
+                orgs = self._filter_blacklisted(orgs)
                 
                 # Check if cached orgs need logo fetching (for old cache entries)
                 needs_logo_update = any(org.get('logo_url') is None for org in orgs)
@@ -190,6 +221,9 @@ class NonprofitService:
             orgs = self._query_perplexity_for_general_orgs(location)
             
             if orgs:
+                # Filter out blacklisted organizations before caching
+                orgs = self._filter_blacklisted(orgs)
+                
                 # Cache the results
                 self._cache_organizations(orgs, cache_path)
                 # Mark as local
