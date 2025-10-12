@@ -1,4 +1,3 @@
-from perplexipy import PerplexityClient
 import os
 import logging
 from datetime import datetime
@@ -6,6 +5,7 @@ from storage_handler import StorageHandler
 from google.api_core import retry
 from google.api_core.exceptions import ServiceUnavailable
 from config import get_config
+from perplexity_client import get_perplexity_client, set_client_model
 import json
 import requests
 import random
@@ -20,17 +20,12 @@ class PrayerGenerator:
     def __init__(self, storage=None):
         logger.debug("Initializing PrayerGenerator")
         try:
-            # Get API key from config instead of environment variable
-            config = get_config()
-            api_key = config.perplexity_api_key
-            if not api_key:
-                raise ValueError("Perplexity API key not found in config")
-                
-            self.client = PerplexityClient(key=api_key)
-            self.client.model = "sonar-reasoning-pro"
+            # Use shared Perplexity client (avoids test query overhead)
+            self.client = get_perplexity_client()
+            set_client_model("sonar-reasoning-pro")
             self.storage = storage or StorageHandler()
             self._load_prompt()
-            logger.debug("Successfully initialized Perplexity client and StorageHandler")
+            logger.debug("Successfully initialized with shared Perplexity client and StorageHandler")
         except Exception as e:
             logger.error(f"Error initializing PrayerGenerator: {e}")
             raise

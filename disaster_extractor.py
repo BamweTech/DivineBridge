@@ -3,11 +3,11 @@ Disaster Extractor for Divine Bridge
 Extracts disaster information from daily prayer text using AI.
 """
 
-from perplexipy import PerplexityClient
 import logging
 import json
 from typing import List, Dict, Optional
 from config import get_config
+from perplexity_client import get_perplexity_client, set_client_model
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -37,14 +37,10 @@ class DisasterExtractor:
     def __init__(self):
         """Initialize the DisasterExtractor"""
         try:
-            config = get_config()
-            api_key = config.perplexity_api_key
-            if not api_key:
-                raise ValueError("Perplexity API key not found")
-            
-            self.client = PerplexityClient(key=api_key)
-            self.client.model = "sonar-reasoning-pro"
-            logger.info("DisasterExtractor initialized successfully")
+            # Use shared Perplexity client (avoids test query overhead)
+            self.client = get_perplexity_client()
+            set_client_model("sonar-reasoning-pro")
+            logger.info("DisasterExtractor initialized successfully (using shared client)")
             
         except Exception as e:
             logger.error(f"Error initializing DisasterExtractor: {e}")

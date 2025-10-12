@@ -3,7 +3,6 @@ Non-Profit Service for Divine Bridge
 Handles non-profit organization queries, caching, and selection using Perplexity AI.
 """
 
-from perplexipy import PerplexityClient
 import logging
 import json
 import random
@@ -14,6 +13,7 @@ from PIL import Image
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 from config import get_config
+from perplexity_client import get_perplexity_client, set_client_model
 from storage_handler import StorageHandler
 from location_service import get_location_service
 
@@ -26,14 +26,10 @@ class NonprofitService:
     def __init__(self, storage_handler=None):
         """Initialize the NonprofitService"""
         try:
-            config = get_config()
-            api_key = config.perplexity_api_key
-            if not api_key:
-                raise ValueError("Perplexity API key not found")
-            
-            self.client = PerplexityClient(key=api_key)
+            # Use shared Perplexity client (avoids test query overhead)
+            self.client = get_perplexity_client()
             # Use faster model for organization queries (sonar-pro is faster than sonar-reasoning-pro)
-            self.client.model = "sonar-pro"
+            set_client_model("sonar-pro")
             self.storage = storage_handler or StorageHandler()
             self.location_service = get_location_service()
             
@@ -41,7 +37,7 @@ class NonprofitService:
             self.general_cache_days = 30
             self.disaster_cache_days = 7
             
-            logger.info("NonprofitService initialized successfully")
+            logger.info("NonprofitService initialized successfully (using shared client)")
             
         except Exception as e:
             logger.error(f"Error initializing NonprofitService: {e}")

@@ -3,10 +3,10 @@ Prayer Summary Generator for Divine Bridge
 Generates concise summaries of prayer requests using AI.
 """
 
-from perplexipy import PerplexityClient
 import logging
 from typing import Optional
 from config import get_config
+from perplexity_client import get_perplexity_client, set_client_model
 
 logger = logging.getLogger(__name__)
 
@@ -17,15 +17,11 @@ class PrayerSummaryGenerator:
     def __init__(self):
         """Initialize the PrayerSummaryGenerator"""
         try:
-            config = get_config()
-            api_key = config.perplexity_api_key
-            if not api_key:
-                raise ValueError("Perplexity API key not found")
-            
-            self.client = PerplexityClient(key=api_key)
+            # Use shared Perplexity client (avoids test query overhead)
+            self.client = get_perplexity_client()
             # Use faster model for summaries
-            self.client.model = "sonar-pro"
-            logger.info("PrayerSummaryGenerator initialized successfully")
+            set_client_model("sonar-pro")
+            logger.info("PrayerSummaryGenerator initialized successfully (using shared client)")
             
         except Exception as e:
             logger.error(f"Error initializing PrayerSummaryGenerator: {e}")
