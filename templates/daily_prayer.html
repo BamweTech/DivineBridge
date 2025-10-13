@@ -97,7 +97,7 @@
     /* Mobile Responsive */
     @media (max-width: 768px) {
         .prayer-page-title {
-            font-size: 2rem;
+            font-size: 1.75rem;
         }
 
         .prayer-content-card {
@@ -107,6 +107,16 @@
         .prayer-text {
             font-size: 1.1rem;
             line-height: 1.8;
+        }
+        
+        .prayer-header-section > div {
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .prayer-header-section button {
+            width: 100%;
+            justify-content: center;
         }
     }
 </style>
@@ -124,7 +134,31 @@
         <!-- Prayer Content (hidden until loaded) -->
         <div id="prayer-content-section" style="display: none;">
             <div class="prayer-header-section">
-                <h1 class="prayer-page-title">Today's Prayer</h1>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <h1 class="prayer-page-title" style="margin-bottom: 0;">Today's Prayer</h1>
+                    <button onclick="downloadDailyPrayerImage()" style="
+                        background: var(--gold);
+                        border: 2px solid var(--gold);
+                        border-radius: 50px;
+                        padding: 0.75rem 1.5rem;
+                        cursor: pointer;
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 0.5rem;
+                        font-size: 0.95rem;
+                        font-weight: 600;
+                        color: var(--black);
+                        transition: all 0.3s ease;
+                        box-shadow: 0 4px 15px rgba(245, 197, 66, 0.3);
+                    " onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 6px 20px rgba(245, 197, 66, 0.4)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(245, 197, 66, 0.3)'" title="Download Prayer Image">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span>Download Image</span>
+                    </button>
+                </div>
                 <p class="prayer-date" id="prayer-date">Loading...</p>
             </div>
 
@@ -214,6 +248,49 @@
             console.error('Error loading daily prayer:', error);
             loadingState.style.display = 'none';
             errorState.style.display = 'block';
+        }
+    }
+
+    // Download daily prayer as image (mobile-friendly with Share API)
+    async function downloadDailyPrayerImage() {
+        const clientDate = getClientLocalDate();
+        const url = `/api/prayer/prayer/download?client_date=${clientDate}`;
+        
+        try {
+            // Fetch the image
+            const response = await fetch(url);
+            const blob = await response.blob();
+            
+            // Check if mobile and Web Share API is available
+            if (navigator.share && navigator.canShare && /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent)) {
+                // Create a File object for sharing
+                const file = new File([blob], `divine_bridge_prayer_${clientDate}.jpg`, { type: 'image/jpeg' });
+                
+                // Check if files can be shared
+                if (navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        title: 'Divine Bridge - Daily Prayer',
+                        text: 'Today\'s global prayer from Divine Bridge',
+                        files: [file]
+                    });
+                    console.log('✅ Prayer shared successfully');
+                    return;
+                }
+            }
+            
+            // Fallback: Standard download for desktop or unsupported browsers
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = `divine_bridge_prayer_${clientDate}.jpg`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(blobUrl);
+            
+        } catch (error) {
+            console.error('Error downloading prayer:', error);
+            alert('Unable to download image. Please try again.');
         }
     }
 

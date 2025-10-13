@@ -176,7 +176,12 @@ app = create_app()
 
 @app.route('/')
 def index():
-    """Serve the main index page"""
+    """Redirect to Prayer Room as main page"""
+    return redirect('/prayers')
+
+@app.route('/home')
+def home():
+    """Serve the original index page (accessible via /home)"""
     return render_template('index.html')
 
 @app.route('/api/og-image')

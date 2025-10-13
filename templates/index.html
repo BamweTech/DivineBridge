@@ -272,30 +272,43 @@
     }
 
     .org-card {
-        background: white;
+        background: linear-gradient(135deg, 
+            rgba(255, 255, 255, 0.9) 0%, 
+            rgba(240, 248, 255, 0.8) 100%);
+        backdrop-filter: blur(10px);
         border-radius: 16px;
         padding: 2rem;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 12px rgba(31, 60, 136, 0.1);
         transition: all 0.3s ease;
         position: relative;
         overflow: hidden;
+        border: 1px solid rgba(31, 60, 136, 0.1);
+    }
+    
+    .org-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, 
+            rgba(31, 60, 136, 0.03) 0%, 
+            rgba(59, 130, 246, 0.05) 50%,
+            rgba(147, 197, 253, 0.03) 100%);
+        pointer-events: none;
+        z-index: 0;
+    }
+    
+    .org-card > * {
+        position: relative;
+        z-index: 1;
     }
 
     .org-card:hover {
         transform: translateY(-5px);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-    }
-
-    .org-card.local {
-        border-left: 5px solid #10b981;
-    }
-
-    .org-card.disaster {
-        border-left: 5px solid #f59e0b;
-    }
-
-    .org-card.general {
-        border-left: 5px solid var(--blue);
+        box-shadow: 0 8px 24px rgba(31, 60, 136, 0.2);
+        border-color: rgba(31, 60, 136, 0.2);
     }
 
     .org-badge {
@@ -396,6 +409,32 @@
         background: #e6b800;
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(245, 197, 66, 0.4);
+    }
+
+    /* Daily Prayer Card Glass Effect */
+    .prayer-card-glass {
+        position: relative;
+    }
+    
+    .prayer-card-glass::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, 
+            rgba(31, 60, 136, 0.03) 0%, 
+            rgba(59, 130, 246, 0.05) 50%,
+            rgba(147, 197, 253, 0.03) 100%);
+        pointer-events: none;
+        z-index: 0;
+        border-radius: 16px;
+    }
+    
+    .prayer-card-glass > * {
+        position: relative;
+        z-index: 1;
     }
 
     .daily-verse-section {
@@ -772,22 +811,23 @@
         </p>
         
         <!-- Prayer Content with Buffer -->
-        <div style="
+        <div class="prayer-card-glass" style="
             position: relative;
-            background: white;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(240, 248, 255, 0.8) 100%);
+            backdrop-filter: blur(10px);
             border-radius: 16px;
-            border-left: 5px solid var(--gold);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(31, 60, 136, 0.1);
+            box-shadow: 0 4px 20px rgba(31, 60, 136, 0.15);
             overflow: hidden;
         ">
-            <!-- White buffer overlay at top -->
+            <!-- Glass buffer overlay at top -->
             <div style="
                 position: absolute;
                 top: 0;
                 left: 0;
                 right: 0;
                 height: 60px;
-                background: white;
+                background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 248, 255, 0.9) 100%);
                 z-index: 10;
                 pointer-events: none;
                 border-top-left-radius: 16px;

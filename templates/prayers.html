@@ -194,13 +194,17 @@
     }
 
     .icon-button .button-label {
-        max-width: 0;
-        opacity: 0;
-        overflow: hidden;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        max-width: 150px;
+        opacity: 1;
+        overflow: visible;
         font-size: 0.95rem;
         font-weight: 600;
         color: var(--black);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .icon-button {
+        padding: 0 20px 0 16px;
     }
 
     .icon-button:hover {
@@ -208,12 +212,6 @@
         border-color: #ffd700;
         transform: translateY(-3px);
         box-shadow: 0 6px 20px rgba(245, 197, 66, 0.4);
-        padding: 0 20px 0 16px;
-    }
-
-    .icon-button:hover .button-label {
-        max-width: 150px;
-        opacity: 1;
     }
 
     .icon-button:active {
@@ -853,8 +851,12 @@
         }
 
         .icon-button {
-            width: 44px;
             height: 44px;
+            padding: 0 16px 0 12px;
+        }
+        
+        .icon-button .button-label {
+            font-size: 0.85rem;
         }
 
         .prayer-header h1 {
@@ -901,60 +903,21 @@
                     </svg>
                     <span class="button-label">Daily Prayer</span>
                 </a>
-                <button id="add-prayer-btn" class="icon-button" onclick="openPrayerModal(event)" title="Submit Prayer Request">
+                <button id="add-prayer-btn" class="icon-button" title="Request Prayer">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="12" y1="5" x2="12" y2="19"></line>
                         <line x1="5" y1="12" x2="19" y2="12"></line>
                     </svg>
-                    <span class="button-label">Submit Prayer</span>
+                    <span class="button-label">Request Prayer</span>
                 </button>
             </div>
         </div>
     </div>
     
     <script>
-    // Define variables and functions needed by inline onclick handlers
+    // Define variables needed by scripts
     // Note: currentUser is defined globally in base.html
     let expandedPrayers = new Set();
-
-    // Open prayer modal (called from inline onclick)
-    function openPrayerModal(event) {
-        try {
-            console.log('openPrayerModal called!');
-            
-            if (event) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
-            
-            const modal = document.getElementById('prayer-modal');
-            
-            if (!modal) {
-                console.error('Modal not found!');
-                alert('Prayer submission form is not available. Please refresh the page.');
-                return;
-            }
-            
-            console.log('Modal found');
-            console.log('Current user:', currentUser);
-            
-            // Check if user is logged in
-            if (!currentUser) {
-                console.log('User not logged in, showing prompt');
-                const wantsToLogin = confirm('Please sign in to submit a prayer request. Would you like to sign in now?');
-                if (wantsToLogin) {
-                    window.location.href = '/login?redirect=/prayers';
-                }
-                return;
-            }
-            
-            console.log('User is logged in, opening modal');
-            modal.style.display = 'block';
-        } catch (error) {
-            console.error('Error in openPrayerModal:', error);
-            alert('Error: ' + error.message);
-        }
-    }
     </script>
     
     <script>
@@ -1248,15 +1211,15 @@
 </div>
 
 <!-- Floating Action Button -->
-<button id="prayer-fab" class="fab" title="Request Prayer" onclick="openPrayerModal(event)">
+<button id="prayer-fab" class="fab" title="Request Prayer">
     <span>+</span>
-                </button>
+</button>
 
 <!-- Prayer Request Modal -->
 <div id="prayer-modal" class="modal">
     <div class="modal-content">
         <span class="close" id="close-modal">&times;</span>
-        <h2 class="prayer-request-title">Submit Prayer Request</h2>
+        <h2 class="prayer-request-title">Request Prayer</h2>
         <div id="modal-success-message" class="success-message" style="display: none;">
             Your prayer request has been submitted successfully!
             </div>
@@ -1272,7 +1235,7 @@
                 <label for="modal-prayer-content">Prayer Request</label>
                 <textarea id="modal-prayer-content" name="content" required placeholder="Share your prayer request..."></textarea>
             </div>
-            <button type="submit" class="submit-btn">Submit Prayer Request</button>
+            <button type="submit" class="submit-btn">Request Prayer</button>
         </form>
     </div>
 </div>
@@ -1822,7 +1785,7 @@
                 if (!currentUser) {
                     console.log('User not logged in, showing prompt');
                     // Show login prompt
-                    if (confirm('Please sign in to submit a prayer request. Would you like to sign in now?')) {
+                    if (confirm('Please sign in to request prayer. Would you like to sign in now?')) {
                         window.location.href = '/login?redirect=/prayers';
                     }
                     return;
@@ -1846,7 +1809,7 @@
                 if (!currentUser) {
                     console.log('User not logged in, showing prompt');
                     // Show login prompt
-                    if (confirm('Please sign in to submit a prayer request. Would you like to sign in now?')) {
+                    if (confirm('Please sign in to request prayer. Would you like to sign in now?')) {
                         window.location.href = '/login?redirect=/prayers';
                     }
                     return;
@@ -1878,7 +1841,7 @@
             e.preventDefault();
             
             if (!currentUser) {
-                showModalError('Please sign in to submit a prayer request.');
+                showModalError('Please sign in to request prayer.');
                 return;
             }
 
@@ -1930,7 +1893,7 @@
                 showModalError('Network error. Please try again.');
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit Prayer Request';
+                submitBtn.textContent = 'Request Prayer';
             }
         });
     }
