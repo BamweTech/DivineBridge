@@ -179,6 +179,71 @@ def index():
     """Serve the main index page"""
     return render_template('index.html')
 
+@app.route('/api/og-image')
+def og_image():
+    """Serve today's prayer image for Open Graph / social media preview"""
+    try:
+        from flask import send_file
+        from io import BytesIO
+        
+        # Get today's date
+        today = datetime.now().strftime('%Y-%m-%d')
+        
+        # Try to get cached prayer image first
+        cached_image = app.storage_handler.get_prayer_image(today)
+        if cached_image:
+            logger.info(f"Serving cached prayer image for OG preview: {today}")
+            return send_file(
+                BytesIO(cached_image),
+                mimetype='image/jpeg',
+                as_attachment=False,
+                download_name=f'divine_bridge_og_{today}.jpg'
+            )
+        
+        # If no cached image, generate it
+        prayer = app.storage_handler.get_prayer(today)
+        if not prayer:
+            logger.warning(f"No prayer found for OG image: {today}")
+            # Return a default OG image or 404
+            return jsonify({'error': 'No prayer available'}), 404
+        
+        # Extract prayer content
+        if isinstance(prayer, dict):
+            prayer_content = prayer.get('content', '')
+        else:
+            prayer_content = prayer
+        
+        if not prayer_content:
+            return jsonify({'error': 'Prayer content is empty'}), 404
+        
+        # Generate and cache image
+        from image_generator import get_image_generator
+        generator = get_image_generator()
+        date_str = datetime.now().strftime('%B %d, %Y')
+        
+        image_data = generator.generate_prayer_image(
+            prayer_text=prayer_content,
+            date=date_str
+        )
+        
+        # Save to cache
+        image_bytes = image_data.getvalue()
+        app.storage_handler.save_prayer_image(today, image_bytes)
+        logger.info(f"Generated and cached prayer image for OG preview: {today}")
+        
+        # Reset and send
+        image_data.seek(0)
+        return send_file(
+            image_data,
+            mimetype='image/jpeg',
+            as_attachment=False,
+            download_name=f'divine_bridge_og_{today}.jpg'
+        )
+        
+    except Exception as e:
+        logger.error(f"Error serving OG image: {e}")
+        return jsonify({'error': 'Failed to generate OG image'}), 500
+
 @app.route('/login')
 def login():
     """Serve the login page"""

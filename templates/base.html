@@ -5,6 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <title>{% block title %}Divine Bridge{% endblock %}</title>
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ request.url }}">
+    <meta property="og:title" content="{% block og_title %}Divine Bridge - Unite in Faith, Hope & Prayer{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}Join thousands of believers worldwide in daily prayer and spiritual growth. Get today's inspiring verse and global prayer.{% endblock %}">
+    <meta property="og:image" content="{% block og_image %}{{ request.url_root }}api/og-image{% endblock %}">
+    <meta property="og:image:width" content="1080">
+    <meta property="og:image:height" content="1350">
+    <meta property="og:image:type" content="image/jpeg">
+    <meta property="og:site_name" content="Divine Bridge">
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="{{ request.url }}">
+    <meta name="twitter:title" content="{% block twitter_title %}Divine Bridge - Unite in Faith, Hope & Prayer{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}Join thousands of believers worldwide in daily prayer and spiritual growth.{% endblock %}">
+    <meta name="twitter:image" content="{% block twitter_image %}{{ request.url_root }}api/og-image{% endblock %}">
+    
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
     
     <!-- Firebase SDK -->
