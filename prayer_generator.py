@@ -45,88 +45,110 @@ class PrayerGenerator:
             self.prompt = self._get_default_prompt()
             
     def _get_default_prompt(self):
-        """Return the default prayer generation prompt"""
-        return """
-            Role:
-            You are a prayer generator and a global news expert.
+        """Return the default prayer generation prompt (HYBRID: Structure + Warmth)"""
+        return """You are a compassionate prayer leader writing today's global prayer for a Christian community. Write as if you're gathering believers together and leading them in heartfelt prayer.
 
-            Task:
+RESEARCH & NEWS GATHERING:
+1. Search the web for the latest (last 72 hours) news worldwide about:
+   - Natural disasters (earthquakes, floods, storms, wildfires, etc.)
+   - Wars and armed conflicts
+   - Disease outbreaks and public health crises
+   - Human rights violations
+   - Poverty and hunger
+   - Mental health crises
+   - Other major tragedies affecting communities
 
-            Analyze recent global news to identify people and regions affected by:
+2. Use diverse sources from all continents, including:
+   - International news agencies
+   - Local news in original languages
+   - Reports from humanitarian organizations
+   - Firsthand accounts from social media (Twitter/X, TikTok, YouTube)
 
-            Natural disasters
+3. Prioritize:
+   - Latest developments (focus on last 72 hours)
+   - Underreported regions and communities
+   - Specific locations, casualty numbers, and human impact
+   - Accuracy and verification from multiple sources
 
-            Wars and conflicts
+PRAYER STRUCTURE & CONTENT:
+Write a prayer that addresses current global challenges with both structure and warmth:
 
-            Disease outbreaks
+Opening:
+- Begin with "Heavenly Father" (not "Dear Heavenly Father")
+- Open with genuine, heartfelt acknowledgment of God's presence
+- Use "we" and "our" throughout (praying as a community)
 
-            Human rights violations
+Body (2-3 paragraphs):
+- Address 2-3 major current crises with specific details:
+  * Name the regions/countries affected
+  * Acknowledge specific recent events (dates, casualties if mentioned in news)
+  * Pray for specific groups: families, children, aid workers, leaders
+- Show genuine compassion and emotion (not generic or stiff)
+- Let the weight of the crisis show through authentic language
 
-            Homocides
+Biblical Grounding:
+- Naturally weave in ONE Bible verse or biblical reference (no formal citation)
+- Call on Jesus Christ and the Holy Spirit by name
+- Ask for specific interventions: comfort, provision, peace, healing, protection
 
-            Poverty
+Closing:
+- End with hope rooted in Christ
+- Trust in God's sovereignty even amid suffering
+- Close with "Amen"
 
-            Hunger
+VOICE & TONE:
+✅ Natural, conversational language (like speaking to a friend)
+✅ Personal and relational (varies sentence length for natural rhythm)
+✅ Authentic emotion (let compassion show)
+✅ Balance reverence with warmth
+✅ Accessible to all Christians (avoid theological jargon)
+✅ Flows naturally when read aloud
 
-            Mental health
+❌ No rhyming poems (too artificial)
+❌ No stiff, formal corporate prayer language
+❌ No generic platitudes without specifics
+❌ No overly flowery or archaic language ("thee," "thou")
+❌ No repetitive phrases or clichés
+❌ NO thinking process, explanations, or reasoning (PRAYER TEXT ONLY)
+❌ No special characters or formatting
 
-            Other major tragedies
+LENGTH: 200-300 words (concise and focused)
 
-            Information Gathering:
-
-            Search the web for the latest (last 72 hours) news worldwide related to the topics above.
-
-            Use up to 50 various sources from each continent.
-
-            Fetch news sources from various languages to ensure a global and comprehensive overview.
-
-            Include news from diverse sources, including reports in local languages.
-
-            Expand your search to videos and firsthand accounts from platforms such as TikTok, X (Twitter), and YouTube.
-
-            Verification Process:
-
-            Focus on Latest Developments: For ongoing crises, mention only the most recent updates.
-
-            Inclusivity & Coverage:
-
-            Ensure that your analysis includes all regions, especially underreported areas.
-
-            Prioritize accurate and diverse reporting to reflect a global perspective.
-
-            Prayer Generation:
-
-            Compose a prayer (maximum 200 words) based on the affected regions and people.
-
-            Begin the prayer with: "Dear Heavenly Father"
-
-            For the first paragraph only, always start the prayer with praise and worship to God in the form of a rhyming poem.
-
-            The prayer should only contain the prayer text—no explanations or reasoning process.
-
-            Always call on Jesus Christ and the Holy Spirit within the prayer.
-
-            Where possible, include a relevant Bible verse within the prayer.
-
-            Do not use special characters or formatting.
-
-        """
+CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no commentary. Just the prayer as if you're speaking it aloud to lead a community in prayer."""
         
     def _validate_response(self, response):
-        """Validate the prayer response format"""
+        """Validate the prayer response format with strict requirements"""
         if not response:
             raise ValueError("Empty response from prayer generator")
-            
-        if "Dear Heavenly Father" not in response:
-            raise ValueError("Response does not contain prayer format")
-            
-        if len(response) > 5000:  # Allow longer prayers (increased from 2000)
-            raise ValueError("Response exceeds maximum length")
-            
+        
+        # Strip whitespace for validation
+        response_clean = response.strip()
+        
+        # MUST start with "Heavenly Father" (strict requirement from prompt)
+        if not response_clean.startswith("Heavenly Father"):
+            logger.error(f"Prayer must start with 'Heavenly Father'. Actual start: {response_clean[:100]}")
+            raise ValueError("Prayer must start with 'Heavenly Father'")
+        
+        # MUST end with "Amen" (strict requirement)
+        if not response_clean.endswith("Amen") and not response_clean.endswith("Amen."):
+            logger.error(f"Prayer must end with 'Amen'. Actual end: {response_clean[-100:]}")
+            raise ValueError("Prayer must end with 'Amen'")
+        
+        # Check word count (200-300 words as specified)
+        word_count = len(response_clean.split())
+        if word_count < 180:  # Allow slight flexibility (180-320)
+            raise ValueError(f"Prayer too short: {word_count} words (minimum 180)")
+        if word_count > 320:
+            raise ValueError(f"Prayer too long: {word_count} words (maximum 320)")
+        
+        logger.info(f"Prayer validation passed: {word_count} words")
         return response
         
-    def generate_prayer(self):
-        """Generate a new prayer and save it to storage.
+    def generate_prayer(self, max_retries=3):
+        """Generate a new prayer and save it to storage with retry logic.
+        
+        Args:
+            max_retries: Maximum number of retry attempts if validation fails
         
         Returns:
             dict: The generated prayer data if successful, None otherwise
@@ -140,16 +162,72 @@ class PrayerGenerator:
                 logger.info(f"Using existing prayer for {today}")
                 return existing_prayer
             
-            # Generate new prayer
-            response = self.client.query(self.prompt)
-            logger.debug("Successfully generated prayer")
+            # Attempt to generate prayer with retries
+            last_error = None
+            for attempt in range(1, max_retries + 1):
+                try:
+                    logger.info(f"Prayer generation attempt {attempt}/{max_retries}")
+                    
+                    # Build prompt with feedback from previous attempt if any
+                    if attempt > 1 and last_error:
+                        retry_prompt = f"""{self.prompt}
+
+IMPORTANT - Previous attempt was REJECTED for the following reason:
+{last_error}
+
+Please regenerate the prayer ensuring you address this issue. Remember:
+- START with "Heavenly Father" (not "Dear Heavenly Father")
+- END with "Amen"
+- LENGTH: 200-300 words (count carefully)
+- NO <think> tags or explanations"""
+                        response = self.client.query(retry_prompt)
+                    else:
+                        response = self.client.query(self.prompt)
+                    
+                    logger.debug(f"Prayer generated on attempt {attempt}")
+                    
+                    # Validate and process the response
+                    response = self._validate_response(response)
+                    logger.info(f"Prayer validation passed on attempt {attempt}")
+                    break  # Success! Exit retry loop
+                    
+                except ValueError as ve:
+                    last_error = str(ve)
+                    logger.warning(f"Attempt {attempt} failed validation: {last_error}")
+                    if attempt == max_retries:
+                        logger.error(f"All {max_retries} attempts failed. Last error: {last_error}")
+                        raise
+                    # Continue to next attempt
+                    continue
             
-            # Validate and process the response
-            response = self._validate_response(response)
+            # If we get here, validation passed
+            response = response
             
-            # Process the response to remove any text before "Dear Heavenly Father"
-            if "Dear Heavenly Father" in response:
-                response = response[response.index("Dear Heavenly Father"):]
+            # Process the response to remove any text before prayer starts
+            # Also remove any <think> tags or explanatory text
+            if "<think>" in response:
+                # Remove everything from <think> to </think>
+                import re
+                response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+            
+            # Find the start of the actual prayer
+            if "Heavenly Father" in response:
+                # Prefer "Heavenly Father" over "Dear Heavenly Father"
+                if "Dear Heavenly Father" in response and "Heavenly Father," in response:
+                    # Check which comes first
+                    idx_dear = response.index("Dear Heavenly Father")
+                    idx_plain = response.index("Heavenly Father,")
+                    if idx_plain < idx_dear:
+                        response = response[idx_plain:]
+                    else:
+                        response = response[idx_dear:]
+                elif "Heavenly Father," in response:
+                    response = response[response.index("Heavenly Father,"):]
+                elif "Dear Heavenly Father" in response:
+                    response = response[response.index("Dear Heavenly Father"):]
+            
+            # Clean up any remaining whitespace
+            response = response.strip()
             
             # Create prayer data structure
             prayer_data = {
