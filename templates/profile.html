@@ -795,7 +795,7 @@
                         const analytics = prayer.analytics || {views: 0, prayers: 0};
                         
                         return `
-                            <div style="
+                            <div id="prayer-${prayer.id}" style="
                                 background: linear-gradient(135deg, 
                                     rgba(255, 255, 255, 0.95) 0%, 
                                     rgba(224, 242, 254, 0.95) 100%);
@@ -805,17 +805,45 @@
                                 box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
                             ">
                                 <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.75rem;">
-                                    <h4 style="color: var(--blue); font-size: 1.1rem; margin: 0; flex: 1;">${prayer.title}</h4>
+                                    <h4 id="prayer-title-${prayer.id}" style="color: var(--blue); font-size: 1.1rem; margin: 0; flex: 1;">${prayer.title}</h4>
                                     <span style="color: var(--gray); font-size: 0.85rem; white-space: nowrap; margin-left: 1rem;">${date}</span>
                                 </div>
-                                <p style="color: var(--gray); margin: 0.5rem 0; line-height: 1.6; white-space: pre-line;">${prayer.content}</p>
-                                <div style="display: flex; gap: 1.5rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(0, 0, 0, 0.1);">
-                                    <span style="color: var(--gray); font-size: 0.9rem;">
-                                        <strong style="color: var(--blue);">${analytics.views}</strong> views
-                                    </span>
-                                    <span style="color: var(--gray); font-size: 0.9rem;">
-                                        <strong style="color: var(--blue);">${analytics.prayers}</strong> prayers
-                                    </span>
+                                <p id="prayer-content-${prayer.id}" style="color: var(--gray); margin: 0.5rem 0; line-height: 1.6; white-space: pre-line;">${prayer.content}</p>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(0, 0, 0, 0.1);">
+                                    <div style="display: flex; gap: 1.5rem;">
+                                        <span style="color: var(--gray); font-size: 0.9rem;">
+                                            <strong style="color: var(--blue);">${analytics.views}</strong> views
+                                        </span>
+                                        <span style="color: var(--gray); font-size: 0.9rem;">
+                                            <strong style="color: var(--blue);">${analytics.prayers}</strong> prayers
+                                        </span>
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem;">
+                                        <button onclick="editPrayer('${prayer.id}', '${prayer.title.replace(/'/g, "\\'")}', \`${prayer.content.replace(/`/g, '\\`')}\`)" style="
+                                            padding: 0.5rem 1rem;
+                                            background: var(--blue);
+                                            color: white;
+                                            border: none;
+                                            border-radius: 8px;
+                                            font-size: 0.85rem;
+                                            cursor: pointer;
+                                            transition: all 0.3s ease;
+                                        " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                                            Edit
+                                        </button>
+                                        <button onclick="deletePrayer('${prayer.id}')" style="
+                                            padding: 0.5rem 1rem;
+                                            background: #ef4444;
+                                            color: white;
+                                            border: none;
+                                            border-radius: 8px;
+                                            font-size: 0.85rem;
+                                            cursor: pointer;
+                                            transition: all 0.3s ease;
+                                        " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                                            Delete
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         `;
@@ -836,6 +864,211 @@
     // Hide prayer requests section
     function hideMyPrayers() {
         document.getElementById('my-prayers-section').style.display = 'none';
+    }
+
+    // Delete a prayer request
+    async function deletePrayer(prayerId) {
+        try {
+            const user = firebase.auth().currentUser;
+            if (!user) return;
+            
+            // Confirm deletion
+            if (!confirm('Are you sure you want to delete this prayer request? This action cannot be undone.')) {
+                return;
+            }
+            
+            // Delete request
+            const response = await fetch(`/api/prayer/request/${prayerId}`, {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ user_id: user.uid })
+            });
+            
+            if (response.ok) {
+                // Remove from UI
+                const prayerElement = document.getElementById(`prayer-${prayerId}`);
+                if (prayerElement) {
+                    prayerElement.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                    prayerElement.style.opacity = '0';
+                    prayerElement.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        prayerElement.remove();
+                        // Check if any prayers left
+                        const list = document.getElementById('my-prayers-list');
+                        if (list.children.length === 0) {
+                            list.innerHTML = '';
+                            document.getElementById('my-prayers-empty').style.display = 'block';
+                        }
+                    }, 300);
+                }
+                
+                // Reload stats
+                loadUserStats(user.uid);
+            } else {
+                alert('Failed to delete prayer request. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error deleting prayer:', error);
+            alert('Failed to delete prayer request. Please try again.');
+        }
+    }
+
+    // Edit a prayer request
+    async function editPrayer(prayerId, currentTitle, currentContent) {
+        try {
+            const user = firebase.auth().currentUser;
+            if (!user) return;
+            
+            // Create edit modal
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                padding: 1rem;
+            `;
+            
+            modal.innerHTML = `
+                <div style="
+                    background: white;
+                    padding: 2rem;
+                    border-radius: 16px;
+                    max-width: 600px;
+                    width: 100%;
+                    max-height: 90vh;
+                    overflow-y: auto;
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                ">
+                    <h3 style="color: var(--blue); margin-bottom: 1.5rem; font-size: 1.5rem;">Edit Prayer Request</h3>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; color: var(--gray); font-weight: 500;">Title</label>
+                        <input type="text" id="edit-title" value="${currentTitle.replace(/"/g, '&quot;')}" style="
+                            width: 100%;
+                            padding: 0.75rem;
+                            border: 2px solid #e5e7eb;
+                            border-radius: 8px;
+                            font-size: 1rem;
+                        ">
+                    </div>
+                    
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="display: block; margin-bottom: 0.5rem; color: var(--gray); font-weight: 500;">Prayer Content</label>
+                        <textarea id="edit-content" rows="6" style="
+                            width: 100%;
+                            padding: 0.75rem;
+                            border: 2px solid #e5e7eb;
+                            border-radius: 8px;
+                            font-size: 1rem;
+                            resize: vertical;
+                        ">${currentContent.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+                    </div>
+                    
+                    <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+                        <button onclick="this.closest('div').parentElement.parentElement.remove()" style="
+                            padding: 0.75rem 1.5rem;
+                            background: var(--gray);
+                            color: white;
+                            border: none;
+                            border-radius: 50px;
+                            font-size: 1rem;
+                            cursor: pointer;
+                            transition: all 0.3s ease;
+                        " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                            Cancel
+                        </button>
+                        <button id="save-edit-btn" onclick="savePrayerEdit('${prayerId}')" style="
+                            padding: 0.75rem 1.5rem;
+                            background: linear-gradient(135deg, var(--blue), #2c5282);
+                            color: white;
+                            border: none;
+                            border-radius: 50px;
+                            font-size: 1rem;
+                            cursor: pointer;
+                            transition: all 0.3s ease;
+                            font-weight: 600;
+                        " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+                            Save Changes
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        } catch (error) {
+            console.error('Error opening edit modal:', error);
+        }
+    }
+
+    // Save edited prayer
+    async function savePrayerEdit(prayerId) {
+        try {
+            const user = firebase.auth().currentUser;
+            if (!user) return;
+            
+            const title = document.getElementById('edit-title').value.trim();
+            const content = document.getElementById('edit-content').value.trim();
+            
+            if (!title || !content) {
+                alert('Please fill in both title and content.');
+                return;
+            }
+            
+            const saveBtn = document.getElementById('save-edit-btn');
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+            
+            // Update request
+            const response = await fetch(`/api/prayer/request/${prayerId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    user_id: user.uid,
+                    title: title,
+                    content: content
+                })
+            });
+            
+            if (response.ok) {
+                // Update UI
+                document.getElementById(`prayer-title-${prayerId}`).textContent = title;
+                document.getElementById(`prayer-content-${prayerId}`).textContent = content;
+                
+                // Close modal
+                document.querySelector('[style*="position: fixed"]').remove();
+                
+                // Show success message briefly
+                const successMsg = document.createElement('div');
+                successMsg.style.cssText = `
+                    position: fixed;
+                    top: 2rem;
+                    right: 2rem;
+                    background: #10b981;
+                    color: white;
+                    padding: 1rem 1.5rem;
+                    border-radius: 8px;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                    z-index: 10001;
+                `;
+                successMsg.textContent = '✅ Prayer updated successfully!';
+                document.body.appendChild(successMsg);
+                setTimeout(() => successMsg.remove(), 3000);
+            } else {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Save Changes';
+                alert('Failed to update prayer request. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error saving edit:', error);
+            alert('Failed to update prayer request. Please try again.');
+        }
     }
 
     async function handleLogout() {
