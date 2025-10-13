@@ -710,7 +710,25 @@
 
 <section class="daily-verse-section" id="daily-verse-section">
     <div class="verse-container">
-        <h2 class="verse-title">Daily Verse</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2 class="verse-title" style="margin-bottom: 0;">Daily Verse</h2>
+            <button onclick="downloadVerseImage()" style="
+                background: transparent;
+                border: none;
+                cursor: pointer;
+                padding: 0.5rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: transform 0.2s ease;
+            " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'" title="Download as Image">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+            </button>
+        </div>
         <div id="verse-skeleton" style="display: flex; flex-direction: column; gap: 1rem;">
             <div class="verse-skeleton" style="height: 24px; width: 90%;"></div>
             <div class="verse-skeleton" style="height: 24px; width: 95%;"></div>
@@ -725,9 +743,30 @@
 <!-- Daily Prayer Section -->
 <section id="daily-prayer-section" class="prayer-section-animate" style="padding: 4rem 2rem; background: linear-gradient(135deg, rgba(31, 60, 136, 0.05) 0%, rgba(44, 82, 130, 0.05) 100%); overflow: visible;">
     <div class="prayer-container-animate" style="max-width: 900px; margin: 0 auto;">
-        <h2 class="section-title" style="color: var(--blue); margin-bottom: 0.5rem; text-align: center;">
-            Today's Global Prayer
-        </h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <div style="flex: 1;"></div>
+            <h2 class="section-title" style="color: var(--blue); margin-bottom: 0; text-align: center; flex: 2;">
+                Today's Global Prayer
+            </h2>
+            <div style="flex: 1; display: flex; justify-content: flex-end;">
+                <button onclick="downloadPrayerImage()" style="
+                    background: transparent;
+                    border: none;
+                    cursor: pointer;
+                    padding: 0.5rem;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: transform 0.2s ease;
+                " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'" title="Download as Image">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
         <p style="text-align: center; color: #555; margin-bottom: 2rem; font-size: 1.1rem; font-weight: 500;" id="daily-prayer-date-home">
             Loading...
         </p>
@@ -1023,7 +1062,10 @@
             
             if (dailyPrayer) {
                 contentEl.textContent = dailyPrayer.content;
-                const date = new Date(dailyPrayer.created_at);
+                
+                // Use user's current local date (not backend UTC timestamp)
+                // This ensures the date always matches the user's timezone
+                const date = new Date();
                 dateEl.textContent = date.toLocaleDateString('en-US', {
                     weekday: 'long',
                     year: 'numeric',
@@ -1116,5 +1158,93 @@
             document.querySelector('.verse-reference span').textContent = 'John 3:16';
         }
     });
+
+    // Download verse as image (mobile-friendly with Share API)
+    async function downloadVerseImage() {
+        const clientDate = getClientLocalDate();
+        const url = `/api/today-verse/download?client_date=${clientDate}`;
+        
+        try {
+            // Fetch the image
+            const response = await fetch(url);
+            const blob = await response.blob();
+            
+            // Check if mobile and Web Share API is available
+            if (navigator.share && navigator.canShare && /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent)) {
+                // Create a File object for sharing
+                const file = new File([blob], `divine_bridge_verse_${clientDate}.jpg`, { type: 'image/jpeg' });
+                
+                // Check if files can be shared
+                if (navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        title: 'Divine Bridge - Daily Verse',
+                        text: 'Today\'s inspiring verse from Divine Bridge',
+                        files: [file]
+                    });
+                    console.log('✅ Verse shared successfully');
+                    return;
+                }
+            }
+            
+            // Fallback: Standard download for desktop or unsupported browsers
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = `divine_bridge_verse_${clientDate}.jpg`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(blobUrl);
+            
+        } catch (error) {
+            console.error('Error downloading verse:', error);
+            // Simple fallback
+            window.location.href = url;
+        }
+    }
+
+    // Download prayer as image (mobile-friendly with Share API)
+    async function downloadPrayerImage() {
+        const clientDate = getClientLocalDate();
+        const url = `/api/prayer/prayer/download?client_date=${clientDate}`;
+        
+        try {
+            // Fetch the image
+            const response = await fetch(url);
+            const blob = await response.blob();
+            
+            // Check if mobile and Web Share API is available
+            if (navigator.share && navigator.canShare && /Mobile|Android|iPhone|iPad/i.test(navigator.userAgent)) {
+                // Create a File object for sharing
+                const file = new File([blob], `divine_bridge_prayer_${clientDate}.jpg`, { type: 'image/jpeg' });
+                
+                // Check if files can be shared
+                if (navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        title: 'Divine Bridge - Daily Prayer',
+                        text: 'Today\'s global prayer from Divine Bridge',
+                        files: [file]
+                    });
+                    console.log('✅ Prayer shared successfully');
+                    return;
+                }
+            }
+            
+            // Fallback: Standard download for desktop or unsupported browsers
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = `divine_bridge_prayer_${clientDate}.jpg`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(blobUrl);
+            
+        } catch (error) {
+            console.error('Error downloading prayer:', error);
+            // Simple fallback
+            window.location.href = url;
+        }
+    }
 </script>
 {% endblock %} 
