@@ -98,7 +98,11 @@ Biblical Grounding:
 Closing:
 - End with hope rooted in Christ
 - Trust in God's sovereignty even amid suffering
-- MUST close with EXACTLY: "In Jesus-Christ's name we pray. Amen!"
+- The LAST LINE of your prayer MUST be EXACTLY (word-for-word):
+  
+  In Jesus-Christ's name we pray. Amen!
+  
+  (Do not change this ending. Do not add anything after it. Use these exact words.)
 
 VOICE & TONE:
 ✅ Natural, conversational language (like speaking to a friend)
