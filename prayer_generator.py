@@ -67,7 +67,7 @@ RESEARCH & NEWS GATHERING:
 3. Prioritize:
    - Latest developments (focus on last 72 hours)
    - Underreported regions and communities
-   - Specific locations, casualty numbers, and human impact
+   - Specific locations and human impact
    - Accuracy and verification from multiple sources
 
 PRAYER STRUCTURE & CONTENT:
@@ -79,10 +79,14 @@ Opening:
 - Use "we" and "our" throughout (praying as a community)
 
 Body (2-3 paragraphs):
-- Address 2-3 major current crises with specific details:
+- Address 2-3 major current crises with compassionate details:
   * Name the regions/countries affected
-  * Acknowledge specific recent events (dates, casualties if mentioned in news)
-  * Pray for specific groups: families, children, aid workers, leaders
+  * Acknowledge the suffering without graphic details or specific casualty numbers
+  * Pray for specific groups: families, children, aid workers, leaders, those grieving
+- ALWAYS include prayer for:
+  * Those who are sick and fighting illness
+  * Those facing hunger and lacking daily provisions
+  * Those who feel lost, hopeless, or spiritually adrift
 - Show genuine compassion and emotion (not generic or stiff)
 - Let the weight of the crisis show through authentic language
 
@@ -94,7 +98,7 @@ Biblical Grounding:
 Closing:
 - End with hope rooted in Christ
 - Trust in God's sovereignty even amid suffering
-- Close with "Amen"
+- MUST close with EXACTLY: "In Jesus-Christ's name we pray. Amen!"
 
 VOICE & TONE:
 ✅ Natural, conversational language (like speaking to a friend)
@@ -112,7 +116,7 @@ VOICE & TONE:
 ❌ NO thinking process, explanations, or reasoning (PRAYER TEXT ONLY)
 ❌ No special characters or formatting
 
-LENGTH: 200-300 words (concise and focused)
+LENGTH: 150-250 words (concise and focused)
 
 CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no commentary. Just the prayer as if you're speaking it aloud to lead a community in prayer."""
         
@@ -129,17 +133,18 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
             logger.error(f"Prayer must start with 'Heavenly Father'. Actual start: {response_clean[:100]}")
             raise ValueError("Prayer must start with 'Heavenly Father'")
         
-        # MUST end with "Amen" (strict requirement)
-        if not response_clean.endswith("Amen") and not response_clean.endswith("Amen."):
-            logger.error(f"Prayer must end with 'Amen'. Actual end: {response_clean[-100:]}")
-            raise ValueError("Prayer must end with 'Amen'")
+        # MUST end with specific closing (strict requirement)
+        required_ending = "In Jesus-Christ's name we pray. Amen!"
+        if not response_clean.endswith(required_ending):
+            logger.error(f"Prayer must end with '{required_ending}'. Actual end: {response_clean[-150:]}")
+            raise ValueError(f"Prayer must end with '{required_ending}'")
         
-        # Check word count (200-300 words as specified)
+        # Check word count (150-250 words as specified)
         word_count = len(response_clean.split())
-        if word_count < 180:  # Allow slight flexibility (180-320)
-            raise ValueError(f"Prayer too short: {word_count} words (minimum 180)")
-        if word_count > 320:
-            raise ValueError(f"Prayer too long: {word_count} words (maximum 320)")
+        if word_count < 140:  # Allow slight flexibility (140-260)
+            raise ValueError(f"Prayer too short: {word_count} words (minimum 140)")
+        if word_count > 260:
+            raise ValueError(f"Prayer too long: {word_count} words (maximum 260)")
         
         logger.info(f"Prayer validation passed: {word_count} words")
         return response
@@ -177,8 +182,8 @@ IMPORTANT - Previous attempt was REJECTED for the following reason:
 
 Please regenerate the prayer ensuring you address this issue. Remember:
 - START with "Heavenly Father" (not "Dear Heavenly Father")
-- END with "Amen"
-- LENGTH: 200-300 words (count carefully)
+- END with EXACTLY "In Jesus-Christ's name we pray. Amen!"
+- LENGTH: 150-250 words (count carefully - be concise!)
 - NO <think> tags or explanations"""
                         response = self.client.query(retry_prompt)
                     else:

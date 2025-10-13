@@ -372,6 +372,9 @@ class StorageHandler:
             date = prayer_request_data.get('date', datetime.now().strftime('%Y-%m-%d'))
             blob_name = f"prayer_requests/{date}/{prayer_request_id}.json"
             
+            # Add ID to the prayer request data (important for background processing)
+            prayer_request_data['id'] = prayer_request_id
+            
             def _upload_with_retry():
                 try:
                     blob = self.bucket.blob(blob_name)
@@ -748,4 +751,108 @@ class StorageHandler:
             return None
         except Exception as e:
             logger.debug(f"Error checking file existence for {file_path}: {e}")
+            return None
+    
+    def save_verse_image(self, date: str, image_data: bytes) -> bool:
+        """Save verse image to Cloud Storage
+        
+        Args:
+            date: Date string in YYYY-MM-DD format
+            image_data: JPEG image data as bytes
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            blob_name = f"images/verses/{date}.jpg"
+            blob = self.bucket.blob(blob_name)
+            
+            # Upload image with proper content type
+            blob.upload_from_string(
+                image_data,
+                content_type='image/jpeg'
+            )
+            
+            logger.info(f"Successfully saved verse image: {blob_name}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error saving verse image: {e}")
+            return False
+    
+    def get_verse_image(self, date: str) -> bytes:
+        """Get verse image from Cloud Storage
+        
+        Args:
+            date: Date string in YYYY-MM-DD format
+            
+        Returns:
+            bytes: JPEG image data if found, None otherwise
+        """
+        try:
+            blob_name = f"images/verses/{date}.jpg"
+            blob = self.bucket.blob(blob_name)
+            
+            if blob.exists():
+                image_data = blob.download_as_bytes()
+                logger.info(f"Retrieved cached verse image: {blob_name}")
+                return image_data
+            else:
+                logger.debug(f"No cached verse image found: {blob_name}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error retrieving verse image: {e}")
+            return None
+    
+    def save_prayer_image(self, date: str, image_data: bytes) -> bool:
+        """Save prayer image to Cloud Storage
+        
+        Args:
+            date: Date string in YYYY-MM-DD format
+            image_data: JPEG image data as bytes
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            blob_name = f"images/prayers/{date}.jpg"
+            blob = self.bucket.blob(blob_name)
+            
+            # Upload image with proper content type
+            blob.upload_from_string(
+                image_data,
+                content_type='image/jpeg'
+            )
+            
+            logger.info(f"Successfully saved prayer image: {blob_name}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error saving prayer image: {e}")
+            return False
+    
+    def get_prayer_image(self, date: str) -> bytes:
+        """Get prayer image from Cloud Storage
+        
+        Args:
+            date: Date string in YYYY-MM-DD format
+            
+        Returns:
+            bytes: JPEG image data if found, None otherwise
+        """
+        try:
+            blob_name = f"images/prayers/{date}.jpg"
+            blob = self.bucket.blob(blob_name)
+            
+            if blob.exists():
+                image_data = blob.download_as_bytes()
+                logger.info(f"Retrieved cached prayer image: {blob_name}")
+                return image_data
+            else:
+                logger.debug(f"No cached prayer image found: {blob_name}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error retrieving prayer image: {e}")
             return None 

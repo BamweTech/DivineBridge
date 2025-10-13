@@ -922,10 +922,18 @@ class ImageGenerator:
         # 5. Prayer text - with increased margins
         max_width = (self.prayer_width - 160) * scale  # Increased margins (80px each side)
         
+        # Separate the closing line from the main prayer text
+        closing_phrase = "In Jesus-Christ's name we pray. Amen!"
+        
+        # Remove the closing from the prayer text if present
+        prayer_body = prayer_text
+        if closing_phrase in prayer_text:
+            prayer_body = prayer_text.replace(closing_phrase, '').strip()
+        
         # Split into paragraphs and wrap text
-        paragraphs = prayer_text.split('\n\n')
-        line_spacing = 35 * scale  # Reduced spacing for 20px text (was 45px for 28px text)
-        paragraph_spacing = 25 * scale  # Reduced paragraph spacing (was 30px)
+        paragraphs = prayer_body.split('\n\n')
+        line_spacing = 35 * scale  # Reduced spacing for 20px text
+        paragraph_spacing = 25 * scale  # Reduced paragraph spacing
         
         for para in paragraphs:
             if para.strip():
@@ -933,17 +941,34 @@ class ImageGenerator:
                 para_lines = self._wrap_text(para.strip(), font_prayer, max_width)
                 
                 for line in para_lines:
-                    if current_y < render_height - (250 * scale):  # Leave space for footer
+                    if current_y < render_height - (300 * scale):  # Leave more space for closing + footer
                         draw.text((render_width/2, current_y), line, font=font_prayer,
                                  fill=dark_blue, anchor="mm")
                         current_y += line_spacing
                 
                 current_y += paragraph_spacing  # Extra space after paragraph
         
-        # 6. Call to action footer (three lines, center-justified)
-        # Position CTA near bottom with proper spacing
-        footer_start_y = render_height - (180 * scale)  # Reserve space for CTA + website
+        # Add extra spacing before closing line
+        current_y += 20 * scale
+        
+        # 5b. Prayer closing line (bold, centered, on its own line)
+        font_closing = font_sans(22 * scale, bold=True)  # Slightly larger and bold
+        draw.text((render_width/2, current_y), closing_phrase, font=font_closing,
+                 fill=dark_blue, anchor="mm")
+        current_y += 60 * scale  # Spacing after closing
+        
+        # 6. Closing golden line (matching the top divider for visual balance)
+        # Position it before the CTA section
+        footer_start_y = render_height - (230 * scale)  # Reserve more space for line + CTA + website
         current_y = footer_start_y
+        
+        # Draw horizontal line - golden yellow
+        line_y = current_y
+        draw.line([(render_width/2 - (80 * scale), line_y), (render_width/2 + (80 * scale), line_y)],
+                 fill=golden_yellow, width=3 * scale)
+        current_y += 50 * scale  # Line → CTA spacing
+        
+        # 8. Call to action footer (three lines, center-justified)
         
         cta_lines = [
             "Join thousands of",
@@ -959,7 +984,7 @@ class ImageGenerator:
         
         current_y += 10 * scale  # Space between CTA and website URL
         
-        # 7. Website URL (bold, bright blue)
+        # 9. Website URL (bold, bright blue)
         font_website_bold = font_sans(26 * scale, bold=True)
         draw.text((render_width/2, current_y), "divinebridge.io", 
                  font=font_website_bold, fill=website_blue, anchor="mm")

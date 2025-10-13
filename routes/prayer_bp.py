@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, send_file
 from datetime import datetime, timedelta
 import logging
 
@@ -34,6 +34,104 @@ def generate_prayer():
     except Exception as e:
         logger.error(f"Error generating prayer: {e}")
         return jsonify({'error': 'Failed to generate prayer'}), 500
+
+@prayer_bp.route('/test-generate-prayer', methods=['POST'])
+def test_generate_prayer():
+    """Generate a test prayer without saving to database"""
+    try:
+        logger.info("Generating test prayer (will not be saved)")
+        
+        # Generate prayer using the client directly (bypassing storage check and save)
+        response = current_app.prayer_generator.client.query(current_app.prayer_generator.prompt)
+        
+        # Validate the response with retry logic
+        last_error = None
+        for attempt in range(1, 4):
+            try:
+                logger.info(f"Test prayer attempt {attempt}/3")
+                
+                if attempt > 1 and last_error:
+                    retry_prompt = f"""{current_app.prayer_generator.prompt}
+
+IMPORTANT - Previous attempt was REJECTED: {last_error}
+Please regenerate following ALL requirements strictly.
+Remember: END with EXACTLY "In Jesus-Christ's name we pray. Amen!" """
+                    response = current_app.prayer_generator.client.query(retry_prompt)
+                
+                response = current_app.prayer_generator._validate_response(response)
+                logger.info(f"Test prayer validation passed on attempt {attempt}")
+                break
+            except ValueError as ve:
+                last_error = str(ve)
+                if attempt == 3:
+                    raise
+                continue
+        
+        # Process the response
+        if "<think>" in response:
+            import re
+            response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+        
+        response = response.strip()
+        word_count = len(response.split())
+        
+        return jsonify({
+            'success': True,
+            'prayer': {
+                'content': response,
+                'word_count': word_count,
+                'test_mode': True
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error generating test prayer: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@prayer_bp.route('/generate', methods=['POST'])
+def generate_daily_prayer():
+    """
+    Generate daily prayer (triggered by Cloud Scheduler)
+    Protected by Cloud IAM - no additional authentication required
+    """
+    try:
+        today = datetime.now().strftime('%Y-%m-%d')
+        logger.info(f"Cloud Scheduler triggered daily prayer generation for {today}")
+        
+        # Check if prayer already exists
+        existing_prayer = current_app.storage_handler.get_prayer(today)
+        if existing_prayer:
+            logger.info(f"Prayer for {today} already exists")
+            return jsonify({
+                'success': True,
+                'message': 'Prayer already exists',
+                'date': today
+            }), 200
+        
+        # Generate new prayer
+        prayer_data = current_app.prayer_generator.generate_prayer()
+        
+        if prayer_data:
+            logger.info(f"Successfully generated prayer for {today}")
+            return jsonify({
+                'success': True,
+                'message': 'Prayer generated successfully',
+                'date': today,
+                'word_count': len(prayer_data.get('content', '').split())
+            }), 200
+        else:
+            logger.error("Failed to generate prayer")
+            return jsonify({
+                'success': False,
+                'message': 'Prayer generation failed'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error generating daily prayer: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
 
 @prayer_bp.route('/subscribe', methods=['POST'])
 def subscribe():
@@ -144,41 +242,159 @@ def submit_prayer_request():
         if not title or not content:
             return jsonify({'error': 'Title and content are required'}), 400
         
-        # Generate AI summary
-        logger.info(f"Generating summary for prayer request: {title}")
-        try:
-            from prayer_summary_generator import get_summary_generator
-            summary_generator = get_summary_generator()
-            summary = summary_generator.generate_summary(title, content)
-        except Exception as e:
-            logger.error(f"Error generating summary: {e}")
-            # Fallback: use first 100 chars of content
-            summary = content[:97] + "..." if len(content) > 100 else content
+        # Create initial simple summary (instant - for immediate response)
+        logger.info(f"Creating initial summary for prayer request: {title}")
+        sentences = content.split('.')
+        if len(sentences) > 1 and len(sentences[0]) < 120:
+            initial_summary = '.'.join(sentences[:2]).strip() + '.'
+        else:
+            initial_summary = content[:117] + "..." if len(content) > 120 else content
         
-        # Create prayer request data with summary and analytics
+        # Get user_id from request body (sent by frontend)
+        user_id = data.get('user_id', '')
+        
+        # Create prayer request data with initial simple summary
         prayer_request = {
             'title': title,
             'content': content,
-            'summary': summary,
-            'user_id': request.headers.get('Authorization', '').replace('Bearer ', ''),
+            'summary': initial_summary,
+            'user_id': user_id,
             'created_at': datetime.now().isoformat(),
             'date': datetime.now().strftime('%Y-%m-%d'),
             'analytics': {
                 'views': 0,
                 'prayers': 0,
                 'created_at': datetime.now().isoformat()
-            }
+            },
+            'summary_status': 'generating'  # Flag to indicate AI summary is being generated
         }
         
-        # Save prayer request to storage
+        # Save prayer request to storage (instant response)
         if current_app.storage_handler.save_prayer_request(prayer_request):
-            return jsonify({'message': 'Prayer request submitted successfully'}), 200
+            request_id = prayer_request.get('id')
+            
+            # Generate AI summary in background thread (non-blocking)
+            import threading
+            from flask import copy_current_request_context
+            
+            # Get storage handler and app before thread starts
+            storage_handler = current_app.storage_handler
+            
+            @copy_current_request_context
+            def generate_ai_summary_background():
+                try:
+                    logger.info(f"Background: Generating AI summary for {request_id}")
+                    from prayer_summary_generator import get_summary_generator
+                    summary_generator = get_summary_generator()
+                    ai_summary = summary_generator.generate_summary(title, content)
+                    
+                    # Update the prayer request with AI summary
+                    prayer_request['summary'] = ai_summary
+                    prayer_request['summary_status'] = 'completed'
+                    storage_handler.update_prayer_request(request_id, prayer_request)
+                    logger.info(f"Background: AI summary generated and saved for {request_id}")
+                except Exception as e:
+                    logger.error(f"Background: Error generating AI summary: {e}")
+                    logger.exception("Full traceback:")
+                    # Keep the simple summary if AI fails
+            
+            # Start background thread
+            thread = threading.Thread(target=generate_ai_summary_background)
+            thread.daemon = True
+            thread.start()
+            
+            return jsonify({
+                'message': 'Prayer request submitted successfully',
+                'id': request_id
+            }), 200
         else:
             return jsonify({'error': 'Failed to save prayer request'}), 500
             
     except Exception as e:
         logger.error(f"Error submitting prayer request: {e}")
         return jsonify({'error': 'Failed to submit prayer request'}), 500
+
+@prayer_bp.route('/request/<request_id>', methods=['DELETE'])
+def delete_prayer_request(request_id):
+    """Delete a prayer request (only by owner)"""
+    try:
+        # Get the prayer request to verify ownership
+        prayer_data = current_app.storage_handler.get_prayer_request_by_id(request_id)
+        
+        if not prayer_data:
+            return jsonify({'error': 'Prayer request not found'}), 404
+        
+        # Get user_id from request body
+        data = request.get_json() or {}
+        user_id = data.get('user_id', '')
+        
+        # Verify ownership
+        if prayer_data.get('user_id') != user_id:
+            return jsonify({'error': 'Unauthorized - can only delete your own prayers'}), 403
+        
+        # Delete from storage
+        prayer_date = prayer_data.get('date')
+        blob_path = f"prayer_requests/{prayer_date}/{request_id}.json"
+        blob = current_app.storage_handler.bucket.blob(blob_path)
+        
+        if blob.exists():
+            blob.delete()
+            logger.info(f"Deleted prayer request: {request_id} by user: {user_id}")
+            return jsonify({'message': 'Prayer request deleted successfully'}), 200
+        else:
+            return jsonify({'error': 'Prayer request not found in storage'}), 404
+            
+    except Exception as e:
+        logger.error(f"Error deleting prayer request: {e}")
+        return jsonify({'error': 'Failed to delete prayer request'}), 500
+
+@prayer_bp.route('/request/<request_id>', methods=['PUT'])
+def update_prayer_request(request_id):
+    """Update a prayer request (only by owner)"""
+    try:
+        # Get the prayer request to verify ownership
+        prayer_data = current_app.storage_handler.get_prayer_request_by_id(request_id)
+        
+        if not prayer_data:
+            return jsonify({'error': 'Prayer request not found'}), 404
+        
+        # Get update data
+        data = request.get_json()
+        user_id = data.get('user_id', '')
+        
+        # Verify ownership
+        if prayer_data.get('user_id') != user_id:
+            return jsonify({'error': 'Unauthorized - can only edit your own prayers'}), 403
+        
+        # Update fields
+        if 'title' in data:
+            prayer_data['title'] = data['title']
+        if 'content' in data:
+            prayer_data['content'] = data['content']
+            # Regenerate summary
+            content = data['content']
+            sentences = content.split('.')
+            if len(sentences) > 1 and len(sentences[0]) < 120:
+                prayer_data['summary'] = '.'.join(sentences[:2]).strip() + '.'
+            else:
+                prayer_data['summary'] = content[:117] + "..." if len(content) > 120 else content
+        
+        # Update timestamp
+        prayer_data['updated_at'] = datetime.now().isoformat()
+        
+        # Save updated prayer
+        if current_app.storage_handler.update_prayer_request(request_id, prayer_data):
+            logger.info(f"Updated prayer request: {request_id} by user: {user_id}")
+            return jsonify({
+                'message': 'Prayer request updated successfully',
+                'prayer': prayer_data
+            }), 200
+        else:
+            return jsonify({'error': 'Failed to update prayer request'}), 500
+            
+    except Exception as e:
+        logger.error(f"Error updating prayer request: {e}")
+        return jsonify({'error': 'Failed to update prayer request'}), 500
 
 @prayer_bp.route('/request/<request_id>/view', methods=['POST'])
 def track_prayer_view(request_id):
@@ -307,4 +523,87 @@ def increment_user_stat(user_id, stat_name):
             
     except Exception as e:
         logger.error(f"Error incrementing user stat: {e}")
-        return jsonify({'error': 'Failed to increment stat'}), 500 
+        return jsonify({'error': 'Failed to increment stat'}), 500
+
+@prayer_bp.route('/prayer/download', methods=['GET'])
+def download_prayer_image():
+    """Download today's global prayer as a JPEG image (with caching)"""
+    try:
+        # Get client's local date
+        client_date = request.args.get('client_date')
+        force_regenerate = request.args.get('force', 'false').lower() == 'true'
+        
+        if client_date:
+            today = client_date
+            try:
+                client_datetime = datetime.strptime(client_date, '%Y-%m-%d')
+                date_str = client_datetime.strftime('%B %d, %Y')
+            except ValueError:
+                date_str = datetime.now().strftime('%B %d, %Y')
+        else:
+            today = datetime.now().strftime('%Y-%m-%d')
+            date_str = datetime.now().strftime('%B %d, %Y')
+        
+        # Try to get cached image first (unless force regenerate)
+        if not force_regenerate:
+            cached_image = current_app.storage_handler.get_prayer_image(today)
+            if cached_image:
+                logger.info(f"✅ Serving cached prayer image for {today}")
+                from io import BytesIO
+                image_data = BytesIO(cached_image)
+                filename = f"divine_bridge_prayer_{client_date or 'today'}.jpg"
+                return send_file(
+                    image_data,
+                    mimetype='image/jpeg',
+                    as_attachment=True,
+                    download_name=filename
+                )
+        
+        # Cache miss or force regenerate - get prayer and generate image
+        logger.info(f"🎨 Generating new prayer image for {today}")
+        
+        # Get today's prayer
+        prayer = current_app.storage_handler.get_prayer(today)
+        
+        if not prayer:
+            return jsonify({'error': 'No prayer available for today'}), 404
+        
+        # Extract prayer content (handle both dict and string formats)
+        if isinstance(prayer, dict):
+            prayer_content = prayer.get('content', '')
+        else:
+            prayer_content = prayer
+        
+        if not prayer_content:
+            return jsonify({'error': 'Prayer content is empty'}), 404
+        
+        # Generate image
+        from image_generator import get_image_generator
+        generator = get_image_generator()
+        
+        image_data = generator.generate_prayer_image(
+            prayer_text=prayer_content,
+            date=date_str
+        )
+        
+        # Save to cache for future requests
+        image_bytes = image_data.getvalue()
+        current_app.storage_handler.save_prayer_image(today, image_bytes)
+        logger.info(f"💾 Cached prayer image for {today}")
+        
+        # Reset BytesIO for sending
+        image_data.seek(0)
+        
+        # Send file
+        filename = f"divine_bridge_prayer_{client_date or 'today'}.jpg"
+        return send_file(
+            image_data,
+            mimetype='image/jpeg',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        logger.error(f"Error generating prayer image: {e}")
+        logger.exception("Full traceback:")
+        return jsonify({'error': 'Failed to generate image'}), 500 
