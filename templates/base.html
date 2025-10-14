@@ -33,7 +33,9 @@
     <style>
         :root {
             --gold: #f5c542;
-            --blue: #1f3c88;
+            --blue: #0f56ff;  /* Logo blue - primary brand color */
+            --blue-dark: #1f3c88;  /* Dark blue for contrast */
+            --blue-light: #90caf9;  /* Light blue for backgrounds */
             --black: #1e1e1e;
             --white: #ffffff;
             --gray: #6b7280;
@@ -275,6 +277,20 @@
             margin-bottom: 2rem;
             flex-wrap: wrap;
         }
+        
+        @media (max-width: 768px) {
+            .footer-links {
+                gap: 1rem;
+                font-size: 0.9rem;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .footer-links {
+                gap: 0.75rem;
+                font-size: 0.85rem;
+            }
+        }
 
         .footer-links a {
             color: var(--white);
@@ -475,7 +491,7 @@
 
         /* Primary button (blue gradient) */
         .cta-button:not(.secondary) {
-            background: linear-gradient(135deg, var(--blue) 0%, #2c5282 100%);
+            background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dark) 100%);
             color: var(--white);
             box-shadow: 0 2px 8px rgba(31, 60, 136, 0.15);
         }
@@ -483,7 +499,7 @@
         .cta-button:not(.secondary):hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 16px rgba(31, 60, 136, 0.25);
-            background: linear-gradient(135deg, #2c5282 0%, var(--blue) 100%);
+            background: linear-gradient(135deg, var(--blue-dark) 0%, var(--blue) 100%);
         }
 
         /* Secondary button (outline) */
@@ -618,7 +634,7 @@
     <header class="header">
         <nav class="nav-container">
             <a href="/" class="logo">
-                <span>Divine Bridge</span>
+                <img src="{{ url_for('static', filename='images/LogowithName.svg') }}" alt="Divine Bridge" style="height: 32px; width: auto;">
             </a>
             <div class="hamburger" onclick="toggleMobileMenu()">
                 <span></span>
@@ -691,8 +707,8 @@
             <div class="footer-links">
                 <a href="/about">About</a>
                 <a href="/prayers">Prayers</a>
-                <a href="/privacy">Privacy Policy</a>
-                <a href="/terms">Terms of Service</a>
+                <a href="/privacy-policy">Privacy Policy</a>
+                <a href="/terms-of-service">Terms of Service</a>
             </div>
             <div class="copyright">
                 &copy; 2025 Divine Bridge. All rights reserved.

@@ -117,8 +117,8 @@
     .submit-button {
         width: 100%;
         padding: 1rem;
-        background: linear-gradient(135deg, var(--gold) 0%, #f4d03f 100%);
-        color: var(--black);
+        background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
+        color: var(--white);
         border: none;
         border-radius: 16px;
         font-size: 1rem;
@@ -134,8 +134,9 @@
 
     .submit-button:hover {
         transform: translateY(-2px);
+        background: linear-gradient(135deg, #1f3c88 0%, #0f56ff 100%);
         box-shadow: 
-            0 8px 20px rgba(245, 197, 66, 0.4),
+            0 8px 20px rgba(15, 86, 255, 0.4),
             inset 0 1px 0 rgba(255, 255, 255, 0.3);
     }
 
@@ -149,7 +150,7 @@
     }
 
     .form-footer a {
-        color: var(--gold);
+        color: #0f56ff;
         text-decoration: none;
         font-weight: 600;
     }
@@ -261,7 +262,7 @@
 {% block content %}
 <section class="register-section">
     <div class="logo-container" style="text-align: center; margin-bottom: 2rem;">
-        <img src="{{ url_for('static', filename='images/LogowithName.svg') }}" alt="Divine Bridge" style="height: 80px; width: auto;">
+        <img src="{{ url_for('static', filename='images/LogoOnly1.png') }}" alt="Divine Bridge" style="height: 60px; width: auto;">
     </div>
     <h1 class="register-title">Create Account</h1>
     <div class="register-form">
