@@ -1,9 +1,19 @@
 from flask import Blueprint, request, jsonify, current_app, send_file
 from datetime import datetime, timedelta
 import logging
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from input_validation import validate_request, sanitize_string
+from auth_decorators import verify_cloud_scheduler
 
 logger = logging.getLogger(__name__)
 prayer_bp = Blueprint('prayer', __name__)
+
+# Initialize rate limiter
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["1000 per day", "100 per hour"]
+)
 
 @prayer_bp.route('/prayer/<date>', methods=['GET'])
 def get_prayer(date):
@@ -89,10 +99,11 @@ Remember: END with EXACTLY "In Jesus-Christ's name we pray. Amen!" """
         return jsonify({'error': str(e)}), 500
 
 @prayer_bp.route('/generate', methods=['POST'])
+@verify_cloud_scheduler()
 def generate_daily_prayer():
     """
     Generate daily prayer (triggered by Cloud Scheduler)
-    Protected by Cloud IAM - no additional authentication required
+    Protected by Cloud Scheduler verification
     """
     try:
         today = datetime.now().strftime('%Y-%m-%d')
@@ -232,12 +243,15 @@ def get_prayers():
         return jsonify({'error': 'Failed to get prayers'}), 500
 
 @prayer_bp.route('/request', methods=['POST'])
+@limiter.limit("10 per hour")
+@limiter.limit("50 per day")
+@validate_request('prayer_request')
 def submit_prayer_request():
     """Submit a prayer request"""
     try:
         data = request.get_json()
-        title = data.get('title')
-        content = data.get('content')
+        title = sanitize_string(data.get('title'), max_length=200)
+        content = sanitize_string(data.get('content'), max_length=2000)
         
         if not title or not content:
             return jsonify({'error': 'Title and content are required'}), 400

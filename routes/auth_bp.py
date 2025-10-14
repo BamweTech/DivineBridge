@@ -15,6 +15,7 @@ import logging
 from firebase_admin import auth
 import traceback
 from datetime import datetime, timedelta
+from input_validation import validate_request, validate_email, validate_password_strength, sanitize_string
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -40,6 +41,8 @@ def get_firebase_config():
         return jsonify({'error': 'Failed to load Firebase configuration'}), 500
 
 @auth_bp.route('/login', methods=['POST'])
+@limiter.limit("10 per minute")
+@limiter.limit("50 per hour")
 def login():
     try:
         data = request.get_json()
@@ -161,13 +164,21 @@ def login():
         return jsonify({'error': 'Login failed'}), 500
 
 @auth_bp.route('/signup', methods=['POST'])
+@limiter.limit("5 per hour")
+@limiter.limit("20 per day")
+@validate_request('signup')
 def signup():
     try:
         data = request.get_json()
-        email = data.get('email')
+        email = sanitize_string(data.get('email'), max_length=255)
         password = data.get('password')
-        first_name = data.get('firstName')
-        last_name = data.get('lastName')
+        first_name = sanitize_string(data.get('firstName'), max_length=50)
+        last_name = sanitize_string(data.get('lastName'), max_length=50)
+        
+        # Additional password strength validation
+        is_strong, error_msg = validate_password_strength(password)
+        if not is_strong:
+            return jsonify({'error': error_msg}), 400
         
         if not all([email, password, first_name, last_name]):
             return jsonify({'error': 'Missing required fields'}), 400

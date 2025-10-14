@@ -8,6 +8,7 @@ from verse_cache import verse_cache
 from storage_handler import StorageHandler
 from flask_session import Session
 from flask_cors import CORS
+from flask_wtf.csrf import CSRFProtect
 from functools import wraps
 from firebase_auth import initialize_firebase
 from verse_generator import verse_generator
@@ -55,11 +56,15 @@ def create_app():
     app.config.from_object('config.Config')
     
     # Session configuration
-    app.config['SECRET_KEY'] = 'dev-secret-key'  # Use a fixed secret key for development
+    # Determine environment
+    is_production = os.getenv('FLASK_ENV') == 'production' or os.getenv('GAE_ENV', '').startswith('standard')
+    
+    # Load secret key from Secret Manager
+    app.config['SECRET_KEY'] = config.session_secret_key
     app.config['SESSION_TYPE'] = 'filesystem'
     app.config['SESSION_PERMANENT'] = True
     app.config['SESSION_USE_SIGNER'] = True
-    app.config['SESSION_COOKIE_SECURE'] = False  # Set to False for local development
+    app.config['SESSION_COOKIE_SECURE'] = is_production  # True in production, False in dev
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
@@ -78,6 +83,14 @@ def create_app():
     # Initialize Flask-Session before other extensions
     Session(app)
     
+    # Initialize CSRF protection
+    csrf = CSRFProtect(app)
+    
+    # Exempt API endpoints from CSRF (they use token auth)
+    csrf.exempt('verse_bp')
+    csrf.exempt('prayer_bp.get_prayer')
+    csrf.exempt('prayer_bp.get_prayers')
+    
     # Add session middleware
     @app.before_request
     def before_request():
@@ -87,6 +100,37 @@ def create_app():
     
     @app.after_request
     def after_request(response):
+        # Security headers
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        
+        # HSTS (only in production with HTTPS)
+        if is_production and request.is_secure:
+            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        
+        # Content Security Policy
+        response.headers['Content-Security-Policy'] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://www.googleapis.com https://apis.google.com; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: https: blob:; "
+            "connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.googleapis.com; "
+            "frame-ancestors 'self'; "
+            "base-uri 'self'; "
+            "form-action 'self'"
+        )
+        
+        # Permissions Policy
+        response.headers['Permissions-Policy'] = (
+            "geolocation=(), "
+            "microphone=(), "
+            "camera=(), "
+            "payment=(), "
+            "usb=()"
+        )
+        
         return response
     
     # Email configuration

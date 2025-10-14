@@ -86,6 +86,9 @@ class Config:
             # API Keys
             self.perplexity_api_key = self._get_secret('perplexity-api-key')
             
+            # Session secret key
+            self.session_secret_key = self._get_secret('session-secret-key')
+            
             logger.info("Successfully loaded all secrets")
             
         except Exception as e:

@@ -24,7 +24,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p logs prayers
+RUN mkdir -p logs prayers flask_session
+
+# Create non-root user
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
 
 # Set environment variables
 ENV PORT=8080
@@ -36,4 +43,5 @@ ENV FLASK_APP=app.py
 EXPOSE 8080
 
 # Run the application with Gunicorn
-CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 app:app 
+# Reduced timeout from infinite to 120s, using 2 workers with 4 threads each
+CMD exec gunicorn --bind :$PORT --workers 2 --threads 4 --timeout 120 --worker-class gthread app:app 
