@@ -26,6 +26,7 @@ wheels/
 
 # Virtual Environment
 venv/
+.venv/
 ENV/
 
 # IDE
@@ -42,10 +43,18 @@ credentials.json
 # Logs
 logs/
 *.log
+app.log
+auth.log
 prayers/
 verses/
 divinebridge-676c7c0963dd.json 
 divinebridge-db42f07139c5.json
+
+# Flask session files
+flask_session/
+
+# Design assets (optional - can be committed if needed)
+# assets/
 
 # Service Account Keys
 *.json

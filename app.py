@@ -90,6 +90,7 @@ def create_app():
     csrf.exempt('verse_bp')
     csrf.exempt('prayer_bp.get_prayer')
     csrf.exempt('prayer_bp.get_prayers')
+    csrf.exempt('auth_bp')
     
     # Add session middleware
     @app.before_request
@@ -342,50 +343,6 @@ def og_image():
         logger.error(f"Error serving OG image: {e}")
         return jsonify({'error': 'Failed to generate OG image'}), 500
 
-@app.route('/login')
-def login():
-    """Serve the login page"""
-    return render_template('login.html')
-
-@app.route('/signup')
-def signup():
-    """Serve the signup page"""
-    return render_template('register.html')
-
-@app.route('/prayers')
-def prayers():
-    """Serve the prayers page"""
-    return render_template('prayers.html')
-
-@app.route('/daily-prayer')
-def daily_prayer():
-    """Serve the daily prayer page"""
-    return render_template('daily_prayer.html')
-
-@app.route('/about')
-def about():
-    """Serve the about page"""
-    return render_template('about.html')
-
-@app.route('/privacy-policy')
-def privacy_policy():
-    """Serve the privacy policy page"""
-    return render_template('privacy_policy.html')
-
-@app.route('/terms-of-service')
-def terms_of_service():
-    """Serve the terms of service page"""
-    return render_template('terms_of_service.html')
-
-@app.route('/profile')
-def profile():
-    """Serve the profile page"""
-    return render_template('profile.html')
-
-@app.route('/test-prayer-debug')
-def test_prayer_debug():
-    """Debug page to test prayer loading"""
-    return render_template('test_prayer_debug.html')
 
 @app.route('/forgot-password')
 def forgot_password():

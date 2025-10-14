@@ -260,59 +260,327 @@
 
 {% block content %}
 <section class="register-section">
+    <div class="logo-container" style="text-align: center; margin-bottom: 2rem;">
+        <img src="{{ url_for('static', filename='images/LogowithName.svg') }}" alt="Divine Bridge" style="height: 80px; width: auto;">
+    </div>
     <h1 class="register-title">Create Account</h1>
-    <form class="register-form" method="POST" action="{{ url_for('auth.register') }}">
-        <div class="form-group">
-            <label for="name" class="form-label">Full Name</label>
-            <input type="text" id="name" name="name" class="form-input" required>
-            {% if form.name.errors %}
-                <div class="form-error">{{ form.name.errors[0] }}</div>
-            {% endif %}
-        </div>
-        <div class="form-group">
-            <label for="email" class="form-label">Email</label>
-            <input type="email" id="email" name="email" class="form-input" required>
-            {% if form.email.errors %}
-                <div class="form-error">{{ form.email.errors[0] }}</div>
-            {% endif %}
-        </div>
-        <div class="form-group">
-            <label for="password" class="form-label">Password</label>
-            <input type="password" id="password" name="password" class="form-input" required>
-            {% if form.password.errors %}
-                <div class="form-error">{{ form.password.errors[0] }}</div>
-            {% endif %}
-        </div>
-        <div class="form-group">
-            <label for="confirm_password" class="form-label">Confirm Password</label>
-            <input type="password" id="confirm_password" name="confirm_password" class="form-input" required>
-            {% if form.confirm_password.errors %}
-                <div class="form-error">{{ form.confirm_password.errors[0] }}</div>
-            {% endif %}
-        </div>
-        <button type="submit" class="submit-button">Create Account</button>
-        <div class="form-footer">
-            <p>Already have an account? <a href="{{ url_for('auth.login') }}">Log In</a></p>
-        </div>
-    </form>
+    <div class="register-form">
+        <div id="error-message" class="form-error" style="display: none;"></div>
+        <div id="success-message" class="success-message" style="display: none;"></div>
+
+        <form id="register-form">
+            <div class="form-group">
+                <label for="firstName" class="form-label">First Name</label>
+                <input type="text" id="firstName" name="firstName" class="form-input" required>
+            </div>
+            <div class="form-group">
+                <label for="lastName" class="form-label">Last Name</label>
+                <input type="text" id="lastName" name="lastName" class="form-input" required>
+            </div>
+            <div class="form-group">
+                <label for="email" class="form-label">Email</label>
+                <input type="email" id="email" name="email" class="form-input" required>
+            </div>
+            <div class="form-group">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" id="password" name="password" class="form-input" required>
+                <div id="password-requirements" style="margin-top: 0.5rem; font-size: 0.85rem; color: #666; display: none;">
+                    <div style="margin-bottom: 0.25rem;">Password must contain:</div>
+                    <div id="req-length" style="color: #999;">✗ At least 8 characters</div>
+                    <div id="req-uppercase" style="color: #999;">✗ One uppercase letter</div>
+                    <div id="req-lowercase" style="color: #999;">✗ One lowercase letter</div>
+                    <div id="req-digit" style="color: #999;">✗ One number</div>
+                    <div id="req-special" style="color: #999;">✗ One special character (!@#$%^&*)</div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="confirmPassword" class="form-label">Confirm Password</label>
+                <input type="password" id="confirmPassword" name="confirmPassword" class="form-input" required>
+            </div>
+            <button type="submit" class="submit-button" id="register-button">
+                <span id="register-text">Create Account</span>
+                <span id="register-loading" style="display: none;">
+                    <span class="spinner" style="border-top-color: var(--black); border-color: rgba(0,0,0,0.2); vertical-align: middle; margin-right: 8px;"></span>
+                    Creating Account...
+                </span>
+            </button>
+            <div class="form-footer">
+                <p>Already have an account? <a href="/login">Log In</a></p>
+            </div>
+        </form>
+    </div>
     <div class="social-register">
         <p class="social-register-title">Or sign up with</p>
         <div class="social-buttons">
-            <button class="social-button" onclick="window.location.href='{{ url_for('auth.google_login') }}'">
-                <img src="{{ url_for('static', filename='images/google-icon.png') }}" alt="Google">
-            </button>
-            <button class="social-button" onclick="window.location.href='{{ url_for('auth.facebook_login') }}'">
-                <img src="{{ url_for('static', filename='images/facebook-icon.png') }}" alt="Facebook">
-            </button>
-            <button class="social-button" onclick="window.location.href='{{ url_for('auth.apple_login') }}'">
-                <img src="{{ url_for('static', filename='images/apple-icon.png') }}" alt="Apple">
+            <button class="social-button" onclick="signUpWithGoogle()">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+                Continue with Google
             </button>
         </div>
     </div>
     <p class="terms-text">
         By creating an account, you agree to our 
-        <a href="{{ url_for('main.terms') }}">Terms of Service</a> and 
-        <a href="{{ url_for('main.privacy') }}">Privacy Policy</a>
+        <a href="/terms-of-service">Terms of Service</a> and 
+        <a href="/privacy-policy">Privacy Policy</a>
     </p>
 </section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let isSubmitting = false;
+
+    // Show password requirements when user focuses on password field
+    document.getElementById('password').addEventListener('focus', function() {
+        document.getElementById('password-requirements').style.display = 'block';
+    });
+
+    // Update password requirements in real-time
+    document.getElementById('password').addEventListener('input', function() {
+        const password = this.value;
+        
+        // Check length
+        updateRequirement('req-length', password.length >= 8);
+        
+        // Check uppercase
+        updateRequirement('req-uppercase', /[A-Z]/.test(password));
+        
+        // Check lowercase
+        updateRequirement('req-lowercase', /[a-z]/.test(password));
+        
+        // Check digit
+        updateRequirement('req-digit', /\d/.test(password));
+        
+        // Check special character
+        updateRequirement('req-special', /[!@#$%^&*(),.?":{}|<>]/.test(password));
+    });
+
+    function updateRequirement(elementId, isValid) {
+        const element = document.getElementById(elementId);
+        if (isValid) {
+            element.style.color = '#4CAF50';
+            element.textContent = element.textContent.replace('✗', '✓');
+        } else {
+            element.style.color = '#999';
+            element.textContent = element.textContent.replace('✓', '✗');
+        }
+    }
+
+    // Handle form submission
+    document.getElementById('register-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        if (isSubmitting) return;
+        
+        const firstName = document.getElementById('firstName').value.trim();
+        const lastName = document.getElementById('lastName').value.trim();
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+        
+        if (!firstName || !lastName || !email || !password || !confirmPassword) {
+            showError('Please fill in all fields');
+            return;
+        }
+        
+        if (password !== confirmPassword) {
+            showError('Passwords do not match');
+            return;
+        }
+        
+        // Validate password strength
+        const passwordValidation = validatePasswordStrength(password);
+        if (!passwordValidation.valid) {
+            showError(passwordValidation.message);
+            return;
+        }
+        
+        await signUpWithEmailAndPassword(firstName, lastName, email, password);
+    });
+
+    // Sign up with email and password
+    async function signUpWithEmailAndPassword(firstName, lastName, email, password) {
+        try {
+            setLoading(true);
+            
+            const userCredential = await firebase.auth().createUserWithEmailAndPassword(email, password);
+            const user = userCredential.user;
+            
+            // Update the user's display name
+            await user.updateProfile({
+                displayName: `${firstName} ${lastName}`
+            });
+            
+            // Get the ID token
+            const idToken = await user.getIdToken();
+            
+            // Send token to server
+            const response = await fetch('/api/auth/signup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    idToken: idToken,
+                    firstName: firstName,
+                    lastName: lastName
+                })
+            });
+            
+            if (response.ok) {
+                showSuccess('Account created successfully! Redirecting...');
+                setTimeout(() => {
+                    window.location.href = '/prayers';
+                }, 1000);
+            } else {
+                const data = await response.json();
+                showError(data.error || 'Registration failed');
+            }
+        } catch (error) {
+            console.error('Registration error:', error);
+            showError(getErrorMessage(error));
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    // Sign up with Google
+    async function signUpWithGoogle() {
+        try {
+            setLoading(true);
+            
+            const provider = new firebase.auth.GoogleAuthProvider();
+            const userCredential = await firebase.auth().signInWithPopup(provider);
+            const user = userCredential.user;
+            
+            // Get the ID token
+            const idToken = await user.getIdToken();
+            
+            // Send token to server
+            const response = await fetch('/api/auth/signup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    idToken: idToken
+                })
+            });
+            
+            if (response.ok) {
+                showSuccess('Account created successfully! Redirecting...');
+                setTimeout(() => {
+                    window.location.href = '/prayers';
+                }, 1000);
+            } else {
+                const data = await response.json();
+                showError(data.error || 'Registration failed');
+            }
+        } catch (error) {
+            console.error('Google registration error:', error);
+            showError(getErrorMessage(error));
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    // Password strength validation
+    function validatePasswordStrength(password) {
+        // Minimum 8 characters
+        if (password.length < 8) {
+            return {
+                valid: false,
+                message: 'Password must be at least 8 characters long'
+            };
+        }
+        
+        // At least one uppercase letter
+        if (!/[A-Z]/.test(password)) {
+            return {
+                valid: false,
+                message: 'Password must contain at least one uppercase letter'
+            };
+        }
+        
+        // At least one lowercase letter
+        if (!/[a-z]/.test(password)) {
+            return {
+                valid: false,
+                message: 'Password must contain at least one lowercase letter'
+            };
+        }
+        
+        // At least one digit
+        if (!/\d/.test(password)) {
+            return {
+                valid: false,
+                message: 'Password must contain at least one digit'
+            };
+        }
+        
+        // At least one special character
+        if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+            return {
+                valid: false,
+                message: 'Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)'
+            };
+        }
+        
+        return {
+            valid: true,
+            message: 'Password is strong'
+        };
+    }
+
+    // Helper functions
+    function setLoading(loading) {
+        isSubmitting = loading;
+        const button = document.getElementById('register-button');
+        const text = document.getElementById('register-text');
+        const loadingText = document.getElementById('register-loading');
+        
+        if (loading) {
+            button.disabled = true;
+            text.style.display = 'none';
+            loadingText.style.display = 'inline';
+        } else {
+            button.disabled = false;
+            text.style.display = 'inline';
+            loadingText.style.display = 'none';
+        }
+    }
+
+    function showError(message) {
+        const errorDiv = document.getElementById('error-message');
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+        
+        setTimeout(() => {
+            errorDiv.style.display = 'none';
+        }, 5000);
+    }
+
+    function showSuccess(message) {
+        const successDiv = document.getElementById('success-message');
+        successDiv.textContent = message;
+        successDiv.style.display = 'block';
+    }
+
+    function getErrorMessage(error) {
+        switch (error.code) {
+            case 'auth/email-already-in-use':
+                return 'An account with this email already exists';
+            case 'auth/invalid-email':
+                return 'Invalid email address';
+            case 'auth/weak-password':
+                return 'Password is too weak';
+            case 'auth/popup-closed-by-user':
+                return 'Registration popup was closed';
+            default:
+                return 'An error occurred during registration. Please try again';
+        }
+    }
+</script>
 {% endblock %} 
