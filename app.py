@@ -99,15 +99,18 @@ def create_app():
             session.modified = True
     
     @app.after_request
-    def after_request(response):
-        # Security headers
+    def set_security_headers(response):
+        # Security headers - always set for all responses
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['X-Frame-Options'] = 'SAMEORIGIN'
         response.headers['X-XSS-Protection'] = '1; mode=block'
         
         # HSTS (only in production with HTTPS)
-        if is_production and request.is_secure:
-            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        # Check if we're in production
+        env = os.getenv('FLASK_ENV', 'production')
+        if env == 'production' or os.getenv('GAE_ENV', '').startswith('standard'):
+            if request.is_secure:
+                response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         
         # Content Security Policy
         response.headers['Content-Security-Policy'] = (
