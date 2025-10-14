@@ -19,9 +19,9 @@ class PrayerSummaryGenerator:
         try:
             # Use shared Perplexity client (avoids test query overhead)
             self.client = get_perplexity_client()
-            # Use faster model for summaries
-            set_client_model("sonar-pro")
-            logger.info("PrayerSummaryGenerator initialized successfully (using shared client)")
+            # Use fastest, cheapest model for simple text summarization
+            set_client_model("sonar")
+            logger.info("PrayerSummaryGenerator initialized successfully (using sonar model)")
             
         except Exception as e:
             logger.error(f"Error initializing PrayerSummaryGenerator: {e}")
