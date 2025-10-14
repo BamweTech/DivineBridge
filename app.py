@@ -260,6 +260,21 @@ def create_app():
     def terms_of_service():
         """Serve the terms of service page"""
         return render_template('terms_of_service.html')
+
+    @app.route('/profile')
+    def profile():
+        """Serve the profile page"""
+        return render_template('profile.html')
+
+    @app.route('/edit-profile')
+    def edit_profile():
+        """Serve the edit profile page"""
+        return render_template('edit_profile.html')
+
+    @app.route('/change-password')
+    def change_password():
+        """Serve the change password page"""
+        return render_template('change_password.html')
     
     return app
 
