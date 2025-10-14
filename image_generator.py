@@ -22,8 +22,8 @@ class ImageGenerator:
         self.logo_path = logo_path
         
         # Background image paths
-        self.verse_background_path = 'static/assets/verse_background.jpg'
-        self.prayer_background_path = 'static/assets/prayer_background.jpg'
+        self.verse_background_path = 'assets/background image square.png'
+        self.prayer_background_path = 'assets/background image portrait.png'
         
         # Image dimensions (Instagram optimized)
         self.verse_width = 1080  # Square for verse (Instagram Feed)
