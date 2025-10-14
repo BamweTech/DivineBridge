@@ -216,6 +216,52 @@ def create_app():
     logger.info(f"Environment: {app.config['ENV']}")
     logger.info(f"Debug mode: {app.debug}")
     
+    # Add main routes
+    @app.route('/login')
+    def login():
+        """Serve the login page"""
+        return render_template('login.html')
+
+    @app.route('/signup')
+    def signup():
+        """Serve the signup page"""
+        return render_template('register.html')
+
+    @app.route('/prayers')
+    def prayers():
+        """Serve the prayers page"""
+        return render_template('prayers.html')
+
+    @app.route('/daily-prayer')
+    def daily_prayer():
+        """Serve the daily prayer page"""
+        return render_template('daily_prayer.html')
+
+    @app.route('/about')
+    def about():
+        """Serve the about page"""
+        return render_template('about.html')
+
+    @app.route('/contact')
+    def contact():
+        """Serve the contact page"""
+        return render_template('contact.html')
+
+    @app.route('/faq')
+    def faq():
+        """Serve the FAQ page"""
+        return render_template('faq.html')
+
+    @app.route('/privacy-policy')
+    def privacy_policy():
+        """Serve the privacy policy page"""
+        return render_template('privacy_policy.html')
+
+    @app.route('/terms-of-service')
+    def terms_of_service():
+        """Serve the terms of service page"""
+        return render_template('terms_of_service.html')
+    
     return app
 
 # Create the Flask application
@@ -304,7 +350,7 @@ def login():
 @app.route('/signup')
 def signup():
     """Serve the signup page"""
-    return render_template('signup.html')
+    return render_template('register.html')
 
 @app.route('/prayers')
 def prayers():
@@ -320,6 +366,16 @@ def daily_prayer():
 def about():
     """Serve the about page"""
     return render_template('about.html')
+
+@app.route('/privacy-policy')
+def privacy_policy():
+    """Serve the privacy policy page"""
+    return render_template('privacy_policy.html')
+
+@app.route('/terms-of-service')
+def terms_of_service():
+    """Serve the terms of service page"""
+    return render_template('terms_of_service.html')
 
 @app.route('/profile')
 def profile():
