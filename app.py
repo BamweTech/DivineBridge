@@ -86,12 +86,6 @@ def create_app():
     # Initialize CSRF protection
     csrf = CSRFProtect(app)
     
-    # Exempt API endpoints from CSRF (they use token auth)
-    csrf.exempt('verse_bp')
-    csrf.exempt('prayer_bp.get_prayer')
-    csrf.exempt('prayer_bp.get_prayers')
-    csrf.exempt('auth_bp')
-    
     # Add session middleware
     @app.before_request
     def before_request():
@@ -201,6 +195,10 @@ def create_app():
         # Register blueprints
         from routes import auth_bp, prayer_bp, verse_bp
         from routes.nonprofit_bp import nonprofit_bp
+        
+        # Exempt auth blueprint from CSRF protection (uses Firebase token auth)
+        csrf.exempt(auth_bp)
+        
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
         app.register_blueprint(prayer_bp, url_prefix='/api/prayer')
         app.register_blueprint(verse_bp, url_prefix='/api')
