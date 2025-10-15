@@ -925,10 +925,13 @@ class ImageGenerator:
         # Separate the closing line from the main prayer text
         closing_phrase = "In Jesus-Christ's name we pray. Amen!"
         
-        # Remove the closing from the prayer text if present
+        # Remove the closing from the prayer text if present (with or without exclamation mark)
         prayer_body = prayer_text
         if closing_phrase in prayer_text:
             prayer_body = prayer_text.replace(closing_phrase, '').strip()
+        elif "In Jesus-Christ's name we pray. Amen" in prayer_text:
+            # Handle case without exclamation mark
+            prayer_body = prayer_text.replace("In Jesus-Christ's name we pray. Amen", '').strip()
         
         # Split into paragraphs and wrap text
         paragraphs = prayer_body.split('\n\n')
