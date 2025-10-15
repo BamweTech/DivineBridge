@@ -346,7 +346,7 @@ DISASTER_PAGE_TEMPLATE = '''
 
 <div class="prayer-content">
     <div class="prayer-card">
-        <h2 style="color: #0f56ff; margin-bottom: 1.5rem; font-size: 1.5rem;">A Prayer for {{ location }}</h2>
+        <h2 style="color: #0f56ff; margin-bottom: 1.5rem; font-size: 1.5rem;">A Prayer for People Affected by {{ disaster_type }} in {{ location }}</h2>
         <div class="prayer-text">{{ disaster_prayer }}</div>
     </div>
     
