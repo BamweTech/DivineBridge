@@ -17,15 +17,24 @@ def _generate_disaster_prayer(disaster_type, location):
         client = get_perplexity_client()
         set_client_model('sonar')  # Fast model for short prayers
         
-        prompt = f"""Write a short, heartfelt Christian prayer for those affected by {disaster_type} in {location}.
+        prompt = f"""Write a heartfelt Christian prayer for those affected by {disaster_type} in {location}.
 
 REQUIREMENTS:
 - Start with "Heavenly Father,"
-- Keep it SHORT: 50-100 words
+- Length: 100-150 words (detailed but concise)
 - Mention {location} and {disaster_type} specifically
-- Pray for: victims, families, rescue workers, community recovery
+- Address specific needs:
+  * Those who lost homes, loved ones, or possessions
+  * Families separated or in fear
+  * Children who are scared and traumatized
+  * Rescue workers and first responders
+  * Medical teams and aid workers
+  * Government leaders making decisions
+  * Community healing and rebuilding
+- Include a brief biblical reference or promise (no citation needed)
 - End with "In Jesus' name, Amen."
-- Natural, compassionate tone
+- Compassionate, specific, and heartfelt tone
+- Write as if leading a prayer gathering
 - NO explanations, NO thinking tags, just the prayer text
 
 Return ONLY the prayer text, nothing else."""
@@ -45,9 +54,9 @@ Return ONLY the prayer text, nothing else."""
             if "In Jesus' name" not in prayer:
                 prayer = prayer.rstrip('.') + ". In Jesus' name, Amen."
         
-        # Validate length (50-150 words)
+        # Validate length (60-150 words)
         word_count = len(prayer.split())
-        if word_count < 30 or word_count > 150:
+        if word_count < 60 or word_count > 160:
             logger.warning(f"Disaster prayer word count out of range: {word_count} words")
             raise ValueError("Prayer length invalid")
         
@@ -56,11 +65,12 @@ Return ONLY the prayer text, nothing else."""
         
     except Exception as e:
         logger.warning(f"Using fallback prayer for {disaster_type}/{location}: {e}")
-        # Return a compassionate fallback prayer
-        return f"""Heavenly Father, we lift up the people of {location} affected by {disaster_type}. 
-Comfort those who are hurting, protect those in danger, and provide for those in need. 
-Give strength to rescue workers and wisdom to leaders. May Your peace and presence be felt 
-in {location} today. In Jesus' name, Amen."""
+        # Return a more detailed compassionate fallback prayer
+        return f"""Heavenly Father, we come before You with hearts heavy for the people of {location} affected by {disaster_type}. We pray for those who have lost their homes, their loved ones, and their sense of security. Comfort the children who are frightened and the families torn apart by this tragedy.
+
+We ask for Your divine protection over rescue workers and first responders as they serve tirelessly. Give wisdom to leaders making critical decisions, and provide resources for those in desperate need. May Your presence be a refuge and strength to every person facing this crisis.
+
+Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hope, and restoration to {location}. In Jesus' name, Amen."""
 
 @seo_bp.route('/sitemap.xml')
 def sitemap():
