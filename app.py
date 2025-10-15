@@ -196,8 +196,10 @@ def create_app():
         from routes import auth_bp, prayer_bp, verse_bp
         from routes.nonprofit_bp import nonprofit_bp
         
-        # Exempt auth blueprint from CSRF protection (uses Firebase token auth)
+        # Exempt auth and prayer blueprints from CSRF protection
+        # Auth uses Firebase token auth, Prayer uses Cloud Scheduler verification
         csrf.exempt(auth_bp)
+        csrf.exempt(prayer_bp)
         
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
         app.register_blueprint(prayer_bp, url_prefix='/api/prayer')
