@@ -359,9 +359,9 @@ DISASTER_PAGE_TEMPLATE = '''
     <div class="cta-section">
         <h2 style="margin-bottom: 1.5rem;">How You Can Help</h2>
         <p style="margin-bottom: 2rem; max-width: 600px; margin-left: auto; margin-right: auto;">
-            Whether you're affected by {{ disaster_type }} or want to support those who are, we're here for you.
+            Whether you're affected by {{ disaster_type }} in {{ location }} or want to support those who are, we're here for you.
         </p>
-        <a href="/prayers" class="cta-button">Submit Prayer Request</a>
+        <a href="/prayers" class="cta-button">Request Prayer</a>
         <a href="/prayers" class="cta-button">Join Prayer Room</a>
         <a href="/home#organizations" class="cta-button">Find Relief Organizations</a>
     </div>
