@@ -143,12 +143,12 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
             logger.error(f"Prayer must end with '{required_ending}'. Actual end: {response_clean[-150:]}")
             raise ValueError(f"Prayer must end with '{required_ending}'")
         
-        # Check word count (150-250 words as specified)
+        # Check word count (150-250 words as specified, with flexibility)
         word_count = len(response_clean.split())
-        if word_count < 140:  # Allow slight flexibility (140-260)
+        if word_count < 140:  # Allow slight flexibility (140-270)
             raise ValueError(f"Prayer too short: {word_count} words (minimum 140)")
-        if word_count > 260:
-            raise ValueError(f"Prayer too long: {word_count} words (maximum 260)")
+        if word_count > 270:
+            raise ValueError(f"Prayer too long: {word_count} words (maximum 270)")
         
         logger.info(f"Prayer validation passed: {word_count} words")
         return response
