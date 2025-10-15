@@ -6,6 +6,12 @@
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <title>{% block title %}Divine Bridge{% endblock %}</title>
     
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="{% block meta_description %}Join thousands of believers worldwide in daily prayer. Get today's inspiring Bible verse and unite in global prayer for those affected by disasters, wars, and crises.{% endblock %}">
+    <meta name="keywords" content="{% block meta_keywords %}Christian prayer, daily devotional, prayer request, Bible verses, global prayer community, disaster prayer, prayer support, spiritual growth{% endblock %}">
+    <meta name="author" content="Divine Bridge">
+    <link rel="canonical" href="{{ request.url }}">
+    
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ request.url }}">

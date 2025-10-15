@@ -195,6 +195,7 @@ def create_app():
         # Register blueprints
         from routes import auth_bp, prayer_bp, verse_bp
         from routes.nonprofit_bp import nonprofit_bp
+        from routes.seo_bp import seo_bp
         
         # Exempt auth and prayer blueprints from CSRF protection
         # Auth uses Firebase token auth, Prayer uses Cloud Scheduler verification
@@ -205,6 +206,7 @@ def create_app():
         app.register_blueprint(prayer_bp, url_prefix='/api/prayer')
         app.register_blueprint(verse_bp, url_prefix='/api')
         app.register_blueprint(nonprofit_bp, url_prefix='/api/nonprofit')
+        app.register_blueprint(seo_bp)  # SEO routes at root level
         logger.info("Blueprints registered")
         
     except Exception as e:
@@ -262,6 +264,12 @@ def create_app():
     def terms_of_service():
         """Serve the terms of service page"""
         return render_template('terms_of_service.html')
+
+    @app.route('/robots.txt')
+    def robots_txt():
+        """Serve robots.txt for SEO"""
+        from flask import send_from_directory
+        return send_from_directory(app.static_folder, 'robots.txt')
 
     @app.route('/profile')
     def profile():

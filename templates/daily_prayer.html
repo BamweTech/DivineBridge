@@ -2,6 +2,53 @@
 
 {% block title %}Divine Bridge - Daily Prayer{% endblock %}
 
+{% block og_title %}Today's Global Prayer - Divine Bridge{% endblock %}
+{% block og_description %}Join thousands of believers in today's prayer for those affected by global crises. Find hope, submit prayer requests, and unite in faith.{% endblock %}
+
+{% block extra_css %}
+<!-- JSON-LD Structured Data for SEO -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Daily Global Prayer for {{ prayer_date if prayer_date else 'Today' }}",
+  "description": "Today's prayer for those affected by disasters worldwide. Join our global prayer community.",
+  "datePublished": "{{ prayer_date if prayer_date else 'today' }}",
+  "author": {
+    "@type": "Organization",
+    "name": "Divine Bridge",
+    "url": "https://divinebridge.io"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Divine Bridge",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "{{ request.url_root }}static/images/LogowithName.svg"
+    }
+  },
+  "image": "{{ request.url_root }}api/og-image",
+  "keywords": "daily prayer, Christian prayer, global prayer community, disaster relief prayer, prayer request"
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ReligiousOrganization",
+  "name": "Divine Bridge",
+  "description": "Global Christian prayer community uniting believers in daily prayer and spiritual growth",
+  "url": "https://divinebridge.io",
+  "logo": "{{ request.url_root }}static/images/LogowithName.svg",
+  "contactPoint": {
+    "@type": "ContactPoint",
+    "contactType": "Prayer Support",
+    "url": "https://divinebridge.io/contact"
+  }
+}
+</script>
+{% endblock %}
+
 {% block extra_css %}
 <style>
     .daily-prayer-page {
