@@ -137,11 +137,12 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
             logger.error(f"Prayer must start with 'Heavenly Father'. Actual start: {response_clean[:100]}")
             raise ValueError("Prayer must start with 'Heavenly Father'")
         
-        # MUST end with specific closing (strict requirement)
-        required_ending = "In Jesus-Christ's name we pray. Amen!"
-        if not response_clean.endswith(required_ending):
-            logger.error(f"Prayer must end with '{required_ending}'. Actual end: {response_clean[-150:]}")
-            raise ValueError(f"Prayer must end with '{required_ending}'")
+        # MUST end with specific closing (allow flexibility with punctuation)
+        required_ending = "In Jesus-Christ's name we pray. Amen"
+        # Accept with or without exclamation mark
+        if not (response_clean.endswith(required_ending + "!") or response_clean.endswith(required_ending)):
+            logger.error(f"Prayer must end with '{required_ending}[!]'. Actual end: {response_clean[-150:]}")
+            raise ValueError(f"Prayer must end with '{required_ending}!'")
         
         # Check word count (150-250 words as specified, with flexibility)
         word_count = len(response_clean.split())
