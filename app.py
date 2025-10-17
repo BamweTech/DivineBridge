@@ -271,6 +271,12 @@ def create_app():
         from flask import send_from_directory
         return send_from_directory(app.static_folder, 'robots.txt')
 
+    @app.route('/google<path:filename>')
+    def google_verification(filename):
+        """Serve Google Search Console verification file"""
+        from flask import send_from_directory
+        return send_from_directory(app.static_folder, f'google{filename}')
+
     @app.route('/profile')
     def profile():
         """Serve the profile page"""
