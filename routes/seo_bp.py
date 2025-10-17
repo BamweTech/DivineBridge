@@ -90,6 +90,7 @@ def sitemap():
             ('/', '1.0', 'daily'),  # Home/Prayer Room
             ('/home', '0.8', 'weekly'),  # Original home
             ('/prayers', '1.0', 'daily'),  # Prayer Room
+            ('/disasters', '0.9', 'daily'),  # Disasters hub (SEO discovery page)
             ('/about', '0.7', 'monthly'),
             ('/contact', '0.6', 'monthly'),
             ('/faq', '0.6', 'monthly'),
@@ -154,6 +155,63 @@ def sitemap():
     except Exception as e:
         logger.error(f"Error generating sitemap: {e}")
         return jsonify({'error': 'Failed to generate sitemap'}), 500
+
+
+@seo_bp.route('/disasters')
+def disasters_hub():
+    """Hub page showing all current disasters (SEO discovery page - not linked in nav)"""
+    try:
+        from flask import current_app
+        
+        # Get today's prayer to extract disasters
+        storage_handler = current_app.storage_handler
+        today = datetime.now()
+        
+        # Collect disasters from last 7 days
+        all_disasters = []
+        disaster_map = {}  # Deduplicate by type+location
+        
+        for i in range(7):
+            date = today - timedelta(days=i)
+            date_str = date.strftime('%Y-%m-%d')
+            
+            try:
+                prayer = storage_handler.get_prayer(date_str)
+                if prayer and isinstance(prayer, dict) and 'metadata' in prayer:
+                    metadata = prayer['metadata']
+                    disasters = metadata.get('disasters', [])
+                    
+                    for disaster in disasters:
+                        if disaster.get('type') and disaster.get('locations'):
+                            disaster_type = disaster['type']
+                            for location in disaster['locations']:
+                                # Create unique key
+                                key = f"{disaster_type}_{location}".lower()
+                                if key not in disaster_map:
+                                    disaster_map[key] = {
+                                        'type': disaster_type,
+                                        'type_display': disaster_type.replace('-', ' ').title(),
+                                        'location': location,
+                                        'location_display': location.title(),
+                                        'severity': disaster.get('severity', 'moderate'),
+                                        'date': date_str,
+                                        'url_slug': f"{disaster_type.lower().replace(' ', '-')}/{location.lower().replace(' ', '-').replace(',', '')}"
+                                    }
+            except:
+                continue
+        
+        # Sort by date (most recent first) and severity
+        all_disasters = list(disaster_map.values())
+        severity_order = {'severe': 0, 'moderate': 1, 'minor': 2}
+        all_disasters.sort(key=lambda x: (x['date'], severity_order.get(x['severity'], 3)), reverse=True)
+        
+        return render_template_string(DISASTERS_HUB_TEMPLATE, 
+                                     disasters=all_disasters,
+                                     today=today.strftime('%B %d, %Y'))
+        
+    except Exception as e:
+        logger.error(f"Error rendering disasters hub: {e}")
+        return jsonify({'error': 'Failed to load disasters'}), 500
 
 
 @seo_bp.route('/prayers/disaster/<disaster_type>/<location>')
@@ -366,6 +424,181 @@ DISASTER_PAGE_TEMPLATE = '''
         <a href="/home#organizations" class="cta-button">Find Relief Organizations</a>
     </div>
     
+</div>
+{% endblock %}
+'''
+
+# Disasters hub template
+DISASTERS_HUB_TEMPLATE = '''
+{% extends "base.html" %}
+
+{% block title %}Current Disasters & Crisis Prayer Support | Divine Bridge{% endblock %}
+
+{% block meta_description %}Find prayers for current disasters worldwide. Dedicated prayer pages for floods, earthquakes, conflicts, and humanitarian crises. Join our global prayer community.{% endblock %}
+
+{% block og_title %}Current Disasters We're Praying For - Divine Bridge{% endblock %}
+{% block og_description %}Discover prayer support for current disasters and crises worldwide. Each disaster has a dedicated prayer page with specific prayers for affected communities.{% endblock %}
+
+{% block extra_css %}
+<style>
+    .disasters-page {
+        min-height: calc(100vh - 200px);
+        padding: 6rem 2rem 4rem;
+        background: linear-gradient(135deg, rgba(15, 86, 255, 0.03) 0%, rgba(31, 60, 136, 0.03) 100%);
+    }
+    
+    .disasters-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    
+    .page-header {
+        text-align: center;
+        margin-bottom: 3rem;
+    }
+    
+    .page-title {
+        font-size: 2.5rem;
+        color: #0f56ff;
+        margin-bottom: 1rem;
+    }
+    
+    .page-subtitle {
+        font-size: 1.1rem;
+        color: #666;
+        max-width: 700px;
+        margin: 0 auto;
+    }
+    
+    .disasters-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 2rem;
+        margin-top: 3rem;
+    }
+    
+    .disaster-card {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        border-left: 4px solid #0f56ff;
+    }
+    
+    .disaster-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 20px rgba(15, 86, 255, 0.2);
+    }
+    
+    .disaster-card.severe {
+        border-left-color: #dc2626;
+    }
+    
+    .disaster-type {
+        display: inline-block;
+        background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+    
+    .disaster-card.severe .disaster-type {
+        background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+    }
+    
+    .disaster-location {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e1e1e;
+        margin-bottom: 0.5rem;
+    }
+    
+    .disaster-date {
+        font-size: 0.9rem;
+        color: #666;
+        margin-bottom: 1.5rem;
+    }
+    
+    .disaster-link {
+        display: inline-block;
+        background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: transform 0.3s ease;
+    }
+    
+    .disaster-link:hover {
+        transform: scale(1.05);
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: #666;
+    }
+    
+    @media (max-width: 768px) {
+        .disasters-grid {
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+        
+        .page-title {
+            font-size: 2rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="disasters-page">
+    <div class="disasters-container">
+        <div class="page-header">
+            <h1 class="page-title">🌍 Current Disasters We're Praying For</h1>
+            <p class="page-subtitle">
+                Each disaster has a dedicated prayer page with specific prayers for affected communities. 
+                These pages are updated based on our daily global prayer research.
+            </p>
+        </div>
+        
+        {% if disasters %}
+        <div class="disasters-grid">
+            {% for disaster in disasters %}
+            <div class="disaster-card {{ disaster.severity }}">
+                <span class="disaster-type">{{ disaster.type_display }}</span>
+                <h2 class="disaster-location">{{ disaster.location_display }}</h2>
+                <p class="disaster-date">Prayer available since {{ disaster.date }}</p>
+                <a href="/prayers/disaster/{{ disaster.url_slug }}" class="disaster-link">
+                    View Prayer & Support →
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p style="font-size: 1.2rem; margin-bottom: 1rem;">🙏 Praise God - No major disasters in recent days</p>
+            <p>Visit our <a href="/prayers" style="color: #0f56ff; font-weight: 600;">Prayer Room</a> for today's global prayer.</p>
+        </div>
+        {% endif %}
+        
+        <div style="text-align: center; margin-top: 4rem; padding: 2rem; background: rgba(15, 86, 255, 0.05); border-radius: 16px;">
+            <h3 style="color: #0f56ff; margin-bottom: 1rem;">Join Our Daily Prayer</h3>
+            <p style="color: #666; margin-bottom: 1.5rem; max-width: 600px; margin-left: auto; margin-right: auto;">
+                Every day at midnight UTC, we research global news and create a comprehensive prayer covering 
+                all current crises, disasters, and humanitarian needs worldwide.
+            </p>
+            <a href="/prayers" style="display: inline-block; background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%); color: white; padding: 1rem 2rem; border-radius: 12px; text-decoration: none; font-weight: 600;">
+                View Today's Global Prayer
+            </a>
+        </div>
+    </div>
 </div>
 {% endblock %}
 '''
