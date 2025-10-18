@@ -80,7 +80,8 @@ def sitemap():
         
         # Get base URL (force HTTPS for production)
         base_url = request.url_root.rstrip('/')
-        if not base_url.startswith('https://') and 'divinebridge.io' in base_url:
+        # Cloud Run is behind load balancer, always use HTTPS for production
+        if 'divinebridge.io' in base_url or 'run.app' in base_url:
             base_url = base_url.replace('http://', 'https://')
         
         # Build sitemap XML
