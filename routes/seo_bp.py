@@ -78,8 +78,10 @@ def sitemap():
     try:
         from flask import current_app
         
-        # Get base URL
+        # Get base URL (force HTTPS for production)
         base_url = request.url_root.rstrip('/')
+        if not base_url.startswith('https://') and 'divinebridge.io' in base_url:
+            base_url = base_url.replace('http://', 'https://')
         
         # Build sitemap XML
         xml_content = ['<?xml version="1.0" encoding="UTF-8"?>']
