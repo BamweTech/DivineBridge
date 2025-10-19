@@ -192,6 +192,25 @@ def signup():
                 return jsonify({'error': 'A user with this email already exists.'}), 400
             except auth.UserNotFoundError:
                 return jsonify({'error': 'Failed to create user'}), 500
+        
+        # Create user profile in Firestore with email subscription enabled by default
+        try:
+            from firebase_admin import firestore
+            db = firestore.client()
+            user_ref = db.collection('users').document(user.uid)
+            user_ref.set({
+                'email': email,
+                'firstName': first_name,
+                'lastName': last_name,
+                'email_subscribed': True,  # Subscribe to daily emails by default
+                'timezone': 'America/New_York',  # Default timezone
+                'createdAt': firestore.SERVER_TIMESTAMP,
+                'emailVerified': False
+            })
+            logger.info(f"Created Firestore profile for user: {user.uid}")
+        except Exception as e:
+            logger.error(f"Error creating Firestore profile: {e}")
+            # Don't fail signup if Firestore write fails
             
         # Send verification email
         if not send_verification_email(email):

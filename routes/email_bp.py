@@ -31,30 +31,8 @@ def send_daily_emails():
         
         logger.info("Starting daily email send job...")
         
-        # Get today's verse
-        today_str = datetime.now().strftime('%Y-%m-%d')
-        
-        # Get verse from storage (handles string format)
-        verse = None
-        try:
-            verse_str = current_app.storage_handler.get_verse(today_str)
-            if verse_str and isinstance(verse_str, str):
-                # Parse: "VERSE: ... REFERENCE: ..."
-                lines = verse_str.strip().split('\n')
-                verse_text = ''
-                verse_ref = ''
-                for line in lines:
-                    if line.startswith('VERSE:'):
-                        verse_text = line.replace('VERSE:', '').strip()
-                    elif line.startswith('REFERENCE:'):
-                        verse_ref = line.replace('REFERENCE:', '').strip()
-                
-                if verse_text and verse_ref:
-                    verse = {'text': verse_text, 'reference': verse_ref}
-            elif verse_str and isinstance(verse_str, dict):
-                verse = verse_str
-        except Exception as e:
-            logger.error(f"Error getting verse: {e}")
+        # Get today's verse using verse_cache (same as website)
+        verse = current_app.verse_cache.get_today_verse()
         
         if not verse:
             logger.error("No verse available for today")
@@ -62,7 +40,7 @@ def send_daily_emails():
         
         verse_data = {
             'reference': verse.get('reference', ''),
-            'text': verse.get('text', '')
+            'text': verse.get('verse', verse.get('text', ''))  # verse_cache uses 'verse' key
         }
         
         # Get today's prayer
@@ -149,42 +127,16 @@ def test_email():
         
         from email_service_v2 import get_email_service
         
-        # Get today's verse from storage
-        today_str = datetime.now().strftime('%Y-%m-%d')
-        
-        # Get today's verse from storage
-        verse = None
-        try:
-            verse_str = current_app.storage_handler.get_verse(today_str)
-            if verse_str and isinstance(verse_str, str):
-                # Parse the verse string format: "VERSE: ... REFERENCE: ..."
-                lines = verse_str.strip().split('\n')
-                verse_text = ''
-                verse_ref = ''
-                for line in lines:
-                    if line.startswith('VERSE:'):
-                        verse_text = line.replace('VERSE:', '').strip()
-                    elif line.startswith('REFERENCE:'):
-                        verse_ref = line.replace('REFERENCE:', '').strip()
-                
-                if verse_text and verse_ref:
-                    verse = {'text': verse_text, 'reference': verse_ref}
-            elif verse_str and isinstance(verse_str, dict):
-                verse = verse_str
-        except Exception as e:
-            logger.warning(f"Error getting verse from storage: {e}")
-        
-        # Fallback to verse cache if storage fails
-        if not verse:
-            from verse_cache import verse_cache
-            verse_cache_data = verse_cache.get_today_verse()
-            if verse_cache_data:
-                verse = verse_cache_data
+        # Get today's verse using verse_cache (same as website)
+        verse = current_app.verse_cache.get_today_verse()
         
         verse_data = {
             'reference': verse.get('reference', 'John 3:16') if verse else 'John 3:16',
-            'text': verse.get('text', 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.') if verse else 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.'
+            'text': verse.get('verse', verse.get('text', 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.')) if verse else 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.'
         }
+        
+        # Get today's prayer
+        today_str = datetime.now().strftime('%Y-%m-%d')
         
         # Get today's prayer
         prayer = current_app.storage_handler.get_prayer(today_str)

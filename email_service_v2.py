@@ -180,6 +180,12 @@ To unsubscribe: https://divinebridge.io/unsubscribe?email={recipient_email}
             .cta-text {{
                 font-size: 13px !important;
             }}
+            .logo-cell {{
+                text-align: center !important;
+            }}
+            .logo-img {{
+                margin: 0 auto !important;
+            }}
         }}
     </style>
 </head>
@@ -198,8 +204,8 @@ To unsubscribe: https://divinebridge.io/unsubscribe?email={recipient_email}
                         <td style="background: linear-gradient(135deg, #ffffff 0%, #e3f2fd 50%, #bbdefb 100%); padding: 40px 30px; text-align: center;">
                             <table width="100%" cellpadding="0" cellspacing="0" border="0">
                                 <tr>
-                                    <td align="center">
-                                        <img src="cid:logo_image" alt="Divine Bridge" width="60" height="60" style="display: block; margin: 0 auto 8px auto; border: 0;" />
+                                    <td class="logo-cell" align="center">
+                                        <img src="cid:logo_image" alt="Divine Bridge" class="logo-img" width="60" height="60" style="display: block; margin: 0 auto 8px auto; border: 0;" />
                                     </td>
                                 </tr>
                             </table>
