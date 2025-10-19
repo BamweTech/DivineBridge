@@ -196,16 +196,19 @@ def create_app():
         from routes import auth_bp, prayer_bp, verse_bp
         from routes.nonprofit_bp import nonprofit_bp
         from routes.seo_bp import seo_bp
+        from routes.email_bp import email_bp
         
-        # Exempt auth and prayer blueprints from CSRF protection
-        # Auth uses Firebase token auth, Prayer uses Cloud Scheduler verification
+        # Exempt auth, prayer, and email blueprints from CSRF protection
+        # Auth uses Firebase token auth, Prayer/Email use Cloud Scheduler verification
         csrf.exempt(auth_bp)
         csrf.exempt(prayer_bp)
+        csrf.exempt(email_bp)
         
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
         app.register_blueprint(prayer_bp, url_prefix='/api/prayer')
         app.register_blueprint(verse_bp, url_prefix='/api')
         app.register_blueprint(nonprofit_bp, url_prefix='/api/nonprofit')
+        app.register_blueprint(email_bp, url_prefix='/api/email')
         app.register_blueprint(seo_bp)  # SEO routes at root level
         logger.info("Blueprints registered")
         
