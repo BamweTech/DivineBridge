@@ -21,9 +21,12 @@ def send_daily_emails():
         from email_service_v2 import get_email_service
         from verse_cache import verse_cache
         
-        # Verify this is from Cloud Scheduler
-        if request.headers.get('X-Appengine-Cron') != 'true':
-            logger.warning("Unauthorized email send attempt")
+        # Verify this is from Cloud Scheduler (OIDC token or Cloud Scheduler user agent)
+        user_agent = request.headers.get('User-Agent', '')
+        is_scheduler = 'Google-Cloud-Scheduler' in user_agent
+        
+        if not is_scheduler:
+            logger.warning(f"Unauthorized email send attempt from: {user_agent}")
             return jsonify({'error': 'Unauthorized'}), 403
         
         logger.info("Starting daily email send job...")
