@@ -695,34 +695,33 @@ class StorageHandler:
     
     def upload_logo(self, file_path: str, logo_data: bytes) -> Optional[str]:
         """
-        Upload logo image to Cloud Storage and generate signed URL
+        Upload logo image to Cloud Storage and return public URL
         
         Args:
             file_path: Path in bucket (e.g., 'organization_logos/org-name.png')
             logo_data: Binary image data
         
         Returns:
-            Signed URL of the uploaded logo (valid for 7 days) or None
+            Public URL of the uploaded logo or None
         """
         try:
             blob = self.bucket.blob(file_path)
             
-            # Upload with correct content type
+            # Upload with correct content type and cache control
             blob.upload_from_string(
                 logo_data,
                 content_type='image/png'
             )
             
-            # Generate a signed URL (valid for 7 days)
-            from datetime import timedelta
-            signed_url = blob.generate_signed_url(
-                version="v4",
-                expiration=timedelta(days=7),
-                method="GET"
-            )
+            # Set cache control for better performance
+            blob.cache_control = 'public, max-age=31536000'  # 1 year
+            blob.patch()
             
-            logger.debug(f"Uploaded logo to {file_path}, generated signed URL (valid 7 days)")
-            return signed_url
+            # Return permanent public URL (bucket is already public)
+            public_url = f"https://storage.googleapis.com/{self.bucket_name}/{file_path}"
+            
+            logger.debug(f"Uploaded logo to {file_path}, public URL: {public_url}")
+            return public_url
             
         except Exception as e:
             logger.error(f"Error uploading logo to {file_path}: {e}")
@@ -730,24 +729,19 @@ class StorageHandler:
     
     def get_public_url(self, file_path: str) -> Optional[str]:
         """
-        Get signed URL of a file in Cloud Storage if it exists
+        Get public URL of a file in Cloud Storage if it exists
         
         Args:
             file_path: Path in bucket
         
         Returns:
-            Signed URL (valid for 7 days) if file exists, None otherwise
+            Public URL if file exists, None otherwise
         """
         try:
             blob = self.bucket.blob(file_path)
             if blob.exists():
-                from datetime import timedelta
-                signed_url = blob.generate_signed_url(
-                    version="v4",
-                    expiration=timedelta(days=7),
-                    method="GET"
-                )
-                return signed_url
+                # Return permanent public URL (bucket is already public)
+                return f"https://storage.googleapis.com/{self.bucket_name}/{file_path}"
             return None
         except Exception as e:
             logger.debug(f"Error checking file existence for {file_path}: {e}")
