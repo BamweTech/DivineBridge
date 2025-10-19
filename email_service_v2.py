@@ -71,7 +71,7 @@ class EnhancedEmailService:
             msg = MIMEMultipart('related')
             msg['From'] = formataddr(("Divine Bridge", self.sender_email))
             msg['To'] = recipient_email
-            msg['Subject'] = f"🙏 Your Daily Blessings - {date_str}"
+            msg['Subject'] = f"Your Daily Blessings - {date_str}"
             
             # Email headers for deliverability
             msg['List-Unsubscribe'] = f"<https://divinebridge.io/unsubscribe?email={recipient_email}>"
