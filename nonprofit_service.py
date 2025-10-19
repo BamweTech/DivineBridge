@@ -224,8 +224,27 @@ class NonprofitService:
                 # Filter out blacklisted organizations before caching
                 orgs = self._filter_blacklisted(orgs)
                 
-                # Cache the results
-                self._cache_organizations(orgs, cache_path)
+                # Cache immediately WITHOUT logos for fast response
+                self._cache_organizations(orgs, cache_path, fetch_logos=False)
+                
+                # Fetch logos in background (don't block response)
+                import threading
+                def fetch_logos_background():
+                    try:
+                        logger.info(f"Background: Fetching logos for {len(orgs)} organizations...")
+                        for org in orgs:
+                            if org.get('logo_url') is None:
+                                logo_url = self._fetch_and_cache_logo(org)
+                                org['logo_url'] = logo_url
+                        # Re-cache with logos
+                        self._cache_organizations(orgs, cache_path, fetch_logos=False)
+                        logger.info(f"Background: Logo fetching complete for {location.get('city')}")
+                    except Exception as e:
+                        logger.error(f"Background logo fetching error: {e}")
+                
+                thread = threading.Thread(target=fetch_logos_background, daemon=True)
+                thread.start()
+                
                 # Mark as local
                 for org in orgs:
                     org['is_local'] = True
@@ -278,8 +297,27 @@ class NonprofitService:
             orgs = self._query_perplexity_for_disaster_orgs(disaster, primary_location)
             
             if orgs:
-                # Cache the results
-                self._cache_organizations(orgs, cache_path)
+                # Cache immediately WITHOUT logos for fast response
+                self._cache_organizations(orgs, cache_path, fetch_logos=False)
+                
+                # Fetch logos in background
+                import threading
+                def fetch_logos_background():
+                    try:
+                        logger.info(f"Background: Fetching logos for {len(orgs)} disaster orgs...")
+                        for org in orgs:
+                            if org.get('logo_url') is None:
+                                logo_url = self._fetch_and_cache_logo(org)
+                                org['logo_url'] = logo_url
+                        # Re-cache with logos
+                        self._cache_organizations(orgs, cache_path, fetch_logos=False)
+                        logger.info(f"Background: Logo fetching complete for {disaster_type} in {primary_location}")
+                    except Exception as e:
+                        logger.error(f"Background logo fetching error: {e}")
+                
+                thread = threading.Thread(target=fetch_logos_background, daemon=True)
+                thread.start()
+                
                 # Mark as disaster response
                 for org in orgs:
                     org['is_disaster_response'] = True
