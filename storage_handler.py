@@ -713,12 +713,8 @@ class StorageHandler:
                 content_type='image/png'
             )
             
-            # Set cache control for better performance
-            blob.cache_control = 'public, max-age=31536000'  # 1 year
-            blob.patch()
-            
             # Return permanent public URL (bucket is already public)
-            public_url = f"https://storage.googleapis.com/{self.bucket_name}/{file_path}"
+            public_url = f"https://storage.googleapis.com/{self.bucket.name}/{file_path}"
             
             logger.debug(f"Uploaded logo to {file_path}, public URL: {public_url}")
             return public_url
@@ -741,7 +737,7 @@ class StorageHandler:
             blob = self.bucket.blob(file_path)
             if blob.exists():
                 # Return permanent public URL (bucket is already public)
-                return f"https://storage.googleapis.com/{self.bucket_name}/{file_path}"
+                return f"https://storage.googleapis.com/{self.bucket.name}/{file_path}"
             return None
         except Exception as e:
             logger.debug(f"Error checking file existence for {file_path}: {e}")
