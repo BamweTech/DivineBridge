@@ -16,7 +16,8 @@ def send_daily_emails():
     Triggered by Cloud Scheduler at 6 AM ET
     """
     try:
-        from firebase_auth import auth, db
+        from firebase_admin import firestore
+        db = firestore.client()
         from email_service_v2 import get_email_service
         from verse_cache import verse_cache
         
