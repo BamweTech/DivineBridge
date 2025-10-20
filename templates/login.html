@@ -299,7 +299,7 @@
             <span>or continue with</span>
         </div>
 
-        <button class="social-button" onclick="signInWithGoogle()" style="width: 100%;">
+        <button class="social-button" id="google-signin-btn" onclick="signInWithGoogle()" style="width: 100%;">
             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
             Continue with Google
         </button>
@@ -390,6 +390,13 @@
             isGoogleSigningIn = true;
             setLoading(true);
             
+            // Disable the button to prevent double clicks
+            const googleBtn = document.getElementById('google-signin-btn');
+            if (googleBtn) {
+                googleBtn.disabled = true;
+                googleBtn.style.opacity = '0.5';
+            }
+            
             const provider = new firebase.auth.GoogleAuthProvider();
             const userCredential = await firebase.auth().signInWithPopup(provider);
             const user = userCredential.user;
@@ -427,6 +434,13 @@
         } finally {
             isGoogleSigningIn = false;
             setLoading(false);
+            
+            // Re-enable the button
+            const googleBtn = document.getElementById('google-signin-btn');
+            if (googleBtn) {
+                googleBtn.disabled = false;
+                googleBtn.style.opacity = '1';
+            }
         }
     }
 

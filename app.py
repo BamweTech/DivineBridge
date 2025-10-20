@@ -100,6 +100,9 @@ def create_app():
         response.headers['X-Frame-Options'] = 'SAMEORIGIN'
         response.headers['X-XSS-Protection'] = '1; mode=block'
         
+        # Cross-Origin-Opener-Policy - Allow popups (needed for OAuth)
+        response.headers['Cross-Origin-Opener-Policy'] = 'same-origin-allow-popups'
+        
         # HSTS (only in production with HTTPS)
         # Check if we're in production
         env = os.getenv('FLASK_ENV', 'production')

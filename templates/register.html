@@ -313,7 +313,7 @@
     <div class="social-register">
         <p class="social-register-title">Or sign up with</p>
         <div class="social-buttons">
-            <button class="social-button" onclick="signUpWithGoogle()">
+            <button class="social-button" id="google-signup-btn" onclick="signUpWithGoogle()">
                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
                 Continue with Google
             </button>
@@ -460,6 +460,13 @@
             isGoogleSigningUp = true;
             setLoading(true);
             
+            // Disable the button to prevent double clicks
+            const googleBtn = document.getElementById('google-signup-btn');
+            if (googleBtn) {
+                googleBtn.disabled = true;
+                googleBtn.style.opacity = '0.5';
+            }
+            
             const provider = new firebase.auth.GoogleAuthProvider();
             const userCredential = await firebase.auth().signInWithPopup(provider);
             const user = userCredential.user;
@@ -496,6 +503,13 @@
         } finally {
             isGoogleSigningUp = false;
             setLoading(false);
+            
+            // Re-enable the button
+            const googleBtn = document.getElementById('google-signup-btn');
+            if (googleBtn) {
+                googleBtn.disabled = false;
+                googleBtn.style.opacity = '1';
+            }
         }
     }
 
