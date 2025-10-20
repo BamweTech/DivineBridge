@@ -118,6 +118,7 @@ def create_app():
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: https: blob:; "
             "connect-src 'self' https://www.gstatic.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.googleapis.com; "
+            "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com; "
             "frame-ancestors 'self'; "
             "base-uri 'self'; "
             "form-action 'self'"
