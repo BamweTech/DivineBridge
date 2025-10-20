@@ -117,7 +117,7 @@ def create_app():
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: https: blob:; "
-            "connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.googleapis.com; "
+            "connect-src 'self' https://www.gstatic.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.googleapis.com; "
             "frame-ancestors 'self'; "
             "base-uri 'self'; "
             "form-action 'self'"
