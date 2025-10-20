@@ -31,11 +31,17 @@ def get_organizations():
         }
     """
     try:
+        import time
+        start_time = time.time()
+        
         location_service = get_location_service()
         nonprofit_service = get_nonprofit_service()
         
         # Get user ID from query params (if authenticated)
         user_id = request.args.get('user_id')
+        
+        t1 = time.time()
+        logger.debug(f"⏱️ Init: {(t1-start_time)*1000:.0f}ms")
         
         # For local testing: allow manual location override via query params
         test_city = request.args.get('city')
@@ -60,6 +66,9 @@ def get_organizations():
             # Get user location (will use IP detection in production)
             user_location = location_service.get_user_location(user_id, ip_address)
         
+        t2 = time.time()
+        logger.debug(f"⏱️ Location: {(t2-t1)*1000:.0f}ms")
+        
         # Get today's prayer to extract disasters
         today = datetime.now().strftime('%Y-%m-%d')
         prayer_data = current_app.storage_handler.get_prayer(today)
@@ -78,10 +87,16 @@ def get_organizations():
                 metadata = extractor.extract_disasters(prayer_data.get('content', ''))
                 prayer_disasters = metadata.get('disasters', [])
         
+        t3 = time.time()
+        logger.debug(f"⏱️ Prayer: {(t3-t2)*1000:.0f}ms")
+        
         # Get top 2 disasters for organization matching
         from disaster_extractor import get_disaster_extractor
         extractor = get_disaster_extractor()
         primary_disasters = extractor.get_primary_disasters({'disasters': prayer_disasters}, limit=2)
+        
+        t4 = time.time()
+        logger.debug(f"⏱️ Disasters: {(t4-t3)*1000:.0f}ms")
         
         # Get 5 organizations
         organizations = nonprofit_service.get_organizations_for_user(
@@ -89,6 +104,10 @@ def get_organizations():
             primary_disasters,
             today
         )
+        
+        t5 = time.time()
+        logger.debug(f"⏱️ Organizations: {(t5-t4)*1000:.0f}ms")
+        logger.debug(f"⏱️ TOTAL: {(t5-start_time)*1000:.0f}ms")
         
         logger.info(f"Returning {len(organizations)} organizations for {user_location.get('city')}")
         
