@@ -447,8 +447,17 @@
     }
 
     // Sign up with Google
+    let isGoogleSigningUp = false;
+    
     async function signUpWithGoogle() {
+        // Prevent multiple popup requests
+        if (isGoogleSigningUp) {
+            console.log('Google sign-up already in progress...');
+            return;
+        }
+        
         try {
+            isGoogleSigningUp = true;
             setLoading(true);
             
             const provider = new firebase.auth.GoogleAuthProvider();
@@ -458,15 +467,17 @@
             // Get the ID token
             const idToken = await user.getIdToken();
             
-            // Send token to server
-            const response = await fetch('/api/auth/signup', {
+            // For Google OAuth, user is already created by Firebase
+            // We just need to verify the token and create session/Firestore profile
+            const response = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 credentials: 'include',
                 body: JSON.stringify({
-                    idToken: idToken
+                    idToken: idToken,
+                    isOAuthSignup: true  // Flag to create Firestore profile if doesn't exist
                 })
             });
             
@@ -483,6 +494,7 @@
             console.error('Google registration error:', error);
             showError(getErrorMessage(error));
         } finally {
+            isGoogleSigningUp = false;
             setLoading(false);
         }
     }

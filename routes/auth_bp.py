@@ -97,6 +97,37 @@ def login():
             logger.info("Clearing existing session data...")
             session.clear()  # Clear any existing session data
             
+            # Check if this is an OAuth signup (create Firestore profile if needed)
+            is_oauth_signup = data.get('isOAuthSignup', False)
+            if is_oauth_signup and user:
+                try:
+                    from firebase_admin import firestore
+                    db = firestore.client()
+                    user_ref = db.collection('users').document(user.uid)
+                    
+                    # Check if profile exists
+                    if not user_ref.get().exists:
+                        # Parse display name for first/last name
+                        display_name = user.display_name or user.email.split('@')[0]
+                        name_parts = display_name.split(' ', 1)
+                        first_name = name_parts[0] if name_parts else 'User'
+                        last_name = name_parts[1] if len(name_parts) > 1 else ''
+                        
+                        # Create Firestore profile for OAuth user
+                        user_ref.set({
+                            'email': user.email,
+                            'firstName': first_name,
+                            'lastName': last_name,
+                            'email_subscribed': True,  # Subscribe to emails by default
+                            'timezone': 'America/New_York',
+                            'createdAt': firestore.SERVER_TIMESTAMP,
+                            'emailVerified': user.email_verified,
+                            'authProvider': 'google'
+                        })
+                        logger.info(f"Created Firestore profile for OAuth user: {user.uid}")
+                except Exception as e:
+                    logger.error(f"Error creating OAuth Firestore profile: {e}")
+            
             logger.info("Setting up new session data...")
             session['user'] = {
                 'uid': decoded_token['uid'],

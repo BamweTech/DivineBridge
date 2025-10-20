@@ -377,8 +377,17 @@
     }
 
     // Sign in with Google
+    let isGoogleSigningIn = false;
+    
     async function signInWithGoogle() {
+        // Prevent multiple popup requests
+        if (isGoogleSigningIn) {
+            console.log('Google sign-in already in progress...');
+            return;
+        }
+        
         try {
+            isGoogleSigningIn = true;
             setLoading(true);
             
             const provider = new firebase.auth.GoogleAuthProvider();
@@ -416,6 +425,7 @@
             console.error('Google login error:', error);
             showError(getErrorMessage(error));
         } finally {
+            isGoogleSigningIn = false;
             setLoading(false);
         }
     }
