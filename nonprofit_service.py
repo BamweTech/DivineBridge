@@ -203,13 +203,27 @@ class NonprofitService:
                 # Check if cached orgs need logo fetching (for old cache entries)
                 needs_logo_update = any(org.get('logo_url') is None for org in orgs)
                 if needs_logo_update:
-                    logger.info(f"Cached orgs missing logos, fetching logos now...")
-                    for org in orgs:
-                        if org.get('logo_url') is None:
-                            logo_url = self._fetch_and_cache_logo(org)
-                            org['logo_url'] = logo_url
-                    # Re-cache with updated logos (don't fetch again since we just did)
-                    self._cache_organizations(orgs, cache_path, fetch_logos=False)
+                    logger.info(f"Cached orgs missing logos, fetching in background...")
+                    
+                    # Fetch logos in background (don't block response)
+                    import threading
+                    orgs_copy = [dict(org) for org in orgs]  # Create a copy for background thread
+                    
+                    def fetch_logos_background():
+                        try:
+                            logger.info(f"Background: Updating logos for cached orgs...")
+                            for org in orgs_copy:
+                                if org.get('logo_url') is None:
+                                    logo_url = self._fetch_and_cache_logo(org)
+                                    org['logo_url'] = logo_url
+                            # Re-cache with updated logos
+                            self._cache_organizations(orgs_copy, cache_path, fetch_logos=False)
+                            logger.info(f"Background: Logo update complete for {location.get('city')}")
+                        except Exception as e:
+                            logger.error(f"Background logo update error: {e}")
+                    
+                    thread = threading.Thread(target=fetch_logos_background, daemon=True)
+                    thread.start()
                 
                 # Mark as local
                 for org in orgs:
