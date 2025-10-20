@@ -126,33 +126,49 @@ class NonprofitService:
                 random.seed(date)
                 selected_orgs.extend(random.sample(fallback, min(3, len(fallback))))
             
-            # 2. Get 2 disaster-specific organizations
+            # 2. Get 2 disaster-specific organizations (deduplicated)
             if prayer_disasters:
                 logger.info(f"Fetching disaster-specific organizations for {len(prayer_disasters)} disasters")
+                # Track already selected org names
+                selected_names = {org.get('name', '').lower() for org in selected_orgs}
+                
                 for disaster in prayer_disasters[:2]:  # Top 2 disasters
                     disaster_orgs = self._get_disaster_organizations(disaster)
                     if disaster_orgs:
-                        # Use date as seed
-                        random.seed(f"{date}-{disaster.get('type')}")
-                        selected_disaster = random.sample(disaster_orgs, min(1, len(disaster_orgs)))
-                        selected_orgs.extend(selected_disaster)
-                        logger.info(f"Selected organization for {disaster.get('type')} disaster")
+                        # Filter out duplicates
+                        disaster_orgs = [o for o in disaster_orgs if o.get('name', '').lower() not in selected_names]
+                        if disaster_orgs:
+                            # Use date as seed
+                            random.seed(f"{date}-{disaster.get('type')}")
+                            selected_disaster = random.sample(disaster_orgs, min(1, len(disaster_orgs)))
+                            selected_orgs.extend(selected_disaster)
+                            # Update selected names
+                            selected_names.update(org.get('name', '').lower() for org in selected_disaster)
+                            logger.info(f"Selected organization for {disaster.get('type')} disaster")
             
             # 3. Fill to 5 if needed with more general orgs or fallback
             if len(selected_orgs) < 5:
                 needed = 5 - len(selected_orgs)
                 logger.info(f"Need {needed} more organizations to reach 5")
                 
+                # Track selected org names for deduplication
+                selected_names = {org.get('name', '').lower() for org in selected_orgs}
+                
                 if general_orgs:
-                    remaining = [o for o in general_orgs if o not in selected_orgs]
+                    # Deduplicate by organization name
+                    remaining = [o for o in general_orgs if o.get('name', '').lower() not in selected_names]
                     if remaining:
                         random.seed(f"{date}-fill")
-                        selected_orgs.extend(random.sample(remaining, min(needed, len(remaining))))
+                        to_add = random.sample(remaining, min(needed, len(remaining)))
+                        selected_orgs.extend(to_add)
+                        # Update selected names
+                        selected_names.update(org.get('name', '').lower() for org in to_add)
                 
                 # Still need more? Use fallback
                 if len(selected_orgs) < 5:
                     fallback = self._get_fallback_organizations()
-                    remaining_fallback = [o for o in fallback if o not in selected_orgs]
+                    # Deduplicate by organization name
+                    remaining_fallback = [o for o in fallback if o.get('name', '').lower() not in selected_names]
                     random.seed(f"{date}-fallback")
                     needed = 5 - len(selected_orgs)
                     selected_orgs.extend(random.sample(remaining_fallback, min(needed, len(remaining_fallback))))
