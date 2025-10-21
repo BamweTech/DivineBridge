@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app, send_file
 from datetime import datetime, timedelta
 import logging
+import os
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from input_validation import validate_request, sanitize_string
@@ -8,6 +9,13 @@ from auth_decorators import verify_cloud_scheduler
 
 logger = logging.getLogger(__name__)
 prayer_bp = Blueprint('prayer', __name__)
+
+# Determine which storage handler to use
+USE_LOCAL_STORAGE = os.getenv('USE_LOCAL_STORAGE', 'false').lower() == 'true'
+if USE_LOCAL_STORAGE:
+    logger.info("Prayer BP: Using local storage for development")
+else:
+    logger.info("Prayer BP: Using cloud storage for production")
 
 # Initialize rate limiter
 limiter = Limiter(
@@ -256,22 +264,30 @@ def submit_prayer_request():
         if not title or not content:
             return jsonify({'error': 'Title and content are required'}), 400
         
-        # Create initial simple summary (instant - for immediate response)
-        logger.info(f"Creating initial summary for prayer request: {title}")
-        sentences = content.split('.')
-        if len(sentences) > 1 and len(sentences[0]) < 120:
-            initial_summary = '.'.join(sentences[:2]).strip() + '.'
-        else:
-            initial_summary = content[:117] + "..." if len(content) > 120 else content
+        # AI Content Moderation + Summary Generation (combined call)
+        logger.info(f"Moderating and summarizing prayer request: {title}")
+        from content_moderator import get_content_moderator
+        
+        moderator = get_content_moderator()
+        approved, rejection_reason, ai_summary = moderator.moderate_content(title, content, "prayer request")
+        
+        # If not approved, return error with reason
+        if not approved:
+            logger.warning(f"Prayer request rejected: {rejection_reason}")
+            return jsonify({
+                'error': 'Content not approved',
+                'reason': rejection_reason,
+                'approved': False
+            }), 400
         
         # Get user_id from request body (sent by frontend)
         user_id = data.get('user_id', '')
         
-        # Create prayer request data with initial simple summary
+        # Create prayer request data with AI summary
         prayer_request = {
             'title': title,
             'content': content,
-            'summary': initial_summary,
+            'summary': ai_summary if ai_summary else content[:120] + '...',
             'user_id': user_id,
             'created_at': datetime.now().isoformat(),
             'date': datetime.now().strftime('%Y-%m-%d'),
@@ -280,46 +296,21 @@ def submit_prayer_request():
                 'prayers': 0,
                 'created_at': datetime.now().isoformat()
             },
-            'summary_status': 'generating'  # Flag to indicate AI summary is being generated
+            'moderation': {
+                'approved': approved,
+                'moderated_at': datetime.now().isoformat(),
+                'ai_moderated': True
+            }
         }
         
-        # Save prayer request to storage (instant response)
+        # Save prayer request to storage with AI-generated summary
         if current_app.storage_handler.save_prayer_request(prayer_request):
             request_id = prayer_request.get('id')
             
-            # Generate AI summary in background thread (non-blocking)
-            import threading
-            from flask import copy_current_request_context
-            
-            # Get storage handler and app before thread starts
-            storage_handler = current_app.storage_handler
-            
-            @copy_current_request_context
-            def generate_ai_summary_background():
-                try:
-                    logger.info(f"Background: Generating AI summary for {request_id}")
-                    from prayer_summary_generator import get_summary_generator
-                    summary_generator = get_summary_generator()
-                    ai_summary = summary_generator.generate_summary(title, content)
-                    
-                    # Update the prayer request with AI summary
-                    prayer_request['summary'] = ai_summary
-                    prayer_request['summary_status'] = 'completed'
-                    storage_handler.update_prayer_request(request_id, prayer_request)
-                    logger.info(f"Background: AI summary generated and saved for {request_id}")
-                except Exception as e:
-                    logger.error(f"Background: Error generating AI summary: {e}")
-                    logger.exception("Full traceback:")
-                    # Keep the simple summary if AI fails
-            
-            # Start background thread
-            thread = threading.Thread(target=generate_ai_summary_background)
-            thread.daemon = True
-            thread.start()
-            
             return jsonify({
                 'message': 'Prayer request submitted successfully',
-                'id': request_id
+                'id': request_id,
+                'approved': True
             }), 200
         else:
             return jsonify({'error': 'Failed to save prayer request'}), 500

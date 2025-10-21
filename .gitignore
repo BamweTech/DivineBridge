@@ -53,6 +53,9 @@ divinebridge-db42f07139c5.json
 # Flask session files
 flask_session/
 
+# Local storage for testing
+local_storage_data/
+
 # Design assets (optional - can be committed if needed)
 # assets/
 

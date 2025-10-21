@@ -418,9 +418,9 @@
                     <div class="stat-sublabel">People who prayed for you</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" id="days-active">0</div>
-                    <div class="stat-label">Days Active</div>
-                    <div class="stat-sublabel">Since joining the community</div>
+                    <div class="stat-value" id="testimonies-shared">0</div>
+                    <div class="stat-label">Testimonies Shared</div>
+                    <div class="stat-sublabel">Stories of God's faithfulness</div>
                 </div>
             </div>
 
@@ -587,12 +587,6 @@
             if (joinedEl) joinedEl.textContent = `Member since ${memberSince}`;
             console.log('Member since:', memberSince);
 
-            // Calculate days active
-            const daysActive = calculateDaysActive(createdAt);
-            const daysEl = document.getElementById('days-active');
-            if (daysEl) daysEl.textContent = daysActive;
-            console.log('Days active:', daysActive);
-
             // Load user statistics from localStorage
             loadUserStats(user.uid);
             
@@ -749,11 +743,23 @@
                 document.getElementById('prayed-for-count').textContent = 0;
                 document.getElementById('received-prayers-count').textContent = 0;
             }
+            
+            // Load testimony count separately
+            const testimonyResponse = await fetch('/api/testimony/testimonies?limit=100');
+            if (testimonyResponse.ok) {
+                const testimonyData = await testimonyResponse.json();
+                const myTestimonies = testimonyData.testimonies.filter(t => t.user_id === userId);
+                document.getElementById('testimonies-shared').textContent = myTestimonies.length;
+                console.log('✅ Loaded testimony count:', myTestimonies.length);
+            } else {
+                document.getElementById('testimonies-shared').textContent = 0;
+            }
         } catch (error) {
             console.error('Error loading user stats:', error);
             document.getElementById('requests-count').textContent = 0;
             document.getElementById('prayed-for-count').textContent = 0;
             document.getElementById('received-prayers-count').textContent = 0;
+            document.getElementById('testimonies-shared').textContent = 0;
         }
     }
 

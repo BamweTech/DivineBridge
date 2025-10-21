@@ -265,6 +265,44 @@
             padding: 2rem 1rem;
             gap: 1.5rem;
         }
+
+        /* Larger touch targets for mobile */
+        .prayer-card {
+            min-height: 200px;
+            padding: 1.75rem;
+            touch-action: manipulation;
+        }
+
+        .icon-button {
+            min-height: 48px;
+            min-width: 48px;
+            padding: 12px 20px;
+        }
+
+        .button-label {
+            font-size: 0.9rem;
+        }
+
+        /* Larger tap area for expand hint */
+        .expand-hint {
+            font-size: 1.5rem;
+            padding: 8px;
+        }
+
+        /* Make buttons more thumb-friendly */
+        .pray-button, .share-button {
+            min-height: 44px;
+            font-size: 1rem;
+            padding: 12px 24px;
+        }
+
+        /* Improved form inputs for mobile */
+        input[type="text"],
+        textarea,
+        select {
+            font-size: 16px !important; /* Prevents zoom on iOS */
+            padding: 14px;
+        }
     }
 
     .prayer-card {
@@ -309,6 +347,31 @@
         /* Inherits styling from .prayer-card above */
         transform-style: preserve-3d;
         position: relative;
+    }
+
+    .prayer-card.testimony {
+        /* Same styling as prayer-request, but with gold border */
+        border: 2px solid rgba(245, 197, 66, 0.3);
+    }
+
+    .prayer-card.testimony:hover {
+        /* Same hover effect as prayer-request, but with gold border */
+        border-color: var(--gold);
+        box-shadow: 0 8px 30px rgba(245, 197, 66, 0.15);
+    }
+
+    .testimony-badge {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: var(--gold);
+        color: var(--black);
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
 
     .prayer-card.prayer-request.collapsed {
@@ -383,22 +446,28 @@
     }
 
     .expand-hint {
-        color: #666;
-        font-size: 1.2rem;
-        opacity: 0.6;
+        color: #718096;
+        font-size: 0.85rem;
+        opacity: 0.5;
         position: absolute;
-        bottom: 1rem;
+        top: 1rem;
         right: 1rem;
         transition: all 0.3s ease;
+        cursor: pointer;
     }
 
     .prayer-card:hover .expand-hint {
-        opacity: 1;
-        transform: translateX(3px);
+        opacity: 0.8;
     }
 
-    .prayer-request.expanded .expand-hint {
-        display: none;
+    .prayer-card.expanded .expand-hint {
+        content: '▲';
+        transform: rotate(180deg);
+    }
+
+    .prayer-request.expanded .expand-hint,
+    .testimony.expanded .expand-hint {
+        content: '▲';
     }
 
     .prayer-meta {
@@ -438,6 +507,38 @@
     .pray-button:hover {
         transform: translateY(-2px);
         box-shadow: 0 6px 16px rgba(245, 197, 66, 0.4);
+    }
+
+    .share-button-icon {
+        position: absolute;
+        bottom: 1rem;
+        right: 1rem;
+        background: transparent;
+        color: #718096;
+        border: none;
+        width: 24px;
+        height: 24px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+        opacity: 0.6;
+    }
+
+    .share-button-icon:hover {
+        color: var(--blue);
+        opacity: 1;
+        transform: translateY(-2px);
+    }
+
+    .card-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-top: 1rem;
     }
 
     .pray-button:active {
@@ -830,6 +931,65 @@
     .submit-btn:disabled {
         background: #ccc;
         cursor: not-allowed;
+        opacity: 0.7;
+    }
+
+    /* Loading spinner */
+    .spinner {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(255,255,255,.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 0.6s linear infinite;
+        margin-right: 8px;
+        vertical-align: middle;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .btn-loading {
+        position: relative;
+        pointer-events: none;
+    }
+
+    /* Character counter */
+    .char-counter {
+        float: right;
+        font-size: 0.85rem;
+        color: #718096;
+        font-weight: normal;
+    }
+
+    .char-counter.warning {
+        color: #f5c542;
+    }
+
+    .char-counter.danger {
+        color: #e53e3e;
+        font-weight: 600;
+    }
+
+    /* Success animation */
+    @keyframes celebrateSuccess {
+        0% {
+            transform: scale(0.8);
+            opacity: 0;
+        }
+        50% {
+            transform: scale(1.1);
+        }
+        100% {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    .success-message.animated {
+        animation: celebrateSuccess 0.5s ease-out;
     }
 
     .success-message {
@@ -936,6 +1096,12 @@
                         <line x1="5" y1="12" x2="19" y2="12"></line>
                     </svg>
                     <span class="button-label">Request Prayer</span>
+                </button>
+                <button id="add-testimony-btn" class="icon-button" title="Share Thanksgiving" style="background: linear-gradient(135deg, #f5c542 0%, #f4d03f 100%);">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+                    </svg>
+                    <span class="button-label">Thanksgiving</span>
                 </button>
             </div>
         </div>
@@ -1092,78 +1258,12 @@
             const data = await response.json();
             
             if (data.prayers) {
-                const prayersList = document.getElementById('prayers-list');
-                if (prayersList && data.prayers) {
-                    // Only show prayer requests (exclude daily prayer - has no title and is generated)
-                    const prayerRequests = data.prayers.filter(p => p.title && p.source !== 'generated');
-                    
-                    // Get user ID (will be available after Firebase loads)
-                    const userId = currentUser ? currentUser.uid : getCachedUserId();
-                    console.log('Initial load - User ID:', userId);
-                    
-                    // Check backend cache status
-                    console.log('🔍 FILTERING CHECK:');
-                    console.log(`   Total prayer requests: ${prayerRequests.length}`);
-                    console.log(`   User ID: ${userId}`);
-                    console.log(`   Cache loaded: ${userPrayedPrayersCache !== null}`);
-                    console.log(`   Prayers in cache: ${userPrayedPrayersCache ? userPrayedPrayersCache.length : 0}`);
-                    if (userPrayedPrayersCache && userPrayedPrayersCache.length > 0) {
-                        console.log(`   Prayer IDs in cache:`, userPrayedPrayersCache);
-                    }
-                    
-                    // Filter out prayers user has already prayed for (using backend cache)
-                    const availablePrayers = userId 
-                        ? prayerRequests.filter(p => {
-                            const hasPrayed = hasUserPrayedForPrayerSync(userId, p.id);
-                            console.log(`   Checking prayer "${p.title}" (ID: ${p.id}): ${hasPrayed ? '❌ SKIP' : '✅ INCLUDE'}`);
-                            if (hasPrayed) {
-                                console.log(`      → Found in cache! Will filter out.`);
-                            }
-                            return !hasPrayed;
-                          })
-                        : prayerRequests;
-                    
-                    console.log(`Initial load - Available prayers: ${availablePrayers.length} (filtered from ${prayerRequests.length})`);
-                    
-                    // Get 10 random prayer requests
-                    const shuffled = availablePrayers.sort(() => 0.5 - Math.random());
-                    const randomRequests = shuffled.slice(0, 10);
-                    const displayPrayers = randomRequests;
-                    
-                    // Check if no prayers available
-                    if (displayPrayers.length === 0) {
-                        console.log('⭐ No prayers available - showing completion message');
-                        showCompletionMessage();
-                        return;
-                    }
-                    
-                    prayersList.innerHTML = displayPrayers.map(prayer => {
-                        const title = prayer.title || 'Prayer Request';
-                        const summary = prayer.summary || prayer.content.substring(0, 100) + '...';
-                        const analytics = prayer.analytics || {views: 0, prayers: 0};
-                        
-                        return `
-                            <div class="prayer-card prayer-request collapsed" data-prayer-id="${prayer.id}" onclick="togglePrayerCard(this, event)">
-                                <div class="prayer-title">${title}</div>
-                                <div class="prayer-summary">${summary}</div>
-                                <div class="prayer-full-content" style="display: none; white-space: pre-line; margin-top: 1rem;">${prayer.content}</div>
-                                <div class="prayer-stats">
-                                    <span class="stat-item"><span class="stat-value">${analytics.views}</span> views</span>
-                                    <span class="stat-item"><span class="stat-value">${analytics.prayers}</span> prayers</span>
-                                </div>
-            <div class="prayer-meta">
-                                    <span class="prayer-date">${new Date(prayer.created_at).toLocaleDateString()}</span>
-            </div>
-                                <span class="expand-hint">↗</span>
-                                <button class="pray-button" style="display: none;" onclick="prayForThis(event, '${prayer.id}')">
-                                    I Prayed for This
-                </button>
-                            </div>
-                        `;
-                    }).join('');
-                    
-                    prayersList.style.display = 'grid';
-                }
+                // Use the displayPrayers function which properly combines prayers and testimonies
+                // It will handle all filtering internally
+                console.log('🎨 Initial load: calling displayPrayers() to render prayers and testimonies');
+                console.log(`   Total prayers from API: ${data.prayers.length}`);
+                console.log(`   Cached testimonies: ${cachedTestimonies.length}`);
+                displayPrayers(data.prayers);
             }
         } catch (error) {
             console.error('Error loading prayers:', error);
@@ -1255,14 +1355,54 @@
         </div>
         <form id="modal-prayer-form" class="prayer-request-form">
             <div class="form-group">
-                <label for="modal-prayer-title">Title</label>
-                <input type="text" id="modal-prayer-title" name="title" required placeholder="Enter prayer title">
-    </div>
+                <label for="modal-prayer-title">Title <span class="char-counter" id="prayer-title-counter">0/200</span></label>
+                <input type="text" id="modal-prayer-title" name="title" required placeholder="Enter prayer title" maxlength="200">
+	</div>
             <div class="form-group">
-                <label for="modal-prayer-content">Prayer Request</label>
-                <textarea id="modal-prayer-content" name="content" required placeholder="Share your prayer request..."></textarea>
+                <label for="modal-prayer-content">Prayer Request <span class="char-counter" id="prayer-content-counter">0/2000</span></label>
+                <textarea id="modal-prayer-content" name="content" required placeholder="Share your prayer request..." maxlength="2000"></textarea>
             </div>
             <button type="submit" class="submit-btn">Request Prayer</button>
+        </form>
+    </div>
+</div>
+
+<!-- Thanksgiving/Testimony Modal -->
+<div id="testimony-modal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="close-testimony-modal">&times;</span>
+        <p style="color: #666; margin-bottom: 0.5rem; margin-top: 0; font-size: 0.9rem; font-style: italic;">"I will praise the name of God with a song; I will magnify him with thanksgiving." - Psalm 69:30</p>
+        <p style="color: #666; margin-bottom: 1.5rem; font-size: 0.95rem;">Share how God has blessed you and answered your prayers</p>
+        <div id="testimony-success-message" class="success-message" style="display: none;">
+            Your testimony has been shared! Thank you for glorifying God! 🙏
+        </div>
+        <div id="testimony-error-message" class="error-message" style="display: none;">
+            There was an error submitting your testimony. Please try again.
+        </div>
+        <form id="testimony-form" class="prayer-request-form">
+            <div class="form-group">
+                <label for="testimony-category">Category</label>
+                <select id="testimony-category" name="category" required style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 15px;">
+                    <option value="">Select a category...</option>
+                    <option value="answered_prayer">🙏 Answered Prayer</option>
+                    <option value="healing">💚 Healing</option>
+                    <option value="provision">💰 Provision</option>
+                    <option value="relationships">🤝 Relationships</option>
+                    <option value="spiritual_growth">📖 Spiritual Growth</option>
+                    <option value="protection">🛡️ Protection</option>
+                    <option value="guidance">🧭 Guidance</option>
+                    <option value="other">✨ Other Blessing</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="testimony-title">Title <span class="char-counter" id="testimony-title-counter">0/200</span></label>
+                <input type="text" id="testimony-title" name="title" required placeholder="What did God do?" maxlength="200">
+            </div>
+            <div class="form-group">
+                <label for="testimony-content">Your Testimony <span class="char-counter" id="testimony-content-counter">0/2000</span></label>
+                <textarea id="testimony-content" name="content" required placeholder="Share your story of God's faithfulness, answered prayer, or blessing..." rows="6" maxlength="2000"></textarea>
+            </div>
+            <button type="submit" class="submit-btn" style="background: linear-gradient(135deg, #f5c542 0%, #f4d03f 100%); color: var(--black);">Share Thanksgiving</button>
         </form>
     </div>
 </div>
@@ -1276,13 +1416,17 @@
 
     // Toggle prayer card expansion with book page-turn animation
     function togglePrayerCard(cardElement, event) {
-        // Prevent toggle if clicking on the pray button
-        if (event.target.classList.contains('pray-button')) {
+        // Prevent toggle if clicking on buttons
+        if (event.target.classList.contains('pray-button') || 
+            event.target.classList.contains('share-button-icon')) {
             return;
         }
 
         const prayerId = cardElement.dataset.prayerId;
         const isExpanded = cardElement.classList.contains('expanded');
+        const cardActions = cardElement.querySelector('.card-actions');
+        const prayButton = cardElement.querySelector('.pray-button');
+        const expandHint = cardElement.querySelector('.expand-hint');
         
         if (isExpanded) {
             // Collapse
@@ -1290,14 +1434,18 @@
             cardElement.classList.add('collapsed');
             cardElement.querySelector('.prayer-summary').style.display = 'block';
             cardElement.querySelector('.prayer-full-content').style.display = 'none';
-            cardElement.querySelector('.pray-button').style.display = 'none';
+            if (cardActions) cardActions.style.display = 'none';
+            if (prayButton) prayButton.style.display = 'none';
+            if (expandHint) expandHint.textContent = '▼';
         } else {
             // Expand with page-flip animation
             cardElement.classList.remove('collapsed');
             cardElement.classList.add('expanded');
             cardElement.querySelector('.prayer-summary').style.display = 'none';
             cardElement.querySelector('.prayer-full-content').style.display = 'block';
-            cardElement.querySelector('.pray-button').style.display = 'block';
+            if (cardActions) cardActions.style.display = 'flex';
+            if (prayButton) prayButton.style.display = 'block';
+            if (expandHint) expandHint.textContent = '▲';
             
             // Track view (only once per prayer per user)
             if (currentUser && !hasUserReadPrayer(currentUser.uid, prayerId)) {
@@ -1573,8 +1721,9 @@
     
     // Initialize modal buttons immediately
     document.addEventListener('DOMContentLoaded', function() {
-        console.log('DOM loaded, initializing modal...');
+        console.log('DOM loaded, initializing modals...');
         initializeModal();
+        initializeTestimonyModal();
     });
 
     // Initialize page when DOM is ready
@@ -1625,9 +1774,12 @@
                 
                 // Always show prayers, whether logged in or not
                 showPrayersContent();
-                updateDebug('showPrayersContent called, now loading prayers...');
-                // Use loadInitialPrayers which has user filtering
-                loadInitialPrayers();
+                updateDebug('showPrayersContent called, now loading content...');
+                // Load testimonies first, then prayers (so they can be combined)
+                loadTestimonies().then(() => {
+                    // Use loadInitialPrayers which has user filtering
+                    loadInitialPrayers();
+                });
             });
         } catch (error) {
             updateDebug(`Error setting up auth listener: ${error.message}. Retrying...`);
@@ -1734,12 +1886,13 @@
         const shuffled = availablePrayers.sort(() => 0.5 - Math.random());
         const displayPrayers = shuffled.slice(0, 10);
         
-        if (displayPrayers.length === 0) {
+        if (displayPrayers.length === 0 && cachedTestimonies.length === 0) {
             showCompletionMessage();
             return;
         }
 
-        prayersList.innerHTML = displayPrayers.map(prayer => {
+        // Create prayer cards HTML
+        const prayerCardsHTML = displayPrayers.map(prayer => {
             const title = prayer.title;
             const summary = prayer.summary || prayer.content.substring(0, 100) + '...';
             const analytics = prayer.analytics || {views: 0, prayers: 0};
@@ -1750,20 +1903,58 @@
                     <div class="prayer-title">${escapeHtml(title)}</div>
                     <div class="prayer-summary">${escapeHtml(summary)}</div>
                     <div class="prayer-full-content" style="display: none; white-space: pre-line; margin-top: 1rem;">${escapeHtml(prayer.content)}</div>
+                    <span class="expand-hint">▼</span>
                     <div class="prayer-stats">
                         <span class="stat-item"><span class="stat-value">${analytics.views}</span> views</span>
                         <span class="stat-item"><span class="stat-value">${analytics.prayers}</span> prayers</span>
                     </div>
-                    <div class="prayer-meta">
-                        <span class="prayer-date">${formatDate(date)}</span>
+                    <div class="card-actions" style="display: none;">
+                        <button class="pray-button" onclick="prayForThis(event, '${prayer.id}')">
+                            I Prayed for This
+                        </button>
+                        <button class="share-button-icon" onclick="sharePrayerRequest(event, '${prayer.id}', '${escapeHtml(title).replace(/'/g, "\\'")}')">
+                            ↗
+                        </button>
                     </div>
-                    <span class="expand-hint">↗</span>
-                    <button class="pray-button" style="display: none;" onclick="prayForThis(event, '${prayer.id}')">
-                        I Prayed for This
+                </div>
+            `;
+        }).join('');
+        
+        // Create testimony cards HTML
+        const testimonyCardsHTML = cachedTestimonies.map(testimony => {
+            const title = testimony.title || 'Thanksgiving';
+            const summary = testimony.content ? testimony.content.substring(0, 150) + (testimony.content.length > 150 ? '...' : '') : '';
+            const category = testimony.category || 'other';
+            
+            // Category emoji and label mapping
+            const categoryMap = {
+                'answered_prayer': '🙏 Answered Prayer',
+                'healing': '💚 Healing',
+                'provision': '💰 Provision',
+                'relationships': '🤝 Relationships',
+                'spiritual_growth': '📖 Spiritual Growth',
+                'protection': '🛡️ Protection',
+                'guidance': '🧭 Guidance',
+                'other': '✨ Blessing'
+            };
+            const categoryLabel = categoryMap[category] || '✨ Blessing';
+            
+            return `
+                <div class="prayer-card testimony collapsed" data-testimony-id="${testimony.id}" onclick="toggleTestimonyCard(this, event)">
+                    <div style="font-size: 0.85rem; color: #718096; margin-bottom: 0.5rem;">${categoryLabel}</div>
+                    <div class="prayer-title">${escapeHtml(title)}</div>
+                    <div class="prayer-summary">${escapeHtml(summary)}</div>
+                    <div class="prayer-full-content" style="display: none; white-space: pre-line; margin-top: 1rem;">${escapeHtml(testimony.content)}</div>
+                    <span class="expand-hint">▼</span>
+                    <button class="share-button-icon" style="display: none;" onclick="shareTestimony(event, '${testimony.id}', '${escapeHtml(title).replace(/'/g, "\\'")}', '${categoryLabel}')">
+                        ↗
                     </button>
                 </div>
             `;
         }).join('');
+        
+        // Combine and display both
+        prayersList.innerHTML = prayerCardsHTML + testimonyCardsHTML;
     }
 
     function showEmptyState() {
@@ -1811,7 +2002,6 @@
                 // Check if user is logged in
                 if (!currentUser) {
                     console.log('User not logged in, showing prompt');
-                    // Show login prompt
                     if (confirm('Please sign in to request prayer. Would you like to sign in now?')) {
                         window.location.href = '/login?redirect=/prayers';
                     }
@@ -1835,7 +2025,6 @@
                 // Check if user is logged in
                 if (!currentUser) {
                     console.log('User not logged in, showing prompt');
-                    // Show login prompt
                     if (confirm('Please sign in to request prayer. Would you like to sign in now?')) {
                         window.location.href = '/login?redirect=/prayers';
                     }
@@ -1863,6 +2052,44 @@
             }
         });
 
+        // Character counters for prayer form
+        const prayerTitleInput = document.getElementById('modal-prayer-title');
+        const prayerContentInput = document.getElementById('modal-prayer-content');
+        const prayerTitleCounter = document.getElementById('prayer-title-counter');
+        const prayerContentCounter = document.getElementById('prayer-content-counter');
+
+        if (prayerTitleInput && prayerTitleCounter) {
+            prayerTitleInput.addEventListener('input', function() {
+                const length = this.value.length;
+                const max = 200;
+                prayerTitleCounter.textContent = `${length}/${max}`;
+                
+                // Change color based on length
+                prayerTitleCounter.classList.remove('warning', 'danger');
+                if (length > max * 0.9) {
+                    prayerTitleCounter.classList.add('danger');
+                } else if (length > max * 0.7) {
+                    prayerTitleCounter.classList.add('warning');
+                }
+            });
+        }
+
+        if (prayerContentInput && prayerContentCounter) {
+            prayerContentInput.addEventListener('input', function() {
+                const length = this.value.length;
+                const max = 2000;
+                prayerContentCounter.textContent = `${length}/${max}`;
+                
+                // Change color based on length
+                prayerContentCounter.classList.remove('warning', 'danger');
+                if (length > max * 0.9) {
+                    prayerContentCounter.classList.add('danger');
+                } else if (length > max * 0.7) {
+                    prayerContentCounter.classList.add('warning');
+                }
+            });
+        }
+
         // Handle form submission
         modalForm.addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -1882,8 +2109,10 @@
             }
 
             const submitBtn = modalForm.querySelector('.submit-btn');
+            const originalText = submitBtn.textContent;
             submitBtn.disabled = true;
-            submitBtn.textContent = 'Submitting...';
+            submitBtn.classList.add('btn-loading');
+            submitBtn.innerHTML = '<span class="spinner"></span>Submitting...';
 
             try {
                 const response = await fetch('/api/prayer/request', {
@@ -1898,6 +2127,8 @@
                     })
                 });
 
+                const data = await response.json();
+                
                 if (response.ok) {
                     showModalSuccess();
                     modalForm.reset();
@@ -1913,14 +2144,19 @@
                         loadPrayers();
                     }, 2000);
                 } else {
-                    const errorData = await response.json();
-                    showModalError(errorData.error || 'Failed to submit prayer request.');
+                    // Check if it's a moderation rejection
+                    if (data.approved === false && data.reason) {
+                        showModalRejection(data.reason);
+                    } else {
+                        showModalError(data.error || 'Failed to submit prayer request.');
+                    }
                 }
             } catch (error) {
-                showModalError('Network error. Please try again.');
+                showModalError('Network error. Please check your connection and try again.');
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Request Prayer';
+                submitBtn.classList.remove('btn-loading');
+                submitBtn.textContent = originalText;
             }
         });
     }
@@ -1928,8 +2164,15 @@
     function showModalSuccess() {
         const successMsg = document.getElementById('modal-success-message');
         const errorMsg = document.getElementById('modal-error-message');
+        const rejectionMsg = document.getElementById('modal-rejection-message');
+        
+        successMsg.classList.add('animated');
         successMsg.style.display = 'block';
         errorMsg.style.display = 'none';
+        if (rejectionMsg) rejectionMsg.style.display = 'none';
+        
+        // Remove animation class after it completes
+        setTimeout(() => successMsg.classList.remove('animated'), 500);
     }
 
     function showModalError(message) {
@@ -1939,15 +2182,362 @@
         successMsg.style.display = 'none';
         errorMsg.style.display = 'block';
     }
+    
+    function showModalRejection(reason) {
+        const errorMsg = document.getElementById('modal-error-message');
+        const successMsg = document.getElementById('modal-success-message');
+        
+        errorMsg.innerHTML = `
+            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <div style="font-weight: 600; color: #856404; margin-bottom: 0.5rem;">⚠️ Content Not Approved</div>
+                <div style="color: #856404; font-size: 0.9rem; line-height: 1.6;">${reason}</div>
+                <div style="margin-top: 0.75rem; font-size: 0.85rem; color: #856404;">
+                    Please review our <a href="/terms-of-service#content-guidelines" target="_blank" style="color: #856404; text-decoration: underline;">Content Guidelines</a> and edit your submission.
+                </div>
+            </div>
+        `;
+        
+        successMsg.style.display = 'none';
+        errorMsg.style.display = 'block';
+    }
 
     function resetModal() {
         const successMsg = document.getElementById('modal-success-message');
         const errorMsg = document.getElementById('modal-error-message');
         const modalForm = document.getElementById('modal-prayer-form');
+        const rejectionMsg = document.getElementById('modal-rejection-message');
         
         successMsg.style.display = 'none';
         errorMsg.style.display = 'none';
+        if (rejectionMsg) rejectionMsg.style.display = 'none';
         modalForm.reset();
+        
+        // Reset character counters
+        const prayerTitleCounter = document.getElementById('prayer-title-counter');
+        const prayerContentCounter = document.getElementById('prayer-content-counter');
+        if (prayerTitleCounter) prayerTitleCounter.textContent = '0/200';
+        if (prayerContentCounter) prayerContentCounter.textContent = '0/2000';
+    }
+
+    // Testimony Modal Functions
+    function initializeTestimonyModal() {
+        const modal = document.getElementById('testimony-modal');
+        const addTestimonyBtn = document.getElementById('add-testimony-btn');
+        const closeBtn = document.getElementById('close-testimony-modal');
+        const testimonyForm = document.getElementById('testimony-form');
+
+        if (!modal || !closeBtn || !testimonyForm) {
+            return;
+        }
+
+        // Open modal when button is clicked
+        if (addTestimonyBtn) {
+            addTestimonyBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Check if user is logged in
+                if (!currentUser) {
+                    if (confirm('Please sign in to share your testimony. Would you like to sign in now?')) {
+                        window.location.href = '/login?redirect=/prayers';
+                    }
+                    return;
+                }
+                
+                modal.style.display = 'block';
+                resetTestimonyModal();
+            });
+        }
+
+        // Close modal
+        closeBtn.addEventListener('click', function() {
+            modal.style.display = 'none';
+            resetTestimonyModal();
+        });
+
+        // Close modal when clicking outside
+        window.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+                resetTestimonyModal();
+            }
+        });
+
+        // Character counters for testimony form
+        const testimonyTitleInput = document.getElementById('testimony-title');
+        const testimonyContentInput = document.getElementById('testimony-content');
+        const testimonyTitleCounter = document.getElementById('testimony-title-counter');
+        const testimonyContentCounter = document.getElementById('testimony-content-counter');
+
+        if (testimonyTitleInput && testimonyTitleCounter) {
+            testimonyTitleInput.addEventListener('input', function() {
+                const length = this.value.length;
+                const max = 200;
+                testimonyTitleCounter.textContent = `${length}/${max}`;
+                
+                // Change color based on length
+                testimonyTitleCounter.classList.remove('warning', 'danger');
+                if (length > max * 0.9) {
+                    testimonyTitleCounter.classList.add('danger');
+                } else if (length > max * 0.7) {
+                    testimonyTitleCounter.classList.add('warning');
+                }
+            });
+        }
+
+        if (testimonyContentInput && testimonyContentCounter) {
+            testimonyContentInput.addEventListener('input', function() {
+                const length = this.value.length;
+                const max = 2000;
+                testimonyContentCounter.textContent = `${length}/${max}`;
+                
+                // Change color based on length
+                testimonyContentCounter.classList.remove('warning', 'danger');
+                if (length > max * 0.9) {
+                    testimonyContentCounter.classList.add('danger');
+                } else if (length > max * 0.7) {
+                    testimonyContentCounter.classList.add('warning');
+                }
+            });
+        }
+
+        // Handle form submission
+        testimonyForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = testimonyForm.querySelector('.submit-btn');
+            const originalText = submitBtn.textContent;
+            
+            try {
+                submitBtn.disabled = true;
+                submitBtn.classList.add('btn-loading');
+                submitBtn.innerHTML = '<span class="spinner"></span>Sharing...';
+
+                const category = document.getElementById('testimony-category').value;
+                const title = document.getElementById('testimony-title').value;
+                const content = document.getElementById('testimony-content').value;
+
+                // Get user info for tracking
+                const userId = currentUser ? currentUser.uid : '';
+                const userEmail = currentUser ? currentUser.email : '';
+
+                const response = await fetch('/api/testimony/submit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        category: category,
+                        title: title,
+                        content: content,
+                        user_id: userId,
+                        user_email: userEmail
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showTestimonySuccess();
+                    setTimeout(() => {
+                        modal.style.display = 'none';
+                        resetTestimonyModal();
+                        // Reload content to show the new testimony
+                        loadTestimonies().then(() => loadInitialPrayers());
+                    }, 2000);
+                } else {
+                    // Check if it's a moderation rejection
+                    if (data.approved === false && data.reason) {
+                        showTestimonyRejection(data.reason);
+                    } else {
+                        showTestimonyError(data.error || 'Failed to submit testimony');
+                    }
+                }
+            } catch (error) {
+                console.error('Error submitting testimony:', error);
+                showTestimonyError('Network error. Please check your connection and try again.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('btn-loading');
+                submitBtn.textContent = originalText;
+            }
+        });
+    }
+
+    function showTestimonySuccess() {
+        const successMsg = document.getElementById('testimony-success-message');
+        const errorMsg = document.getElementById('testimony-error-message');
+        const rejectionMsg = document.getElementById('testimony-rejection-message');
+        
+        successMsg.classList.add('animated');
+        successMsg.style.display = 'block';
+        errorMsg.style.display = 'none';
+        if (rejectionMsg) rejectionMsg.style.display = 'none';
+        
+        // Remove animation class after it completes
+        setTimeout(() => successMsg.classList.remove('animated'), 500);
+    }
+
+    function showTestimonyError(message) {
+        const successMsg = document.getElementById('testimony-success-message');
+        const errorMsg = document.getElementById('testimony-error-message');
+        errorMsg.textContent = message;
+        successMsg.style.display = 'none';
+        errorMsg.style.display = 'block';
+    }
+    
+    function showTestimonyRejection(reason) {
+        const errorMsg = document.getElementById('testimony-error-message');
+        const successMsg = document.getElementById('testimony-success-message');
+        
+        errorMsg.innerHTML = `
+            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <div style="font-weight: 600; color: #856404; margin-bottom: 0.5rem;">⚠️ Testimony Not Approved</div>
+                <div style="color: #856404; font-size: 0.9rem; line-height: 1.6;">${reason}</div>
+                <div style="margin-top: 0.75rem; font-size: 0.85rem; color: #856404;">
+                    Please review our <a href="/terms-of-service#content-guidelines" target="_blank" style="color: #856404; text-decoration: underline;">Content Guidelines</a> and edit your testimony.
+                </div>
+            </div>
+        `;
+        
+        successMsg.style.display = 'none';
+        errorMsg.style.display = 'block';
+    }
+
+    function resetTestimonyModal() {
+        const successMsg = document.getElementById('testimony-success-message');
+        const errorMsg = document.getElementById('testimony-error-message');
+        const testimonyForm = document.getElementById('testimony-form');
+        const rejectionMsg = document.getElementById('testimony-rejection-message');
+        
+        successMsg.style.display = 'none';
+        errorMsg.style.display = 'none';
+        if (rejectionMsg) rejectionMsg.style.display = 'none';
+        testimonyForm.reset();
+        
+        // Reset character counters
+        const testimonyTitleCounter = document.getElementById('testimony-title-counter');
+        const testimonyContentCounter = document.getElementById('testimony-content-counter');
+        if (testimonyTitleCounter) testimonyTitleCounter.textContent = '0/200';
+        if (testimonyContentCounter) testimonyContentCounter.textContent = '0/2000';
+    }
+
+    // Load testimonies and combine with prayers
+    let cachedTestimonies = [];
+    
+    async function loadTestimonies() {
+        try {
+            const response = await fetch('/api/testimony/testimonies');
+            if (response.ok) {
+                const data = await response.json();
+                cachedTestimonies = data.testimonies || [];
+                console.log(`Loaded ${cachedTestimonies.length} testimonies`);
+            }
+        } catch (error) {
+            console.error('Error loading testimonies:', error);
+            cachedTestimonies = [];
+        }
+    }
+
+    function displayTestimonies(testimonies) {
+        // Testimonies are now displayed together with prayers in displayPrayers()
+        // This function is kept for compatibility but does nothing
+    }
+
+    function toggleTestimonyCard(card, event) {
+        // Prevent toggle if clicking on the share button
+        if (event.target.classList.contains('share-button-icon')) {
+            return;
+        }
+        
+        const shareButton = card.querySelector('.share-button-icon');
+        const expandHint = card.querySelector('.expand-hint');
+        
+        if (card.classList.contains('expanded')) {
+            card.classList.remove('expanded');
+            card.classList.add('collapsed');
+            card.querySelector('.prayer-summary').style.display = 'block';
+            card.querySelector('.prayer-full-content').style.display = 'none';
+            if (shareButton) shareButton.style.display = 'none';
+            if (expandHint) expandHint.textContent = '▼';
+        } else {
+            card.classList.add('expanded');
+            card.classList.remove('collapsed');
+            card.querySelector('.prayer-summary').style.display = 'none';
+            card.querySelector('.prayer-full-content').style.display = 'block';
+            if (shareButton) shareButton.style.display = 'block';
+            if (expandHint) expandHint.textContent = '▲';
+        }
+    }
+
+    // Share prayer request function
+    async function sharePrayerRequest(event, prayerId, title) {
+        event.stopPropagation();
+        
+        const shareData = {
+            title: 'Prayer Request - Divine Bridge',
+            text: `🙏 ${title}\n\nJoin me in prayer on Divine Bridge`,
+            url: `${window.location.origin}/prayers#prayer-${prayerId}`
+        };
+        
+        try {
+            // Try Web Share API (works on mobile)
+            if (navigator.share) {
+                await navigator.share(shareData);
+                console.log('Prayer shared successfully');
+            } else {
+                // Fallback: Copy link to clipboard
+                await navigator.clipboard.writeText(shareData.url);
+                
+                // Show a nice notification
+                const notification = document.createElement('div');
+                notification.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: var(--blue); color: white; padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; animation: slideInRight 0.3s ease;';
+                notification.textContent = '✓ Link copied to clipboard!';
+                document.body.appendChild(notification);
+                
+                setTimeout(() => {
+                    notification.style.animation = 'slideOutRight 0.3s ease';
+                    setTimeout(() => notification.remove(), 300);
+                }, 2000);
+            }
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.error('Error sharing:', error);
+            }
+        }
+    }
+
+    // Share testimony function
+    async function shareTestimony(event, testimonyId, title, category) {
+        event.stopPropagation();
+        
+        const shareData = {
+            title: `${category} - Divine Bridge`,
+            text: `${title}\n\nRead this inspiring testimony on Divine Bridge`,
+            url: `${window.location.origin}/prayers#testimony-${testimonyId}`
+        };
+        
+        try {
+            // Try Web Share API (works on mobile)
+            if (navigator.share) {
+                await navigator.share(shareData);
+                console.log('Testimony shared successfully');
+            } else {
+                // Fallback: Copy link to clipboard
+                await navigator.clipboard.writeText(shareData.url);
+                
+                // Show a nice notification
+                const notification = document.createElement('div');
+                notification.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: var(--gold); color: var(--black); padding: 12px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; font-weight: 600;';
+                notification.textContent = '✓ Link copied to clipboard!';
+                document.body.appendChild(notification);
+                
+                setTimeout(() => notification.remove(), 2000);
+            }
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.error('Error sharing:', error);
+            }
+        }
     }
 
     // Show welcome banner for first-time visitors

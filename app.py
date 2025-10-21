@@ -5,13 +5,21 @@ import os
 from prayer_generator import PrayerGenerator
 from config import get_config
 from verse_cache import verse_cache
-from storage_handler import StorageHandler
 from flask_session import Session
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
 from functools import wraps
 from firebase_auth import initialize_firebase
 from verse_generator import verse_generator
+
+# Import appropriate storage handler based on environment
+USE_LOCAL_STORAGE = os.getenv('USE_LOCAL_STORAGE', 'false').lower() == 'true'
+if USE_LOCAL_STORAGE:
+    from local_storage import LocalStorageHandler as StorageHandler
+    print("🔧 Using LocalStorageHandler for development")
+else:
+    from storage_handler import StorageHandler
+    print("☁️  Using CloudStorageHandler for production")
 
 # Configure logging
 logging.basicConfig(
@@ -201,18 +209,21 @@ def create_app():
         from routes.nonprofit_bp import nonprofit_bp
         from routes.seo_bp import seo_bp
         from routes.email_bp import email_bp
+        from routes.testimony_bp import testimony_bp
         
-        # Exempt auth, prayer, and email blueprints from CSRF protection
+        # Exempt auth, prayer, email, and testimony blueprints from CSRF protection
         # Auth uses Firebase token auth, Prayer/Email use Cloud Scheduler verification
         csrf.exempt(auth_bp)
         csrf.exempt(prayer_bp)
         csrf.exempt(email_bp)
+        csrf.exempt(testimony_bp)
         
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
         app.register_blueprint(prayer_bp, url_prefix='/api/prayer')
         app.register_blueprint(verse_bp, url_prefix='/api')
         app.register_blueprint(nonprofit_bp, url_prefix='/api/nonprofit')
         app.register_blueprint(email_bp, url_prefix='/api/email')
+        app.register_blueprint(testimony_bp, url_prefix='/api/testimony')
         app.register_blueprint(seo_bp)  # SEO routes at root level
         logger.info("Blueprints registered")
         

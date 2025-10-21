@@ -1,0 +1,41 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: divinebridge
+  namespace: divinebridge
+spec:
+  template:
+    spec:
+      containers:
+      - image: gcr.io/divinebridge/divinebridge:latest
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            cpu: "1"
+            memory: "512Mi"
+          requests:
+            cpu: "500m"
+            memory: "256Mi"
+        env:
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: FLASK_APP
+          value: "app.py"
+        - name: PORT
+          value: "8080"
+        livenessProbe:
+          httpGet:
+            path: /_ah/health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /_ah/health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 15
+      timeoutSeconds: 300
+      containerConcurrency: 80
+      serviceAccountName: divinebridge-sa 

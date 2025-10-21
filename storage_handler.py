@@ -845,4 +845,108 @@ class StorageHandler:
                 
         except Exception as e:
             logger.error(f"Error retrieving prayer image: {e}")
-            return None 
+            return None
+    
+    # Testimony Methods
+    def save_testimony(self, testimony_data: dict) -> str:
+        """
+        Save a testimony to Cloud Storage
+        
+        Args:
+            testimony_data: Dictionary containing testimony data (must include 'id')
+        
+        Returns:
+            Path to saved testimony or None if failed
+        """
+        try:
+            testimony_id = testimony_data.get('id')
+            if not testimony_id:
+                logger.error("Testimony data missing 'id' field")
+                return None
+            
+            # Create date-based path
+            date_str = datetime.now().strftime('%Y-%m-%d')
+            testimony_path = f"testimonies/{date_str}/{testimony_id}.json"
+            
+            # Save to Cloud Storage
+            blob = self.bucket.blob(testimony_path)
+            json_data = json.dumps(testimony_data, indent=2)
+            blob.upload_from_string(json_data, content_type='application/json')
+            
+            logger.info(f"Saved testimony to Cloud Storage: {testimony_path}")
+            return testimony_path
+            
+        except Exception as e:
+            logger.error(f"Error saving testimony: {e}")
+            return None
+    
+    def get_all_testimonies(self, limit=20) -> list:
+        """
+        Get all testimonies from Cloud Storage
+        
+        Args:
+            limit: Maximum number of testimonies to return
+        
+        Returns:
+            List of testimony dictionaries
+        """
+        try:
+            # List all testimony files
+            blobs = list(self.bucket.list_blobs(prefix='testimonies/'))
+            
+            testimonies = []
+            for blob in blobs:
+                if blob.name.endswith('.json'):
+                    try:
+                        content = blob.download_as_text()
+                        testimony = json.loads(content)
+                        testimonies.append(testimony)
+                    except Exception as e:
+                        logger.warning(f"Error loading testimony {blob.name}: {e}")
+            
+            # Sort by created_at descending (newest first)
+            testimonies.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+            
+            return testimonies[:limit]
+            
+        except Exception as e:
+            logger.error(f"Error getting testimonies: {e}")
+            return []
+    
+    def get_testimony(self, testimony_id: str) -> Optional[dict]:
+        """Get a specific testimony by ID"""
+        try:
+            # Search for the testimony file
+            blobs = list(self.bucket.list_blobs(prefix='testimonies/'))
+            
+            for blob in blobs:
+                if testimony_id in blob.name and blob.name.endswith('.json'):
+                    content = blob.download_as_text()
+                    return json.loads(content)
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting testimony {testimony_id}: {e}")
+            return None
+    
+    def update_testimony(self, testimony_id: str, testimony_data: dict) -> bool:
+        """Update a testimony"""
+        try:
+            # Find and update the testimony file
+            blobs = list(self.bucket.list_blobs(prefix='testimonies/'))
+            
+            for blob in blobs:
+                if testimony_id in blob.name and blob.name.endswith('.json'):
+                    blob.upload_from_string(
+                        json.dumps(testimony_data, indent=2),
+                        content_type='application/json'
+                    )
+                    logger.info(f"Updated testimony: {testimony_id}")
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error updating testimony {testimony_id}: {e}")
+            return False 
