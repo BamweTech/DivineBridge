@@ -1566,9 +1566,12 @@
             if (prayButton) prayButton.style.display = 'block';
             if (expandHint) expandHint.textContent = '▲';
             
-            // Track view (only once per prayer per user)
-            if (currentUser && !hasUserReadPrayer(currentUser.uid, prayerId)) {
-                markPrayerAsRead(currentUser.uid, prayerId);
+            // Track view for all users (logged in or not)
+            // Use user ID if logged in, otherwise use generic tracking
+            const userId = currentUser ? currentUser.uid : 'anonymous';
+            
+            if (!hasUserReadPrayer(userId, prayerId)) {
+                markPrayerAsRead(userId, prayerId);
                 trackView(prayerId, cardElement);
             }
         }
