@@ -18,7 +18,7 @@ nonprofit_bp = Blueprint('nonprofit', __name__)
 @nonprofit_bp.route('/organizations', methods=['GET'])
 def get_organizations():
     """
-    Get 5 organizations for current user based on location and today's prayer
+    Get 6 organizations for current user based on location and today's prayer
     
     Query params:
         - user_id (optional): Firebase user ID from auth
@@ -98,7 +98,7 @@ def get_organizations():
         t4 = time.time()
         logger.debug(f"⏱️ Disasters: {(t4-t3)*1000:.0f}ms")
         
-        # Get 5 organizations
+        # Get 6 organizations
         organizations = nonprofit_service.get_organizations_for_user(
             user_location,
             primary_disasters,

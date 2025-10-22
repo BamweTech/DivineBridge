@@ -2599,6 +2599,7 @@
             return;
         }
         
+        const testimonyId = card.dataset.testimonyId;
         const shareButton = card.querySelector('.share-button-icon');
         const expandHint = card.querySelector('.expand-hint');
         
@@ -2616,6 +2617,31 @@
             card.querySelector('.prayer-full-content').style.display = 'block';
             if (shareButton) shareButton.style.display = 'block';
             if (expandHint) expandHint.textContent = '▲';
+            
+            // Track view for all users (logged in or not)
+            const userId = currentUser ? currentUser.uid : 'anonymous';
+            
+            if (!hasUserReadPrayer(userId, testimonyId)) {
+                markPrayerAsRead(userId, testimonyId);
+                trackTestimonyView(testimonyId, card);
+            }
+        }
+    }
+    
+    // Track when a testimony is viewed
+    async function trackTestimonyView(testimonyId, cardElement) {
+        try {
+            const response = await fetch(`/api/testimony/testimony/${testimonyId}/view`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log(`Testimony view tracked: ${data.views} views`);
+            }
+        } catch (error) {
+            console.error('Error tracking testimony view:', error);
         }
     }
 

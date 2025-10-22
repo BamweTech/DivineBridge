@@ -180,6 +180,31 @@ def get_testimony(testimony_id):
         return jsonify({'error': 'Failed to get testimony'}), 500
 
 
+@testimony_bp.route('/testimony/<testimony_id>/view', methods=['POST'])
+def track_testimony_view(testimony_id):
+    """Track when a testimony is viewed (expanded)"""
+    try:
+        testimony = current_app.storage_handler.get_testimony(testimony_id)
+        
+        if not testimony:
+            return jsonify({'error': 'Testimony not found'}), 404
+        
+        # Increment view count
+        testimony['views'] = testimony.get('views', 0) + 1
+        
+        if current_app.storage_handler.update_testimony(testimony_id, testimony):
+            return jsonify({
+                'message': 'View tracked',
+                'views': testimony['views']
+            }), 200
+        else:
+            return jsonify({'error': 'Failed to track view'}), 500
+        
+    except Exception as e:
+        logger.error(f"Error tracking testimony view: {e}")
+        return jsonify({'error': 'Failed to track view'}), 500
+
+
 @testimony_bp.route('/testimony/<testimony_id>/like', methods=['POST'])
 def like_testimony(testimony_id):
     """Increment like count for a testimony"""

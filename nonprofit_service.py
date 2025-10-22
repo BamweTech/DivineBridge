@@ -72,7 +72,7 @@ class NonprofitService:
     def get_organizations_for_user(self, user_location: Dict, prayer_disasters: List[Dict], 
                                   date: str) -> List[Dict]:
         """
-        Get 5 organizations for a user (3 general + 2 disaster-specific)
+        Get 6 organizations for a user (4 general + 2 disaster-specific)
         Uses Perplexity AI with caching for local organizations
         
         Args:
@@ -81,7 +81,7 @@ class NonprofitService:
             date: Today's date (YYYY-MM-DD) for seeding randomization
         
         Returns:
-            List of 5 organization dictionaries
+            List of 6 organization dictionaries
         """
         try:
             selected_orgs = []
@@ -105,18 +105,18 @@ class NonprofitService:
                         org['logo_url'] = logo_url
                 
                 random.seed(date)
-                # Get all 5 from fallback when location is not detected
-                selected_orgs.extend(random.sample(fallback, min(5, len(fallback))))
+                # Get all 6 from fallback when location is not detected
+                selected_orgs.extend(random.sample(fallback, min(6, len(fallback))))
                 return selected_orgs
             
-            # 1. Get 3 general local organizations (from cache or Perplexity)
+            # 1. Get 4 general local organizations (from cache or Perplexity)
             logger.info(f"Fetching general organizations for {user_location.get('city', 'Unknown')}")
             general_orgs = self._get_general_organizations(user_location)
             
-            if general_orgs and len(general_orgs) >= 3:
+            if general_orgs and len(general_orgs) >= 4:
                 # Use date as seed for daily consistency
                 random.seed(date)
-                selected_general = random.sample(general_orgs, min(3, len(general_orgs)))
+                selected_general = random.sample(general_orgs, min(4, len(general_orgs)))
                 selected_orgs.extend(selected_general)
                 logger.info(f"Selected {len(selected_general)} general organizations")
             else:
@@ -124,7 +124,7 @@ class NonprofitService:
                 logger.warning(f"Not enough general orgs found, using fallback")
                 fallback = self._get_fallback_organizations()
                 random.seed(date)
-                selected_orgs.extend(random.sample(fallback, min(3, len(fallback))))
+                selected_orgs.extend(random.sample(fallback, min(4, len(fallback))))
             
             # 2. Get 2 disaster-specific organizations (deduplicated)
             if prayer_disasters:
@@ -146,10 +146,10 @@ class NonprofitService:
                             selected_names.update(org.get('name', '').lower() for org in selected_disaster)
                             logger.info(f"Selected organization for {disaster.get('type')} disaster")
             
-            # 3. Fill to 5 if needed with more general orgs or fallback
-            if len(selected_orgs) < 5:
-                needed = 5 - len(selected_orgs)
-                logger.info(f"Need {needed} more organizations to reach 5")
+            # 3. Fill to 6 if needed with more general orgs or fallback
+            if len(selected_orgs) < 6:
+                needed = 6 - len(selected_orgs)
+                logger.info(f"Need {needed} more organizations to reach 6")
                 
                 # Track selected org names for deduplication
                 selected_names = {org.get('name', '').lower() for org in selected_orgs}
