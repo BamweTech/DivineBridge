@@ -165,12 +165,12 @@ class NonprofitService:
                         selected_names.update(org.get('name', '').lower() for org in to_add)
                 
                 # Still need more? Use fallback
-                if len(selected_orgs) < 5:
+                if len(selected_orgs) < 6:
                     fallback = self._get_fallback_organizations()
                     # Deduplicate by organization name
                     remaining_fallback = [o for o in fallback if o.get('name', '').lower() not in selected_names]
                     random.seed(f"{date}-fallback")
-                    needed = 5 - len(selected_orgs)
+                    needed = 6 - len(selected_orgs)
                     selected_orgs.extend(random.sample(remaining_fallback, min(needed, len(remaining_fallback))))
             
             # Add badges based on context
@@ -182,7 +182,7 @@ class NonprofitService:
                 org['badge_type'] = 'local' if org.get('is_local') else 'disaster' if org.get('is_disaster_response') else 'general'
             
             logger.info(f"Returning {len(selected_orgs)} total organizations (after blacklist filter)")
-            return selected_orgs[:5]
+            return selected_orgs[:6]
             
         except Exception as e:
             logger.error(f"Error getting organizations for user: {e}", exc_info=True)
@@ -190,7 +190,7 @@ class NonprofitService:
             logger.info("Falling back to global organizations")
             fallback = self._get_fallback_organizations()
             random.seed(date)
-            return random.sample(fallback, min(5, len(fallback)))
+            return random.sample(fallback, min(6, len(fallback)))
     
     def _get_general_organizations(self, location: Dict) -> List[Dict]:
         """
