@@ -863,6 +863,37 @@ Priority: on-ground organizations, accepting donations for this disaster."""
                 "is_fallback": True
             }
         ]
+    
+    def prewarm_cache_for_location(self, location: Dict) -> None:
+        """
+        Pre-warm the organization cache for a given location in the background.
+        This should be called when a user visits the Prayer Room to prepare
+        organizations for when they navigate to the home page.
+        
+        Args:
+            location: Location dictionary with city, state, country
+        """
+        import threading
+        
+        def prewarm_background():
+            try:
+                logger.info(f"Pre-warming organization cache for {location.get('city', 'unknown')}")
+                
+                # Fetch general organizations (this will cache them)
+                general_orgs = self._get_general_organizations(location)
+                
+                if general_orgs:
+                    logger.info(f"Successfully pre-warmed cache with {len(general_orgs)} organizations")
+                else:
+                    logger.warning("Pre-warming returned no organizations")
+                    
+            except Exception as e:
+                logger.error(f"Error pre-warming organization cache: {e}")
+        
+        # Run in background thread so it doesn't block the request
+        thread = threading.Thread(target=prewarm_background, daemon=True)
+        thread.start()
+        logger.info("Started background pre-warming of organization cache")
 
 
 # Singleton instance

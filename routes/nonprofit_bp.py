@@ -240,3 +240,53 @@ def refresh_organizations():
         logger.error(f"Error refreshing organizations: {e}")
         return jsonify({'error': 'Failed to refresh'}), 500
 
+
+@nonprofit_bp.route('/organizations/prewarm', methods=['POST'])
+def prewarm_organizations():
+    """
+    Pre-warm organization cache in the background.
+    Called when user visits Prayer Room to prepare organizations for home page.
+    
+    Body:
+        {
+          "user_id": "firebase_uid" (optional)
+        }
+    
+    Returns:
+        {
+          "message": "Cache pre-warming started"
+        }
+    """
+    try:
+        location_service = get_location_service()
+        nonprofit_service = get_nonprofit_service()
+        
+        # Get user ID from body (if authenticated)
+        data = request.get_json() or {}
+        user_id = data.get('user_id')
+        
+        # Get user's IP address
+        ip_address = request.headers.get('X-Forwarded-For', request.remote_addr)
+        if ',' in ip_address:
+            ip_address = ip_address.split(',')[0].strip()
+        
+        # Get user location
+        user_location = location_service.get_user_location(user_id, ip_address)
+        
+        # Start background pre-warming
+        nonprofit_service.prewarm_cache_for_location(user_location)
+        
+        logger.info(f"Cache pre-warming started for {user_location.get('city')}")
+        
+        return jsonify({
+            'message': 'Cache pre-warming started',
+            'location': {
+                'city': user_location.get('city'),
+                'country': user_location.get('country')
+            }
+        }), 202  # 202 Accepted (processing in background)
+        
+    except Exception as e:
+        logger.error(f"Error starting cache pre-warming: {e}")
+        return jsonify({'error': 'Failed to start pre-warming'}), 500
+

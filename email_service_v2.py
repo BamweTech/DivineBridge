@@ -65,13 +65,14 @@ class EnhancedEmailService:
         """
         try:
             # Format date based on timezone
-            date_str = datetime.now().strftime('%A, %B %d, %Y')
+            now = datetime.now()
+            date_str = now.strftime('%A, %B %d, %Y')
             
             # Create message with related for embedded images
             msg = MIMEMultipart('related')
             msg['From'] = formataddr(("Divine Bridge", self.sender_email))
             msg['To'] = recipient_email
-            msg['Subject'] = f"Your Daily Blessings - {date_str}"
+            msg['Subject'] = f"Your Blessings - {date_str}"
             
             # Email headers for deliverability
             msg['List-Unsubscribe'] = f"<https://divinebridge.io/unsubscribe?email={recipient_email}>"
@@ -121,7 +122,7 @@ class EnhancedEmailService:
     def _create_plain_text(self, first_name, date_str, verse_data, prayer_data, recipient_email):
         """Create plain text version of email"""
         return f"""
-Divine Bridge - Your Daily Blessings
+Divine Bridge - Your Blessings
 {date_str}
 
 Dear {first_name},
@@ -186,6 +187,11 @@ To unsubscribe: https://divinebridge.io/unsubscribe?email={recipient_email}
             .logo-img {{
                 margin: 0 auto !important;
             }}
+            .header-tagline {{
+                font-size: 11px !important;
+                letter-spacing: 0.5px !important;
+                white-space: nowrap !important;
+            }}
         }}
     </style>
 </head>
@@ -209,7 +215,7 @@ To unsubscribe: https://divinebridge.io/unsubscribe?email={recipient_email}
                                     </td>
                                 </tr>
                             </table>
-                            <div style="color: #0f56ff; font-size: 14px; font-weight: 600; letter-spacing: 1px;">UNITING HEARTS IN GLOBAL PRAYER</div>
+                            <div class="header-tagline" style="color: #0f56ff; font-size: 14px; font-weight: 600; letter-spacing: 1px;">UNITING HEARTS IN GLOBAL PRAYER</div>
                         </td>
                     </tr>
                     
@@ -217,11 +223,11 @@ To unsubscribe: https://divinebridge.io/unsubscribe?email={recipient_email}
                     <tr>
                         <td class="content-padding" style="padding: 30px 30px 20px;">
                             <p style="font-size: 18px; color: #1e1e1e; margin: 0 0 10px 0;">Dear {first_name},</p>
-                            <p style="font-size: 16px; color: #666; margin: 0; line-height: 1.6;">May this day be filled with God's grace and peace. Here are your daily blessings:</p>
+                            <p style="font-size: 16px; color: #666; margin: 0; line-height: 1.6;">May this day be filled with God's grace and peace. Here are your blessings:</p>
                         </td>
                     </tr>
                     
-                    <!-- Daily Verse Section -->
+                    <!-- Verse Section -->
                     <tr>
                         <td class="content-padding" style="padding: 0 30px 30px;">
                             <div class="verse-card" style="background: linear-gradient(135deg, rgba(15, 86, 255, 0.08) 0%, rgba(31, 60, 136, 0.05) 100%); border-radius: 16px; padding: 25px; border-left: 4px solid #0f56ff;">
@@ -239,7 +245,7 @@ To unsubscribe: https://divinebridge.io/unsubscribe?email={recipient_email}
                         </td>
                     </tr>
                     
-                    <!-- Daily Prayer Section -->
+                    <!-- Prayer Section -->
                     <tr>
                         <td class="content-padding" style="padding: 30px;">
                             <div class="prayer-card" style="background: rgba(255, 255, 255, 0.25); border-radius: 16px; padding: 25px; border: 1px solid rgba(15, 86, 255, 0.15); backdrop-filter: blur(10px); box-shadow: 0 8px 16px rgba(15, 86, 255, 0.05);">
