@@ -1,0 +1,900 @@
+{% extends "base.html" %}
+
+{% block title %}Live Prayer Rooms - Divine Bridge{% endblock %}
+
+{% block body_class %}prayer-rooms-page{% endblock %}
+{% block body_attributes %}class="prayer-rooms-page"{% endblock %}
+{% block body_style %}style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important; margin: 0 !important; padding: 0 !important; min-height: 100vh !important;"{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room.css') }}?v={{ range(10000, 99999) | random }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-rooms-standalone.css') }}?v={{ range(10000, 99999) | random }}">
+<style>
+/* CRITICAL OVERRIDE - Force all styles */
+* { box-sizing: border-box !important; }
+html, body { 
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important; 
+    margin: 0 !important; 
+    padding: 0 !important; 
+    min-height: 100vh !important; 
+    height: 100% !important; 
+    overflow-x: hidden !important; 
+}
+.main-content { 
+    background: transparent !important; 
+    margin: 0 !important; 
+    padding: 0 !important; 
+    min-height: 100vh !important; 
+}
+.prayer-rooms-container { 
+    min-height: 100vh !important; 
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important; 
+    padding: 60px 20px 40px 20px !important; 
+    margin: 0 !important; 
+    position: relative !important; 
+    z-index: 1 !important; 
+    width: 100% !important; 
+    display: block !important; 
+}
+.prayer-rooms-content { 
+    display: grid !important; 
+    grid-template-columns: 1fr 1fr !important; 
+    gap: 40px !important; 
+    max-width: 1200px !important; 
+    margin: 0 auto !important; 
+    width: 100% !important; 
+}
+.left-panel, .right-panel { 
+    background: rgba(255, 255, 255, 0.1) !important; 
+    backdrop-filter: blur(20px) !important; 
+    border-radius: 20px !important; 
+    padding: 40px !important; 
+    border: 1px solid rgba(255, 255, 255, 0.2) !important; 
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1) !important; 
+    width: 100% !important; 
+    display: block !important; 
+}
+.action-buttons { 
+    display: grid !important; 
+    grid-template-columns: 1fr 1fr !important; 
+    gap: 20px !important; 
+    width: 100% !important; 
+    margin-top: 30px !important; 
+}
+.action-btn { 
+    background: rgba(255, 255, 255, 0.1) !important; 
+    border: 1px solid rgba(255, 255, 255, 0.2) !important; 
+    color: white !important; 
+    padding: 20px 15px !important; 
+    border-radius: 16px !important; 
+    text-decoration: none !important; 
+    text-align: center !important; 
+    font-size: 0.9rem !important; 
+    font-weight: 500 !important; 
+    transition: all 0.3s ease !important; 
+    cursor: pointer !important; 
+    display: flex !important; 
+    flex-direction: column !important; 
+    align-items: center !important; 
+    justify-content: center !important; 
+    gap: 8px !important; 
+    min-height: 90px !important; 
+    backdrop-filter: blur(10px) !important; 
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1) !important; 
+}
+.action-btn.primary { 
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important; 
+    border: none !important; 
+    box-shadow: 0 6px 25px rgba(102, 126, 234, 0.3) !important; 
+}
+.action-btn.secondary { 
+    background: linear-gradient(135deg, #4ecdc4, #44a08d) !important; 
+    border: none !important; 
+}
+.action-btn.tertiary { 
+    background: linear-gradient(135deg, #a8edea, #fed6e3) !important; 
+    color: #333 !important; 
+    border: none !important; 
+}
+.action-btn.quaternary { 
+    background: linear-gradient(135deg, #d299c2, #fef9d7) !important; 
+    color: #333 !important; 
+    border: none !important; 
+}
+@media (max-width: 768px) {
+    .prayer-rooms-content { grid-template-columns: 1fr !important; gap: 20px !important; }
+    .action-buttons { grid-template-columns: 1fr !important; gap: 15px !important; }
+}
+</style>
+<style>
+    /* CRITICAL: Override all base template styles with maximum specificity */
+    html.prayer-rooms-page,
+    body.prayer-rooms-page,
+    html[class*="prayer"],
+    body[class*="prayer"],
+    html,
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        min-height: 100vh !important;
+        height: 100% !important;
+        overflow-x: hidden !important;
+    }
+    
+    /* Override any existing container styles */
+    .prayer-rooms-page .main-content,
+    .prayer-rooms-page .content,
+    .prayer-rooms-page .container,
+    .prayer-rooms-page .wrapper {
+        background: transparent !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    .prayer-rooms-container {
+        min-height: 100vh !important;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        padding: 60px 20px 40px 20px !important;
+        margin: 0 !important;
+        position: relative !important;
+        z-index: 1 !important;
+    }
+    
+        /* Override base template styles */
+        .main-content {
+            margin-top: 0 !important;
+            min-height: 100vh !important;
+            background: transparent !important;
+            padding: 0 !important;
+        }
+        
+        /* Force override all body and html styles with maximum specificity */
+        html, body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            min-height: 100vh !important;
+            height: 100% !important;
+            overflow-x: hidden !important;
+        }
+        
+        /* Override any existing body classes */
+        body.prayer-rooms-page,
+        body[class*="prayer"],
+        body[class*="room"] {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        }
+        
+        /* Override any existing main content styles */
+        .main-content,
+        .content,
+        .container,
+        .wrapper {
+            background: transparent !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+    
+    .prayer-rooms-header {
+        text-align: center !important;
+        margin-bottom: 60px !important;
+        color: white !important;
+        padding: 0 20px !important;
+    }
+    
+    .prayer-rooms-header h1 {
+        font-size: 3.5rem !important;
+        margin-bottom: 20px !important;
+        font-weight: 300 !important;
+        color: white !important;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3) !important;
+        letter-spacing: -0.5px !important;
+    }
+    
+    .prayer-rooms-header p {
+        font-size: 1.3rem !important;
+        opacity: 0.9 !important;
+        color: white !important;
+        max-width: 600px !important;
+        margin: 0 auto !important;
+        line-height: 1.6 !important;
+    }
+    
+    .prayer-rooms-content {
+        max-width: 1200px !important;
+        margin: 0 auto !important;
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 50px !important;
+        align-items: start !important;
+        width: 100% !important;
+    }
+    
+    .left-panel {
+        background: rgba(255, 255, 255, 0.1) !important;
+        backdrop-filter: blur(10px) !important;
+        border-radius: 20px !important;
+        padding: 40px !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1) !important;
+        width: 100% !important;
+        display: block !important;
+    }
+    
+    .left-panel h2 {
+        color: white !important;
+        font-size: 2.5rem !important;
+        margin-bottom: 20px !important;
+        font-weight: 300 !important;
+    }
+    
+    .left-panel p {
+        color: rgba(255, 255, 255, 0.8) !important;
+        font-size: 1.1rem !important;
+        margin-bottom: 30px !important;
+        line-height: 1.6 !important;
+    }
+    
+    .action-buttons {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 20px !important;
+        width: 100% !important;
+        margin-top: 30px !important;
+    }
+    
+    .action-btn {
+        background: rgba(255, 255, 255, 0.1) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        color: white !important;
+        padding: 20px 15px !important;
+        border-radius: 16px !important;
+        text-decoration: none !important;
+        text-align: center !important;
+        font-size: 0.9rem !important;
+        font-weight: 500 !important;
+        transition: all 0.3s ease !important;
+        cursor: pointer !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 8px !important;
+        min-height: 90px !important;
+        backdrop-filter: blur(10px) !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1) !important;
+    }
+    
+    .action-btn:hover {
+        background: rgba(255, 255, 255, 0.2) !important;
+        transform: translateY(-3px) !important;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2) !important;
+    }
+    
+    .action-btn.primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        border: none !important;
+        box-shadow: 0 6px 25px rgba(102, 126, 234, 0.3) !important;
+    }
+    
+    .action-btn.primary:hover {
+        box-shadow: 0 12px 35px rgba(102, 126, 234, 0.4) !important;
+    }
+    
+    .action-btn.secondary {
+        background: linear-gradient(135deg, #4ecdc4, #44a08d) !important;
+        border: none !important;
+    }
+    
+    .action-btn.tertiary {
+        background: linear-gradient(135deg, #a8edea, #fed6e3) !important;
+        color: #333 !important;
+        border: none !important;
+    }
+    
+    .action-btn.quaternary {
+        background: linear-gradient(135deg, #d299c2, #fef9d7) !important;
+        color: #333 !important;
+        border: none !important;
+    }
+    
+    .action-btn .icon {
+        font-size: 1.5rem !important;
+        margin-bottom: 5px !important;
+    }
+    
+    .action-btn .text {
+        font-size: 0.85rem !important;
+        font-weight: 500 !important;
+        line-height: 1.2 !important;
+    }
+    
+    .right-panel {
+        background: rgba(255, 255, 255, 0.1) !important;
+        backdrop-filter: blur(10px) !important;
+        border-radius: 20px !important;
+        padding: 30px !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1) !important;
+        width: 100% !important;
+        display: block !important;
+        /* Debug styles */
+        border: 2px solid rgba(255, 0, 0, 0.5) !important;
+        min-height: 300px !important;
+    }
+    
+    .active-rooms {
+        margin-bottom: 20px;
+    }
+    
+    .active-rooms h3 {
+        color: white !important;
+        font-size: 1.5rem !important;
+        margin-bottom: 20px !important;
+        font-weight: 400 !important;
+    }
+    
+    .room-card {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: all 0.3s ease;
+    }
+    
+    .room-card:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: translateY(-2px);
+    }
+    
+    .room-header {
+        display: flex;
+        justify-content: between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    
+    .room-name {
+        color: white;
+        font-size: 1.2rem;
+        font-weight: 500;
+        margin: 0;
+    }
+    
+    .room-participants {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.9rem;
+        margin: 5px 0;
+    }
+    
+    .room-host {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.9rem;
+        margin: 5px 0;
+    }
+    
+    .join-room-btn {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-top: 10px;
+    }
+    
+    .join-room-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .loading-state {
+        text-align: center;
+        color: rgba(255, 255, 255, 0.7);
+        padding: 40px;
+    }
+    
+    .loading-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-top: 3px solid white;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .no-rooms {
+        text-align: center;
+        color: rgba(255, 255, 255, 0.7);
+        padding: 40px;
+        font-style: italic;
+    }
+    
+    /* Modal Styles */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(5px);
+    }
+    
+    .modal-content {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        margin: 5% auto;
+        padding: 0;
+        border-radius: 20px;
+        width: 90%;
+        max-width: 500px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .modal-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px 30px;
+        border-radius: 20px 20px 0 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .modal-header h3 {
+        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 500;
+    }
+    
+    .close {
+        color: white;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .close:hover {
+        opacity: 0.7;
+        transform: scale(1.1);
+    }
+    
+    .modal-body {
+        padding: 30px;
+    }
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: #333;
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+    
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+        width: 100%;
+        padding: 12px 15px;
+        border: 2px solid #e1e5e9;
+        border-radius: 10px;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        background: rgba(255, 255, 255, 0.8);
+    }
+    
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .form-group textarea {
+        resize: vertical;
+        min-height: 80px;
+    }
+    
+    .form-actions {
+        display: flex;
+        gap: 15px;
+        justify-content: flex-end;
+        margin-top: 30px;
+    }
+    
+    .btn-primary,
+    .btn-secondary {
+        padding: 12px 25px;
+        border: none;
+        border-radius: 10px;
+        font-size: 1rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        min-width: 100px;
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+    }
+    
+    .btn-secondary {
+        background: rgba(108, 117, 125, 0.1);
+        color: #6c757d;
+        border: 2px solid #e1e5e9;
+    }
+    
+    .btn-secondary:hover {
+        background: rgba(108, 117, 125, 0.2);
+        transform: translateY(-2px);
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+        .prayer-rooms-content {
+            grid-template-columns: 1fr !important;
+            gap: 20px !important;
+        }
+        
+        .prayer-rooms-header h1 {
+            font-size: 2rem !important;
+        }
+        
+        .left-panel h2 {
+            font-size: 2rem !important;
+        }
+        
+        .left-panel, .right-panel {
+            padding: 20px !important;
+        }
+        
+        .action-buttons {
+            grid-template-columns: 1fr !important;
+            gap: 15px !important;
+        }
+        
+        .action-btn {
+            min-height: 80px !important;
+            padding: 15px 10px !important;
+        }
+        
+        .action-btn .icon {
+            font-size: 1.3rem !important;
+        }
+        
+        .action-btn .text {
+            font-size: 0.8rem !important;
+        }
+        
+        .modal-content {
+            width: 95% !important;
+            margin: 10% auto !important;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .form-actions {
+            flex-direction: column;
+        }
+        
+        .btn-primary,
+        .btn-secondary {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<script>
+        // Ensure proper styling is applied
+        window.addEventListener('DOMContentLoaded', function() {
+            // Force apply styles to override any base template conflicts
+            document.body.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            document.body.style.margin = '0';
+            document.body.style.padding = '0';
+            document.body.style.minHeight = '100vh';
+            document.documentElement.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            document.documentElement.style.margin = '0';
+            document.documentElement.style.padding = '0';
+            document.documentElement.style.minHeight = '100vh';
+            
+            // Override main content styles
+            const mainContent = document.querySelector('.main-content');
+            if (mainContent) {
+                mainContent.style.background = 'transparent';
+                mainContent.style.margin = '0';
+                mainContent.style.padding = '0';
+            }
+            
+            // Ensure container styling
+            const container = document.querySelector('.prayer-rooms-container');
+            if (container) {
+                container.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                container.style.minHeight = '100vh';
+                container.style.padding = '20px';
+                container.style.margin = '0';
+            }
+            
+            // Ensure grid layout
+            const content = document.querySelector('.prayer-rooms-content');
+            if (content) {
+                content.style.display = 'grid';
+                content.style.gridTemplateColumns = '1fr 1fr';
+                content.style.gap = '40px';
+                content.style.maxWidth = '1200px';
+                content.style.margin = '0 auto';
+                content.style.alignItems = 'start';
+            }
+            
+            // Ensure glassmorphic panel styling
+            const leftPanel = document.querySelector('.left-panel');
+            const rightPanel = document.querySelector('.right-panel');
+            
+            if (leftPanel) {
+                leftPanel.style.background = 'rgba(255, 255, 255, 0.1)';
+                leftPanel.style.backdropFilter = 'blur(10px)';
+                leftPanel.style.borderRadius = '20px';
+                leftPanel.style.padding = '40px';
+                leftPanel.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+                leftPanel.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1)';
+            }
+            
+            if (rightPanel) {
+                rightPanel.style.background = 'rgba(255, 255, 255, 0.1)';
+                rightPanel.style.backdropFilter = 'blur(10px)';
+                rightPanel.style.borderRadius = '20px';
+                rightPanel.style.padding = '30px';
+                rightPanel.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+                rightPanel.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1)';
+            }
+        });
+</script>
+<div class="prayer-rooms-container">
+    <div class="prayer-rooms-header">
+        <h1>Live Prayer Rooms</h1>
+        <p>Connect with believers worldwide through voice prayer sessions</p>
+    </div>
+    
+    <div class="prayer-rooms-content">
+        <!-- Left Panel - Actions -->
+        <div class="left-panel">
+            <h2>Start Your Journey</h2>
+            <p>Join thousands of believers in live prayer sessions. Create your own room, join existing ones, or schedule future sessions.</p>
+            
+            <div class="action-buttons">
+                <button class="action-btn primary" onclick="showCreateRoomModal()">
+                    <div class="icon">🎤</div>
+                    <div class="text">Create Prayer Room</div>
+                </button>
+                <button class="action-btn secondary" onclick="showJoinRoomModal()">
+                    <div class="icon">🔗</div>
+                    <div class="text">Join with Code</div>
+                </button>
+                <button class="action-btn tertiary" onclick="showScheduleModal()">
+                    <div class="icon">📅</div>
+                    <div class="text">Schedule Session</div>
+                </button>
+                <button class="action-btn quaternary" onclick="showMyRooms()">
+                    <div class="icon">🏠</div>
+                    <div class="text">My Rooms</div>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Right Panel - Active Rooms -->
+        <div class="right-panel">
+            <div class="active-rooms">
+                <h3>Active Prayer Rooms</h3>
+                <div id="roomsList">
+                    <div class="loading-state">
+                        <div class="loading-spinner"></div>
+                        <p>Loading active rooms...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Room Modal -->
+<div id="createRoomModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Create Prayer Room</h3>
+            <span class="close" onclick="hideCreateRoomModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="createRoomForm">
+                <div class="form-group">
+                    <label for="roomName">Room Name *</label>
+                    <input type="text" id="roomName" name="roomName" required placeholder="Enter room name">
+                </div>
+                <div class="form-group">
+                    <label for="roomDescription">Description</label>
+                    <textarea id="roomDescription" name="roomDescription" placeholder="Describe your prayer session (optional)"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="roomType">Room Type</label>
+                    <select id="roomType" name="roomType">
+                        <option value="public">Public - Anyone can join</option>
+                        <option value="private">Private - Invite only</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="hideCreateRoomModal()">Cancel</button>
+                    <button type="submit" class="btn-primary">Create Room</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Join Room Modal -->
+<div id="joinRoomModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Join Prayer Room</h3>
+            <span class="close" onclick="hideJoinRoomModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="joinRoomForm">
+                <div class="form-group">
+                    <label for="roomCode">Room Code</label>
+                    <input type="text" id="roomCode" name="roomCode" required placeholder="Enter room code">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="hideJoinRoomModal()">Cancel</button>
+                    <button type="submit" class="btn-primary">Join Room</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Schedule Modal -->
+<div id="scheduleModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Schedule Prayer Session</h3>
+            <span class="close" onclick="hideScheduleModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="scheduleForm">
+                <div class="form-group">
+                    <label for="scheduledRoomName">Room Name *</label>
+                    <input type="text" id="scheduledRoomName" name="roomName" required placeholder="Enter room name">
+                </div>
+                <div class="form-group">
+                    <label for="scheduledDateTime">Date & Time</label>
+                    <input type="datetime-local" id="scheduledDateTime" name="scheduledDateTime" required>
+                </div>
+                <div class="form-group">
+                    <label for="scheduledDescription">Description</label>
+                    <textarea id="scheduledDescription" name="description" placeholder="Describe your prayer session"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="hideScheduleModal()">Cancel</button>
+                    <button type="submit" class="btn-primary">Schedule Session</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/prayer-rooms.js') }}?v={{ range(10000, 99999) | random }}"></script>
+
+<script>
+// Force apply styles directly to DOM elements - IMMEDIATE EXECUTION
+(function() {
+    // Add prayer rooms class to body
+    document.body.classList.add('prayer-rooms-page');
+    
+    // Force body and html styles immediately
+    document.body.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+    document.body.style.margin = '0';
+    document.body.style.padding = '0';
+    document.body.style.minHeight = '100vh';
+    document.body.style.height = '100%';
+    document.body.style.overflowX = 'hidden';
+    document.documentElement.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+    document.documentElement.style.margin = '0';
+    document.documentElement.style.padding = '0';
+    document.documentElement.style.minHeight = '100vh';
+    document.documentElement.style.height = '100%';
+    document.documentElement.style.overflowX = 'hidden';
+    
+    console.log('Prayer rooms styles forced applied immediately');
+})();
+
+// Also apply on DOM ready
+document.addEventListener('DOMContentLoaded', function() {
+    // Force main content styles
+    const mainContent = document.querySelector('.main-content');
+    if (mainContent) {
+        mainContent.style.background = 'transparent';
+        mainContent.style.margin = '0';
+        mainContent.style.padding = '0';
+        mainContent.style.minHeight = '100vh';
+    }
+    
+    // Force prayer rooms container styles
+    const prayerContainer = document.querySelector('.prayer-rooms-container');
+    if (prayerContainer) {
+        prayerContainer.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+        prayerContainer.style.minHeight = '100vh';
+        prayerContainer.style.padding = '60px 20px 40px 20px';
+        prayerContainer.style.margin = '0';
+        prayerContainer.style.width = '100%';
+        prayerContainer.style.display = 'block';
+    }
+    
+    // Force left and right panel styles
+    const leftPanel = document.querySelector('.left-panel');
+    if (leftPanel) {
+        leftPanel.style.background = 'rgba(255, 255, 255, 0.1)';
+        leftPanel.style.backdropFilter = 'blur(20px)';
+        leftPanel.style.borderRadius = '20px';
+        leftPanel.style.padding = '40px';
+        leftPanel.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+        leftPanel.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1)';
+        leftPanel.style.width = '100%';
+        leftPanel.style.display = 'block';
+    }
+    
+    const rightPanel = document.querySelector('.right-panel');
+    if (rightPanel) {
+        rightPanel.style.background = 'rgba(255, 255, 255, 0.1)';
+        rightPanel.style.backdropFilter = 'blur(20px)';
+        rightPanel.style.borderRadius = '20px';
+        rightPanel.style.padding = '40px';
+        rightPanel.style.border = '1px solid rgba(255, 255, 255, 0.2)';
+        rightPanel.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.1)';
+        rightPanel.style.width = '100%';
+        rightPanel.style.display = 'block';
+    }
+    
+    // Force content grid
+    const content = document.querySelector('.prayer-rooms-content');
+    if (content) {
+        content.style.display = 'grid';
+        content.style.gridTemplateColumns = '1fr 1fr';
+        content.style.gap = '40px';
+        content.style.maxWidth = '1200px';
+        content.style.margin = '0 auto';
+        content.style.width = '100%';
+    }
+    
+    console.log('Prayer rooms styles forced applied on DOM ready');
+});
+</script>
+
+{% endblock %}

@@ -154,7 +154,7 @@ def login():
                 'user': session['user']
             })
             
-            # Set session cookie
+            # Set session cookie with proper configuration
             response.set_cookie(
                 'divinebridge_session',
                 session.sid if hasattr(session, 'sid') else '',
@@ -162,7 +162,8 @@ def login():
                 samesite='Lax',
                 secure=False,  # Set to False for local development
                 path='/',
-                max_age=timedelta(days=7).total_seconds()
+                max_age=timedelta(days=7).total_seconds(),
+                domain=None  # Allow cookie for all domains in development
             )
             
             return response, 200
@@ -359,6 +360,24 @@ def reset_password():
         logger.error(f"Unexpected error in reset password: {e}")
         return jsonify({'error': 'An unexpected error occurred'}), 500
 
+@auth_bp.route('/debug-session')
+def debug_session():
+    """Debug session information"""
+    try:
+        return jsonify({
+            'session_data': dict(session),
+            'session_id': session.sid if hasattr(session, 'sid') else 'No session ID',
+            'session_permanent': session.permanent,
+            'session_modified': session.modified,
+            'cookie_secure': current_app.config.get('SESSION_COOKIE_SECURE'),
+            'cookie_httponly': current_app.config.get('SESSION_COOKIE_HTTPONLY'),
+            'cookie_samesite': current_app.config.get('SESSION_COOKIE_SAMESITE'),
+            'has_user': 'user' in session,
+            'user_data': session.get('user') if 'user' in session else None
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @auth_bp.route('/status')
 def auth_status():
     """Check if user is authenticated"""
@@ -388,17 +407,9 @@ def auth_status():
                 })
                 session.modified = True
                 
-                # Save session changes
-                try:
-                    logger.info("Saving updated session...")
-                    session.save()
-                    logger.info("Session saved successfully")
-                    logger.info(f"Updated session data: {dict(session)}")
-                except Exception as e:
-                    logger.error(f"Failed to save updated session: {str(e)}")
-                    logger.error(f"Error type: {type(e)}")
-                    logger.error(f"Error args: {e.args}")
-                    logger.error(f"Error traceback: {traceback.format_exc()}")
+                # Session changes are automatically saved by Flask-Session
+                logger.info("Session updated successfully")
+                logger.info(f"Updated session data: {dict(session)}")
                 
                 return jsonify({
                     'authenticated': True,

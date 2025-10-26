@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}Prayer Room - {{ room_name or 'Divine Bridge' }}{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room.css') }}?v={{ range(10000, 99999) | random }}">
+
+<!-- Firebase Configuration and Initialization -->
+<script>
+// Firebase configuration
+const firebaseConfig = {
+    apiKey: "{{ firebase_config.apiKey }}",
+    authDomain: "{{ firebase_config.authDomain }}",
+    projectId: "{{ firebase_config.projectId }}",
+    storageBucket: "{{ firebase_config.storageBucket }}",
+    messagingSenderId: "{{ firebase_config.messagingSenderId }}",
+    appId: "{{ firebase_config.appId }}"
+};
+
+// Initialize Firebase when it's loaded
+window.addEventListener('load', function() {
+    // Wait for Firebase to be available
+    let attempts = 0;
+    const checkFirebase = setInterval(() => {
+        if (typeof firebase !== 'undefined' && firebase.initializeApp) {
+            clearInterval(checkFirebase);
+            
+            try {
+                // Initialize Firebase
+                firebase.initializeApp(firebaseConfig);
+                console.log('Firebase initialized successfully');
+                
+                // Initialize Auth
+                firebase.auth();
+                console.log('Firebase Auth initialized');
+                
+            } catch (error) {
+                console.error('Error initializing Firebase:', error);
+            }
+        } else {
+            attempts++;
+            if (attempts > 50) { // 5 seconds timeout
+                clearInterval(checkFirebase);
+                console.error('Firebase not loaded after 5 seconds');
+            }
+        }
+    }, 100);
+});
+
+// Fallback mechanism for Firebase loading
+window.firebaseLoadError = false;
+window.addEventListener('error', function(e) {
+    if (e.target && e.target.src && e.target.src.includes('firebase')) {
+        console.warn('Firebase CDN failed, attempting fallback...');
+        window.firebaseLoadError = true;
+    }
+});
+
+// Check if Firestore is loaded and attempt fallback if needed
+window.addEventListener('load', function() {
+    setTimeout(function() {
+        if (typeof firebase !== 'undefined' && typeof firebase.firestore !== 'function') {
+            console.warn('Firebase Firestore not loaded, attempting fallback...');
+            
+            // Try to load Firestore from alternative CDN
+            const script = document.createElement('script');
+            script.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js';
+            script.onload = function() {
+                console.log('Firebase Firestore fallback loaded successfully');
+            };
+            script.onerror = function() {
+                console.error('Firebase Firestore fallback also failed');
+            };
+            document.head.appendChild(script);
+        }
+    }, 2000); // Wait 2 seconds before attempting fallback
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="prayer-room-container">
+    <div class="prayer-room-interface">
+        <!-- Header -->
+        <div class="prayer-room-header">
+            <div class="header-left">
+                <div class="prayer-room-logo">
+                    <img src="{{ url_for('static', filename='images/LogowithName.svg') }}" alt="Divine Bridge" style="height: 40px;">
+                </div>
+                <h1 class="prayer-room-title">{{ room_name or 'Prayer Room' }}</h1>
+            </div>
+            <div class="room-code-section">
+                <div class="room-code" id="roomCode">{{ room_id or 'Loading...' }}</div>
+                <button class="copy-room-code-btn" id="copyRoomCodeBtn">
+                    📋 Copy Code
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="prayer-room-content">
+            <!-- Participants Section -->
+            <div class="prayer-room-main">
+                <div class="prayer-room-participants">
+                    <h3 style="color: white; margin-bottom: 15px;">Participants</h3>
+                    <div class="loading-state" id="participantsLoading">
+                        <div class="loading-spinner"></div>
+                        <p>Loading participants...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Section -->
+            <div class="prayer-room-chat">
+                <div class="chat-header">💬 Chat</div>
+                <div class="chat-messages" id="chatMessages">
+                    <div class="chat-message">
+                        <div class="chat-message-content">
+                            Welcome to the prayer room! Share your prayers and thoughts with the community.
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-input-container">
+                    <input type="text" class="chat-input" id="chatInput" placeholder="Type your message...">
+                    <button class="chat-send-btn" id="chatSendBtn">Send</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="prayer-room-controls">
+            <button class="control-btn join-audio-btn" id="joinAudioBtn">
+                🎤 Join Audio
+            </button>
+            <button class="control-btn mute-btn" id="muteBtn" style="display: none;">
+                🔇 Mute
+            </button>
+            <button class="control-btn leave" id="leaveBtn">
+                🚪 Leave Room
+            </button>
+        </div>
+
+        <!-- Error State -->
+        <div class="error-state" id="errorState" style="display: none;">
+            <div class="error-message" id="errorMessage"></div>
+            <a href="/prayers" class="return-btn">Return to Prayers</a>
+        </div>
+    </div>
+
+    <!-- Mobile Tab Navigation -->
+    <div class="mobile-tab-navigation" id="mobile-tab-navigation">
+        <button class="mobile-tab-btn" data-tab="main">
+            👥 Participants
+        </button>
+        <button class="mobile-tab-btn" data-tab="chat">
+            💬 Chat
+        </button>
+    </div>
+</div>
+
+<script>
+// Extract room ID from URL
+const urlParams = new URLSearchParams(window.location.search);
+window.roomId = urlParams.get('room');
+
+// Log the room ID for debugging
+console.log('Room ID from URL:', window.roomId);
+
+// Mobile tab switching function
+function switchMobileTab(tabName) {
+    // Hide all sections
+    document.querySelectorAll('.mobile-hidden').forEach(el => {
+        el.classList.add('mobile-hidden');
+    });
+    
+    // Show selected section
+    if (tabName === 'main') {
+        document.querySelector('.prayer-room-main')?.classList.remove('mobile-hidden');
+    } else if (tabName === 'chat') {
+        document.querySelector('.prayer-room-chat')?.classList.remove('mobile-hidden');
+    }
+    
+    // Update active tab
+    document.querySelectorAll('.mobile-tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[data-tab="${tabName}"]`)?.classList.add('active');
+}
+
+// Initialize mobile tab navigation
+document.addEventListener('DOMContentLoaded', () => {
+    const mobileTabNavigation = document.getElementById('mobile-tab-navigation');
+    if (mobileTabNavigation && window.innerWidth <= 768) {
+        mobileTabNavigation.style.display = 'flex';
+        // Set initial active tab
+        document.querySelector('[data-tab="main"]')?.classList.add('active');
+    }
+    
+    // Handle window resize
+    window.addEventListener('resize', () => {
+        if (window.innerWidth <= 768) {
+            mobileTabNavigation.style.display = 'flex';
+        } else {
+            mobileTabNavigation.style.display = 'none';
+            // Show all sections on desktop
+            document.querySelectorAll('.mobile-hidden').forEach(el => {
+                el.classList.remove('mobile-hidden');
+            });
+        }
+    });
+});
+</script>
+
+<script src="{{ url_for('static', filename='js/prayer-room.js') }}"></script>
+{% endblock %}

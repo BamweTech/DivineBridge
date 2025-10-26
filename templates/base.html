@@ -33,8 +33,23 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
     
     <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    
+    <!-- Firebase Loading Verification -->
+    <script>
+    // Verify Firebase modules are loaded
+    window.addEventListener('load', function() {
+        console.log('Firebase modules check:');
+        if (typeof firebase !== 'undefined') {
+            console.log('Firebase SDK loaded:', Object.keys(firebase));
+            console.log('Firestore available:', typeof firebase.firestore);
+        } else {
+            console.error('Firebase SDK not loaded');
+        }
+    });
+    </script>
     
     {% block extra_head %}{% endblock %}
     
@@ -62,6 +77,23 @@
             color: var(--black);
             background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
             min-height: 100vh;
+        }
+        
+        /* Prayer Rooms Page Override */
+        body.prayer-rooms-page {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            min-height: 100vh !important;
+            height: 100% !important;
+            overflow-x: hidden !important;
+        }
+        
+        body.prayer-rooms-page .main-content {
+            background: transparent !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            min-height: 100vh !important;
         }
 
         /* Header */
@@ -637,7 +669,7 @@
     </style>
     {% block extra_css %}{% endblock %}
 </head>
-<body>
+<body{% if body_class %} class="{{ body_class }}"{% endif %}{% if body_attributes %} {{ body_attributes }}{% endif %}{% if body_style %} style="{{ body_style }}"{% endif %}>
     <!-- Header -->
     <header class="header">
         <nav class="nav-container">

@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Prayer Rooms - Divine Bridge</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 25%, #cbd5e1 50%, #94a3b8 75%, #64748b 100%);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            height: 100%;
+            overflow-x: hidden;
+            font-family: 'Inter', sans-serif;
+            position: relative;
+        }
+        
+        html::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(15, 86, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(31, 60, 136, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(144, 202, 249, 0.05) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .prayer-rooms-container {
+            min-height: 100vh;
+            background: transparent;
+            padding: 0;
+            margin: 0;
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            display: block;
+        }
+
+        /* Navigation Menu */
+        .nav-menu {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 20px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .nav-menu:hover {
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .nav-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #1e293b;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.3rem;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .nav-logo:hover {
+            color: #0f56ff;
+            transform: translateY(-2px);
+        }
+        
+        .nav-logo::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #0f56ff, #1f3c88);
+            transition: width 0.3s ease;
+        }
+        
+        .nav-logo:hover::after {
+            width: 100%;
+        }
+
+        .nav-logo img {
+            height: 40px;
+            width: auto;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: #1e293b;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 12px 24px;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .nav-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+        
+        .nav-btn:hover::before {
+            left: 100%;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            color: #0f56ff;
+        }
+
+        .nav-btn.active {
+            background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 8px 25px rgba(15, 86, 255, 0.3);
+        }
+        
+        .nav-btn.active:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(15, 86, 255, 0.4);
+        }
+        
+        .prayer-rooms-header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: #1e293b;
+            padding: 40px 20px 0 20px;
+            position: relative;
+            animation: fadeInUp 1s ease-out;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .prayer-rooms-header h1 {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #1e293b 0%, #0f56ff 50%, #1f3c88 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -1px;
+            animation: slideInFromTop 1.2s ease-out 0.2s both;
+        }
+        
+        @keyframes slideInFromTop {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .prayer-rooms-header p {
+            font-size: 1.2rem;
+            color: #64748b;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
+            animation: slideInFromBottom 1.2s ease-out 0.4s both;
+        }
+        
+        @keyframes slideInFromBottom {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .prayer-rooms-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+            padding: 0 20px;
+        }
+        
+        .left-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            display: block;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            animation: slideInFromLeft 1s ease-out 0.6s both;
+        }
+        
+        @keyframes slideInFromLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .left-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+            border-radius: 24px;
+            pointer-events: none;
+        }
+        
+        .left-panel:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .right-panel {
+            background: linear-gradient(135deg, rgba(15, 86, 255, 0.1) 0%, rgba(31, 60, 136, 0.15) 100%);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(15, 86, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(15, 86, 255, 0.15);
+            width: 100%;
+            display: block;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            animation: slideInFromRight 1s ease-out 0.8s both;
+        }
+        
+        @keyframes slideInFromRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        .right-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(15, 86, 255, 0.05) 0%, rgba(31, 60, 136, 0.1) 100%);
+            border-radius: 24px;
+            pointer-events: none;
+        }
+        
+        .right-panel:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(15, 86, 255, 0.2);
+        }
+        
+        
+        .action-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            width: 100%;
+            margin-top: 20px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .action-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #1e293b;
+            padding: 24px 20px;
+            border-radius: 16px;
+            text-decoration: none;
+            text-align: center;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            min-height: 120px;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .action-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+            border-radius: 20px;
+            pointer-events: none;
+        }
+        
+        .action-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .action-btn.primary {
+            background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
+            border: none;
+            box-shadow: 0 8px 32px rgba(15, 86, 255, 0.3);
+            color: white;
+        }
+        
+        .action-btn.primary:hover {
+            box-shadow: 0 20px 40px rgba(15, 86, 255, 0.4);
+        }
+        
+        .action-btn .icon {
+            position: relative;
+            z-index: 1;
+            transition: all 0.3s ease;
+        }
+        
+        .action-btn:hover .icon {
+            transform: scale(1.1) rotate(5deg);
+        }
+        
+        .action-btn .text {
+            position: relative;
+            z-index: 1;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        
+        .action-btn.secondary {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            color: white;
+            box-shadow: 0 8px 32px rgba(16, 185, 129, 0.3);
+        }
+        
+        .action-btn.secondary:hover {
+            box-shadow: 0 20px 40px rgba(16, 185, 129, 0.4);
+        }
+        
+        .action-btn.tertiary {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            border: none;
+            box-shadow: 0 8px 32px rgba(245, 158, 11, 0.3);
+        }
+        
+        .action-btn.tertiary:hover {
+            box-shadow: 0 20px 40px rgba(245, 158, 11, 0.4);
+        }
+        
+        .action-btn.quaternary {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            box-shadow: 0 8px 32px rgba(139, 92, 246, 0.3);
+        }
+        
+        .action-btn.quaternary:hover {
+            box-shadow: 0 20px 40px rgba(139, 92, 246, 0.4);
+        }
+        
+        .action-btn .icon {
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+        }
+        
+        .action-btn .text {
+            font-size: 0.85rem;
+            font-weight: 500;
+            line-height: 1.2;
+        }
+        
+        .active-rooms h3 {
+            font-size: 1.8rem;
+            margin-bottom: 25px;
+            color: #0f56ff;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(15, 86, 255, 0.2);
+            background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 50%, #0f56ff 100%);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientShift 3s ease-in-out infinite;
+            position: relative;
+            z-index: 1;
+        }
+        
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        
+        .rooms-container {
+            position: relative;
+            z-index: 1;
+        }
+        
+        .room-card {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            animation: slideInUp 0.6s ease-out;
+        }
+        
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .room-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.08) 100%);
+            border-radius: 20px;
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }
+        
+        .room-card::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(135deg, rgba(15, 86, 255, 0.3), rgba(31, 60, 136, 0.3), rgba(144, 202, 249, 0.2));
+            border-radius: 18px;
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .room-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+        }
+        
+        .room-card:hover::before {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.12) 100%);
+        }
+        
+        .room-card:hover::after {
+            opacity: 1;
+        }
+        
+        .room-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .room-title {
+            color: #1e293b;
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin: 0;
+            background: linear-gradient(135deg, #1e293b 0%, #0f56ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .room-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(16, 185, 129, 0.1);
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .status-text {
+            color: #10b981;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .room-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .room-detail {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+        
+        .room-detail .icon {
+            width: 16px;
+            height: 16px;
+            opacity: 0.7;
+        }
+        
+        .room-description {
+            color: #64748b;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+            font-style: italic;
+        }
+        
+        .room-actions {
+            display: flex;
+            gap: 12px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .btn-join {
+            background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 15px rgba(15, 86, 255, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-join::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+        
+        .btn-join:hover::before {
+            left: 100%;
+        }
+        
+        .btn-join:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(15, 86, 255, 0.4);
+        }
+        
+        .btn-join:active {
+            transform: translateY(-1px);
+        }
+        
+        .no-rooms-message {
+            text-align: center;
+            padding: 40px 20px;
+            color: #64748b;
+            font-size: 1.1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(15px);
+            position: relative;
+            z-index: 1;
+        }
+        
+        .no-rooms-message::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+            border-radius: 20px;
+            pointer-events: none;
+        }
+        
+        /* Desktop optimization for single page view */
+        @media (min-width: 1200px) {
+            .prayer-rooms-container {
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+            }
+            
+            .prayer-rooms-content {
+                flex: 1;
+                display: flex;
+                align-items: stretch;
+            }
+            
+            .left-panel, .right-panel {
+                display: flex;
+                flex-direction: column;
+            }
+            
+            .right-panel {
+                max-height: 70vh;
+                overflow-y: auto;
+            }
+        }
+        
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .nav-content {
+                padding: 0 15px;
+            }
+            
+            .nav-logo {
+                font-size: 1rem;
+            }
+            
+            .nav-logo img {
+                height: 35px;
+            }
+            
+            .nav-buttons {
+                gap: 10px;
+            }
+            
+            .nav-btn {
+                padding: 8px 15px;
+                font-size: 0.9rem;
+            }
+            
+            .prayer-rooms-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .prayer-rooms-header {
+                padding: 40px 20px 0 20px;
+            }
+            
+            .prayer-rooms-header h1 {
+                font-size: 2rem;
+            }
+            
+            .left-panel h2 {
+                font-size: 2rem;
+            }
+            
+            .left-panel, .right-panel {
+                padding: 20px;
+            }
+            
+            .action-buttons {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            
+            .action-btn {
+                min-height: 80px;
+                padding: 15px 10px;
+            }
+            
+            .action-btn .icon {
+                font-size: 1.3rem;
+            }
+            
+            .action-btn .text {
+                font-size: 0.8rem;
+            }
+            
+            /* Active Rooms Mobile Styles */
+            .active-rooms h3 {
+                font-size: 1.5rem;
+                margin-bottom: 20px;
+            }
+            
+            .room-card {
+                padding: 20px;
+                margin-bottom: 16px;
+            }
+            
+            .room-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+                margin-bottom: 16px;
+            }
+            
+            .room-title {
+                font-size: 1.1rem;
+                max-width: 100%;
+            }
+            
+            .room-info {
+                grid-template-columns: 1fr;
+                gap: 12px;
+                margin-bottom: 16px;
+            }
+            
+            .room-detail {
+                font-size: 0.85rem;
+            }
+            
+            .room-description {
+                font-size: 0.85rem;
+                margin-bottom: 16px;
+            }
+            
+            .room-actions {
+                justify-content: center;
+            }
+            
+            .btn-join {
+                padding: 14px 24px;
+                font-size: 0.95rem;
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .no-rooms-message {
+                padding: 30px 15px;
+                font-size: 1rem;
+            }
+        }
+
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: rgba(255, 255, 255, 0.95);
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .modal-header {
+            padding: 20px 30px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            color: #333;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .modal-body {
+            padding: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+            box-sizing: border-box;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #0f56ff;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn.primary {
+            background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
+            color: white;
+        }
+
+        .btn.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(15, 86, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="prayer-rooms-container">
+        <!-- Navigation Menu -->
+        <nav class="nav-menu">
+            <div class="nav-content">
+                <a href="/" class="nav-logo">
+                    <img src="{{ url_for('static', filename='images/LogowithName.svg') }}" alt="Divine Bridge">
+                </a>
+                <div class="nav-buttons">
+                    <a href="/" class="nav-btn">Home</a>
+                    <a href="/prayer-room" class="nav-btn active">Live Prayer</a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="prayer-rooms-header">
+            <h1>Live Prayer Rooms</h1>
+            <p>Connect with other believers in live prayer sessions. Create your own room, join existing ones, or schedule future sessions.</p>
+        </div>
+        
+        <div class="prayer-rooms-content">
+            <div class="left-panel">
+                <div class="action-buttons">
+                    <button class="action-btn primary" onclick="showCreateRoomModal()">
+                        <div class="icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 1C13.1 1 14 1.9 14 3V21C14 22.1 13.1 23 12 23C10.9 23 10 22.1 10 21V3C10 1.9 10.9 1 12 1Z" fill="currentColor"/>
+                                <path d="M7 6C7.55 6 8 6.45 8 7V17C8 17.55 7.55 18 7 18C6.45 18 6 17.55 6 17V7C6 6.45 6.45 6 7 6Z" fill="currentColor"/>
+                                <path d="M17 6C17.55 6 18 6.45 18 7V17C18 17.55 17.55 18 17 18C16.45 18 16 17.55 16 17V7C16 6.45 16.45 6 17 6Z" fill="currentColor"/>
+                            </svg>
+                        </div>
+                        <div class="text">Create Prayer Room</div>
+                    </button>
+                    <button class="action-btn secondary" onclick="showJoinRoomModal()">
+                        <div class="icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10.59 13.41C11 13.8 11 14.44 10.59 14.83C10.2 15.22 9.56 15.22 9.17 14.83L5.58 11.24C4.8 10.46 4.8 9.19 5.58 8.41L9.17 4.82C9.56 4.43 10.2 4.43 10.59 4.82C11 5.21 11 5.85 10.59 6.24L7.41 9.41H20C20.55 9.41 21 9.86 21 10.41C21 10.96 20.55 11.41 20 11.41H7.41L10.59 14.59C11 14.98 11 15.62 10.59 16.01Z" fill="currentColor"/>
+                            </svg>
+                        </div>
+                        <div class="text">Join with Code</div>
+                    </button>
+                    <button class="action-btn tertiary" onclick="showScheduleModal()">
+                        <div class="icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M19 3H18V1H16V3H8V1H6V3H5C3.89 3 3.01 3.9 3.01 5L3 19C3 20.1 3.89 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3ZM19 19H5V8H19V19ZM7 10H12V15H7V10Z" fill="currentColor"/>
+                            </svg>
+                        </div>
+                        <div class="text">Schedule Session</div>
+                    </button>
+                    <button class="action-btn quaternary" onclick="showMyRooms()">
+                        <div class="icon">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10 20V14H14V20H19V12H22L12 3L2 12H5V20H10Z" fill="currentColor"/>
+                            </svg>
+                        </div>
+                        <div class="text">My Rooms</div>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="right-panel">
+                <div class="active-rooms">
+                    <h3>Active Rooms</h3>
+                    <div class="rooms-container">
+                        <div id="roomsList">
+                            <!-- Active rooms will be loaded here by JavaScript -->
+                            <div class="no-rooms-message">
+                                <p>No active rooms. Be the first to start one!</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modals -->
+    <div id="createRoomModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Create New Prayer Room</h2>
+                <span class="close" onclick="hideCreateRoomModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="createRoomForm">
+                    <div class="form-group">
+                        <label for="roomName">Room Name:</label>
+                        <input type="text" id="roomName" name="room_name" required maxlength="50" placeholder="Enter room name (max 50 characters)">
+                    </div>
+                    <div class="form-group">
+                        <label for="roomPrivacy">Room Privacy:</label>
+                        <select id="roomPrivacy" name="room_privacy" required>
+                            <option value="public">Public - Anyone can join</option>
+                            <option value="private">Private - Requires room code</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="roomDescription">Description (Optional):</label>
+                        <textarea id="roomDescription" name="room_description"></textarea>
+                    </div>
+                    <button type="submit" class="btn primary">Create Room</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="joinRoomModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Join Prayer Room</h2>
+                <span class="close" onclick="hideJoinRoomModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="joinRoomForm">
+                    <div class="form-group">
+                        <label for="joinRoomCode">Room Code:</label>
+                        <input type="text" id="joinRoomCode" required>
+                    </div>
+                    <button type="submit" class="btn primary">Join Room</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="scheduleModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Schedule Prayer Session</h2>
+                <span class="close" onclick="hideScheduleModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="scheduleForm">
+                    <div class="form-group">
+                        <label for="scheduleRoomName">Session Name:</label>
+                        <input type="text" id="scheduleRoomName" name="scheduleRoomName" required maxlength="50" placeholder="Enter session name (max 50 characters)">
+                    </div>
+                    <div class="form-group">
+                        <label for="scheduleDateTime">Date and Time:</label>
+                        <input type="datetime-local" id="scheduleDateTime" required>
+                    </div>
+                    <button type="submit" class="btn primary">Schedule</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/prayer-rooms.js') }}?v={{ range(10000, 99999) | random }}"></script>
+</body>
+</html>

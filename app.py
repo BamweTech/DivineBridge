@@ -72,14 +72,14 @@ def create_app():
     app.config['SESSION_TYPE'] = 'filesystem'
     app.config['SESSION_PERMANENT'] = True
     app.config['SESSION_USE_SIGNER'] = True
-    app.config['SESSION_COOKIE_SECURE'] = is_production  # True in production, False in dev
+    app.config['SESSION_COOKIE_SECURE'] = False  # Always False for local development
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
     app.config['SESSION_FILE_DIR'] = os.path.join(app.root_path, 'flask_session')
     app.config['SESSION_FILE_THRESHOLD'] = 500  # Maximum number of sessions to store
     app.config['SESSION_FILE_MODE'] = 0o600  # Secure file permissions
-    app.config['SESSION_REFRESH_EACH_REQUEST'] = True  # Refresh session on each request
+    app.config['SESSION_REFRESH_EACH_REQUEST'] = False  # Don't refresh session on each request
     app.config['SESSION_COOKIE_NAME'] = 'divinebridge_session'  # Custom session cookie name
     app.config['SESSION_COOKIE_PATH'] = '/'  # Ensure cookie is available for all paths
     app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow cookie for all domains in development
@@ -100,6 +100,9 @@ def create_app():
         session.permanent = True
         if 'user' in session:
             session.modified = True
+            logger.info(f"Session contains user: {session['user'].get('uid', 'unknown')}")
+        else:
+            logger.info("No user in session")
     
     @app.after_request
     def set_security_headers(response):
@@ -135,7 +138,7 @@ def create_app():
         # Permissions Policy
         response.headers['Permissions-Policy'] = (
             "geolocation=(), "
-            "microphone=(), "
+            "microphone=*, "
             "camera=(), "
             "payment=(), "
             "usb=()"
@@ -210,13 +213,15 @@ def create_app():
         from routes.seo_bp import seo_bp
         from routes.email_bp import email_bp
         from routes.testimony_bp import testimony_bp
+        from routes.prayer_room_bp import prayer_room_bp
         
-        # Exempt auth, prayer, email, and testimony blueprints from CSRF protection
+        # Exempt auth, prayer, email, testimony, and prayer room blueprints from CSRF protection
         # Auth uses Firebase token auth, Prayer/Email use Cloud Scheduler verification
         csrf.exempt(auth_bp)
         csrf.exempt(prayer_bp)
         csrf.exempt(email_bp)
         csrf.exempt(testimony_bp)
+        csrf.exempt(prayer_room_bp)
         
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
         app.register_blueprint(prayer_bp, url_prefix='/api/prayer')
@@ -224,6 +229,7 @@ def create_app():
         app.register_blueprint(nonprofit_bp, url_prefix='/api/nonprofit')
         app.register_blueprint(email_bp, url_prefix='/api/email')
         app.register_blueprint(testimony_bp, url_prefix='/api/testimony')
+        app.register_blueprint(prayer_room_bp, url_prefix='/api/prayer-room')
         app.register_blueprint(seo_bp)  # SEO routes at root level
         logger.info("Blueprints registered")
         
@@ -252,6 +258,60 @@ def create_app():
     def prayers():
         """Serve the prayers page"""
         return render_template('prayers.html')
+
+    @app.route('/prayer-room')
+    def prayer_room():
+        """Serve the Live Prayer Room directory page"""
+        logger.info("🔍 DEBUG: Rendering prayer_rooms_standalone.html template")
+        return render_template('prayer_rooms_standalone.html')
+
+    @app.route('/prayer-room/join')
+    def join_prayer_room():
+        """Serve the individual prayer room page"""
+        room_id = request.args.get('room')
+        room_code = request.args.get('code')  # Room code for private rooms
+        
+        if not room_id:
+            return redirect('/prayer-room')
+        
+        # Fetch the actual room name from the database
+        room_name = 'Prayer Room'  # Default fallback
+        room_privacy = 'public'  # Default fallback
+        try:
+            from firebase_auth import get_firestore_client
+            db = get_firestore_client()
+            room_doc = db.collection('prayer_rooms').document(room_id).get()
+            
+            if room_doc.exists:
+                room_data = room_doc.to_dict()
+                room_name = room_data.get('room_name', f'Prayer Room {room_id[:6]}')
+                room_privacy = room_data.get('room_privacy', 'public')
+                logger.info(f"Found room name in database: {room_name}, privacy: {room_privacy}")
+            else:
+                logger.warning(f"Room {room_id} not found in database, using fallback name")
+                room_name = f'Prayer Room {room_id[:6]}'
+        except Exception as e:
+            logger.error(f"Error fetching room name from database: {e}")
+            room_name = f'Prayer Room {room_id[:6]}'
+        
+        # Get Firebase configuration
+        firebase_config = config.FIREBASE_CLIENT_CONFIG
+        if isinstance(firebase_config, str):
+            import json
+            firebase_config = json.loads(firebase_config)
+        
+        logger.info("🔍 DEBUG: Rendering prayer_room_standalone.html template")
+        from flask import make_response
+        response = make_response(render_template('prayer_room_standalone.html', 
+                                                 room_id=room_id, 
+                                                 room_name=room_name,
+                                                 room_code=room_code,
+                                                 room_privacy=room_privacy,
+                                                 firebase_config=firebase_config))
+        
+        # Add permissions policy header to allow microphone access
+        response.headers['Permissions-Policy'] = 'microphone=*'
+        return response
 
     @app.route('/daily-prayer')
     def daily_prayer():

@@ -1,5 +1,5 @@
 import firebase_admin
-from firebase_admin import credentials, auth
+from firebase_admin import credentials, auth, firestore
 from flask import current_app
 import logging
 import json
@@ -304,4 +304,17 @@ def verify_email_token(token):
         return True
     except Exception as e:
         logger.error(f"Error verifying email token: {e}")
-        return False 
+        return False
+
+def get_firestore_client():
+    """Get Firestore client instance"""
+    try:
+        # Ensure Firebase is initialized
+        if not firebase_admin._apps:
+            initialize_firebase()
+        
+        # Return Firestore client
+        return firestore.client()
+    except Exception as e:
+        logger.error(f"Error getting Firestore client: {e}")
+        return None
