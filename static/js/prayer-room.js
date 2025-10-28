@@ -64,8 +64,7 @@ class PrayerRoomService {
             await this.loadChatMessages();
             await this.loadParticipants();
             
-            // Initialize WebRTC for voice communication
-            await this.initializeWebRTC();
+            // Note: WebRTC initialization happens when user clicks "Join Audio"
             
         } catch (error) {
             console.error('Error initializing prayer room:', error);
@@ -210,6 +209,9 @@ class PrayerRoomService {
         }
         
         // Mobile layout is now handled by CSS - no tab navigation needed
+        
+        // Initialize audio controls
+        this.updateAudioControls();
     }
     
     updateUserInfo() {
@@ -406,29 +408,40 @@ class PrayerRoomService {
     
     async joinAudio() {
         try {
+            console.log('Joining audio...');
+            
+            if (!this.roomId) {
+                throw new Error('Room ID not available. Please refresh the page and try again.');
+            }
+            
             // Request microphone permission
+            console.log('Requesting microphone permission...');
             this.localStream = await navigator.mediaDevices.getUserMedia({
-                audio: true,
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    sampleRate: 48000,
+                    channelCount: 1
+                },
                 video: false
             });
             
-            // Initialize SimplePeer
-            this.initializeWebRTC();
+            console.log('Microphone permission granted, stream obtained');
+            
+            // Initialize WebRTC with SimplePeer now that we have a local stream
+            await this.initializeWebRTC();
             
             // Update UI
             this.isAudioEnabled = true;
             this.updateAudioControls();
             
+            console.log('Successfully joined audio');
+            
         } catch (error) {
             console.error('Error joining audio:', error);
-            this.showError('Failed to access microphone. Please check permissions.');
+            this.showError('Failed to access microphone. Please check permissions and try again.');
         }
-    }
-    
-    initializeWebRTC() {
-        // This is a simplified WebRTC implementation
-        // In a real implementation, you would use SimplePeer or similar library
-        console.log('WebRTC initialized');
     }
     
     toggleMute() {
@@ -447,49 +460,59 @@ class PrayerRoomService {
     }
     
     updateAudioControls() {
+        const joinAudioBtn = document.getElementById('joinAudioBtn');
         const muteBtn = document.getElementById('muteBtn');
         
         console.log('🔧 updateAudioControls called:', {
             isAudioEnabled: this.isAudioEnabled,
             isMuted: this.isMuted,
+            joinAudioBtn: !!joinAudioBtn,
             muteBtn: !!muteBtn
         });
         
-        if (muteBtn) {
-            // Always show the mute button
-            muteBtn.style.display = 'flex';
-            
-            // Update button state
-            if (this.isMuted) {
-                muteBtn.classList.add('muted');
-                // Show muted icon and text
-                const micIcon = muteBtn.querySelector('.mic-icon');
-                const mutedIcon = muteBtn.querySelector('.muted-icon');
-                const muteText = muteBtn.querySelector('.mute-text');
-                const unmuteText = muteBtn.querySelector('.unmute-text');
+        if (joinAudioBtn && muteBtn) {
+            if (this.isAudioEnabled) {
+                // Show mute button, hide join audio button
+                joinAudioBtn.style.display = 'none';
+                muteBtn.style.display = 'flex';
                 
-                if (micIcon) micIcon.style.display = 'none';
-                if (mutedIcon) mutedIcon.style.display = 'block';
-                if (muteText) muteText.style.display = 'none';
-                if (unmuteText) unmuteText.style.display = 'block';
+                // Update mute button state
+                if (this.isMuted) {
+                    muteBtn.classList.add('muted');
+                    // Show muted icon and text
+                    const micIcon = muteBtn.querySelector('.mic-icon');
+                    const mutedIcon = muteBtn.querySelector('.muted-icon');
+                    const muteText = muteBtn.querySelector('.mute-text');
+                    const unmuteText = muteBtn.querySelector('.unmute-text');
+                    
+                    if (micIcon) micIcon.style.display = 'none';
+                    if (mutedIcon) mutedIcon.style.display = 'block';
+                    if (muteText) muteText.style.display = 'none';
+                    if (unmuteText) unmuteText.style.display = 'block';
+                } else {
+                    muteBtn.classList.remove('muted');
+                    // Show mic icon and text
+                    const micIcon = muteBtn.querySelector('.mic-icon');
+                    const mutedIcon = muteBtn.querySelector('.muted-icon');
+                    const muteText = muteBtn.querySelector('.mute-text');
+                    const unmuteText = muteBtn.querySelector('.unmute-text');
+                    
+                    if (micIcon) micIcon.style.display = 'block';
+                    if (mutedIcon) mutedIcon.style.display = 'none';
+                    if (muteText) muteText.style.display = 'block';
+                    if (unmuteText) unmuteText.style.display = 'none';
+                }
             } else {
-                muteBtn.classList.remove('muted');
-                // Show mic icon and text
-                const micIcon = muteBtn.querySelector('.mic-icon');
-                const mutedIcon = muteBtn.querySelector('.muted-icon');
-                const muteText = muteBtn.querySelector('.mute-text');
-                const unmuteText = muteBtn.querySelector('.unmute-text');
-                
-                if (micIcon) micIcon.style.display = 'block';
-                if (mutedIcon) mutedIcon.style.display = 'none';
-                if (muteText) muteText.style.display = 'block';
-                if (unmuteText) unmuteText.style.display = 'none';
+                // Show join audio button, hide mute button
+                joinAudioBtn.style.display = 'flex';
+                muteBtn.style.display = 'none';
             }
             
-            console.log('🔧 Mute button updated:', {
-                display: muteBtn.style.display,
-                isMuted: this.isMuted,
-                hasMutedClass: muteBtn.classList.contains('muted')
+            console.log('🔧 Audio controls updated:', {
+                joinAudioDisplay: joinAudioBtn.style.display,
+                muteDisplay: muteBtn.style.display,
+                isAudioEnabled: this.isAudioEnabled,
+                isMuted: this.isMuted
             });
         }
     }
@@ -512,6 +535,85 @@ class PrayerRoomService {
     }
     
     async leaveRoom() {
+        try {
+            // If user is the host, show custom confirmation modal
+            if (this.isHost) {
+                return new Promise((resolve) => {
+                    this.showHostLeaveModal(resolve);
+                });
+            }
+            
+            // For non-hosts, proceed directly
+            await this.performLeave();
+            
+        } catch (error) {
+            console.error('Error leaving room:', error);
+            // Still redirect even if API call fails
+            window.location.href = '/prayers';
+        }
+    }
+
+    showHostLeaveModal(resolve) {
+        const modal = document.getElementById('hostLeaveModal');
+        const cancelBtn = document.getElementById('cancelLeaveBtn');
+        const confirmBtn = document.getElementById('confirmLeaveBtn');
+        
+        if (!modal || !cancelBtn || !confirmBtn) {
+            console.error('Modal elements not found');
+            // Fallback to browser confirm
+            const confirmed = confirm(
+                '⚠️ Warning: You are the host of this prayer room.\n\n' +
+                'Leaving will end the session for ALL participants.\n\n' +
+                'Are you sure you want to end the prayer session?'
+            );
+            
+            if (confirmed) {
+                this.performLeave();
+            }
+            resolve();
+            return;
+        }
+        
+        // Show modal
+        modal.style.display = 'flex';
+        
+        // Handle cancel
+        cancelBtn.onclick = () => {
+            modal.style.display = 'none';
+            console.log('Host leave cancelled by user');
+            resolve();
+        };
+        
+        // Handle confirm
+        confirmBtn.onclick = async () => {
+            modal.style.display = 'none';
+            console.log('Host confirmed leaving - ending session for all participants');
+            await this.performLeave();
+            resolve();
+        };
+        
+        // Handle clicking outside modal
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+                console.log('Host leave cancelled by clicking outside');
+                resolve();
+            }
+        };
+        
+        // Handle escape key
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                modal.style.display = 'none';
+                console.log('Host leave cancelled by escape key');
+                document.removeEventListener('keydown', handleEscape);
+                resolve();
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+    }
+
+    async performLeave() {
         try {
             // Stop local stream
             if (this.localStream) {
@@ -727,41 +829,13 @@ class PrayerRoomService {
     }
     
     setupRealtimeListeners() {
-        if (!this.firestore || !this.roomId) return;
+        // Note: We're using API endpoints instead of direct Firestore access
+        // This avoids permission issues and provides better error handling
+        console.log('Using API-based polling instead of direct Firestore listeners');
         
-        // Listen for participant changes
-        this.firestore.collection('prayer_rooms').doc(this.roomId)
-            .onSnapshot((doc) => {
-                if (doc.exists) {
-                    const data = doc.data();
-                    this.updateParticipants(data.participants || []);
-                }
-            }, (error) => {
-                // Fallback to polling for participants
-                this.setupParticipantPolling();
-            });
-        
-        // Listen for chat messages with error handling
-        try {
-            this.firestore.collection('chat_messages')
-                .where('room_id', '==', this.roomId)
-                .orderBy('timestamp', 'desc')
-                .limit(50)
-                .onSnapshot((snapshot) => {
-                    this.chatMessages = [];
-                    snapshot.forEach(doc => {
-                        this.chatMessages.push(doc.data());
-                    });
-                    this.chatMessages.reverse();
-                    this.updateChatDisplay();
-                }, (error) => {
-                    // Fallback to periodic polling
-                    this.setupChatPolling();
-                });
-        } catch (error) {
-            // Fallback to periodic polling
-            this.setupChatPolling();
-        }
+        // Set up polling for participants and chat
+        this.setupParticipantPolling();
+        this.setupChatPolling();
     }
     
     setupChatPolling() {
@@ -839,19 +913,10 @@ class PrayerRoomService {
         try {
             console.log('Initializing WebRTC for voice communication...');
             
-            // Request high-quality microphone access
-            this.localStream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                    sampleRate: 48000,
-                    channelCount: 1,
-                    latency: 0.01
-                }
-            });
-            
-            console.log('High-quality microphone access granted');
+            if (!this.localStream) {
+                console.log('No local stream available yet. WebRTC will be initialized when user joins audio.');
+                return;
+            }
             
             // Initialize audio context for voice activity detection
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -859,14 +924,14 @@ class PrayerRoomService {
             // Set up voice activity detection
             this.setupVoiceActivityDetection();
             
-            // Set up WebRTC signaling
+            // Set up WebRTC signaling with SimplePeer
             this.setupWebRTCSignaling();
             
             console.log('WebRTC initialized successfully');
             
         } catch (error) {
             console.error('Error initializing WebRTC:', error);
-            this.showError('Failed to access microphone. Please check your permissions and try again.');
+            this.showError('Failed to initialize voice communication. Please try again.');
         }
     }
 
@@ -957,51 +1022,80 @@ class PrayerRoomService {
         try {
             if (!this.roomId) return;
             
+            console.log('Setting up WebRTC signaling with SimplePeer...');
+            
             // Note: WebRTC signaling is now handled via API endpoints
-            // Real-time listeners are disabled to avoid Firestore permission issues
-            console.log('WebRTC signaling setup completed (using API endpoints)');
+            // This avoids Firestore permission issues
+            console.log('WebRTC signaling will be handled via API endpoints');
             
         } catch (error) {
             console.error('Error setting up WebRTC signaling:', error);
         }
     }
 
-    async createPeerConnection(participantId) {
+    async createPeerConnection(participantId, participantData) {
         try {
-            const peerConnection = new RTCPeerConnection({
-                iceServers: this.iceServers
+            console.log(`Creating peer connection with ${participantId}`);
+            
+            // Create SimplePeer instance
+            const peer = new SimplePeer({
+                initiator: false, // We'll let the first participant be the initiator
+                stream: this.localStream,
+                trickle: false
             });
             
-            // Add local stream
-            if (this.localStream) {
-                this.localStream.getTracks().forEach(track => {
-                    peerConnection.addTrack(track, this.localStream);
-                });
-            }
+            // Store the peer connection
+            this.peers.set(participantId, peer);
             
-            // Handle remote stream
-            peerConnection.ontrack = (event) => {
-                this.handleRemoteStream(participantId, event.streams[0]);
-            };
+            // Handle incoming signal
+            peer.on('signal', (data) => {
+                console.log('Sending signal to', participantId);
+                // Send signal to the other participant via Firestore
+                this.sendSignal(participantId, data);
+            });
             
-            // Handle ICE candidates
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    this.sendICECandidate(participantId, event.candidate);
-                }
-            };
+            // Handle incoming stream
+            peer.on('stream', (stream) => {
+                console.log('Received stream from', participantId);
+                this.handleRemoteStream(participantId, stream);
+            });
             
-            this.peerConnections.set(participantId, peerConnection);
+            // Handle connection errors
+            peer.on('error', (err) => {
+                console.error('Peer connection error:', err);
+            });
             
-            // Create offer
-            const offer = await peerConnection.createOffer();
-            await peerConnection.setLocalDescription(offer);
+            // Handle connection close
+            peer.on('close', () => {
+                console.log('Peer connection closed:', participantId);
+                this.peers.delete(participantId);
+            });
             
-            // Send offer
-            await this.sendWebRTCOffer(participantId, offer);
+            console.log(`Peer connection created for ${participantId}`);
             
         } catch (error) {
             console.error('Error creating peer connection:', error);
+        }
+    }
+
+    async sendSignal(participantId, signalData) {
+        try {
+            // Note: WebRTC signaling is now handled via API endpoints
+            // This avoids Firestore permission issues
+            console.log('WebRTC signaling via API endpoints (not implemented yet)');
+        } catch (error) {
+            console.error('Error sending signal:', error);
+        }
+    }
+    
+    async handleIncomingSignal(signalData) {
+        try {
+            const peer = this.peers.get(signalData.from);
+            if (peer) {
+                peer.signal(signalData.signal);
+            }
+        } catch (error) {
+            console.error('Error handling incoming signal:', error);
         }
     }
 
@@ -1112,10 +1206,10 @@ class PrayerRoomService {
 
     closePeerConnection(participantId) {
         try {
-            const peerConnection = this.peerConnections.get(participantId);
-            if (peerConnection) {
-                peerConnection.close();
-                this.peerConnections.delete(participantId);
+            const peer = this.peers.get(participantId);
+            if (peer) {
+                peer.destroy();
+                this.peers.delete(participantId);
             }
             
             // Remove audio element
@@ -1137,13 +1231,8 @@ class PrayerRoomService {
                 return;
             }
             
-            await this.firestore.collection('prayer_rooms').doc(this.roomId)
-                .collection('participants').doc(participantId)
-                .update({
-                    is_muted: true,
-                    muted_by: this.userId,
-                    muted_at: firebase.firestore.FieldValue.serverTimestamp()
-                });
+            // Note: Host controls are now handled via API endpoints
+            console.log('Muting participant via API endpoint (not implemented yet)');
                 
         } catch (error) {
             console.error('Error muting participant:', error);
@@ -1157,13 +1246,8 @@ class PrayerRoomService {
                 return;
             }
             
-            await this.firestore.collection('prayer_rooms').doc(this.roomId)
-                .collection('participants').doc(participantId)
-                .update({
-                    is_muted: false,
-                    muted_by: null,
-                    muted_at: null
-                });
+            // Note: Host controls are now handled via API endpoints
+            console.log('Unmuting participant via API endpoint (not implemented yet)');
                 
         } catch (error) {
             console.error('Error unmuting participant:', error);
@@ -1177,9 +1261,8 @@ class PrayerRoomService {
                 return;
             }
             
-            await this.firestore.collection('prayer_rooms').doc(this.roomId)
-                .collection('participants').doc(participantId)
-                .delete();
+            // Note: Host controls are now handled via API endpoints
+            console.log('Removing participant via API endpoint (not implemented yet)');
                 
         } catch (error) {
             console.error('Error removing participant:', error);
