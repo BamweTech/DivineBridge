@@ -33,6 +33,7 @@ gcloud run services add-iam-policy-binding divinebridge \
 ### 3. Create Scheduler Job
 
 ```bash
+# Daily prayer generation job
 gcloud scheduler jobs create http daily-prayer-generator \
     --location=us-central1 \
     --schedule="0 0 * * *" \
@@ -40,6 +41,16 @@ gcloud scheduler jobs create http daily-prayer-generator \
     --uri="https://divinebridge-<your-hash>-uc.a.run.app/api/prayer/generate" \
     --http-method=POST \
     --oidc-service-account-email=prayer-scheduler@divinebridge.iam.gserviceaccount.com \
+    --oidc-token-audience="https://divinebridge-<your-hash>-uc.a.run.app"
+
+# Weekly email sending job (Mondays at 6 AM ET)
+gcloud scheduler jobs create http send-daily-emails \
+    --location=us-central1 \
+    --schedule="0 6 * * 1" \
+    --time-zone="America/New_York" \
+    --uri="https://divinebridge-<your-hash>-uc.a.run.app/api/email/send-daily-emails" \
+    --http-method=POST \
+    --oidc-service-account-email=divinebridge@appspot.gserviceaccount.com \
     --oidc-token-audience="https://divinebridge-<your-hash>-uc.a.run.app"
 ```
 
@@ -113,9 +124,17 @@ def generate_daily_prayer():
 
 ## Schedule Details
 
+### Daily Prayer Generation
 - **Frequency**: Daily at 00:00 UTC (midnight)
 - **Cron Expression**: `0 0 * * *`
 - **Timezone**: UTC
+- **Method**: HTTP POST
+- **Authentication**: OIDC (Cloud IAM)
+
+### Weekly Email Sending
+- **Frequency**: Every Monday at 6:00 AM ET
+- **Cron Expression**: `0 6 * * 1`
+- **Timezone**: America/New_York
 - **Method**: HTTP POST
 - **Authentication**: OIDC (Cloud IAM)
 

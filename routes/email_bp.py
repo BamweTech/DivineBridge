@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 def send_daily_emails():
     """
     Send daily verse + prayer emails to all Firebase subscribers
-    Triggered by Cloud Scheduler at 6 AM ET
+    Triggered by Cloud Scheduler every Monday at 6 AM ET
     """
     try:
         from firebase_admin import firestore
@@ -44,6 +44,7 @@ def send_daily_emails():
         }
         
         # Get today's prayer
+        today_str = datetime.now().strftime('%Y-%m-%d')
         prayer = current_app.storage_handler.get_prayer(today_str)
         if not prayer:
             logger.error("No prayer available for today")
