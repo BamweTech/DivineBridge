@@ -408,14 +408,14 @@ class PrayerRoomService {
     
     async joinAudio() {
         try {
-            console.log('Joining audio...');
+            console.log('🎤 Joining audio...');
             
             if (!this.roomId) {
                 throw new Error('Room ID not available. Please refresh the page and try again.');
             }
             
             // Request microphone permission
-            console.log('Requesting microphone permission...');
+            console.log('🎤 Requesting microphone permission...');
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     echoCancellation: true,
@@ -427,7 +427,12 @@ class PrayerRoomService {
                 video: false
             });
             
-            console.log('Microphone permission granted, stream obtained');
+            console.log('🎤 Microphone permission granted, stream obtained:', this.localStream);
+            console.log('🎤 Local stream tracks:', this.localStream.getTracks());
+            console.log('🎤 Local stream active:', this.localStream.active);
+            
+            // Enable audio playback first
+            await this.enableAudioPlayback();
             
             // Initialize WebRTC with SimplePeer now that we have a local stream
             await this.initializeWebRTC();
@@ -439,10 +444,10 @@ class PrayerRoomService {
             this.isAudioEnabled = true;
             this.updateAudioControls();
             
-            console.log('Successfully joined audio');
+            console.log('🎤 Successfully joined audio');
             
         } catch (error) {
-            console.error('Error joining audio:', error);
+            console.error('🎤 Error joining audio:', error);
             this.showError('Failed to access microphone. Please check permissions and try again.');
         }
     }
@@ -914,15 +919,22 @@ class PrayerRoomService {
     // WebRTC Voice Communication Methods
     async initializeWebRTC() {
         try {
-            console.log('Initializing WebRTC for voice communication...');
+            console.log('🔧 Initializing WebRTC for voice communication...');
             
             if (!this.localStream) {
-                console.log('No local stream available yet. WebRTC will be initialized when user joins audio.');
+                console.log('🔧 No local stream available yet. WebRTC will be initialized when user joins audio.');
                 return;
             }
             
             // Initialize audio context for voice activity detection
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            console.log('🔧 Audio context created:', this.audioContext.state);
+            
+            // Resume audio context if it's suspended (required for autoplay)
+            if (this.audioContext.state === 'suspended') {
+                await this.audioContext.resume();
+                console.log('🔧 Audio context resumed:', this.audioContext.state);
+            }
             
             // Set up voice activity detection
             this.setupVoiceActivityDetection();
@@ -930,10 +942,10 @@ class PrayerRoomService {
             // Set up WebRTC signaling with SimplePeer
             this.setupWebRTCSignaling();
             
-            console.log('WebRTC initialized successfully');
+            console.log('🔧 WebRTC initialized successfully');
             
         } catch (error) {
-            console.error('Error initializing WebRTC:', error);
+            console.error('🔧 Error initializing WebRTC:', error);
             this.showError('Failed to initialize voice communication. Please try again.');
         }
     }
@@ -1077,16 +1089,21 @@ class PrayerRoomService {
 
     async createPeerConnection(participantId, participantData) {
         try {
-            console.log(`Creating peer connection with ${participantId}`);
+            console.log(`🔗 Creating peer connection with ${participantId}`);
             
             // Don't create connection with ourselves
-            if (participantId === this.userId) return;
+            if (participantId === this.userId) {
+                console.log(`🔗 Skipping self-connection with ${participantId}`);
+                return;
+            }
             
             // Check if we already have a connection with this participant
             if (this.peers.has(participantId)) {
-                console.log(`Peer connection already exists with ${participantId}`);
+                console.log(`🔗 Peer connection already exists with ${participantId}`);
                 return;
             }
+            
+            console.log(`🔗 Creating SimplePeer instance for ${participantId} with local stream:`, this.localStream);
             
             // Create SimplePeer instance as initiator
             const peer = new SimplePeer({
@@ -1095,16 +1112,18 @@ class PrayerRoomService {
                 trickle: false
             });
             
+            console.log(`🔗 SimplePeer instance created for ${participantId}:`, peer);
+            
             // Store the peer connection
             this.peers.set(participantId, peer);
             
             // Set up peer event handlers
             this.setupPeerEventHandlers(peer, participantId);
             
-            console.log(`Peer connection created with ${participantId}`);
+            console.log(`🔗 Peer connection created with ${participantId}`);
             
         } catch (error) {
-            console.error('Error creating peer connection:', error);
+            console.error(`🔗 Error creating peer connection with ${participantId}:`, error);
         }
     }
 
@@ -1183,24 +1202,31 @@ class PrayerRoomService {
     setupPeerEventHandlers(peer, participantId) {
         // Handle incoming signal (offer/answer)
         peer.on('signal', (data) => {
-            console.log('Sending signal to', participantId);
+            console.log(`📡 Sending signal to ${participantId}:`, data.type);
             this.sendSignal(participantId, data);
         });
         
         // Handle incoming stream
         peer.on('stream', (stream) => {
-            console.log('Received stream from', participantId);
+            console.log(`🎵 Received stream from ${participantId}:`, stream);
+            console.log(`🎵 Stream tracks:`, stream.getTracks());
+            console.log(`🎵 Stream active:`, stream.active);
             this.handleRemoteStream(participantId, stream);
+        });
+        
+        // Handle connection established
+        peer.on('connect', () => {
+            console.log(`✅ Peer connection established with ${participantId}`);
         });
         
         // Handle connection errors
         peer.on('error', (err) => {
-            console.error('Peer connection error:', err);
+            console.error(`❌ Peer connection error with ${participantId}:`, err);
         });
         
         // Handle connection close
         peer.on('close', () => {
-            console.log('Peer connection closed:', participantId);
+            console.log(`🔌 Peer connection closed with ${participantId}`);
             this.peers.delete(participantId);
         });
     }
@@ -1260,24 +1286,72 @@ class PrayerRoomService {
 
     handleRemoteStream(participantId, stream) {
         try {
+            console.log(`🎵 Handling remote stream from ${participantId}`, stream);
+            
             // Create audio element for remote stream
             const audioElement = document.createElement('audio');
             audioElement.srcObject = stream;
             audioElement.autoplay = true;
+            audioElement.playsInline = true; // Important for mobile
             audioElement.id = `audio-${participantId}`;
             audioElement.volume = 0.8; // Set default volume
             
-            // Add to participants container
+            // Add event listeners for debugging
+            audioElement.addEventListener('loadedmetadata', () => {
+                console.log(`🎵 Audio metadata loaded for ${participantId}`);
+            });
+            
+            audioElement.addEventListener('canplay', () => {
+                console.log(`🎵 Audio can play for ${participantId}`);
+            });
+            
+            audioElement.addEventListener('play', () => {
+                console.log(`🎵 Audio started playing for ${participantId}`);
+            });
+            
+            audioElement.addEventListener('error', (e) => {
+                console.error(`🎵 Audio error for ${participantId}:`, e);
+            });
+            
+            // Try to add to participants container first
             const participantsContainer = document.getElementById('participantsList');
             if (participantsContainer) {
                 const participantElement = participantsContainer.querySelector(`[data-user-id="${participantId}"]`);
                 if (participantElement) {
                     participantElement.appendChild(audioElement);
+                    console.log(`🎵 Audio element added to participant element for ${participantId}`);
+                } else {
+                    // Fallback: add to body if participant element not found
+                    document.body.appendChild(audioElement);
+                    console.log(`🎵 Audio element added to body for ${participantId} (fallback)`);
                 }
+            } else {
+                // Fallback: add to body if participants container not found
+                document.body.appendChild(audioElement);
+                console.log(`🎵 Audio element added to body for ${participantId} (fallback)`);
             }
+            
+            // Try to play the audio
+            audioElement.play().catch(error => {
+                console.error(`🎵 Failed to play audio for ${participantId}:`, error);
+            });
             
         } catch (error) {
             console.error('Error handling remote stream:', error);
+        }
+    }
+
+    // Method to handle audio autoplay issues
+    async enableAudioPlayback() {
+        try {
+            // Create a temporary audio context to enable audio playback
+            const tempAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+            if (tempAudioContext.state === 'suspended') {
+                await tempAudioContext.resume();
+            }
+            console.log('🔊 Audio playback enabled');
+        } catch (error) {
+            console.error('🔊 Error enabling audio playback:', error);
         }
     }
 
