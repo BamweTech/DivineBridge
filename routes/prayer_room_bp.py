@@ -873,3 +873,115 @@ def get_webrtc_answers(room_id):
     except Exception as e:
         logging.error(f"Error getting WebRTC answers: {str(e)}")
         return jsonify({'error': 'Failed to get WebRTC answers'}), 500
+
+# Multi-Device Session Management Endpoints
+@prayer_room_bp.route('/<room_id>/check-session', methods=['POST'])
+def check_session(room_id):
+    """Check if user already has an active session on another device"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        device_id = data.get('device_id')
+        device_info = data.get('device_info', {})
+        
+        if not user_id:
+            return jsonify({'error': 'User ID is required'}), 400
+        
+        db = get_firestore_client()
+        
+        # Check for existing active sessions for this user
+        sessions_ref = db.collection('prayer_rooms').document(room_id)\
+            .collection('device_sessions')\
+            .where('user_id', '==', user_id)\
+            .where('is_active', '==', True)\
+            .limit(1)
+        
+        existing_sessions = list(sessions_ref.stream())
+        
+        if existing_sessions:
+            existing_session = existing_sessions[0].to_dict()
+            return jsonify({
+                'has_existing_session': True,
+                'existing_device_info': existing_session.get('device_info', {})
+            })
+        
+        return jsonify({'has_existing_session': False})
+        
+    except Exception as e:
+        logging.error(f"Error checking session: {str(e)}")
+        return jsonify({'error': 'Failed to check session'}), 500
+
+@prayer_room_bp.route('/<room_id>/register-session', methods=['POST'])
+def register_session(room_id):
+    """Register a new device session"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        device_id = data.get('device_id')
+        device_info = data.get('device_info', {})
+        
+        if not user_id or not device_id:
+            return jsonify({'error': 'User ID and Device ID are required'}), 400
+        
+        db = get_firestore_client()
+        
+        # Deactivate any existing sessions for this user
+        existing_sessions_ref = db.collection('prayer_rooms').document(room_id)\
+            .collection('device_sessions')\
+            .where('user_id', '==', user_id)\
+            .where('is_active', '==', True)
+        
+        for session_doc in existing_sessions_ref.stream():
+            session_doc.reference.update({
+                'is_active': False,
+                'ended_at': datetime.utcnow()
+            })
+        
+        # Register new session
+        session_data = {
+            'user_id': user_id,
+            'device_id': device_id,
+            'device_info': device_info,
+            'is_active': True,
+            'created_at': datetime.utcnow(),
+            'last_seen': datetime.utcnow()
+        }
+        
+        db.collection('prayer_rooms').document(room_id)\
+            .collection('device_sessions').add(session_data)
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        logging.error(f"Error registering session: {str(e)}")
+        return jsonify({'error': 'Failed to register session'}), 500
+
+@prayer_room_bp.route('/<room_id>/disconnect-session', methods=['POST'])
+def disconnect_session(room_id):
+    """Disconnect existing session (for device switching)"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return jsonify({'error': 'User ID is required'}), 400
+        
+        db = get_firestore_client()
+        
+        # Deactivate all sessions for this user
+        sessions_ref = db.collection('prayer_rooms').document(room_id)\
+            .collection('device_sessions')\
+            .where('user_id', '==', user_id)\
+            .where('is_active', '==', True)
+        
+        for session_doc in sessions_ref.stream():
+            session_doc.reference.update({
+                'is_active': False,
+                'ended_at': datetime.utcnow()
+            })
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        logging.error(f"Error disconnecting session: {str(e)}")
+        return jsonify({'error': 'Failed to disconnect session'}), 500

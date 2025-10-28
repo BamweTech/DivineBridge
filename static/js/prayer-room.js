@@ -19,10 +19,31 @@ class PrayerRoomService {
         this.audioAnalyser = null;
         this.voiceActivityThreshold = 0.01;
         this.isSpeaking = false;
+        
+        // Advanced Audio Processing Components
+        this.audioProcessor = null;
+        this.noiseSuppressor = null;
+        this.echoCanceller = null;
+        this.gainController = null;
+        this.audioEnhancer = null;
+        this.voiceActivityDetector = null;
+        
+        // Audio Quality Monitoring
+        this.audioQualityMonitor = null;
+        this.connectionQuality = 'good';
+        this.adaptiveBitrate = true;
+        
+        // Multi-device session management
+        this.deviceSessions = new Map();
+        this.currentDeviceId = null;
+        this.sessionConflict = false;
+        
         this.iceServers = [
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
-            { urls: 'stun:stun2.l.google.com:19302' }
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' }
         ];
         
         // Track processed signals to prevent duplicates
@@ -55,6 +76,12 @@ class PrayerRoomService {
                     window.location.href = '/prayer-rooms';
                 }, 3000);
                 return;
+            }
+            
+            // Check for existing device sessions
+            const hasConflict = await this.checkForExistingSession();
+            if (hasConflict) {
+                return; // User will handle the conflict dialog
             }
             
             // Initialize UI
@@ -466,15 +493,18 @@ class PrayerRoomService {
                 console.warn('⚠️ Audio playback initialization failed:', error);
             });
             
-            // Initialize WebRTC (more complex)
-            this.initializeWebRTC().then(() => {
-                console.log('🎤 WebRTC initialized, starting participant connections...');
-                // Only initiate connections after WebRTC is ready
+            // Initialize advanced audio processing and WebRTC
+            Promise.all([
+                this.initializeAdvancedAudioProcessing(),
+                this.initializeWebRTC()
+            ]).then(() => {
+                console.log('🎤 Advanced audio processing and WebRTC initialized, starting participant connections...');
+                // Only initiate connections after everything is ready
                 this.initiateConnectionsWithParticipants().catch(error => {
                     console.error('⚠️ Error initiating connections:', error);
                 });
             }).catch(error => {
-                console.warn('⚠️ WebRTC initialization failed:', error);
+                console.warn('⚠️ Advanced audio processing or WebRTC initialization failed:', error);
             });
             
             console.log('🎤 Audio join process initiated successfully');
@@ -1874,6 +1904,563 @@ class PrayerRoomService {
             console.log('🔊 Audio playback enabled');
         } catch (error) {
             console.error('🔊 Error enabling audio playback:', error);
+        }
+    }
+
+    // Advanced Audio Processing Methods
+    async initializeAdvancedAudioProcessing() {
+        try {
+            console.log('🎛️ Initializing advanced audio processing...');
+            
+            if (!this.audioContext) {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            
+            // Resume audio context
+            if (this.audioContext.state === 'suspended') {
+                await this.audioContext.resume();
+            }
+            
+            // Create audio processing chain
+            await this.setupAudioProcessingChain();
+            
+            // Initialize voice activity detection
+            this.setupAdvancedVoiceActivityDetection();
+            
+            // Start audio quality monitoring
+            this.startAudioQualityMonitoring();
+            
+            console.log('🎛️ Advanced audio processing initialized');
+            
+        } catch (error) {
+            console.error('🎛️ Error initializing advanced audio processing:', error);
+        }
+    }
+
+    async setupAudioProcessingChain() {
+        try {
+            if (!this.localStream || !this.audioContext) return;
+            
+            // Get the audio track
+            const audioTrack = this.localStream.getAudioTracks()[0];
+            if (!audioTrack) return;
+            
+            // Create media stream source
+            const source = this.audioContext.createMediaStreamSource(this.localStream);
+            
+            // Create audio processing nodes
+            this.gainController = this.audioContext.createGain();
+            this.audioAnalyser = this.audioContext.createAnalyser();
+            
+            // Configure analyser for better frequency analysis
+            this.audioAnalyser.fftSize = 2048;
+            this.audioAnalyser.smoothingTimeConstant = 0.8;
+            
+            // Create noise suppression using Web Audio API
+            this.noiseSuppressor = this.createNoiseSuppressor();
+            
+            // Create echo cancellation
+            this.echoCanceller = this.createEchoCanceller();
+            
+            // Create audio enhancer
+            this.audioEnhancer = this.createAudioEnhancer();
+            
+            // Connect the audio processing chain
+            source.connect(this.gainController);
+            this.gainController.connect(this.noiseSuppressor);
+            this.noiseSuppressor.connect(this.echoCanceller);
+            this.echoCanceller.connect(this.audioEnhancer);
+            this.audioEnhancer.connect(this.audioAnalyser);
+            
+            // Create destination for processed audio
+            const destination = this.audioContext.createMediaStreamDestination();
+            this.audioEnhancer.connect(destination);
+            
+            // Replace the original stream with processed stream
+            this.localStream = destination.stream;
+            
+            console.log('🎛️ Audio processing chain created');
+            
+        } catch (error) {
+            console.error('🎛️ Error setting up audio processing chain:', error);
+        }
+    }
+
+    createNoiseSuppressor() {
+        try {
+            // Create a high-pass filter to remove low-frequency noise
+            const highPassFilter = this.audioContext.createBiquadFilter();
+            highPassFilter.type = 'highpass';
+            highPassFilter.frequency.value = 80; // Remove frequencies below 80Hz
+            highPassFilter.Q.value = 1;
+            
+            // Create a low-pass filter to remove high-frequency noise
+            const lowPassFilter = this.audioContext.createBiquadFilter();
+            lowPassFilter.type = 'lowpass';
+            lowPassFilter.frequency.value = 8000; // Remove frequencies above 8kHz
+            lowPassFilter.Q.value = 1;
+            
+            // Create a notch filter for common noise frequencies
+            const notchFilter = this.audioContext.createBiquadFilter();
+            notchFilter.type = 'notch';
+            notchFilter.frequency.value = 60; // Remove 60Hz hum
+            notchFilter.Q.value = 30;
+            
+            // Connect filters in series
+            highPassFilter.connect(lowPassFilter);
+            lowPassFilter.connect(notchFilter);
+            
+            return highPassFilter;
+            
+        } catch (error) {
+            console.error('🎛️ Error creating noise suppressor:', error);
+            return this.audioContext.createGain(); // Fallback to simple gain
+        }
+    }
+
+    createEchoCanceller() {
+        try {
+            // Create a dynamic range compressor to reduce echo
+            const compressor = this.audioContext.createDynamicsCompressor();
+            compressor.threshold.value = -24;
+            compressor.knee.value = 30;
+            compressor.ratio.value = 12;
+            compressor.attack.value = 0.003;
+            compressor.release.value = 0.25;
+            
+            return compressor;
+            
+        } catch (error) {
+            console.error('🎛️ Error creating echo canceller:', error);
+            return this.audioContext.createGain(); // Fallback to simple gain
+        }
+    }
+
+    createAudioEnhancer() {
+        try {
+            // Create a multi-band equalizer for voice enhancement
+            const eq = this.audioContext.createBiquadFilter();
+            eq.type = 'peaking';
+            eq.frequency.value = 1000; // Enhance voice frequencies around 1kHz
+            eq.gain.value = 3; // Boost by 3dB
+            eq.Q.value = 1;
+            
+            // Create a gentle compressor for consistent volume
+            const compressor = this.audioContext.createDynamicsCompressor();
+            compressor.threshold.value = -20;
+            compressor.knee.value = 20;
+            compressor.ratio.value = 4;
+            compressor.attack.value = 0.01;
+            compressor.release.value = 0.1;
+            
+            eq.connect(compressor);
+            return eq;
+            
+        } catch (error) {
+            console.error('🎛️ Error creating audio enhancer:', error);
+            return this.audioContext.createGain(); // Fallback to simple gain
+        }
+    }
+
+    setupAdvancedVoiceActivityDetection() {
+        try {
+            if (!this.audioAnalyser) return;
+            
+            const bufferLength = this.audioAnalyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            
+            const detectVoiceActivity = () => {
+                this.audioAnalyser.getByteFrequencyData(dataArray);
+                
+                // Calculate RMS (Root Mean Square) for voice detection
+                let sum = 0;
+                for (let i = 0; i < bufferLength; i++) {
+                    sum += dataArray[i] * dataArray[i];
+                }
+                const rms = Math.sqrt(sum / bufferLength);
+                
+                // Advanced voice activity detection
+                const voiceThreshold = this.calculateDynamicThreshold(dataArray);
+                const isCurrentlySpeaking = rms > voiceThreshold;
+                
+                if (isCurrentlySpeaking !== this.isSpeaking) {
+                    this.isSpeaking = isCurrentlySpeaking;
+                    this.updateSpeakingState(this.isSpeaking);
+                    
+                    // Update UI with speaking indicator
+                    this.updateSpeakingIndicator(this.isSpeaking);
+                }
+                
+                // Continue monitoring
+                requestAnimationFrame(detectVoiceActivity);
+            };
+            
+            detectVoiceActivity();
+            console.log('🎤 Advanced voice activity detection started');
+            
+        } catch (error) {
+            console.error('🎤 Error setting up voice activity detection:', error);
+        }
+    }
+
+    calculateDynamicThreshold(dataArray) {
+        try {
+            // Calculate dynamic threshold based on frequency analysis
+            const voiceFrequencies = dataArray.slice(85, 340); // ~1kHz to ~4kHz range
+            const avgVoiceLevel = voiceFrequencies.reduce((a, b) => a + b, 0) / voiceFrequencies.length;
+            
+            // Adaptive threshold based on background noise
+            const backgroundNoise = dataArray.slice(0, 85).reduce((a, b) => a + b, 0) / 85;
+            const dynamicThreshold = Math.max(avgVoiceLevel * 0.3, backgroundNoise * 2);
+            
+            return Math.min(dynamicThreshold, 50); // Cap at reasonable level
+            
+        } catch (error) {
+            console.error('🎤 Error calculating dynamic threshold:', error);
+            return this.voiceActivityThreshold * 100; // Fallback to static threshold
+        }
+    }
+
+    startAudioQualityMonitoring() {
+        try {
+            if (!this.audioAnalyser) return;
+            
+            const monitorQuality = () => {
+                const bufferLength = this.audioAnalyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                this.audioAnalyser.getByteFrequencyData(dataArray);
+                
+                // Calculate audio quality metrics
+                const quality = this.calculateAudioQuality(dataArray);
+                this.connectionQuality = quality;
+                
+                // Adapt bitrate based on quality
+                if (this.adaptiveBitrate) {
+                    this.adaptBitrateBasedOnQuality(quality);
+                }
+                
+                // Update UI with quality indicator
+                this.updateAudioQualityIndicator(quality);
+                
+                // Continue monitoring
+                setTimeout(monitorQuality, 1000); // Check every second
+            };
+            
+            monitorQuality();
+            console.log('📊 Audio quality monitoring started');
+            
+        } catch (error) {
+            console.error('📊 Error starting audio quality monitoring:', error);
+        }
+    }
+
+    calculateAudioQuality(dataArray) {
+        try {
+            // Calculate signal-to-noise ratio
+            const signal = dataArray.slice(85, 340).reduce((a, b) => a + b, 0) / 255;
+            const noise = dataArray.slice(0, 85).reduce((a, b) => a + b, 0) / 255;
+            const snr = signal / (noise + 0.1); // Add small value to avoid division by zero
+            
+            // Determine quality level
+            if (snr > 3) return 'excellent';
+            if (snr > 2) return 'good';
+            if (snr > 1) return 'fair';
+            return 'poor';
+            
+        } catch (error) {
+            console.error('📊 Error calculating audio quality:', error);
+            return 'unknown';
+        }
+    }
+
+    adaptBitrateBasedOnQuality(quality) {
+        try {
+            // Adjust audio constraints based on quality
+            const audioTracks = this.localStream.getAudioTracks();
+            if (audioTracks.length === 0) return;
+            
+            const track = audioTracks[0];
+            
+            switch (quality) {
+                case 'excellent':
+                    // Use highest quality settings
+                    track.applyConstraints({
+                        sampleRate: 48000,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    });
+                    break;
+                case 'good':
+                    // Use balanced settings
+                    track.applyConstraints({
+                        sampleRate: 44100,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    });
+                    break;
+                case 'fair':
+                case 'poor':
+                    // Use conservative settings for better reliability
+                    track.applyConstraints({
+                        sampleRate: 22050,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    });
+                    break;
+            }
+            
+            console.log(`🎛️ Adapted bitrate for ${quality} quality`);
+            
+        } catch (error) {
+            console.error('🎛️ Error adapting bitrate:', error);
+        }
+    }
+
+    updateAudioQualityIndicator(quality) {
+        try {
+            const qualityIndicator = document.getElementById('audioQualityIndicator');
+            if (!qualityIndicator) return;
+            
+            // Update quality indicator color and text
+            qualityIndicator.className = `audio-quality-indicator ${quality}`;
+            qualityIndicator.textContent = quality.charAt(0).toUpperCase() + quality.slice(1);
+            
+        } catch (error) {
+            console.error('📊 Error updating audio quality indicator:', error);
+        }
+    }
+
+    updateSpeakingIndicator(isSpeaking) {
+        try {
+            // Update speaking indicator in participant list
+            const participantElement = document.querySelector(`[data-user-id="${this.userId}"]`);
+            if (participantElement) {
+                const speakingIndicator = participantElement.querySelector('.speaking-indicator');
+                if (speakingIndicator) {
+                    speakingIndicator.style.display = isSpeaking ? 'inline' : 'none';
+                }
+            }
+            
+        } catch (error) {
+            console.error('🎤 Error updating speaking indicator:', error);
+        }
+    }
+
+    // Multi-Device Session Management
+    async checkForExistingSession() {
+        try {
+            console.log('📱 Checking for existing device sessions...');
+            
+            // Generate unique device ID
+            this.currentDeviceId = this.generateDeviceId();
+            
+            // Check if user already has an active session
+            const response = await fetch(`/api/prayer-room/${this.roomId}/check-session`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_id: this.userId,
+                    device_id: this.currentDeviceId,
+                    device_info: this.getDeviceInfo()
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                
+                if (data.has_existing_session) {
+                    console.log('📱 Existing session detected, showing conflict resolution dialog');
+                    this.showDeviceConflictDialog(data.existing_device_info);
+                    return true;
+                }
+            }
+            
+            // Register this device session
+            await this.registerDeviceSession();
+            return false;
+            
+        } catch (error) {
+            console.error('📱 Error checking for existing session:', error);
+            return false;
+        }
+    }
+
+    generateDeviceId() {
+        try {
+            // Generate a unique device ID based on browser fingerprint
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.textBaseline = 'top';
+            ctx.font = '14px Arial';
+            ctx.fillText('Device fingerprint', 2, 2);
+            
+            const fingerprint = [
+                navigator.userAgent,
+                navigator.language,
+                screen.width + 'x' + screen.height,
+                new Date().getTimezoneOffset(),
+                canvas.toDataURL()
+            ].join('|');
+            
+            // Create a simple hash
+            let hash = 0;
+            for (let i = 0; i < fingerprint.length; i++) {
+                const char = fingerprint.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // Convert to 32-bit integer
+            }
+            
+            return 'device_' + Math.abs(hash).toString(36);
+            
+        } catch (error) {
+            console.error('📱 Error generating device ID:', error);
+            return 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+    }
+
+    getDeviceInfo() {
+        try {
+            return {
+                user_agent: navigator.userAgent,
+                platform: navigator.platform,
+                language: navigator.language,
+                screen_resolution: `${screen.width}x${screen.height}`,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                timestamp: new Date().toISOString()
+            };
+        } catch (error) {
+            console.error('📱 Error getting device info:', error);
+            return {
+                user_agent: 'Unknown',
+                platform: 'Unknown',
+                language: 'Unknown',
+                screen_resolution: 'Unknown',
+                timezone: 'Unknown',
+                timestamp: new Date().toISOString()
+            };
+        }
+    }
+
+    showDeviceConflictDialog(existingDeviceInfo) {
+        try {
+            console.log('📱 Showing device conflict dialog');
+            
+            // Create modal for device conflict resolution
+            const modal = document.createElement('div');
+            modal.className = 'device-conflict-modal';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>📱 Device Conflict Detected</h3>
+                    </div>
+                    <div class="modal-body">
+                        <p>You're already connected to this prayer room from another device:</p>
+                        <div class="device-info">
+                            <p><strong>Device:</strong> ${existingDeviceInfo.platform || 'Unknown'}</p>
+                            <p><strong>Browser:</strong> ${this.parseUserAgent(existingDeviceInfo.user_agent)}</p>
+                            <p><strong>Connected:</strong> ${new Date(existingDeviceInfo.timestamp).toLocaleString()}</p>
+                        </div>
+                        <p>What would you like to do?</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="keepExistingSession" class="btn btn-secondary">Keep Existing Session</button>
+                        <button id="switchToNewDevice" class="btn btn-primary">Switch to This Device</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Add event listeners
+            document.getElementById('keepExistingSession').addEventListener('click', () => {
+                this.handleKeepExistingSession();
+                document.body.removeChild(modal);
+            });
+            
+            document.getElementById('switchToNewDevice').addEventListener('click', () => {
+                this.handleSwitchToNewDevice();
+                document.body.removeChild(modal);
+            });
+            
+        } catch (error) {
+            console.error('📱 Error showing device conflict dialog:', error);
+        }
+    }
+
+    parseUserAgent(userAgent) {
+        try {
+            if (userAgent.includes('Chrome')) return 'Chrome';
+            if (userAgent.includes('Firefox')) return 'Firefox';
+            if (userAgent.includes('Safari')) return 'Safari';
+            if (userAgent.includes('Edge')) return 'Edge';
+            return 'Unknown Browser';
+        } catch (error) {
+            return 'Unknown Browser';
+        }
+    }
+
+    async handleKeepExistingSession() {
+        try {
+            console.log('📱 User chose to keep existing session');
+            alert('You will remain connected on your other device. This session will be closed.');
+            window.location.href = '/prayers';
+        } catch (error) {
+            console.error('📱 Error handling keep existing session:', error);
+        }
+    }
+
+    async handleSwitchToNewDevice() {
+        try {
+            console.log('📱 User chose to switch to new device');
+            await this.disconnectExistingSession();
+            await this.registerDeviceSession();
+            console.log('📱 Successfully switched to new device');
+        } catch (error) {
+            console.error('📱 Error handling switch to new device:', error);
+        }
+    }
+
+    async disconnectExistingSession() {
+        try {
+            const response = await fetch(`/api/prayer-room/${this.roomId}/disconnect-session`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: this.userId })
+            });
+            
+            if (response.ok) {
+                console.log('📱 Successfully disconnected existing session');
+            }
+        } catch (error) {
+            console.error('📱 Error disconnecting existing session:', error);
+        }
+    }
+
+    async registerDeviceSession() {
+        try {
+            const response = await fetch(`/api/prayer-room/${this.roomId}/register-session`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: this.userId,
+                    device_id: this.currentDeviceId,
+                    device_info: this.getDeviceInfo()
+                })
+            });
+            
+            if (response.ok) {
+                console.log('📱 Successfully registered device session');
+            }
+        } catch (error) {
+            console.error('📱 Error registering device session:', error);
         }
     }
 
