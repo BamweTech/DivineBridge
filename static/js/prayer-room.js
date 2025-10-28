@@ -349,6 +349,18 @@ class PrayerRoomService {
             return;
         }
         
+        // Get current participant IDs
+        const currentParticipantIds = participants ? participants.map(p => p.user_id) : [];
+        
+        // Clean up peer connections for participants who have left
+        const existingPeerIds = Array.from(this.peers.keys());
+        existingPeerIds.forEach(peerId => {
+            if (!currentParticipantIds.includes(peerId)) {
+                console.log(`🧹 Participant ${peerId} left, cleaning up peer connection`);
+                this.cleanupPeerConnection(peerId);
+            }
+        });
+        
         participantsContainer.innerHTML = '';
         
         if (participants && participants.length > 0) {
@@ -1347,6 +1359,22 @@ class PrayerRoomService {
                 message: err.message,
                 stack: err.stack
             });
+            
+            // Check if this is an intentional close (don't handle as error)
+            if (peer._intentionallyClosing) {
+                console.log(`👋 Intentional close for ${participantId}, ignoring error`);
+                return;
+            }
+            
+            // Check if this is an expected disconnection (user-initiated abort)
+            if (err.name === 'OperationError' && err.message.includes('User-Initiated Abort')) {
+                console.log(`👋 Expected disconnection for ${participantId} (user left or connection closed)`);
+                this.updateParticipantConnectionStatus(participantId, 'disconnected');
+                // Don't attempt reconnection for expected disconnections
+                return;
+            }
+            
+            // Only attempt reconnection for unexpected errors
             this.updateParticipantConnectionStatus(participantId, 'error');
             this.handleConnectionError(participantId, err);
         });
@@ -1376,11 +1404,20 @@ class PrayerRoomService {
                     case 'failed':
                         console.error(`❌ ICE connection failed with ${participantId}`);
                         this.updateParticipantConnectionStatus(participantId, 'failed');
+                        // Only attempt ICE restart for unexpected failures
                         this.handleICEConnectionFailure(participantId);
                         break;
                     case 'closed':
                         console.log(`🔌 ICE connection closed with ${participantId}`);
                         this.updateParticipantConnectionStatus(participantId, 'closed');
+                        break;
+                    case 'checking':
+                        console.log(`🔍 ICE checking connection with ${participantId}`);
+                        this.updateParticipantConnectionStatus(participantId, 'checking');
+                        break;
+                    case 'completed':
+                        console.log(`✅ ICE connection completed with ${participantId}`);
+                        this.updateParticipantConnectionStatus(participantId, 'connected');
                         break;
                 }
             });
@@ -1396,9 +1433,28 @@ class PrayerRoomService {
                 const state = peer._pc.connectionState;
                 console.log(`🔗 Connection state for ${participantId}: ${state}`);
                 
-                if (state === 'failed') {
-                    console.error(`❌ Connection failed with ${participantId}`);
-                    this.handleConnectionFailure(participantId);
+                switch (state) {
+                    case 'connected':
+                        console.log(`✅ Connection established with ${participantId}`);
+                        this.updateParticipantConnectionStatus(participantId, 'connected');
+                        break;
+                    case 'disconnected':
+                        console.log(`⚠️ Connection disconnected with ${participantId}`);
+                        this.updateParticipantConnectionStatus(participantId, 'disconnected');
+                        break;
+                    case 'failed':
+                        console.error(`❌ Connection failed with ${participantId}`);
+                        this.updateParticipantConnectionStatus(participantId, 'failed');
+                        this.handleConnectionFailure(participantId);
+                        break;
+                    case 'closed':
+                        console.log(`🔌 Connection closed with ${participantId}`);
+                        this.updateParticipantConnectionStatus(participantId, 'closed');
+                        break;
+                    case 'connecting':
+                        console.log(`🔗 Connecting to ${participantId}...`);
+                        this.updateParticipantConnectionStatus(participantId, 'connecting');
+                        break;
                 }
             });
         }
@@ -1500,6 +1556,30 @@ class PrayerRoomService {
             
         } catch (error) {
             console.error(`❌ Reconnection failed for ${participantId}:`, error);
+        }
+    }
+
+    // Clean up peer connection gracefully
+    cleanupPeerConnection(participantId) {
+        try {
+            console.log(`🧹 Cleaning up peer connection for ${participantId}`);
+            
+            const peer = this.peers.get(participantId);
+            if (peer) {
+                // Mark as intentionally closing to avoid error handling
+                peer._intentionallyClosing = true;
+                
+                // Destroy the peer connection
+                peer.destroy();
+                this.peers.delete(participantId);
+                
+                // Update UI status
+                this.updateParticipantConnectionStatus(participantId, 'disconnected');
+                
+                console.log(`✅ Peer connection cleaned up for ${participantId}`);
+            }
+        } catch (error) {
+            console.error(`❌ Error cleaning up peer connection for ${participantId}:`, error);
         }
     }
 
