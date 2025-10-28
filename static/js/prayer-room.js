@@ -25,6 +25,9 @@ class PrayerRoomService {
             { urls: 'stun:stun2.l.google.com:19302' }
         ];
         
+        // Track processed signals to prevent duplicates
+        this.processedSignals = new Set();
+        
         this.init();
     }
     
@@ -1239,6 +1242,16 @@ class PrayerRoomService {
         try {
             console.log('📡 Handling WebRTC offer from:', offer.from_user);
             
+            // Create a unique signal ID to prevent duplicates
+            const signalId = `${offer.from_user}-${offer.id || Date.now()}`;
+            
+            if (this.processedSignals.has(signalId)) {
+                console.log(`📡 Duplicate offer detected for ${offer.from_user}, ignoring`);
+                return;
+            }
+            
+            this.processedSignals.add(signalId);
+            
             // Create a new peer connection for this offer with enhanced configuration
             const peer = new SimplePeer({
                 initiator: false,
@@ -1316,7 +1329,17 @@ class PrayerRoomService {
 
     async handleWebRTCAnswer(answer) {
         try {
-            console.log('Handling WebRTC answer from:', answer.from_user);
+            console.log('📡 Handling WebRTC answer from:', answer.from_user);
+            
+            // Create a unique signal ID to prevent duplicates
+            const signalId = `${answer.from_user}-answer-${answer.id || Date.now()}`;
+            
+            if (this.processedSignals.has(signalId)) {
+                console.log(`📡 Duplicate answer detected for ${answer.from_user}, ignoring`);
+                return;
+            }
+            
+            this.processedSignals.add(signalId);
             
             const peer = this.peers.get(answer.from_user);
             if (peer) {
@@ -1371,6 +1394,16 @@ class PrayerRoomService {
                 console.log(`👋 Expected disconnection for ${participantId} (user left or connection closed)`);
                 this.updateParticipantConnectionStatus(participantId, 'disconnected');
                 // Don't attempt reconnection for expected disconnections
+                return;
+            }
+            
+            // Handle InvalidStateError (signaling state issues)
+            if (err.name === 'InvalidStateError' && err.message.includes('setRemoteDescription')) {
+                console.log(`⚠️ Signaling state error for ${participantId}: ${err.message}`);
+                console.log(`🔄 Attempting to recover from signaling state error...`);
+                
+                // Try to recover by recreating the connection
+                this.handleSignalingStateError(participantId, err);
                 return;
             }
             
@@ -1580,6 +1613,42 @@ class PrayerRoomService {
             }
         } catch (error) {
             console.error(`❌ Error cleaning up peer connection for ${participantId}:`, error);
+        }
+    }
+
+    // Handle signaling state errors (InvalidStateError)
+    async handleSignalingStateError(participantId, error) {
+        try {
+            console.log(`🔧 Handling signaling state error for ${participantId}:`, error.message);
+            
+            // Clean up the problematic connection
+            this.cleanupPeerConnection(participantId);
+            
+            // Wait a moment before recreating
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Check if participant is still in the room
+            const response = await fetch(`/api/prayer-room/${this.roomId}/participants`);
+            if (!response.ok) {
+                console.error(`Failed to fetch participants for signaling recovery: ${response.status}`);
+                return;
+            }
+            
+            const data = await response.json();
+            const participants = data.participants || [];
+            const participant = participants.find(p => p.user_id === participantId);
+            
+            if (!participant) {
+                console.log(`👋 Participant ${participantId} no longer in room, skipping signaling recovery`);
+                return;
+            }
+            
+            // Create a fresh connection
+            console.log(`🔄 Creating fresh connection for ${participantId} after signaling error`);
+            await this.createPeerConnection(participantId, participant);
+            
+        } catch (error) {
+            console.error(`❌ Error handling signaling state error for ${participantId}:`, error);
         }
     }
 
