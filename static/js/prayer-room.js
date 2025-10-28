@@ -31,7 +31,7 @@ class PrayerRoomService {
         // Audio Quality Monitoring
         this.audioQualityMonitor = null;
         this.connectionQuality = 'good';
-        this.adaptiveBitrate = true;
+        this.adaptiveBitrate = false; // Disabled by default to prevent OverconstrainedError
         
         // Multi-device session management
         this.deviceSessions = new Map();
@@ -460,20 +460,15 @@ class PrayerRoomService {
             this.isAudioEnabled = true;
             this.updateAudioControls();
             
-            // Request microphone permission with optimized constraints
+            // Request microphone permission with minimal constraints for fastest initialization
             console.log('🎤 Requesting microphone permission...');
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                    sampleRate: 44100, // Reduced from 48000 for faster processing
-                    channelCount: 1,
-                    // Simplified constraints for faster initialization
-                    latency: 0.02, // Slightly higher for better compatibility
-                    googEchoCancellation: true,
-                    googAutoGainControl: true,
-                    googNoiseSuppression: true
+                    echoCancellation: { ideal: true },
+                    noiseSuppression: { ideal: true },
+                    autoGainControl: { ideal: true },
+                    sampleRate: { ideal: 44100 },
+                    channelCount: { ideal: 1 }
                 },
                 video: false
             });
@@ -485,26 +480,28 @@ class PrayerRoomService {
                 throw new Error('Invalid audio stream from microphone');
             }
             
-            // Start all initialization tasks immediately and in parallel
-            console.log('🎤 Starting optimized parallel initialization...');
+            // Start lightweight initialization immediately
+            console.log('🎤 Starting fast initialization...');
             
-            // Enable audio playback (lightweight)
+            // Enable audio playback (non-blocking)
             this.enableAudioPlayback().catch(error => {
                 console.warn('⚠️ Audio playback initialization failed:', error);
             });
             
-            // Initialize advanced audio processing and WebRTC
-            Promise.all([
-                this.initializeAdvancedAudioProcessing(),
-                this.initializeWebRTC()
-            ]).then(() => {
-                console.log('🎤 Advanced audio processing and WebRTC initialized, starting participant connections...');
-                // Only initiate connections after everything is ready
+            // Initialize WebRTC first (most critical for voice)
+            this.initializeWebRTC().then(() => {
+                console.log('🎤 WebRTC initialized, starting participant connections...');
+                // Start participant connections immediately
                 this.initiateConnectionsWithParticipants().catch(error => {
                     console.error('⚠️ Error initiating connections:', error);
                 });
+                
+                // Initialize advanced audio processing in background (non-blocking)
+                this.initializeAdvancedAudioProcessing().catch(error => {
+                    console.warn('⚠️ Advanced audio processing failed:', error);
+                });
             }).catch(error => {
-                console.warn('⚠️ Advanced audio processing or WebRTC initialization failed:', error);
+                console.warn('⚠️ WebRTC initialization failed:', error);
             });
             
             console.log('🎤 Audio join process initiated successfully');
@@ -1916,19 +1913,27 @@ class PrayerRoomService {
                 this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             }
             
-            // Resume audio context
+            // Resume audio context (non-blocking)
             if (this.audioContext.state === 'suspended') {
-                await this.audioContext.resume();
+                this.audioContext.resume().catch(error => {
+                    console.warn('🎛️ Audio context resume failed:', error);
+                });
             }
             
-            // Create audio processing chain
-            await this.setupAudioProcessingChain();
+            // Create audio processing chain (non-blocking)
+            this.setupAudioProcessingChain().catch(error => {
+                console.warn('🎛️ Audio processing chain setup failed:', error);
+            });
             
-            // Initialize voice activity detection
-            this.setupAdvancedVoiceActivityDetection();
+            // Initialize voice activity detection (non-blocking)
+            setTimeout(() => {
+                this.setupAdvancedVoiceActivityDetection();
+            }, 100);
             
-            // Start audio quality monitoring
-            this.startAudioQualityMonitoring();
+            // Start audio quality monitoring (non-blocking)
+            setTimeout(() => {
+                this.startAudioQualityMonitoring();
+            }, 200);
             
             console.log('🎛️ Advanced audio processing initialized');
             
@@ -2181,41 +2186,68 @@ class PrayerRoomService {
             
             const track = audioTracks[0];
             
+            // Get current constraints to avoid conflicts
+            const currentConstraints = track.getConstraints();
+            console.log('🎛️ Current constraints:', currentConstraints);
+            
+            // Create new constraints based on quality, but only change what's necessary
+            let newConstraints = {};
+            
             switch (quality) {
                 case 'excellent':
-                    // Use highest quality settings
-                    track.applyConstraints({
-                        sampleRate: 48000,
-                        channelCount: 1,
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true
-                    });
+                    // Use highest quality settings (only if supported)
+                    newConstraints = {
+                        sampleRate: { ideal: 48000 },
+                        channelCount: { ideal: 1 },
+                        echoCancellation: { ideal: true },
+                        noiseSuppression: { ideal: true },
+                        autoGainControl: { ideal: true }
+                    };
                     break;
                 case 'good':
                     // Use balanced settings
-                    track.applyConstraints({
-                        sampleRate: 44100,
-                        channelCount: 1,
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true
-                    });
+                    newConstraints = {
+                        sampleRate: { ideal: 44100 },
+                        channelCount: { ideal: 1 },
+                        echoCancellation: { ideal: true },
+                        noiseSuppression: { ideal: true },
+                        autoGainControl: { ideal: true }
+                    };
                     break;
                 case 'fair':
                 case 'poor':
                     // Use conservative settings for better reliability
-                    track.applyConstraints({
-                        sampleRate: 22050,
-                        channelCount: 1,
-                        echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true
-                    });
+                    newConstraints = {
+                        sampleRate: { ideal: 22050 },
+                        channelCount: { ideal: 1 },
+                        echoCancellation: { ideal: true },
+                        noiseSuppression: { ideal: true },
+                        autoGainControl: { ideal: true }
+                    };
                     break;
             }
             
-            console.log(`🎛️ Adapted bitrate for ${quality} quality`);
+            // Only apply constraints if they're different from current ones
+            const constraintsChanged = JSON.stringify(newConstraints) !== JSON.stringify(currentConstraints);
+            
+            if (constraintsChanged) {
+                track.applyConstraints(newConstraints).then(() => {
+                    console.log(`🎛️ Successfully adapted bitrate for ${quality} quality`);
+                }).catch(error => {
+                    console.warn(`🎛️ Failed to apply ${quality} quality constraints:`, error);
+                    
+                    // Fallback to basic constraints if advanced ones fail
+                    const fallbackConstraints = {
+                        echoCancellation: { ideal: true },
+                        noiseSuppression: { ideal: true },
+                        autoGainControl: { ideal: true }
+                    };
+                    
+                    track.applyConstraints(fallbackConstraints).catch(fallbackError => {
+                        console.warn('🎛️ Fallback constraints also failed:', fallbackError);
+                    });
+                });
+            }
             
         } catch (error) {
             console.error('🎛️ Error adapting bitrate:', error);
@@ -2249,6 +2281,34 @@ class PrayerRoomService {
             
         } catch (error) {
             console.error('🎤 Error updating speaking indicator:', error);
+        }
+    }
+
+    // Enable adaptive bitrate (can be called by user if needed)
+    enableAdaptiveBitrate() {
+        try {
+            console.log('🎛️ Enabling adaptive bitrate...');
+            this.adaptiveBitrate = true;
+            
+            // Start monitoring if not already started
+            if (!this.audioQualityMonitor) {
+                this.startAudioQualityMonitoring();
+            }
+            
+            console.log('🎛️ Adaptive bitrate enabled');
+        } catch (error) {
+            console.error('🎛️ Error enabling adaptive bitrate:', error);
+        }
+    }
+
+    // Disable adaptive bitrate (default state)
+    disableAdaptiveBitrate() {
+        try {
+            console.log('🎛️ Disabling adaptive bitrate...');
+            this.adaptiveBitrate = false;
+            console.log('🎛️ Adaptive bitrate disabled');
+        } catch (error) {
+            console.error('🎛️ Error disabling adaptive bitrate:', error);
         }
     }
 
