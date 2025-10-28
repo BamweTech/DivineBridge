@@ -399,10 +399,10 @@ class PrayerRoomService {
                     </div>
                     ${this.isHost && !participant.is_host ? `
                         <div class="participant-actions">
-                            <button class="action-btn mute-btn" onclick="prayerRoom.muteParticipant('${participant.user_id}')" title="Mute">
+                            <button class="action-btn mute-btn" onclick="window.prayerRoomService.muteParticipant('${participant.user_id}')" title="Mute">
                                 <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
                             </button>
-                            <button class="action-btn remove-btn" onclick="prayerRoom.removeParticipant('${participant.user_id}')" title="Remove">
+                            <button class="action-btn remove-btn" onclick="window.prayerRoomService.removeParticipant('${participant.user_id}')" title="Remove">
                                 <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                             </button>
                         </div>
@@ -429,65 +429,60 @@ class PrayerRoomService {
                 throw new Error('Room ID not available. Please refresh the page and try again.');
             }
             
-            // Request microphone permission with improved constraints
+            // Update UI immediately for instant feedback
+            this.isAudioEnabled = true;
+            this.updateAudioControls();
+            
+            // Request microphone permission with optimized constraints
             console.log('🎤 Requesting microphone permission...');
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     echoCancellation: true,
                     noiseSuppression: true,
                     autoGainControl: true,
-                    sampleRate: 48000,
+                    sampleRate: 44100, // Reduced from 48000 for faster processing
                     channelCount: 1,
-                    // Add additional constraints for better compatibility
-                    latency: 0.01, // Low latency
+                    // Simplified constraints for faster initialization
+                    latency: 0.02, // Slightly higher for better compatibility
                     googEchoCancellation: true,
                     googAutoGainControl: true,
-                    googNoiseSuppression: true,
-                    googHighpassFilter: true,
-                    googTypingNoiseDetection: true,
-                    googAudioMirroring: false
+                    googNoiseSuppression: true
                 },
                 video: false
             });
             
             console.log('🎤 Microphone permission granted, stream obtained:', this.localStream);
-            console.log('🎤 Local stream tracks:', this.localStream.getTracks());
-            console.log('🎤 Local stream active:', this.localStream.active);
             
-            // Validate the local stream
-            if (!this.validateAudioStream(this.localStream, 'local microphone')) {
+            // Quick validation
+            if (!this.localStream || !this.localStream.active) {
                 throw new Error('Invalid audio stream from microphone');
             }
             
-            // Update UI immediately for better user experience
-            this.isAudioEnabled = true;
-            this.updateAudioControls();
+            // Start all initialization tasks immediately and in parallel
+            console.log('🎤 Starting optimized parallel initialization...');
             
-            // Run these operations in parallel for faster connection
-            console.log('🎤 Starting parallel initialization...');
-            const [audioPlaybackResult, webrtcResult] = await Promise.allSettled([
-                this.enableAudioPlayback(),
-                this.initializeWebRTC()
-            ]);
-            
-            // Check if both operations succeeded
-            if (audioPlaybackResult.status === 'rejected') {
-                console.warn('⚠️ Audio playback initialization failed:', audioPlaybackResult.reason);
-            }
-            if (webrtcResult.status === 'rejected') {
-                console.warn('⚠️ WebRTC initialization failed:', webrtcResult.reason);
-            }
-            
-            // Initiate connections with existing participants (non-blocking)
-            console.log('🎤 Initiating connections with participants...');
-            this.initiateConnectionsWithParticipants().catch(error => {
-                console.error('⚠️ Error initiating connections:', error);
+            // Enable audio playback (lightweight)
+            this.enableAudioPlayback().catch(error => {
+                console.warn('⚠️ Audio playback initialization failed:', error);
             });
             
-            console.log('🎤 Successfully joined audio');
+            // Initialize WebRTC (more complex)
+            this.initializeWebRTC().then(() => {
+                console.log('🎤 WebRTC initialized, starting participant connections...');
+                // Only initiate connections after WebRTC is ready
+                this.initiateConnectionsWithParticipants().catch(error => {
+                    console.error('⚠️ Error initiating connections:', error);
+                });
+            }).catch(error => {
+                console.warn('⚠️ WebRTC initialization failed:', error);
+            });
+            
+            console.log('🎤 Audio join process initiated successfully');
             
         } catch (error) {
             console.error('🎤 Error joining audio:', error);
+            this.isAudioEnabled = false;
+            this.updateAudioControls();
             this.showError('Failed to access microphone. Please check permissions and try again.');
         }
     }
@@ -1861,14 +1856,21 @@ class PrayerRoomService {
         }
     }
 
-    // Method to handle audio autoplay issues
+    // Method to handle audio autoplay issues (optimized for speed)
     async enableAudioPlayback() {
         try {
-            // Create a temporary audio context to enable audio playback
-            const tempAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-            if (tempAudioContext.state === 'suspended') {
-                await tempAudioContext.resume();
+            // Use existing audio context if available, otherwise create a minimal one
+            if (!this.audioContext) {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             }
+            
+            // Resume if suspended (non-blocking)
+            if (this.audioContext.state === 'suspended') {
+                this.audioContext.resume().catch(error => {
+                    console.warn('🔊 Audio context resume failed:', error);
+                });
+            }
+            
             console.log('🔊 Audio playback enabled');
         } catch (error) {
             console.error('🔊 Error enabling audio playback:', error);
@@ -2032,4 +2034,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Initialize prayer room service
     window.prayerRoomService = new PrayerRoomService();
+    
+    // Create shorter alias for easier access
+    window.prayerRoom = window.prayerRoomService;
 });
