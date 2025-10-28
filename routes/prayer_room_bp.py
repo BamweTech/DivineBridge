@@ -748,7 +748,17 @@ def get_webrtc_offers(room_id):
             offers.append(offer_data)
         
         # Sort by timestamp descending (most recent first)
-        offers.sort(key=lambda x: x.get('timestamp', {}).get('_seconds', 0), reverse=True)
+        # Handle Firestore timestamp objects properly
+        def get_timestamp_sort_key(item):
+            timestamp = item.get('timestamp')
+            if hasattr(timestamp, 'timestamp'):
+                return timestamp.timestamp()
+            elif isinstance(timestamp, dict) and '_seconds' in timestamp:
+                return timestamp['_seconds']
+            else:
+                return 0
+        
+        offers.sort(key=get_timestamp_sort_key, reverse=True)
         
         return jsonify(offers)
         
@@ -780,7 +790,17 @@ def get_webrtc_answers(room_id):
             answers.append(answer_data)
         
         # Sort by timestamp descending (most recent first)
-        answers.sort(key=lambda x: x.get('timestamp', {}).get('_seconds', 0), reverse=True)
+        # Handle Firestore timestamp objects properly
+        def get_timestamp_sort_key(item):
+            timestamp = item.get('timestamp')
+            if hasattr(timestamp, 'timestamp'):
+                return timestamp.timestamp()
+            elif isinstance(timestamp, dict) and '_seconds' in timestamp:
+                return timestamp['_seconds']
+            else:
+                return 0
+        
+        answers.sort(key=get_timestamp_sort_key, reverse=True)
         
         return jsonify(answers)
         
