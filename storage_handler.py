@@ -171,9 +171,14 @@ class StorageHandler:
             if date is None:
                 date = datetime.now().strftime('%Y-%m-%d')
             
+            logger.info(f"StorageHandler.save_prayer called with date: {date}")
+            logger.info(f"Prayer data type: {type(prayer_data)}")
+            logger.info(f"Prayer data keys: {list(prayer_data.keys()) if isinstance(prayer_data, dict) else 'Not a dict'}")
+            
             # Generate a unique ID for the prayer
             prayer_id = str(uuid.uuid4())
             blob_name = f"prayers/{date}/{prayer_id}.json"
+            logger.info(f"Blob name: {blob_name}")
             
             # Ensure prayer_data is a dictionary
             if isinstance(prayer_data, str):
@@ -185,13 +190,18 @@ class StorageHandler:
             
             def _upload_with_retry():
                 try:
+                    logger.info(f"Attempting to upload to blob: {blob_name}")
                     blob = self.bucket.blob(blob_name)
                     # Convert prayer data to JSON and upload
                     prayer_json = json.dumps(prayer_data)
+                    logger.info(f"JSON data length: {len(prayer_json)} characters")
                     blob.upload_from_string(prayer_json, content_type='application/json')
+                    logger.info(f"Successfully uploaded to {blob_name}")
                     return True
                 except Exception as e:
                     logger.error(f"Error in upload operation: {str(e)}")
+                    import traceback
+                    logger.error(f"Upload traceback: {traceback.format_exc()}")
                     return False
 
             # Use the retry decorator with specific retry conditions

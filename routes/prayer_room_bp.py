@@ -735,11 +735,10 @@ def get_webrtc_offers(room_id):
         
         db = get_firestore_client()
         
-        # Get offers for this user
+        # Get offers for this user (simplified query to avoid composite index requirement)
         offers_ref = db.collection('prayer_rooms').document(room_id)\
             .collection('webrtc_offers')\
             .where('to_user', '==', user['user_id'])\
-            .order_by('timestamp', direction=firestore.Query.DESCENDING)\
             .limit(10)
         
         offers = []
@@ -747,6 +746,9 @@ def get_webrtc_offers(room_id):
             offer_data = doc.to_dict()
             offer_data['id'] = doc.id
             offers.append(offer_data)
+        
+        # Sort by timestamp descending (most recent first)
+        offers.sort(key=lambda x: x.get('timestamp', {}).get('_seconds', 0), reverse=True)
         
         return jsonify(offers)
         
@@ -765,11 +767,10 @@ def get_webrtc_answers(room_id):
         
         db = get_firestore_client()
         
-        # Get answers for this user
+        # Get answers for this user (simplified query to avoid composite index requirement)
         answers_ref = db.collection('prayer_rooms').document(room_id)\
             .collection('webrtc_answers')\
             .where('to_user', '==', user['user_id'])\
-            .order_by('timestamp', direction=firestore.Query.DESCENDING)\
             .limit(10)
         
         answers = []
@@ -777,6 +778,9 @@ def get_webrtc_answers(room_id):
             answer_data = doc.to_dict()
             answer_data['id'] = doc.id
             answers.append(answer_data)
+        
+        # Sort by timestamp descending (most recent first)
+        answers.sort(key=lambda x: x.get('timestamp', {}).get('_seconds', 0), reverse=True)
         
         return jsonify(answers)
         

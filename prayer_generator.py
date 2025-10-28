@@ -261,7 +261,12 @@ Please regenerate the prayer ensuring you address this issue. Remember:
             
             # Save the generated prayer to Cloud Storage
             try:
-                if self.storage.save_prayer(prayer_data, today):
+                logger.info(f"Attempting to save prayer for date: {today}")
+                logger.info(f"Prayer data keys: {list(prayer_data.keys())}")
+                save_result = self.storage.save_prayer(prayer_data, today)
+                logger.info(f"Save result: {save_result}")
+                
+                if save_result:
                     logger.info("Successfully saved prayer with metadata to Cloud Storage")
                     return prayer_data
                 else:
@@ -269,6 +274,8 @@ Please regenerate the prayer ensuring you address this issue. Remember:
                     return None
             except Exception as e:
                 logger.error(f"Error saving prayer to Cloud Storage: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
                 # Return the prayer data even if storage fails
                 return prayer_data
                 

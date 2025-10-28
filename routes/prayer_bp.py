@@ -37,12 +37,9 @@ def get_prayer(date):
 @prayer_bp.route('/generate-prayer', methods=['POST'])
 def generate_prayer():
     try:
-        # Check if we already have a prayer for today
+        # Force generation of new prayer (ignore existing ones)
         today = datetime.now().strftime('%Y-%m-%d')
-        existing_prayer = current_app.storage_handler.get_prayer(today)
-        if existing_prayer:
-            return jsonify({'prayer': existing_prayer}), 200
-            
+        
         # Generate new prayer
         prayer_data = current_app.prayer_generator.generate_prayer()
         if not prayer_data:
@@ -52,59 +49,6 @@ def generate_prayer():
     except Exception as e:
         logger.error(f"Error generating prayer: {e}")
         return jsonify({'error': 'Failed to generate prayer'}), 500
-
-@prayer_bp.route('/test-generate-prayer', methods=['POST'])
-def test_generate_prayer():
-    """Generate a test prayer without saving to database"""
-    try:
-        logger.info("Generating test prayer (will not be saved)")
-        
-        # Generate prayer using the client directly (bypassing storage check and save)
-        response = current_app.prayer_generator.client.query(current_app.prayer_generator.prompt)
-        
-        # Validate the response with retry logic
-        last_error = None
-        for attempt in range(1, 4):
-            try:
-                logger.info(f"Test prayer attempt {attempt}/3")
-                
-                if attempt > 1 and last_error:
-                    retry_prompt = f"""{current_app.prayer_generator.prompt}
-
-IMPORTANT - Previous attempt was REJECTED: {last_error}
-Please regenerate following ALL requirements strictly.
-Remember: END with EXACTLY "In Jesus-Christ's name we pray. Amen!" """
-                    response = current_app.prayer_generator.client.query(retry_prompt)
-                
-                response = current_app.prayer_generator._validate_response(response)
-                logger.info(f"Test prayer validation passed on attempt {attempt}")
-                break
-            except ValueError as ve:
-                last_error = str(ve)
-                if attempt == 3:
-                    raise
-                continue
-        
-        # Process the response
-        if "<think>" in response:
-            import re
-            response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
-        
-        response = response.strip()
-        word_count = len(response.split())
-        
-        return jsonify({
-            'success': True,
-            'prayer': {
-                'content': response,
-                'word_count': word_count,
-                'test_mode': True
-            }
-        }), 200
-        
-    except Exception as e:
-        logger.error(f"Error generating test prayer: {e}")
-        return jsonify({'error': str(e)}), 500
 
 @prayer_bp.route('/generate', methods=['POST'])
 @verify_cloud_scheduler()
