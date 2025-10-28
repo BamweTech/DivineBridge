@@ -682,7 +682,7 @@ def send_webrtc_offer(room_id):
             'from_user': user['user_id'],
             'to_user': to_user,
             'offer': offer,
-            'timestamp': firestore.SERVER_TIMESTAMP()
+            'timestamp': firestore.SERVER_TIMESTAMP
         })
         
         return jsonify({'success': True})
@@ -715,7 +715,7 @@ def send_webrtc_answer(room_id):
             'from_user': user['user_id'],
             'to_user': to_user,
             'answer': answer,
-            'timestamp': firestore.SERVER_TIMESTAMP()
+            'timestamp': firestore.SERVER_TIMESTAMP
         })
         
         return jsonify({'success': True})
