@@ -1289,8 +1289,15 @@ class PrayerRoomService {
                 return;
             }
             
-            // Get current participants
-            const participants = await this.getRoomParticipants();
+            // Get current participants via API
+            const response = await fetch(`/api/prayer-room/${this.roomId}/participants`);
+            if (!response.ok) {
+                console.error('Failed to fetch participants:', await response.text());
+                return;
+            }
+            
+            const data = await response.json();
+            const participants = data.participants || [];
             
             for (const participant of participants) {
                 if (participant.user_id !== this.userId) {
