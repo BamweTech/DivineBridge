@@ -1123,16 +1123,58 @@ class PrayerRoomService {
                 initiator: true, // We initiate the connection
                 stream: this.localStream,
                 trickle: false,
-                // Add WebRTC configuration for better audio handling
+                // Enhanced WebRTC configuration for better connectivity
                 config: {
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' }
-                    ]
+                        { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: 'stun:stun2.l.google.com:19302' },
+                        { urls: 'stun:stun3.l.google.com:19302' },
+                        { urls: 'stun:stun4.l.google.com:19302' },
+                        // Add more STUN servers for better NAT traversal
+                        { urls: 'stun:stun.stunprotocol.org:3478' },
+                        { urls: 'stun:stun.ekiga.net' },
+                        { urls: 'stun:stun.ideasip.com' },
+                        { urls: 'stun:stun.schlund.de' },
+                        { urls: 'stun:stun.stunprotocol.org:3478' },
+                        { urls: 'stun:stun.voiparound.com' },
+                        { urls: 'stun:stun.voipbuster.com' },
+                        { urls: 'stun:stun.voipstunt.com' },
+                        { urls: 'stun:stun.counterpath.com' },
+                        { urls: 'stun:stun.1und1.de' },
+                        { urls: 'stun:stun.gmx.net' },
+                        { urls: 'stun:stun.sipgate.net' },
+                        { urls: 'stun:stun.radiojar.com' },
+                        { urls: 'stun:stun.sipnet.net' },
+                        { urls: 'stun:stun.softjoys.com' },
+                        { urls: 'stun:stun.voipgate.com' },
+                        { urls: 'stun:stun.voys.nl' },
+                        { urls: 'stun:stun.counterpath.com' },
+                        { urls: 'stun:stun.1und1.de' },
+                        { urls: 'stun:stun.gmx.net' },
+                        { urls: 'stun:stun.sipgate.net' },
+                        { urls: 'stun:stun.radiojar.com' },
+                        { urls: 'stun:stun.sipnet.net' },
+                        { urls: 'stun:stun.softjoys.com' },
+                        { urls: 'stun:stun.voipgate.com' },
+                        { urls: 'stun:stun.voys.nl' }
+                    ],
+                    iceCandidatePoolSize: 10,
+                    bundlePolicy: 'max-bundle',
+                    rtcpMuxPolicy: 'require'
                 },
-                // Ensure audio tracks are properly handled
-                offerToReceiveAudio: true,
-                offerToReceiveVideo: false
+                // Enhanced constraints for better audio handling
+                constraints: {
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: false,
+                    voiceActivityDetection: true
+                },
+                // Additional options for better connectivity
+                objectMode: false,
+                channelConfig: {
+                    ordered: false,
+                    maxRetransmits: 0
+                }
             });
             
             console.log(`🔗 SimplePeer instance created for ${participantId}:`, peer);
@@ -1185,21 +1227,63 @@ class PrayerRoomService {
         try {
             console.log('📡 Handling WebRTC offer from:', offer.from_user);
             
-            // Create a new peer connection for this offer with improved configuration
+            // Create a new peer connection for this offer with enhanced configuration
             const peer = new SimplePeer({
                 initiator: false,
                 stream: this.localStream,
                 trickle: false,
-                // Add WebRTC configuration for better audio handling
+                // Enhanced WebRTC configuration for better connectivity
                 config: {
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' }
-                    ]
+                        { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: 'stun:stun2.l.google.com:19302' },
+                        { urls: 'stun:stun3.l.google.com:19302' },
+                        { urls: 'stun:stun4.l.google.com:19302' },
+                        // Add more STUN servers for better NAT traversal
+                        { urls: 'stun:stun.stunprotocol.org:3478' },
+                        { urls: 'stun:stun.ekiga.net' },
+                        { urls: 'stun:stun.ideasip.com' },
+                        { urls: 'stun:stun.schlund.de' },
+                        { urls: 'stun:stun.stunprotocol.org:3478' },
+                        { urls: 'stun:stun.voiparound.com' },
+                        { urls: 'stun:stun.voipbuster.com' },
+                        { urls: 'stun:stun.voipstunt.com' },
+                        { urls: 'stun:stun.counterpath.com' },
+                        { urls: 'stun:stun.1und1.de' },
+                        { urls: 'stun:stun.gmx.net' },
+                        { urls: 'stun:stun.sipgate.net' },
+                        { urls: 'stun:stun.radiojar.com' },
+                        { urls: 'stun:stun.sipnet.net' },
+                        { urls: 'stun:stun.softjoys.com' },
+                        { urls: 'stun:stun.voipgate.com' },
+                        { urls: 'stun:stun.voys.nl' },
+                        { urls: 'stun:stun.counterpath.com' },
+                        { urls: 'stun:stun.1und1.de' },
+                        { urls: 'stun:stun.gmx.net' },
+                        { urls: 'stun:stun.sipgate.net' },
+                        { urls: 'stun:stun.radiojar.com' },
+                        { urls: 'stun:stun.sipnet.net' },
+                        { urls: 'stun:stun.softjoys.com' },
+                        { urls: 'stun:stun.voipgate.com' },
+                        { urls: 'stun:stun.voys.nl' }
+                    ],
+                    iceCandidatePoolSize: 10,
+                    bundlePolicy: 'max-bundle',
+                    rtcpMuxPolicy: 'require'
                 },
-                // Ensure audio tracks are properly handled
-                offerToReceiveAudio: true,
-                offerToReceiveVideo: false
+                // Enhanced constraints for better audio handling
+                constraints: {
+                    offerToReceiveAudio: true,
+                    offerToReceiveVideo: false,
+                    voiceActivityDetection: true
+                },
+                // Additional options for better connectivity
+                objectMode: false,
+                channelConfig: {
+                    ordered: false,
+                    maxRetransmits: 0
+                }
             });
             
             console.log('📡 SimplePeer instance created for incoming offer:', peer);
@@ -1252,20 +1336,172 @@ class PrayerRoomService {
         // Handle connection established
         peer.on('connect', () => {
             console.log(`✅ Peer connection established with ${participantId}`);
+            this.updateParticipantConnectionStatus(participantId, 'connected');
         });
         
-        // Handle connection errors
+        // Handle connection errors with detailed logging
         peer.on('error', (err) => {
             console.error(`❌ Peer connection error with ${participantId}:`, err);
+            console.error(`❌ Error details:`, {
+                name: err.name,
+                message: err.message,
+                stack: err.stack
+            });
+            this.updateParticipantConnectionStatus(participantId, 'error');
+            this.handleConnectionError(participantId, err);
         });
         
         // Handle connection close
         peer.on('close', () => {
             console.log(`🔌 Peer connection closed with ${participantId}`);
+            this.updateParticipantConnectionStatus(participantId, 'disconnected');
             this.peers.delete(participantId);
         });
+        
+        // Enhanced ICE connection state monitoring
+        if (peer._pc) {
+            peer._pc.addEventListener('iceconnectionstatechange', () => {
+                const state = peer._pc.iceConnectionState;
+                console.log(`🧊 ICE connection state changed for ${participantId}: ${state}`);
+                
+                switch (state) {
+                    case 'connected':
+                        console.log(`✅ ICE connected with ${participantId}`);
+                        this.updateParticipantConnectionStatus(participantId, 'connected');
+                        break;
+                    case 'disconnected':
+                        console.log(`⚠️ ICE disconnected with ${participantId}`);
+                        this.updateParticipantConnectionStatus(participantId, 'disconnected');
+                        break;
+                    case 'failed':
+                        console.error(`❌ ICE connection failed with ${participantId}`);
+                        this.updateParticipantConnectionStatus(participantId, 'failed');
+                        this.handleICEConnectionFailure(participantId);
+                        break;
+                    case 'closed':
+                        console.log(`🔌 ICE connection closed with ${participantId}`);
+                        this.updateParticipantConnectionStatus(participantId, 'closed');
+                        break;
+                }
+            });
+            
+            // Monitor ICE gathering state
+            peer._pc.addEventListener('icegatheringstatechange', () => {
+                const state = peer._pc.iceGatheringState;
+                console.log(`🧊 ICE gathering state for ${participantId}: ${state}`);
+            });
+            
+            // Monitor connection state
+            peer._pc.addEventListener('connectionstatechange', () => {
+                const state = peer._pc.connectionState;
+                console.log(`🔗 Connection state for ${participantId}: ${state}`);
+                
+                if (state === 'failed') {
+                    console.error(`❌ Connection failed with ${participantId}`);
+                    this.handleConnectionFailure(participantId);
+                }
+            });
+        }
     }
 
+    // Helper method to update participant connection status in UI
+    updateParticipantConnectionStatus(participantId, status) {
+        try {
+            const participantElement = document.querySelector(`[data-user-id="${participantId}"]`);
+            if (participantElement) {
+                // Remove existing status classes
+                participantElement.classList.remove('connected', 'disconnected', 'error', 'failed', 'closed');
+                // Add new status class
+                participantElement.classList.add(status);
+                
+                // Update status indicator if it exists
+                const statusIndicator = participantElement.querySelector('.connection-status');
+                if (statusIndicator) {
+                    statusIndicator.textContent = status;
+                    statusIndicator.className = `connection-status ${status}`;
+                }
+                
+                console.log(`📊 Updated connection status for ${participantId}: ${status}`);
+            }
+        } catch (error) {
+            console.error(`Error updating connection status for ${participantId}:`, error);
+        }
+    }
+
+    // Handle general connection errors
+    handleConnectionError(participantId, error) {
+        console.error(`🔧 Handling connection error for ${participantId}:`, error);
+        
+        // Attempt to reconnect after a delay
+        setTimeout(() => {
+            this.attemptReconnection(participantId);
+        }, 3000);
+    }
+
+    // Handle ICE connection failures specifically
+    handleICEConnectionFailure(participantId) {
+        console.error(`🧊 ICE connection failed for ${participantId}, attempting recovery...`);
+        
+        // Try to restart ICE
+        const peer = this.peers.get(participantId);
+        if (peer && peer._pc) {
+            try {
+                peer._pc.restartIce();
+                console.log(`🔄 ICE restart initiated for ${participantId}`);
+            } catch (error) {
+                console.error(`❌ Failed to restart ICE for ${participantId}:`, error);
+                this.attemptReconnection(participantId);
+            }
+        } else {
+            this.attemptReconnection(participantId);
+        }
+    }
+
+    // Handle general connection failures
+    handleConnectionFailure(participantId) {
+        console.error(`🔗 Connection failed for ${participantId}, attempting reconnection...`);
+        this.attemptReconnection(participantId);
+    }
+
+    // Attempt to reconnect to a participant
+    async attemptReconnection(participantId) {
+        try {
+            console.log(`🔄 Attempting reconnection to ${participantId}...`);
+            
+            // Clean up existing connection
+            const existingPeer = this.peers.get(participantId);
+            if (existingPeer) {
+                existingPeer.destroy();
+                this.peers.delete(participantId);
+            }
+            
+            // Wait a moment before reconnecting
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Check if participant is still in the room
+            const response = await fetch(`/api/prayer-room/${this.roomId}/participants`);
+            if (!response.ok) {
+                console.error(`Failed to fetch participants for reconnection: ${response.status}`);
+                return;
+            }
+            
+            const data = await response.json();
+            const participants = data.participants || [];
+            const participant = participants.find(p => p.user_id === participantId);
+            
+            if (!participant) {
+                console.log(`👋 Participant ${participantId} no longer in room, skipping reconnection`);
+                return;
+            }
+            
+            // Create new connection
+            await this.createPeerConnection(participantId, participant);
+            console.log(`✅ Reconnection attempt completed for ${participantId}`);
+            
+        } catch (error) {
+            console.error(`❌ Reconnection failed for ${participantId}:`, error);
+        }
+    }
 
     async sendWebRTCOffer(toUser, offer) {
         try {
