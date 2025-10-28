@@ -387,6 +387,72 @@ def mute_participant(room_id):
         logging.error(f"Error muting participant: {str(e)}")
         return jsonify({'error': 'Failed to mute participant'}), 500
 
+@prayer_room_bp.route('/<room_id>/remove', methods=['POST'])
+def remove_participant(room_id):
+    """Remove a participant from the room (host only)"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return jsonify({'error': 'User ID is required'}), 400
+        
+        # Get the requesting user to check if they're the host
+        requesting_user = get_user_from_session()
+        if not requesting_user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        db = get_firestore_client()
+        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_doc = room_ref.get()
+        
+        if not room_doc.exists:
+            return jsonify({'error': 'Room not found'}), 404
+        
+        room_data = room_doc.to_dict()
+        
+        # Check if requesting user is the host
+        if room_data.get('host_id') != requesting_user['user_id']:
+            return jsonify({'error': 'Only the host can remove participants'}), 403
+        
+        participants = room_data.get('participants', [])
+        
+        # Find the participant to remove
+        participant_to_remove = None
+        for participant in participants:
+            if participant['user_id'] == user_id:
+                participant_to_remove = participant
+                break
+        
+        if not participant_to_remove:
+            return jsonify({'error': 'Participant not found'}), 404
+        
+        # Remove participant
+        participants = [p for p in participants if p['user_id'] != user_id]
+        
+        # Add notification message to chat
+        chat_ref = db.collection('chat_messages')
+        notification_message = {
+            'room_id': room_id,
+            'user_id': 'system',
+            'user_name': 'System',
+            'message': f"👋 {participant_to_remove.get('user_name', 'A participant')} has been removed from the room by the host.",
+            'timestamp': datetime.utcnow(),
+            'message_type': 'system_notification'
+        }
+        chat_ref.add(notification_message)
+        
+        room_ref.update({
+            'participants': participants,
+            'last_activity': datetime.utcnow()
+        })
+        
+        return jsonify({'success': True, 'removed_user': participant_to_remove.get('user_name', 'Unknown')})
+        
+    except Exception as e:
+        logging.error(f"Error removing participant: {str(e)}")
+        return jsonify({'error': 'Failed to remove participant'}), 500
+
 @prayer_room_bp.route('/<room_id>/chat', methods=['POST'])
 def send_chat_message(room_id):
     """Send a chat message to the room"""

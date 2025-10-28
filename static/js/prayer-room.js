@@ -459,18 +459,30 @@ class PrayerRoomService {
                 throw new Error('Invalid audio stream from microphone');
             }
             
-            // Enable audio playback first
-            await this.enableAudioPlayback();
-            
-            // Initialize WebRTC with SimplePeer now that we have a local stream
-            await this.initializeWebRTC();
-            
-            // Initiate connections with existing participants
-            await this.initiateConnectionsWithParticipants();
-            
-            // Update UI
+            // Update UI immediately for better user experience
             this.isAudioEnabled = true;
             this.updateAudioControls();
+            
+            // Run these operations in parallel for faster connection
+            console.log('🎤 Starting parallel initialization...');
+            const [audioPlaybackResult, webrtcResult] = await Promise.allSettled([
+                this.enableAudioPlayback(),
+                this.initializeWebRTC()
+            ]);
+            
+            // Check if both operations succeeded
+            if (audioPlaybackResult.status === 'rejected') {
+                console.warn('⚠️ Audio playback initialization failed:', audioPlaybackResult.reason);
+            }
+            if (webrtcResult.status === 'rejected') {
+                console.warn('⚠️ WebRTC initialization failed:', webrtcResult.reason);
+            }
+            
+            // Initiate connections with existing participants (non-blocking)
+            console.log('🎤 Initiating connections with participants...');
+            this.initiateConnectionsWithParticipants().catch(error => {
+                console.error('⚠️ Error initiating connections:', error);
+            });
             
             console.log('🎤 Successfully joined audio');
             
@@ -1903,11 +1915,32 @@ class PrayerRoomService {
                 return;
             }
             
-            // Note: Host controls are now handled via API endpoints
-            console.log('Muting participant via API endpoint (not implemented yet)');
+            console.log(`🔇 Host muting participant: ${participantId}`);
+            
+            const response = await fetch(`/api/prayer-room/${this.roomId}/mute`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_id: participantId,
+                    is_muted: true
+                })
+            });
+            
+            if (response.ok) {
+                console.log(`✅ Successfully muted participant: ${participantId}`);
+                // Refresh participants to update UI
+                this.loadParticipants();
+            } else {
+                const error = await response.text();
+                console.error(`❌ Failed to mute participant: ${error}`);
+                this.showError('Failed to mute participant');
+            }
                 
         } catch (error) {
             console.error('Error muting participant:', error);
+            this.showError('Failed to mute participant');
         }
     }
 
@@ -1918,11 +1951,32 @@ class PrayerRoomService {
                 return;
             }
             
-            // Note: Host controls are now handled via API endpoints
-            console.log('Unmuting participant via API endpoint (not implemented yet)');
+            console.log(`🔊 Host unmuting participant: ${participantId}`);
+            
+            const response = await fetch(`/api/prayer-room/${this.roomId}/mute`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_id: participantId,
+                    is_muted: false
+                })
+            });
+            
+            if (response.ok) {
+                console.log(`✅ Successfully unmuted participant: ${participantId}`);
+                // Refresh participants to update UI
+                this.loadParticipants();
+            } else {
+                const error = await response.text();
+                console.error(`❌ Failed to unmute participant: ${error}`);
+                this.showError('Failed to unmute participant');
+            }
                 
         } catch (error) {
             console.error('Error unmuting participant:', error);
+            this.showError('Failed to unmute participant');
         }
     }
 
@@ -1933,11 +1987,39 @@ class PrayerRoomService {
                 return;
             }
             
-            // Note: Host controls are now handled via API endpoints
-            console.log('Removing participant via API endpoint (not implemented yet)');
+            // Confirm removal
+            const confirmed = confirm(`Are you sure you want to remove this participant from the prayer room?`);
+            if (!confirmed) {
+                return;
+            }
+            
+            console.log(`👋 Host removing participant: ${participantId}`);
+            
+            const response = await fetch(`/api/prayer-room/${this.roomId}/remove`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_id: participantId
+                })
+            });
+            
+            if (response.ok) {
+                console.log(`✅ Successfully removed participant: ${participantId}`);
+                // Clean up peer connection
+                this.cleanupPeerConnection(participantId);
+                // Refresh participants to update UI
+                this.loadParticipants();
+            } else {
+                const error = await response.text();
+                console.error(`❌ Failed to remove participant: ${error}`);
+                this.showError('Failed to remove participant');
+            }
                 
         } catch (error) {
             console.error('Error removing participant:', error);
+            this.showError('Failed to remove participant');
         }
     }
 }
