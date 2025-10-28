@@ -432,6 +432,9 @@ class PrayerRoomService {
             // Initialize WebRTC with SimplePeer now that we have a local stream
             await this.initializeWebRTC();
             
+            // Initiate connections with existing participants
+            await this.initiateConnectionsWithParticipants();
+            
             // Update UI
             this.isAudioEnabled = true;
             this.updateAudioControls();
@@ -1024,12 +1027,51 @@ class PrayerRoomService {
             
             console.log('Setting up WebRTC signaling with SimplePeer...');
             
-            // Note: WebRTC signaling is now handled via API endpoints
-            // This avoids Firestore permission issues
-            console.log('WebRTC signaling will be handled via API endpoints');
+            // Set up polling for WebRTC signals
+            this.setupSignalPolling();
+            
+            console.log('WebRTC signaling setup complete');
             
         } catch (error) {
             console.error('Error setting up WebRTC signaling:', error);
+        }
+    }
+
+    setupSignalPolling() {
+        // Poll for WebRTC offers and answers every 2 seconds
+        this.signalPollInterval = setInterval(() => {
+            this.checkForWebRTCSignals();
+        }, 2000);
+    }
+
+    async checkForWebRTCSignals() {
+        try {
+            if (!this.roomId) return;
+            
+            // Check for WebRTC offers
+            const offersResponse = await fetch(`/api/prayer-room/room/${this.roomId}/webrtc-offers`);
+            if (offersResponse.ok) {
+                const offers = await offersResponse.json();
+                for (const offer of offers) {
+                    if (offer.to_user === this.userId) {
+                        await this.handleWebRTCOffer(offer);
+                    }
+                }
+            }
+            
+            // Check for WebRTC answers
+            const answersResponse = await fetch(`/api/prayer-room/room/${this.roomId}/webrtc-answers`);
+            if (answersResponse.ok) {
+                const answers = await answersResponse.json();
+                for (const answer of answers) {
+                    if (answer.to_user === this.userId) {
+                        await this.handleWebRTCAnswer(answer);
+                    }
+                }
+            }
+            
+        } catch (error) {
+            console.error('Error checking for WebRTC signals:', error);
         }
     }
 
@@ -1037,9 +1079,18 @@ class PrayerRoomService {
         try {
             console.log(`Creating peer connection with ${participantId}`);
             
-            // Create SimplePeer instance
+            // Don't create connection with ourselves
+            if (participantId === this.userId) return;
+            
+            // Check if we already have a connection with this participant
+            if (this.peers.has(participantId)) {
+                console.log(`Peer connection already exists with ${participantId}`);
+                return;
+            }
+            
+            // Create SimplePeer instance as initiator
             const peer = new SimplePeer({
-                initiator: false, // We'll let the first participant be the initiator
+                initiator: true, // We initiate the connection
                 stream: this.localStream,
                 trickle: false
             });
@@ -1047,31 +1098,10 @@ class PrayerRoomService {
             // Store the peer connection
             this.peers.set(participantId, peer);
             
-            // Handle incoming signal
-            peer.on('signal', (data) => {
-                console.log('Sending signal to', participantId);
-                // Send signal to the other participant via Firestore
-                this.sendSignal(participantId, data);
-            });
+            // Set up peer event handlers
+            this.setupPeerEventHandlers(peer, participantId);
             
-            // Handle incoming stream
-            peer.on('stream', (stream) => {
-                console.log('Received stream from', participantId);
-                this.handleRemoteStream(participantId, stream);
-            });
-            
-            // Handle connection errors
-            peer.on('error', (err) => {
-                console.error('Peer connection error:', err);
-            });
-            
-            // Handle connection close
-            peer.on('close', () => {
-                console.log('Peer connection closed:', participantId);
-                this.peers.delete(participantId);
-            });
-            
-            console.log(`Peer connection created for ${participantId}`);
+            console.log(`Peer connection created with ${participantId}`);
             
         } catch (error) {
             console.error('Error creating peer connection:', error);
@@ -1080,38 +1110,54 @@ class PrayerRoomService {
 
     async sendSignal(participantId, signalData) {
         try {
-            // Note: WebRTC signaling is now handled via API endpoints
-            // This avoids Firestore permission issues
-            console.log('WebRTC signaling via API endpoints (not implemented yet)');
+            if (!this.roomId || !this.userId) return;
+            
+            console.log(`Sending WebRTC signal to ${participantId}:`, signalData.type);
+            
+            const signalType = signalData.type;
+            const endpoint = signalType === 'offer' ? 'webrtc-offer' : 'webrtc-answer';
+            
+            const response = await fetch(`/api/prayer-room/room/${this.roomId}/${endpoint}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    to_user: participantId,
+                    [signalType]: signalData
+                })
+            });
+            
+            if (response.ok) {
+                console.log(`WebRTC ${signalType} sent successfully to ${participantId}`);
+            } else {
+                console.error(`Failed to send WebRTC ${signalType}:`, await response.text());
+            }
+            
         } catch (error) {
-            console.error('Error sending signal:', error);
+            console.error('Error sending WebRTC signal:', error);
         }
     }
     
-    async handleIncomingSignal(signalData) {
-        try {
-            const peer = this.peers.get(signalData.from);
-            if (peer) {
-                peer.signal(signalData.signal);
-            }
-        } catch (error) {
-            console.error('Error handling incoming signal:', error);
-        }
-    }
-
     async handleWebRTCOffer(offer) {
         try {
-            const peerConnection = this.peerConnections.get(offer.from_user);
-            if (!peerConnection) {
-                await this.createPeerConnection(offer.from_user);
-            }
+            console.log('Handling WebRTC offer from:', offer.from_user);
             
-            await peerConnection.setRemoteDescription(offer.offer);
+            // Create a new peer connection for this offer
+            const peer = new SimplePeer({
+                initiator: false,
+                stream: this.localStream,
+                trickle: false
+            });
             
-            const answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
+            // Store the peer connection
+            this.peers.set(offer.from_user, peer);
             
-            await this.sendWebRTCAnswer(offer.from_user, answer);
+            // Set up peer event handlers
+            this.setupPeerEventHandlers(peer, offer.from_user);
+            
+            // Handle the incoming offer
+            peer.signal(offer.offer);
             
         } catch (error) {
             console.error('Error handling WebRTC offer:', error);
@@ -1120,14 +1166,45 @@ class PrayerRoomService {
 
     async handleWebRTCAnswer(answer) {
         try {
-            const peerConnection = this.peerConnections.get(answer.from_user);
-            if (peerConnection) {
-                await peerConnection.setRemoteDescription(answer.answer);
+            console.log('Handling WebRTC answer from:', answer.from_user);
+            
+            const peer = this.peers.get(answer.from_user);
+            if (peer) {
+                peer.signal(answer.answer);
+            } else {
+                console.warn('No peer connection found for answer from:', answer.from_user);
             }
+            
         } catch (error) {
             console.error('Error handling WebRTC answer:', error);
         }
     }
+
+    setupPeerEventHandlers(peer, participantId) {
+        // Handle incoming signal (offer/answer)
+        peer.on('signal', (data) => {
+            console.log('Sending signal to', participantId);
+            this.sendSignal(participantId, data);
+        });
+        
+        // Handle incoming stream
+        peer.on('stream', (stream) => {
+            console.log('Received stream from', participantId);
+            this.handleRemoteStream(participantId, stream);
+        });
+        
+        // Handle connection errors
+        peer.on('error', (err) => {
+            console.error('Peer connection error:', err);
+        });
+        
+        // Handle connection close
+        peer.on('close', () => {
+            console.log('Peer connection closed:', participantId);
+            this.peers.delete(participantId);
+        });
+    }
+
 
     async sendWebRTCOffer(toUser, offer) {
         try {
@@ -1204,24 +1281,30 @@ class PrayerRoomService {
         }
     }
 
-    closePeerConnection(participantId) {
+    // Method to initiate connections with existing participants
+    async initiateConnectionsWithParticipants() {
         try {
-            const peer = this.peers.get(participantId);
-            if (peer) {
-                peer.destroy();
-                this.peers.delete(participantId);
+            if (!this.localStream) {
+                console.log('No local stream available for initiating connections');
+                return;
             }
             
-            // Remove audio element
-            const audioElement = document.getElementById(`audio-${participantId}`);
-            if (audioElement) {
-                audioElement.remove();
+            // Get current participants
+            const participants = await this.getRoomParticipants();
+            
+            for (const participant of participants) {
+                if (participant.user_id !== this.userId) {
+                    await this.createPeerConnection(participant.user_id, participant);
+                }
             }
+            
+            console.log('Initiated connections with all participants');
             
         } catch (error) {
-            console.error('Error closing peer connection:', error);
+            console.error('Error initiating connections with participants:', error);
         }
     }
+
 
     // Host Controls for Managing Participants
     async muteParticipant(participantId) {

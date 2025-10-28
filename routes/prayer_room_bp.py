@@ -723,3 +723,63 @@ def send_webrtc_answer(room_id):
     except Exception as e:
         logging.error(f"Error sending WebRTC answer: {str(e)}")
         return jsonify({'error': 'Failed to send WebRTC answer'}), 500
+
+@prayer_room_bp.route('/room/<room_id>/webrtc-offers', methods=['GET'])
+def get_webrtc_offers(room_id):
+    """Get WebRTC offers for a room"""
+    try:
+        user = get_user_from_session()
+        
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        db = get_firestore_client()
+        
+        # Get offers for this user
+        offers_ref = db.collection('prayer_rooms').document(room_id)\
+            .collection('webrtc_offers')\
+            .where('to_user', '==', user['user_id'])\
+            .order_by('timestamp', direction=firestore.Query.DESCENDING)\
+            .limit(10)
+        
+        offers = []
+        for doc in offers_ref.stream():
+            offer_data = doc.to_dict()
+            offer_data['id'] = doc.id
+            offers.append(offer_data)
+        
+        return jsonify(offers)
+        
+    except Exception as e:
+        logging.error(f"Error getting WebRTC offers: {str(e)}")
+        return jsonify({'error': 'Failed to get WebRTC offers'}), 500
+
+@prayer_room_bp.route('/room/<room_id>/webrtc-answers', methods=['GET'])
+def get_webrtc_answers(room_id):
+    """Get WebRTC answers for a room"""
+    try:
+        user = get_user_from_session()
+        
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        db = get_firestore_client()
+        
+        # Get answers for this user
+        answers_ref = db.collection('prayer_rooms').document(room_id)\
+            .collection('webrtc_answers')\
+            .where('to_user', '==', user['user_id'])\
+            .order_by('timestamp', direction=firestore.Query.DESCENDING)\
+            .limit(10)
+        
+        answers = []
+        for doc in answers_ref.stream():
+            answer_data = doc.to_dict()
+            answer_data['id'] = doc.id
+            answers.append(answer_data)
+        
+        return jsonify(answers)
+        
+    except Exception as e:
+        logging.error(f"Error getting WebRTC answers: {str(e)}")
+        return jsonify({'error': 'Failed to get WebRTC answers'}), 500
