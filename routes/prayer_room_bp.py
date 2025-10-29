@@ -175,13 +175,19 @@ def join_prayer_room(room_id):
         room_privacy = room_data.get('room_privacy', 'public')
         if room_privacy == 'private':
             data = request.get_json() or {}
-            provided_code = data.get('room_code', '').strip()
+            provided_code = data.get('room_code', '').strip().upper()
             room_code = room_data.get('room_code')
+            
+            if not room_code:
+                logging.error(f"Private room {room_id} has no room_code set in database")
+                return jsonify({'error': 'Room configuration error: missing room code'}), 500
             
             if not provided_code:
                 return jsonify({'error': 'Room code is required for private rooms'}), 400
             
-            if provided_code != room_code:
+            # Normalize both codes to uppercase for comparison
+            if provided_code != room_code.upper():
+                logging.warning(f"Invalid room code provided for room {room_id}: expected {room_code}, got {provided_code}")
                 return jsonify({'error': 'Invalid room code'}), 400
         
         # Check if user is already in the room
@@ -238,7 +244,7 @@ def join_prayer_room(room_id):
         })
         
     except Exception as e:
-        logging.error(f"Error joining prayer room: {str(e)}")
+        logging.error(f"Error joining prayer room {room_id}: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to join prayer room'}), 500
 
 @prayer_room_bp.route('/leave/<room_id>', methods=['POST'])

@@ -326,8 +326,12 @@ class PrayerRoomsDirectory {
                     alert('Room reopened successfully!');
                 }
                 
-                // Redirect to the reopened room
-                window.location.href = `/prayer-room/join?room=${result.room_id}&name=${encodeURIComponent(result.room_name)}`;
+                // Redirect to the reopened room with room code if it's a private room
+                let redirectUrl = `/prayer-room/join?room=${result.room_id}&name=${encodeURIComponent(result.room_name)}`;
+                if (result.room_code) {
+                    redirectUrl += `&code=${result.room_code}`;
+                }
+                window.location.href = redirectUrl;
             } else {
                 alert('Failed to reopen room: ' + (result.error || 'Unknown error'));
             }
@@ -927,9 +931,19 @@ function reopenRoom(roomId) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('Room reopened successfully!');
-                // Redirect to the new room
-                window.location.href = `/prayer-room/join?room=${data.room_id}`;
+                // Show room code for private rooms
+                if (data.room_code) {
+                    alert(`Room reopened successfully!\n\nRoom Code: ${data.room_code}\n\nShare this code with others to let them join your private room.`);
+                } else {
+                    alert('Room reopened successfully!');
+                }
+                
+                // Redirect to the new room with room code if it's a private room
+                let redirectUrl = `/prayer-room/join?room=${data.room_id}`;
+                if (data.room_code) {
+                    redirectUrl += `&code=${data.room_code}`;
+                }
+                window.location.href = redirectUrl;
             } else {
                 alert('Failed to reopen room: ' + (data.error || 'Unknown error'));
             }
