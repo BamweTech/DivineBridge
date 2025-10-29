@@ -38,6 +38,12 @@ class PrayerRoomService {
         this.currentDeviceId = null;
         this.sessionConflict = false;
         
+        // Throttling for speaking state updates
+        this.lastSpeakingStateUpdate = 0;
+        this.speakingStateThrottleMs = 300; // Minimum 300ms between updates
+        this.pendingSpeakingStateUpdate = false;
+        this.voiceActivityDetectionActive = false; // Prevent multiple detection loops
+        
         this.iceServers = [
             { urls: 'stun:stun.l.google.com:19302' },
             { urls: 'stun:stun1.l.google.com:19302' },
@@ -704,6 +710,9 @@ class PrayerRoomService {
                 this.localStream.getTracks().forEach(track => track.stop());
             }
             
+            // Stop voice activity detection
+            this.voiceActivityDetectionActive = false;
+            
             // Clear all polling intervals
             if (this.chatPollInterval) {
                 clearInterval(this.chatPollInterval);
@@ -720,6 +729,10 @@ class PrayerRoomService {
             if (this.participantPollingInterval) {
                 clearInterval(this.participantPollingInterval);
                 this.participantPollingInterval = null;
+            }
+            if (this.signalPollInterval) {
+                clearInterval(this.signalPollInterval);
+                this.signalPollInterval = null;
             }
             
             // Leave room via API
@@ -1049,10 +1062,23 @@ class PrayerRoomService {
     detectVoiceActivity() {
         if (!this.audioAnalyser) return;
         
+        // Prevent multiple detection loops from running simultaneously
+        if (this.voiceActivityDetectionActive) {
+            console.log('🎤 Voice activity detection already active, skipping');
+            return;
+        }
+        
+        this.voiceActivityDetectionActive = true;
+        
         const bufferLength = this.audioAnalyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
         
         const checkVoiceActivity = () => {
+            // Stop if detection is no longer active
+            if (!this.voiceActivityDetectionActive) {
+                return;
+            }
+            
             this.audioAnalyser.getByteFrequencyData(dataArray);
             
             // Calculate average volume
@@ -1090,6 +1116,28 @@ class PrayerRoomService {
         try {
             if (!this.roomId) return;
             
+            // Throttle updates to prevent resource exhaustion
+            const now = Date.now();
+            const timeSinceLastUpdate = now - this.lastSpeakingStateUpdate;
+            
+            // If we're still within the throttle window, skip this update
+            if (timeSinceLastUpdate < this.speakingStateThrottleMs) {
+                // Schedule a delayed update if one isn't already pending
+                if (!this.pendingSpeakingStateUpdate) {
+                    this.pendingSpeakingStateUpdate = true;
+                    const delay = this.speakingStateThrottleMs - timeSinceLastUpdate;
+                    setTimeout(() => {
+                        this.pendingSpeakingStateUpdate = false;
+                        this.broadcastSpeakingState();
+                    }, delay);
+                }
+                return;
+            }
+            
+            // Reset pending flag
+            this.pendingSpeakingStateUpdate = false;
+            this.lastSpeakingStateUpdate = now;
+            
             const response = await fetch(`/api/prayer-room/room/${this.roomId}/speaking-state`, {
                 method: 'POST',
                 headers: {
@@ -1106,6 +1154,8 @@ class PrayerRoomService {
                 
         } catch (error) {
             console.error('Error broadcasting speaking state:', error);
+            // Reset pending flag on error so we can retry
+            this.pendingSpeakingStateUpdate = false;
         }
     }
 
@@ -2089,10 +2139,23 @@ class PrayerRoomService {
         try {
             if (!this.audioAnalyser) return;
             
+            // Prevent multiple detection loops from running simultaneously
+            if (this.voiceActivityDetectionActive) {
+                console.log('🎤 Voice activity detection already active, skipping advanced setup');
+                return;
+            }
+            
+            this.voiceActivityDetectionActive = true;
+            
             const bufferLength = this.audioAnalyser.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
             
             const detectVoiceActivity = () => {
+                // Stop if detection is no longer active
+                if (!this.voiceActivityDetectionActive) {
+                    return;
+                }
+                
                 this.audioAnalyser.getByteFrequencyData(dataArray);
                 
                 // Calculate RMS (Root Mean Square) for voice detection
@@ -2123,6 +2186,7 @@ class PrayerRoomService {
             
         } catch (error) {
             console.error('🎤 Error setting up voice activity detection:', error);
+            this.voiceActivityDetectionActive = false;
         }
     }
 

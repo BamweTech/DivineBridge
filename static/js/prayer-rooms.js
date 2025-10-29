@@ -40,22 +40,29 @@ class PrayerRoomsDirectory {
                 if (userData.authenticated) {
                     this.currentUser = userData.user;
                     console.log('User authenticated:', this.currentUser);
+                    // User is authenticated, no redirect needed
+                    return;
                 } else {
                     console.log('User not authenticated');
-                    // Redirect to login if needed
+                    // Only redirect to login if not already on login page
+                    // Set redirect-path to /prayer-room instead of current path
                     if (window.location.pathname !== '/login') {
-                        window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+                        const targetPath = '/prayer-room';
+                        window.location.href = '/login?redirect=' + encodeURIComponent(targetPath);
                     }
                 }
             } else {
                 console.log('User not authenticated');
-                // Redirect to login if needed
+                // Only redirect to login if not already on login page
+                // Set redirect-path to /prayer-room instead of current path
                 if (window.location.pathname !== '/login') {
-                    window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+                    const targetPath = '/prayer-room';
+                    window.location.href = '/login?redirect=' + encodeURIComponent(targetPath);
                 }
             }
         } catch (error) {
             console.error('Auth check failed:', error);
+            // Don't redirect on error - let the page load normally
         }
     }
 
