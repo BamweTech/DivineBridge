@@ -610,7 +610,194 @@ html, body {
             width: 100%;
         }
     }
-</style>
+    
+    /* My Rooms Modal Styles */
+    .my-rooms-tabs {
+        display: flex;
+        margin-bottom: 20px;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .tab-button {
+        background: transparent;
+        border: none;
+        padding: 12px 24px;
+        color: rgba(255, 255, 255, 0.7);
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: 600;
+        border-bottom: 3px solid transparent;
+        transition: all 0.3s ease;
+    }
+    
+    .tab-button.active {
+        color: #fff;
+        border-bottom-color: #4CAF50;
+    }
+    
+    .tab-button:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.1);
+    }
+    
+    .tab-content {
+        display: none;
+    }
+    
+    .tab-content.active {
+        display: block;
+    }
+    
+    .rooms-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .room-item {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: all 0.3s ease;
+    }
+    
+    .room-item:hover {
+        background: rgba(255, 255, 255, 0.15);
+        transform: translateY(-2px);
+    }
+    
+    .room-info h3 {
+        margin: 0 0 8px 0;
+        color: #fff;
+        font-size: 18px;
+    }
+    
+    .room-description {
+        margin: 0 0 8px 0;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 14px;
+    }
+    
+    .room-meta {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    
+    .room-meta span {
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    
+    .room-privacy.public {
+        background: rgba(76, 175, 80, 0.2);
+        color: #4CAF50;
+    }
+    
+    .room-privacy.private {
+        background: rgba(255, 193, 7, 0.2);
+        color: #FFC107;
+    }
+    
+    .room-status.active {
+        background: rgba(76, 175, 80, 0.2);
+        color: #4CAF50;
+    }
+    
+    .room-status.ended {
+        background: rgba(158, 158, 158, 0.2);
+        color: #9E9E9E;
+    }
+    
+    .room-status.upcoming {
+        background: rgba(33, 150, 243, 0.2);
+        color: #2196F3;
+    }
+    
+    .room-status.past {
+        background: rgba(158, 158, 158, 0.2);
+        color: #9E9E9E;
+    }
+    
+    .room-date, .room-activity {
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.7);
+    }
+    
+    .room-actions {
+        display: flex;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+    
+    .room-actions .btn {
+        padding: 8px 16px;
+        font-size: 14px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-primary {
+        background: #4CAF50;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #45a049;
+        transform: translateY(-1px);
+    }
+    
+    .btn-secondary {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+    }
+    
+    .btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: translateY(-1px);
+    }
+    
+    .btn-danger {
+        background: #f44336;
+        color: white;
+    }
+    
+    .btn-danger:hover {
+        background: #da190b;
+        transform: translateY(-1px);
+    }
+    
+    .btn-outline {
+        background: transparent;
+        color: #4CAF50;
+        border: 2px solid #4CAF50;
+    }
+    
+    .btn-outline:hover {
+        background: #4CAF50;
+        color: white;
+        transform: translateY(-1px);
+    }
+    
+    .no-rooms {
+        text-align: center;
+        padding: 40px 20px;
+        color: rgba(255, 255, 255, 0.7);
+    }
+    
+    .loading {
+        text-align: center;
+        padding: 20px;
+        color: rgba(255, 255, 255, 0.7);
+    }
 {% endblock %}
 
 {% block content %}
@@ -806,6 +993,36 @@ html, body {
                     <button type="submit" class="btn-primary">Schedule Session</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- My Rooms Modal -->
+<div id="myRoomsModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-header">
+            <h3>My Prayer Rooms</h3>
+            <span class="close" onclick="hideMyRoomsModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="my-rooms-tabs">
+                <button class="tab-button active" onclick="switchMyRoomsTab('created')">My Rooms</button>
+                <button class="tab-button" onclick="switchMyRoomsTab('scheduled')">Scheduled</button>
+            </div>
+            
+            <div id="createdRoomsTab" class="tab-content active">
+                <h4>Rooms I Created</h4>
+                <div id="myRoomsList" class="rooms-list">
+                    <div class="loading">Loading your rooms...</div>
+                </div>
+            </div>
+            
+            <div id="scheduledRoomsTab" class="tab-content">
+                <h4>Scheduled Sessions</h4>
+                <div id="scheduledRoomsList" class="rooms-list">
+                    <div class="loading">Loading scheduled rooms...</div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

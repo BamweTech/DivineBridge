@@ -48,6 +48,7 @@ class PrayerRoomService {
         
         // Track processed signals to prevent duplicates
         this.processedSignals = new Set();
+        this.maxProcessedSignals = 1000; // Limit to prevent memory issues
         
         this.init();
     }
@@ -426,8 +427,11 @@ class PrayerRoomService {
                     </div>
                     ${this.isHost && !participant.is_host ? `
                         <div class="participant-actions">
-                            <button class="action-btn mute-btn" onclick="window.prayerRoomService.muteParticipant('${participant.user_id}')" title="Mute">
-                                <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
+                            <button class="action-btn mute-btn ${participant.is_muted ? 'muted' : ''}" onclick="window.prayerRoomService.muteParticipant('${participant.user_id}')" title="${participant.is_muted ? 'Unmute' : 'Mute'}">
+                                ${participant.is_muted ? 
+                                    '<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M23 9l-6 6"></path><path d="M17 9l6 6"></path></svg>' :
+                                    '<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>'
+                                }
                             </button>
                             <button class="action-btn remove-btn" onclick="window.prayerRoomService.removeParticipant('${participant.user_id}')" title="Remove">
                                 <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -1279,15 +1283,33 @@ class PrayerRoomService {
         try {
             console.log('📡 Handling WebRTC offer from:', offer.from_user);
             
-            // Create a unique signal ID to prevent duplicates
-            const signalId = `${offer.from_user}-${offer.id || Date.now()}`;
+            // Create a more unique signal ID to prevent duplicates
+            // Use offer content hash + timestamp + user ID for better uniqueness
+            const offerContent = JSON.stringify(offer.offer);
+            const contentHash = offerContent.length + offerContent.slice(0, 50); // Simple hash
+            const signalId = `${offer.from_user}-${contentHash}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            
+            console.log(`📡 Generated signal ID: ${signalId}`);
             
             if (this.processedSignals.has(signalId)) {
                 console.log(`📡 Duplicate offer detected for ${offer.from_user}, ignoring`);
                 return;
             }
             
+            // Check if we already have a connection with this user
+            if (this.peers.has(offer.from_user)) {
+                console.log(`📡 Peer connection already exists for ${offer.from_user}, cleaning up old connection`);
+                const existingPeer = this.peers.get(offer.from_user);
+                if (existingPeer) {
+                    existingPeer.destroy();
+                }
+                this.peers.delete(offer.from_user);
+            }
+            
             this.processedSignals.add(signalId);
+            
+            // Clean up old signals if we have too many
+            this.cleanupProcessedSignals();
             
             // Create a new peer connection for this offer with ultra-low latency configuration
             const peer = new SimplePeer({
@@ -1349,8 +1371,13 @@ class PrayerRoomService {
         try {
             console.log('📡 Handling WebRTC answer from:', answer.from_user);
             
-            // Create a unique signal ID to prevent duplicates
-            const signalId = `${answer.from_user}-answer-${answer.id || Date.now()}`;
+            // Create a more unique signal ID to prevent duplicates
+            // Use answer content hash + timestamp + user ID for better uniqueness
+            const answerContent = JSON.stringify(answer.answer);
+            const contentHash = answerContent.length + answerContent.slice(0, 50); // Simple hash
+            const signalId = `${answer.from_user}-answer-${contentHash}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            
+            console.log(`📡 Generated answer signal ID: ${signalId}`);
             
             if (this.processedSignals.has(signalId)) {
                 console.log(`📡 Duplicate answer detected for ${answer.from_user}, ignoring`);
@@ -1358,6 +1385,9 @@ class PrayerRoomService {
             }
             
             this.processedSignals.add(signalId);
+            
+            // Clean up old signals if we have too many
+            this.cleanupProcessedSignals();
             
             const peer = this.peers.get(answer.from_user);
             if (peer) {
@@ -2078,7 +2108,7 @@ class PrayerRoomService {
                 
                 if (isCurrentlySpeaking !== this.isSpeaking) {
                     this.isSpeaking = isCurrentlySpeaking;
-                    this.updateSpeakingState(this.isSpeaking);
+                    this.broadcastSpeakingState();
                     
                     // Update UI with speaking indicator
                     this.updateSpeakingIndicator(this.isSpeaking);
@@ -2544,6 +2574,18 @@ class PrayerRoomService {
     }
 
 
+    // Helper method to get current participants
+    async getCurrentParticipants() {
+        try {
+            const response = await fetch(`/api/prayer-room/${this.roomId}/participants`);
+            const data = await response.json();
+            return data.participants || [];
+        } catch (error) {
+            console.error('Error getting current participants:', error);
+            return [];
+        }
+    }
+
     // Host Controls for Managing Participants
     async muteParticipant(participantId) {
         try {
@@ -2552,7 +2594,20 @@ class PrayerRoomService {
                 return;
             }
             
-            console.log(`🔇 Host muting participant: ${participantId}`);
+            // Get current participant data to determine current mute state
+            const participants = await this.getCurrentParticipants();
+            const participant = participants.find(p => p.user_id === participantId);
+            
+            if (!participant) {
+                console.error(`Participant ${participantId} not found`);
+                this.showError('Participant not found');
+                return;
+            }
+            
+            const currentMuteState = participant.is_muted || false;
+            const newMuteState = !currentMuteState;
+            
+            console.log(`🔇 Host ${newMuteState ? 'muting' : 'unmuting'} participant: ${participantId}`);
             
             const response = await fetch(`/api/prayer-room/${this.roomId}/mute`, {
                 method: 'POST',
@@ -2561,18 +2616,18 @@ class PrayerRoomService {
                 },
                 body: JSON.stringify({
                     user_id: participantId,
-                    is_muted: true
+                    is_muted: newMuteState
                 })
             });
             
             if (response.ok) {
-                console.log(`✅ Successfully muted participant: ${participantId}`);
+                console.log(`✅ Successfully ${newMuteState ? 'muted' : 'unmuted'} participant: ${participantId}`);
                 // Refresh participants to update UI
                 this.loadParticipants();
             } else {
                 const error = await response.text();
-                console.error(`❌ Failed to mute participant: ${error}`);
-                this.showError('Failed to mute participant');
+                console.error(`❌ Failed to ${newMuteState ? 'mute' : 'unmute'} participant: ${error}`);
+                this.showError(`Failed to ${newMuteState ? 'mute' : 'unmute'} participant`);
             }
                 
         } catch (error) {
@@ -2659,9 +2714,76 @@ class PrayerRoomService {
             this.showError('Failed to remove participant');
         }
     }
+
+    // Clean up old processed signals to prevent memory issues
+    cleanupProcessedSignals() {
+        try {
+            if (this.processedSignals.size > this.maxProcessedSignals) {
+                console.log(`🧹 Cleaning up processed signals: ${this.processedSignals.size} -> ${this.maxProcessedSignals / 2}`);
+                // Keep only the most recent half
+                const signalsArray = Array.from(this.processedSignals);
+                const keepCount = Math.floor(this.maxProcessedSignals / 2);
+                this.processedSignals.clear();
+                
+                // Keep the most recent signals (assuming they're added chronologically)
+                signalsArray.slice(-keepCount).forEach(signal => {
+                    this.processedSignals.add(signal);
+                });
+            }
+        } catch (error) {
+            console.error('🧹 Error cleaning up processed signals:', error);
+        }
+    }
 }
 
 // Initialize when DOM is loaded
+// Mobile Chat Expansion Functions
+function expandMobileChat() {
+    const chatPanel = document.getElementById('chatPanel');
+    if (chatPanel) {
+        chatPanel.classList.add('mobile-expanded');
+        // Prevent body scroll when chat is expanded
+        document.body.style.overflow = 'hidden';
+        // Focus on chat input for better UX
+        const chatInput = document.getElementById('chatInput');
+        if (chatInput) {
+            setTimeout(() => chatInput.focus(), 300);
+        }
+    }
+}
+
+function collapseMobileChat() {
+    const chatPanel = document.getElementById('chatPanel');
+    if (chatPanel) {
+        chatPanel.classList.remove('mobile-expanded');
+        // Restore body scroll
+        document.body.style.overflow = '';
+    }
+}
+
+// Handle escape key to collapse mobile chat
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+        const chatPanel = document.getElementById('chatPanel');
+        if (chatPanel && chatPanel.classList.contains('mobile-expanded')) {
+            collapseMobileChat();
+        }
+    }
+});
+
+// Auto-expand chat on mobile when user clicks on chat input
+function setupMobileChatAutoExpand() {
+    const chatInput = document.getElementById('chatInput');
+    if (chatInput && window.innerWidth <= 768) {
+        chatInput.addEventListener('focus', () => {
+            const chatPanel = document.getElementById('chatPanel');
+            if (chatPanel && !chatPanel.classList.contains('mobile-expanded')) {
+                expandMobileChat();
+            }
+        });
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Extract room ID from URL and set it globally
     const urlParams = new URLSearchParams(window.location.search);
@@ -2672,4 +2794,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Create shorter alias for easier access
     window.prayerRoom = window.prayerRoomService;
+    
+    // Setup mobile chat auto-expand
+    setupMobileChatAutoExpand();
 });

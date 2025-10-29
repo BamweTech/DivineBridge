@@ -76,6 +76,154 @@ class PrayerRoomsDirectory {
         }
     }
 
+    async loadMyRooms() {
+        try {
+            console.log('Loading user rooms...');
+            
+            const response = await fetch('/api/prayer-room/my-rooms', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.displayMyRooms(data.rooms);
+            } else {
+                console.error('Failed to load user rooms:', await response.text());
+                this.displayMyRooms([]);
+            }
+        } catch (error) {
+            console.error('Error loading user rooms:', error);
+            this.displayMyRooms([]);
+        }
+    }
+
+    async loadMyScheduledRooms() {
+        try {
+            console.log('Loading scheduled rooms...');
+            
+            const response = await fetch('/api/prayer-room/my-scheduled-rooms', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.displayScheduledRooms(data.scheduled_rooms);
+            } else {
+                console.error('Failed to load scheduled rooms:', await response.text());
+                this.displayScheduledRooms([]);
+            }
+        } catch (error) {
+            console.error('Error loading scheduled rooms:', error);
+            this.displayScheduledRooms([]);
+        }
+    }
+
+    displayMyRooms(rooms) {
+        const roomsContainer = document.getElementById('myRoomsList');
+        if (!roomsContainer) return;
+        
+        if (rooms.length === 0) {
+            roomsContainer.innerHTML = `
+                <div class="no-rooms">
+                    <p>You haven't created any rooms yet.</p>
+                    <p>Create your first prayer room to get started!</p>
+                </div>
+            `;
+            return;
+        }
+        
+        roomsContainer.innerHTML = rooms.map(room => {
+            const createdDate = new Date(room.created_at * 1000).toLocaleDateString();
+            const lastActivity = room.last_activity ? new Date(room.last_activity * 1000).toLocaleDateString() : 'Never';
+            const isActive = room.is_active ? 'Active' : 'Ended';
+            const statusClass = room.is_active ? 'active' : 'ended';
+            
+            return `
+                <div class="room-item">
+                    <div class="room-info">
+                        <h3>${room.room_name}</h3>
+                        <p class="room-description">${room.room_description || 'No description'}</p>
+                        <div class="room-meta">
+                            <span class="room-privacy ${room.room_privacy}">${room.room_privacy}</span>
+                            <span class="room-status ${statusClass}">${isActive}</span>
+                            <span class="room-date">Created: ${createdDate}</span>
+                            <span class="room-activity">Last activity: ${lastActivity}</span>
+                        </div>
+                    </div>
+                    <div class="room-actions">
+                        ${room.is_active ? 
+                            `<button class="btn btn-primary" onclick="joinRoom('${room.room_id}', '${room.room_privacy}')">
+                                Join Room
+                            </button>` :
+                            `<button class="btn btn-secondary" onclick="reopenRoom('${room.room_id}')">
+                                Reopen Room
+                            </button>`
+                        }
+                        ${room.room_code ? 
+                            `<button class="btn btn-outline" onclick="copyRoomCode('${room.room_code}')">
+                                Copy Code
+                            </button>` : ''
+                        }
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    displayScheduledRooms(scheduledRooms) {
+        const scheduledContainer = document.getElementById('scheduledRoomsList');
+        if (!scheduledContainer) return;
+        
+        if (scheduledRooms.length === 0) {
+            scheduledContainer.innerHTML = `
+                <div class="no-rooms">
+                    <p>You don't have any scheduled rooms.</p>
+                    <p>Schedule a prayer room to plan ahead!</p>
+                </div>
+            `;
+            return;
+        }
+        
+        scheduledContainer.innerHTML = scheduledRooms.map(room => {
+            const scheduledDate = new Date(room.scheduled_time * 1000);
+            const isUpcoming = scheduledDate > new Date();
+            const statusClass = isUpcoming ? 'upcoming' : 'past';
+            const statusText = isUpcoming ? 'Upcoming' : 'Past';
+            
+            return `
+                <div class="room-item">
+                    <div class="room-info">
+                        <h3>${room.room_name}</h3>
+                        <p class="room-description">${room.room_description || 'No description'}</p>
+                        <div class="room-meta">
+                            <span class="room-privacy ${room.room_privacy}">${room.room_privacy}</span>
+                            <span class="room-status ${statusClass}">${statusText}</span>
+                            <span class="room-date">Scheduled: ${scheduledDate.toLocaleString()}</span>
+                        </div>
+                    </div>
+                    <div class="room-actions">
+                        ${isUpcoming ? 
+                            `<button class="btn btn-danger" onclick="cancelScheduledRoom('${room.scheduled_room_id}')">
+                                Cancel
+                            </button>` :
+                            `<button class="btn btn-secondary" onclick="reopenRoom('${room.room_id || room.scheduled_room_id}')">
+                                Reopen
+                            </button>`
+                        }
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
     renderRooms() {
         const roomsList = document.getElementById('roomsList');
         
@@ -153,6 +301,69 @@ class PrayerRoomsDirectory {
         `;
     }
 
+    async reopenRoom(originalRoomId) {
+        try {
+            console.log('Reopening room:', originalRoomId);
+            
+            const response = await fetch('/api/prayer-room/reopen-room', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    original_room_id: originalRoomId
+                }),
+                credentials: 'include'
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                // Show room code for private rooms
+                if (result.room_code) {
+                    alert(`Room reopened successfully!\n\nRoom Code: ${result.room_code}\n\nShare this code with others to let them join your private room.`);
+                } else {
+                    alert('Room reopened successfully!');
+                }
+                
+                // Redirect to the reopened room
+                window.location.href = `/prayer-room/join?room=${result.room_id}&name=${encodeURIComponent(result.room_name)}`;
+            } else {
+                alert('Failed to reopen room: ' + (result.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error reopening room:', error);
+            alert('Failed to reopen room. Please try again.');
+        }
+    }
+
+    async cancelScheduledRoom(scheduledRoomId) {
+        try {
+            console.log('Canceling scheduled room:', scheduledRoomId);
+            
+            const response = await fetch(`/api/prayer-room/scheduled-room/${scheduledRoomId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include'
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                alert('Scheduled room canceled successfully!');
+                // Reload the scheduled rooms
+                this.loadMyScheduledRooms();
+            } else {
+                alert('Failed to cancel scheduled room: ' + (result.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error canceling scheduled room:', error);
+            alert('Failed to cancel scheduled room. Please try again.');
+        }
+    }
+
     formatTime(timestamp) {
         const date = new Date(timestamp);
         const now = new Date();
@@ -187,7 +398,12 @@ class PrayerRoomsDirectory {
         // Schedule form
         const scheduleForm = document.getElementById('scheduleForm');
         if (scheduleForm) {
-            scheduleForm.addEventListener('submit', (e) => this.handleScheduleRoom(e));
+            scheduleForm.addEventListener('submit', (e) => {
+                console.log('Form submission event triggered!');
+                console.log('Form element:', e.target);
+                console.log('Form data before processing:', new FormData(e.target));
+                this.handleScheduleRoom(e);
+            });
         }
 
         // Modal close on outside click
@@ -200,6 +416,13 @@ class PrayerRoomsDirectory {
 
     async handleCreateRoom(e) {
         e.preventDefault();
+
+        // Check if user is authenticated
+        if (!this.currentUser) {
+            console.log('User not authenticated, redirecting to login');
+            window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+            return;
+        }
 
         const formData = new FormData(e.target);
         const roomName = formData.get('room_name');
@@ -283,11 +506,28 @@ class PrayerRoomsDirectory {
     }
 
     async handleScheduleRoom(e) {
+        console.log('handleScheduleRoom called!');
+        console.log('Event:', e);
+        console.log('Event target:', e.target);
         e.preventDefault();
 
+        // Check if user is authenticated
+        if (!this.currentUser) {
+            console.log('User not authenticated, redirecting to login');
+            window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+            return;
+        }
+
         const formData = new FormData(e.target);
-        const roomName = formData.get('scheduleRoomName');
+        const roomName = formData.get('room_name');
         const hostName = this.currentUser.displayName || this.currentUser.name || 'Anonymous';
+        
+        console.log('Form data debug:', {
+            roomName: roomName,
+            description: formData.get('description'),
+            scheduledDateTime: formData.get('scheduledDateTime'),
+            allFormData: Array.from(formData.entries())
+        });
         
         // Validate room name length
         if (roomName && roomName.length > 50) {
@@ -303,15 +543,25 @@ class PrayerRoomsDirectory {
         
         const scheduleData = {
             room_name: roomName,
-            description: formData.get('description'),
-            scheduled_time: formData.get('scheduleDateTime'),
+            room_description: formData.get('room_description'),
+            scheduled_time: formData.get('scheduled_time'),
+            room_privacy: 'public', // Default to public for now
             host_id: this.currentUser.uid,
             host_name: hostName
         };
+        
+        console.log('Schedule data being sent:', scheduleData);
 
         try {
-            const response = await fetch('/api/prayer-room/schedule', {
-                method: 'POST',
+            // Check if we're editing an existing scheduled room
+            const isEditing = window.editingScheduledRoomId;
+            const url = isEditing ? 
+                `/api/prayer-room/update-scheduled-room/${window.editingScheduledRoomId}` : 
+                '/api/prayer-room/schedule';
+            const method = isEditing ? 'PUT' : 'POST';
+            
+            const response = await fetch(url, {
+                method: method,
                 headers: {
                     'Content-Type': 'application/json',
                 },
@@ -321,16 +571,27 @@ class PrayerRoomsDirectory {
             const result = await response.json();
             
             if (response.ok) {
-                alert('Room scheduled successfully!');
+                if (isEditing) {
+                    alert('Scheduled room updated successfully!');
+                    // Clear the editing state
+                    window.editingScheduledRoomId = null;
+                    // Reset the submit button text
+                    const submitBtn = document.querySelector('#scheduleRoomModal .btn-primary');
+                    if (submitBtn) {
+                        submitBtn.textContent = 'Schedule Room';
+                    }
+                } else {
+                    alert('Room scheduled successfully!');
+                }
                 this.hideScheduleModal();
-                // Refresh the page or update UI
-                location.reload();
+                // Refresh the scheduled rooms list
+                this.loadMyScheduledRooms();
             } else {
-                alert('Failed to schedule room: ' + (result.error || 'Unknown error'));
+                alert(`Failed to ${isEditing ? 'update' : 'schedule'} room: ` + (result.error || 'Unknown error'));
             }
         } catch (error) {
-            console.error('Error scheduling room:', error);
-            alert('Failed to schedule room. Please try again.');
+            console.error(`Error ${isEditing ? 'updating' : 'scheduling'} room:`, error);
+            alert(`Failed to ${isEditing ? 'update' : 'schedule'} room. Please try again.`);
         }
     }
 
@@ -346,22 +607,172 @@ class PrayerRoomsDirectory {
         document.getElementById('joinRoomModal').style.display = 'none';
         document.getElementById('scheduleModal').style.display = 'none';
     }
+
+    hideScheduleModal() {
+        const modal = document.getElementById('scheduleModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+
+    async loadMyRooms() {
+        try {
+            console.log('Loading user rooms...');
+            const response = await fetch('/api/prayer-room/my-rooms', {
+                method: 'GET',
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.displayMyRooms(data.rooms || []);
+            } else {
+                console.error('Failed to load user rooms:', response.status);
+                this.displayMyRooms([]);
+            }
+        } catch (error) {
+            console.error('Error loading user rooms:', error);
+            this.displayMyRooms([]);
+        }
+    }
+
+    async loadMyScheduledRooms() {
+        try {
+            console.log('Loading scheduled rooms...');
+            const response = await fetch('/api/prayer-room/my-scheduled-rooms', {
+                method: 'GET',
+                credentials: 'include'
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.displayScheduledRooms(data.scheduled_rooms || []);
+            } else {
+                console.error('Failed to load scheduled rooms:', response.status);
+                this.displayScheduledRooms([]);
+            }
+        } catch (error) {
+            console.error('Error loading scheduled rooms:', error);
+            this.displayScheduledRooms([]);
+        }
+    }
+
+    displayMyRooms(rooms) {
+        const myRoomsList = document.getElementById('myRoomsList');
+        if (!myRoomsList) return;
+
+        if (rooms.length === 0) {
+            myRoomsList.innerHTML = `
+                <div class="no-rooms">
+                    <h3>No Rooms Yet</h3>
+                    <p>You haven't created any prayer rooms yet. Create your first room to get started!</p>
+                </div>
+            `;
+            return;
+        }
+
+        const roomsHtml = rooms.map(room => {
+            const status = room.is_active ? 'active' : 'inactive';
+            const statusText = room.is_active ? 'Active' : 'Inactive';
+            const createdDate = new Date(room.created_at * 1000).toLocaleDateString();
+            
+            return `
+                <div class="room-item">
+                    <div class="room-item-header">
+                        <div class="room-item-name">${this.escapeHtml(room.room_name)}</div>
+                        <div class="room-item-status ${status}">${statusText}</div>
+                    </div>
+                    <div class="room-item-details">
+                        Created: ${createdDate}<br>
+                        Privacy: ${room.room_privacy === 'private' ? 'Private' : 'Public'}
+                        ${room.room_code ? `<br>Code: ${room.room_code}` : ''}
+                    </div>
+                    <div class="room-item-actions">
+                        ${room.is_active ? 
+                            `<button class="room-action-btn primary" onclick="joinRoom('${room.room_id}', '${room.room_privacy}')">Join</button>` :
+                            `<button class="room-action-btn primary" onclick="reopenRoom('${room.room_id}')">Reopen</button>`
+                        }
+                        <button class="room-action-btn secondary" onclick="copyRoomCode('${room.room_code || ''}')">Copy Code</button>
+                        <button class="room-action-btn danger" onclick="deleteRoom('${room.room_id}', '${this.escapeHtml(room.room_name)}')">Delete</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        myRoomsList.innerHTML = roomsHtml;
+    }
+
+    displayScheduledRooms(scheduledRooms) {
+        const scheduledRoomsList = document.getElementById('scheduledRoomsList');
+        if (!scheduledRoomsList) return;
+
+        if (scheduledRooms.length === 0) {
+            scheduledRoomsList.innerHTML = `
+                <div class="no-rooms">
+                    <h3>No Scheduled Rooms</h3>
+                    <p>You haven't scheduled any prayer rooms yet. Schedule your first session to get started!</p>
+                </div>
+            `;
+            return;
+        }
+
+        const roomsHtml = scheduledRooms.map(room => {
+            const scheduledDate = new Date(room.scheduled_time * 1000);
+            const isUpcoming = scheduledDate > new Date();
+            const status = isUpcoming ? 'scheduled' : 'past';
+            const statusText = isUpcoming ? 'Upcoming' : 'Past';
+            
+            return `
+                <div class="room-item">
+                    <div class="room-item-header">
+                        <div class="room-item-name">${this.escapeHtml(room.room_name)}</div>
+                        <div class="room-item-status ${status}">${statusText}</div>
+                    </div>
+                    <div class="room-item-details">
+                        Scheduled: ${scheduledDate.toLocaleString()}<br>
+                        Privacy: ${room.room_privacy === 'private' ? 'Private' : 'Public'}
+                        ${room.room_code ? `<br>Code: ${room.room_code}` : ''}
+                    </div>
+                    <div class="room-item-actions">
+                        ${isUpcoming ? 
+                            `<button class="room-action-btn primary" onclick="editScheduledRoom('${room.scheduled_room_id}', '${this.escapeHtml(room.room_name)}', '${this.escapeHtml(room.room_description || '')}', '${room.scheduled_time}', '${room.room_privacy}')">Edit</button>` :
+                            ''
+                        }
+                        <button class="room-action-btn secondary" onclick="shareScheduledRoom('${room.scheduled_room_id}', '${this.escapeHtml(room.room_name)}', '${room.scheduled_time}', '${room.room_code || ''}', '${room.room_privacy}')">Share</button>
+                        ${isUpcoming ? 
+                            `<button class="room-action-btn danger" onclick="cancelScheduledRoom('${room.scheduled_room_id}', '${this.escapeHtml(room.room_name)}')">Cancel</button>` :
+                            `<button class="room-action-btn danger" onclick="deleteScheduledRoom('${room.scheduled_room_id}', '${this.escapeHtml(room.room_name)}')">Delete</button>`
+                        }
+                        <button class="room-action-btn secondary" onclick="copyRoomCode('${room.room_code || ''}')">Copy Code</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        scheduledRoomsList.innerHTML = roomsHtml;
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 }
 
 // Global functions for modal management
 function showCreateRoomModal() {
-    // Check authentication before showing the modal
-    const prayerRoomsDirectory = window.prayerRoomsDirectory;
-    if (!prayerRoomsDirectory || !prayerRoomsDirectory.currentUser) {
-        alert('Please log in to create a prayer room');
-        return;
-    }
-    
+    // Let the global authentication system handle auth checks
+    // The modal will be shown, and if user is not authenticated,
+    // the API call will fail and redirect to login automatically
     document.getElementById('createRoomModal').style.display = 'block';
 }
 
 function hideCreateRoomModal() {
     document.getElementById('createRoomModal').style.display = 'none';
+}
+
+function hideScheduleModal() {
+    document.getElementById('scheduleModal').style.display = 'none';
 }
 
 function showJoinRoomModal() {
@@ -373,33 +784,379 @@ function hideJoinRoomModal() {
 }
 
 function showScheduleModal() {
-    // Check authentication before showing the modal
-    const prayerRoomsDirectory = window.prayerRoomsDirectory;
-    if (!prayerRoomsDirectory || !prayerRoomsDirectory.currentUser) {
-        alert('Please log in to schedule a prayer room');
-        return;
-    }
-    
+    // Let the global authentication system handle auth checks
+    // The modal will be shown, and if user is not authenticated,
+    // the API call will fail and redirect to login automatically
     document.getElementById('scheduleModal').style.display = 'block';
 }
 
-function hideScheduleModal() {
-    document.getElementById('scheduleModal').style.display = 'none';
+function hideMyRoomsModal() {
+    document.getElementById('myRoomsModal').style.display = 'none';
+}
+
+function reopenRoom(originalRoomId) {
+    if (!originalRoomId) {
+        alert('Room ID not found');
+        return;
+    }
+    
+    const prayerRoomsDirectory = window.prayerRoomsDirectory;
+    if (!prayerRoomsDirectory) {
+        alert('Prayer rooms directory not initialized');
+        return;
+    }
+    
+    prayerRoomsDirectory.reopenRoom(originalRoomId);
+}
+
+function cancelScheduledRoom(scheduledRoomId) {
+    if (!scheduledRoomId) {
+        alert('Scheduled room ID not found');
+        return;
+    }
+    
+    const confirmed = confirm('Are you sure you want to cancel this scheduled room?');
+    if (!confirmed) return;
+    
+    const prayerRoomsDirectory = window.prayerRoomsDirectory;
+    if (!prayerRoomsDirectory) {
+        alert('Prayer rooms directory not initialized');
+        return;
+    }
+    
+    prayerRoomsDirectory.cancelScheduledRoom(scheduledRoomId);
+}
+
+function switchMyRoomsTab(tabName) {
+    // Update tab buttons
+    const tabButtons = document.querySelectorAll('.tab-button');
+    tabButtons.forEach(button => button.classList.remove('active'));
+    
+    const activeButton = document.querySelector(`[onclick="switchMyRoomsTab('${tabName}')"]`);
+    if (activeButton) {
+        activeButton.classList.add('active');
+    }
+    
+    // Update tab content
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabContents.forEach(content => content.classList.remove('active'));
+    
+    const activeContent = document.getElementById(tabName === 'created' ? 'createdRoomsTab' : 'scheduledRoomsTab');
+    if (activeContent) {
+        activeContent.classList.add('active');
+    }
 }
 
 function showMyRooms() {
-    // TODO: Implement my rooms functionality
-    alert('My Rooms feature coming soon!');
+    // Check if user is authenticated
+    const prayerRoomsDirectory = window.prayerRoomsDirectory;
+    if (!prayerRoomsDirectory || !prayerRoomsDirectory.currentUser) {
+        console.log('User not authenticated, redirecting to login');
+        window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+        return;
+    }
+    
+    // Check if My Rooms modal exists
+    const myRoomsModal = document.getElementById('myRoomsModal');
+    if (!myRoomsModal) {
+        console.error('My Rooms modal not found in template');
+        alert('My Rooms functionality is not available yet. Please check back later.');
+        return;
+    }
+    
+    // Show the My Rooms modal
+    myRoomsModal.style.display = 'block';
+    
+    // Load both user's rooms and scheduled rooms
+    prayerRoomsDirectory.loadMyRooms();
+    prayerRoomsDirectory.loadMyScheduledRooms();
+}
+
+function hideMyRoomsModal() {
+    const modal = document.getElementById('myRoomsModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function showTab(tabId) {
+    // Hide all tab contents
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabContents.forEach(content => content.classList.remove('active'));
+    
+    // Remove active class from all tab buttons
+    const tabButtons = document.querySelectorAll('.tab-button');
+    tabButtons.forEach(button => button.classList.remove('active'));
+    
+    // Show selected tab content
+    const selectedTab = document.getElementById(tabId);
+    if (selectedTab) {
+        selectedTab.classList.add('active');
+    }
+    
+    // Add active class to clicked tab button
+    const clickedButton = event.target;
+    clickedButton.classList.add('active');
 }
 
 function joinRoom(roomId, roomPrivacy = 'public') {
     if (roomPrivacy === 'private') {
         // For private rooms, show the join modal to enter room code
         showJoinRoomModal();
+        // Store the room ID for later use
+        window.joinRoomId = roomId;
     } else {
         // For public rooms, join directly
         window.location.href = `/prayer-room/join?room=${roomId}`;
     }
+}
+
+function reopenRoom(roomId) {
+    if (confirm('Are you sure you want to reopen this room as a live session?')) {
+        // Call the reopen room API
+        fetch('/api/prayer-room/reopen-room', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                original_room_id: roomId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Room reopened successfully!');
+                // Redirect to the new room
+                window.location.href = `/prayer-room/join?room=${data.room_id}`;
+            } else {
+                alert('Failed to reopen room: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error reopening room:', error);
+            alert('Failed to reopen room. Please try again.');
+        });
+    }
+}
+
+function cancelScheduledRoom(scheduledRoomId, roomName = '') {
+    const confirmMessage = roomName ? 
+        `Are you sure you want to cancel the scheduled room "${roomName}"?` :
+        'Are you sure you want to cancel this scheduled room?';
+        
+    if (confirm(confirmMessage)) {
+        fetch(`/api/prayer-room/scheduled-room/${scheduledRoomId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Scheduled room cancelled successfully!');
+                // Reload the scheduled rooms
+                const prayerRoomsDirectory = window.prayerRoomsDirectory;
+                if (prayerRoomsDirectory) {
+                    prayerRoomsDirectory.loadMyScheduledRooms();
+                }
+            } else {
+                alert('Failed to cancel scheduled room: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error cancelling scheduled room:', error);
+            alert('Failed to cancel scheduled room. Please try again.');
+        });
+    }
+}
+
+function copyRoomCode(roomCode) {
+    if (!roomCode) {
+        alert('No room code available');
+        return;
+    }
+    
+    navigator.clipboard.writeText(roomCode).then(() => {
+        alert('Room code copied to clipboard!');
+    }).catch(err => {
+        console.error('Failed to copy room code:', err);
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = roomCode;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            alert('Room code copied to clipboard!');
+        } catch (err) {
+            alert('Failed to copy room code. Please copy manually: ' + roomCode);
+        }
+        document.body.removeChild(textArea);
+    });
+}
+
+function deleteRoom(roomId, roomName) {
+    if (confirm(`Are you sure you want to delete the room "${roomName}"? This action cannot be undone.`)) {
+        fetch(`/api/prayer-room/delete-room/${roomId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Room deleted successfully!');
+                // Reload the rooms
+                const prayerRoomsDirectory = window.prayerRoomsDirectory;
+                if (prayerRoomsDirectory) {
+                    prayerRoomsDirectory.loadMyRooms();
+                }
+            } else {
+                alert('Failed to delete room: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting room:', error);
+            alert('Failed to delete room. Please try again.');
+        });
+    }
+}
+
+function deleteScheduledRoom(scheduledRoomId, roomName) {
+    if (confirm(`Are you sure you want to delete the scheduled room "${roomName}"? This action cannot be undone.`)) {
+        fetch(`/api/prayer-room/scheduled-room/${scheduledRoomId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Scheduled room deleted successfully!');
+                // Reload the scheduled rooms
+                const prayerRoomsDirectory = window.prayerRoomsDirectory;
+                if (prayerRoomsDirectory) {
+                    prayerRoomsDirectory.loadMyScheduledRooms();
+                }
+            } else {
+                alert('Failed to delete scheduled room: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting scheduled room:', error);
+            alert('Failed to delete scheduled room. Please try again.');
+        });
+    }
+}
+
+function editScheduledRoom(scheduledRoomId, roomName, roomDescription, scheduledTime, roomPrivacy) {
+    // Convert timestamp to datetime-local format
+    const scheduledDate = new Date(scheduledTime * 1000);
+    const localDateTime = scheduledDate.toISOString().slice(0, 16);
+    
+    // Pre-fill the schedule form
+    document.getElementById('scheduleRoomName').value = roomName;
+    document.getElementById('scheduleRoomDescription').value = roomDescription;
+    document.getElementById('scheduleDateTime').value = localDateTime;
+    document.getElementById('scheduleRoomPrivacy').value = roomPrivacy;
+    
+    // Show the schedule modal
+    document.getElementById('scheduleRoomModal').style.display = 'block';
+    
+    // Store the scheduled room ID for updating
+    window.editingScheduledRoomId = scheduledRoomId;
+    
+    // Change the submit button text
+    const submitBtn = document.querySelector('#scheduleRoomModal .btn-primary');
+    if (submitBtn) {
+        submitBtn.textContent = 'Update Scheduled Room';
+    }
+}
+
+function shareScheduledRoom(scheduledRoomId, roomName, scheduledTime, roomCode, roomPrivacy) {
+    const scheduledDate = new Date(scheduledTime * 1000);
+    const formattedDate = scheduledDate.toLocaleString();
+    
+    // Create shareable content
+    const shareText = `Join me for a prayer session: "${roomName}"\n📅 ${formattedDate}\n${roomPrivacy === 'private' ? `🔐 Room Code: ${roomCode}` : '🌐 Public Room'}\n\nJoin at: ${window.location.origin}/api/prayer-room/join-scheduled/${scheduledRoomId}`;
+    
+    // Create share data
+    const shareData = {
+        title: `Prayer Session: ${roomName}`,
+        text: shareText,
+        url: `${window.location.origin}/api/prayer-room/join-scheduled/${scheduledRoomId}`
+    };
+    
+    // Try to use native sharing API first
+    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+        navigator.share(shareData)
+            .then(() => {
+                console.log('Successfully shared scheduled room');
+            })
+            .catch((error) => {
+                console.error('Error sharing:', error);
+                // Fallback to copy to clipboard
+                fallbackShare(shareText);
+            });
+    } else {
+        // Fallback to copy to clipboard
+        fallbackShare(shareText);
+    }
+}
+
+function fallbackShare(shareText) {
+    // Copy to clipboard
+    navigator.clipboard.writeText(shareText).then(() => {
+        alert('Prayer session details copied to clipboard! You can now share it with others.');
+    }).catch(err => {
+        console.error('Failed to copy to clipboard:', err);
+        // Show the text in a modal for manual copying
+        showShareModal(shareText);
+    });
+}
+
+function showShareModal(shareText) {
+    // Create a simple modal to display the share text
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+    `;
+    
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        max-width: 500px;
+        width: 90%;
+        max-height: 80%;
+        overflow-y: auto;
+    `;
+    
+    modalContent.innerHTML = `
+        <h3>Share Prayer Session</h3>
+        <p>Copy the text below to share this prayer session:</p>
+        <textarea readonly style="width: 100%; height: 200px; margin: 10px 0; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">${shareText}</textarea>
+        <div style="text-align: right;">
+            <button onclick="this.closest('.share-modal').remove()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">Close</button>
+        </div>
+    `;
+    
+    modal.className = 'share-modal';
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+    
+    // Auto-select the text
+    const textarea = modalContent.querySelector('textarea');
+    textarea.select();
 }
 
 // Initialize when DOM is loaded

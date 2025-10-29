@@ -351,7 +351,7 @@ def get_room_participants(room_id):
 
 @prayer_room_bp.route('/<room_id>/mute', methods=['POST'])
 def mute_participant(room_id):
-    """Mute/unmute a participant"""
+    """Mute/unmute a participant (host only)"""
     try:
         data = request.get_json()
         user_id = data.get('user_id')
@@ -359,6 +359,11 @@ def mute_participant(room_id):
         
         if not user_id:
             return jsonify({'error': 'User ID is required'}), 400
+        
+        # Get the requesting user to check if they're the host
+        requesting_user = get_user_from_session()
+        if not requesting_user:
+            return jsonify({'error': 'Authentication required'}), 401
         
         db = get_firestore_client()
         room_ref = db.collection('prayer_rooms').document(room_id)
@@ -368,18 +373,43 @@ def mute_participant(room_id):
             return jsonify({'error': 'Room not found'}), 404
         
         room_data = room_doc.to_dict()
+        
+        # Check if requesting user is the host
+        if room_data.get('host_id') != requesting_user['user_id']:
+            return jsonify({'error': 'Only the host can mute participants'}), 403
+        
         participants = room_data.get('participants', [])
         
         # Update participant mute status
+        participant_found = False
         for participant in participants:
             if participant['user_id'] == user_id:
                 participant['is_muted'] = is_muted
+                participant_found = True
                 break
+        
+        if not participant_found:
+            return jsonify({'error': 'Participant not found'}), 404
         
         room_ref.update({
             'participants': participants,
             'last_activity': datetime.utcnow()
         })
+        
+        # Add notification message to chat
+        action = "muted" if is_muted else "unmuted"
+        participant_name = next((p.get('user_name', 'A participant') for p in participants if p['user_id'] == user_id), 'A participant')
+        
+        chat_ref = db.collection('chat_messages')
+        notification_message = {
+            'room_id': room_id,
+            'user_id': 'system',
+            'user_name': 'System',
+            'message': f"🔇 {participant_name} has been {action} by the host.",
+            'timestamp': datetime.utcnow(),
+            'message_type': 'system_notification'
+        }
+        chat_ref.add(notification_message)
         
         return jsonify({'success': True, 'is_muted': is_muted})
         
@@ -985,3 +1015,446 @@ def disconnect_session(room_id):
     except Exception as e:
         logging.error(f"Error disconnecting session: {str(e)}")
         return jsonify({'error': 'Failed to disconnect session'}), 500
+
+@prayer_room_bp.route('/my-rooms', methods=['GET'])
+def get_my_rooms():
+    """Get all rooms created by the current user"""
+    try:
+        user = get_user_from_session()
+        
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        db = get_firestore_client()
+        
+        # Get rooms created by this user (simplified query to avoid composite index)
+        rooms_ref = db.collection('prayer_rooms')\
+            .where('host_id', '==', user['user_id'])\
+            .limit(50)
+        
+        rooms = []
+        for doc in rooms_ref.stream():
+            room_data = doc.to_dict()
+            room_data['room_id'] = doc.id
+            # Convert Firestore timestamps to ISO strings
+            if 'created_at' in room_data and hasattr(room_data['created_at'], 'timestamp'):
+                room_data['created_at'] = room_data['created_at'].timestamp()
+            if 'last_activity' in room_data and hasattr(room_data['last_activity'], 'timestamp'):
+                room_data['last_activity'] = room_data['last_activity'].timestamp()
+            rooms.append(room_data)
+        
+        # Sort by created_at in Python (since we can't order_by in the query)
+        rooms.sort(key=lambda x: x.get('created_at', 0), reverse=True)
+        
+        return jsonify({'rooms': rooms})
+        
+    except Exception as e:
+        logging.error(f"Error getting user rooms: {str(e)}")
+        return jsonify({'error': 'Failed to get user rooms'}), 500
+
+@prayer_room_bp.route('/schedule', methods=['POST'])
+def schedule_room():
+    """Schedule a prayer room for a future time"""
+    try:
+        user = get_user_from_session()
+        
+        if not user:
+            logging.error("No user found in session for schedule request")
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        data = request.get_json()
+        logging.info(f"Schedule request data: {data}")
+        
+        room_name = data.get('room_name')
+        room_description = data.get('room_description', '')
+        scheduled_time = data.get('scheduled_time')
+        room_privacy = data.get('room_privacy', 'public')
+        host_name = user.get('user_name', 'Anonymous')
+        
+        logging.info(f"Parsed data - room_name: {room_name}, scheduled_time: {scheduled_time}")
+        
+        if not room_name:
+            logging.error("Room name is missing")
+            return jsonify({'error': 'Room name is required'}), 400
+        
+        if not scheduled_time:
+            logging.error("Scheduled time is missing")
+            return jsonify({'error': 'Scheduled time is required'}), 400
+        
+        # Validate room name length
+        if len(room_name) > 50:
+            logging.error(f"Room name too long: {len(room_name)} characters")
+            return jsonify({'error': 'Room name must be 50 characters or less'}), 400
+        
+        # Validate host name length
+        if len(host_name) > 30:
+            logging.error(f"Host name too long: {len(host_name)} characters")
+            return jsonify({'error': 'Host name must be 30 characters or less'}), 400
+        
+        # Parse scheduled time - handle local timezone
+        try:
+            # The datetime-local input provides local time without timezone info
+            # We need to treat it as local time, not UTC
+            if 'T' in scheduled_time and '+' not in scheduled_time and 'Z' not in scheduled_time:
+                # This is a local datetime from datetime-local input
+                # Parse it as naive datetime (no timezone info)
+                scheduled_datetime = datetime.fromisoformat(scheduled_time)
+                logging.info(f"Parsed scheduled time (local): {scheduled_datetime}")
+            else:
+                # This has timezone info, parse normally
+                scheduled_datetime = datetime.fromisoformat(scheduled_time.replace('Z', '+00:00'))
+                logging.info(f"Parsed scheduled time (with timezone): {scheduled_datetime}")
+        except ValueError as e:
+            logging.error(f"Invalid scheduled time format: {scheduled_time}, error: {e}")
+            return jsonify({'error': 'Invalid scheduled time format'}), 400
+        
+        # Check if scheduled time is in the future
+        # For local datetime, compare with local time
+        now = datetime.now()
+        if scheduled_datetime <= now:
+            logging.error(f"Scheduled time is in the past: {scheduled_datetime} (current time: {now})")
+            return jsonify({'error': 'Scheduled time must be in the future'}), 400
+        
+        db = get_firestore_client()
+        
+        # Create scheduled room data
+        scheduled_room_data = {
+            'room_name': room_name,
+            'room_description': room_description,
+            'room_privacy': room_privacy,
+            'host_id': user['user_id'],
+            'host_name': host_name,
+            'scheduled_time': scheduled_datetime,
+            'created_at': datetime.utcnow(),
+            'status': 'scheduled'
+        }
+        
+        # Generate room code for private rooms
+        if room_privacy == 'private':
+            scheduled_room_data['room_code'] = ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
+        
+        # Save the scheduled room
+        scheduled_room_ref = db.collection('scheduled_rooms').add(scheduled_room_data)
+        scheduled_room_id = scheduled_room_ref[1].id
+        
+        logging.info(f"Successfully scheduled room: {scheduled_room_id}")
+        
+        return jsonify({
+            'success': True,
+            'scheduled_room_id': scheduled_room_id,
+            'room_code': scheduled_room_data.get('room_code'),
+            'message': 'Room scheduled successfully'
+        })
+        
+    except Exception as e:
+        logging.error(f"Error scheduling room: {str(e)}")
+        return jsonify({'error': 'Failed to schedule room'}), 500
+
+@prayer_room_bp.route('/my-scheduled-rooms', methods=['GET'])
+def get_my_scheduled_rooms():
+    """Get all scheduled rooms created by the current user"""
+    try:
+        user = get_user_from_session()
+        
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        db = get_firestore_client()
+        
+        # Get scheduled rooms created by this user (simplified query to avoid composite index)
+        scheduled_rooms_ref = db.collection('scheduled_rooms')\
+            .where('host_id', '==', user['user_id'])\
+            .limit(50)
+        
+        scheduled_rooms = []
+        for doc in scheduled_rooms_ref.stream():
+            room_data = doc.to_dict()
+            room_data['scheduled_room_id'] = doc.id
+            # Convert Firestore timestamps to ISO strings
+            if 'scheduled_time' in room_data and hasattr(room_data['scheduled_time'], 'timestamp'):
+                room_data['scheduled_time'] = room_data['scheduled_time'].timestamp()
+            if 'created_at' in room_data and hasattr(room_data['created_at'], 'timestamp'):
+                room_data['created_at'] = room_data['created_at'].timestamp()
+            scheduled_rooms.append(room_data)
+        
+        # Sort by scheduled_time in Python (since we can't order_by in the query)
+        scheduled_rooms.sort(key=lambda x: x.get('scheduled_time', 0), reverse=False)
+        
+        # Filter out past scheduled meetings
+        now = datetime.now().timestamp()
+        future_scheduled_rooms = [room for room in scheduled_rooms if room.get('scheduled_time', 0) > now]
+        
+        return jsonify({'scheduled_rooms': future_scheduled_rooms})
+        
+    except Exception as e:
+        logging.error(f"Error getting scheduled rooms: {str(e)}")
+        return jsonify({'error': 'Failed to get scheduled rooms'}), 500
+
+@prayer_room_bp.route('/scheduled-room/<scheduled_room_id>', methods=['DELETE'])
+def cancel_scheduled_room(scheduled_room_id):
+    """Cancel a scheduled room"""
+    try:
+        user = get_user_from_session()
+        
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        db = get_firestore_client()
+        
+        # Get the scheduled room
+        scheduled_room_ref = db.collection('scheduled_rooms').document(scheduled_room_id)
+        scheduled_room_doc = scheduled_room_ref.get()
+        
+        if not scheduled_room_doc.exists:
+            return jsonify({'error': 'Scheduled room not found'}), 404
+        
+        scheduled_room_data = scheduled_room_doc.to_dict()
+        
+        # Check if user is the host
+        if scheduled_room_data.get('host_id') != user['user_id']:
+            return jsonify({'error': 'Only the host can cancel scheduled rooms'}), 403
+        
+        # Delete the scheduled room
+        scheduled_room_ref.delete()
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        logging.error(f"Error canceling scheduled room: {str(e)}")
+        return jsonify({'error': 'Failed to cancel scheduled room'}), 500
+
+@prayer_room_bp.route('/reopen-room', methods=['POST'])
+def reopen_room():
+    """Reopen a previous room as a live session"""
+    try:
+        user = get_user_from_session()
+        
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        data = request.get_json()
+        original_room_id = data.get('original_room_id')
+        
+        if not original_room_id:
+            return jsonify({'error': 'Original room ID is required'}), 400
+        
+        db = get_firestore_client()
+        
+        # Get the original room data
+        original_room_ref = db.collection('prayer_rooms').document(original_room_id)
+        original_room_doc = original_room_ref.get()
+        
+        if not original_room_doc.exists:
+            return jsonify({'error': 'Original room not found'}), 404
+        
+        original_room_data = original_room_doc.to_dict()
+        
+        # Check if user is the original host
+        if original_room_data.get('host_id') != user['user_id']:
+            return jsonify({'error': 'Only the original host can reopen rooms'}), 403
+        
+        # Generate new room ID
+        new_room_id = ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
+        
+        # Create new room with same settings
+        new_room_data = {
+            'room_name': original_room_data.get('room_name', 'Prayer Room'),
+            'room_description': original_room_data.get('room_description', ''),
+            'room_privacy': original_room_data.get('room_privacy', 'public'),
+            'host_id': user['user_id'],
+            'host_name': user['user_name'],
+            'is_active': True,
+            'created_at': datetime.utcnow(),
+            'last_activity': datetime.utcnow(),
+            'participants': [],
+            'original_room_id': original_room_id  # Track the original room
+        }
+        
+        # Generate room code for private rooms
+        if new_room_data['room_privacy'] == 'private':
+            new_room_data['room_code'] = ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
+        
+        # Save the new room
+        db.collection('prayer_rooms').document(new_room_id).set(new_room_data)
+        
+        return jsonify({
+            'success': True,
+            'room_id': new_room_id,
+            'room_code': new_room_data.get('room_code'),
+            'room_name': new_room_data['room_name']
+        })
+        
+    except Exception as e:
+        logging.error(f"Error reopening room: {str(e)}")
+        return jsonify({'error': 'Failed to reopen room'}), 500
+
+@prayer_room_bp.route('/delete-room/<room_id>', methods=['DELETE'])
+def delete_room(room_id):
+    """Delete a room created by the current user"""
+    try:
+        user = get_user_from_session()
+        
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        db = get_firestore_client()
+        
+        # Get the room to verify ownership
+        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_doc = room_ref.get()
+        
+        if not room_doc.exists:
+            return jsonify({'error': 'Room not found'}), 404
+        
+        room_data = room_doc.to_dict()
+        
+        # Check if user is the host
+        if room_data.get('host_id') != user['user_id']:
+            return jsonify({'error': 'Only the room creator can delete rooms'}), 403
+        
+        # Delete the room
+        room_ref.delete()
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        logging.error(f"Error deleting room: {str(e)}")
+        return jsonify({'error': 'Failed to delete room'}), 500
+
+@prayer_room_bp.route('/update-scheduled-room/<scheduled_room_id>', methods=['PUT'])
+def update_scheduled_room(scheduled_room_id):
+    """Update a scheduled room"""
+    try:
+        user = get_user_from_session()
+        
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        data = request.get_json()
+        room_name = data.get('room_name')
+        room_description = data.get('room_description', '')
+        scheduled_time = data.get('scheduled_time')
+        room_privacy = data.get('room_privacy', 'public')
+        
+        if not room_name:
+            return jsonify({'error': 'Room name is required'}), 400
+        
+        if not scheduled_time:
+            return jsonify({'error': 'Scheduled time is required'}), 400
+        
+        # Validate room name length
+        if len(room_name) > 50:
+            return jsonify({'error': 'Room name must be 50 characters or less'}), 400
+        
+        # Parse scheduled time - handle local timezone
+        try:
+            if 'T' in scheduled_time and '+' not in scheduled_time and 'Z' not in scheduled_time:
+                # Parse it as naive datetime (no timezone info)
+                scheduled_datetime = datetime.fromisoformat(scheduled_time)
+            else:
+                # This has timezone info, parse normally
+                scheduled_datetime = datetime.fromisoformat(scheduled_time.replace('Z', '+00:00'))
+        except ValueError as e:
+            return jsonify({'error': 'Invalid scheduled time format'}), 400
+        
+        # Check if scheduled time is in the future
+        now = datetime.now()
+        if scheduled_datetime <= now:
+            return jsonify({'error': 'Scheduled time must be in the future'}), 400
+        
+        db = get_firestore_client()
+        
+        # Get the scheduled room to verify ownership
+        scheduled_room_ref = db.collection('scheduled_rooms').document(scheduled_room_id)
+        scheduled_room_doc = scheduled_room_ref.get()
+        
+        if not scheduled_room_doc.exists:
+            return jsonify({'error': 'Scheduled room not found'}), 404
+        
+        scheduled_room_data = scheduled_room_doc.to_dict()
+        
+        # Check if user is the host
+        if scheduled_room_data.get('host_id') != user['user_id']:
+            return jsonify({'error': 'Only the room creator can update scheduled rooms'}), 403
+        
+        # Update the scheduled room
+        update_data = {
+            'room_name': room_name,
+            'room_description': room_description,
+            'room_privacy': room_privacy,
+            'scheduled_time': scheduled_datetime,
+            'updated_at': datetime.utcnow()
+        }
+        
+        # Generate new room code for private rooms if privacy changed
+        if room_privacy == 'private' and scheduled_room_data.get('room_privacy') != 'private':
+            update_data['room_code'] = ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
+        
+        scheduled_room_ref.update(update_data)
+        
+        return jsonify({
+            'success': True,
+            'room_code': update_data.get('room_code', scheduled_room_data.get('room_code')),
+            'message': 'Scheduled room updated successfully'
+        })
+        
+    except Exception as e:
+        logging.error(f"Error updating scheduled room: {str(e)}")
+        return jsonify({'error': 'Failed to update scheduled room'}), 500
+
+@prayer_room_bp.route('/join-scheduled/<scheduled_room_id>', methods=['GET'])
+def join_scheduled_room(scheduled_room_id):
+    """Join a scheduled room by its scheduled room ID"""
+    try:
+        user = get_user_from_session()
+        
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        db = get_firestore_client()
+        
+        # Get the scheduled room
+        scheduled_room_ref = db.collection('scheduled_rooms').document(scheduled_room_id)
+        scheduled_room_doc = scheduled_room_ref.get()
+        
+        if not scheduled_room_doc.exists:
+            return jsonify({'error': 'Scheduled room not found'}), 404
+        
+        scheduled_room_data = scheduled_room_doc.to_dict()
+        
+        # Check if the scheduled time has passed
+        scheduled_time = scheduled_room_data.get('scheduled_time')
+        if scheduled_time:
+            # Convert Firestore timestamp to datetime if needed
+            if hasattr(scheduled_time, 'timestamp'):
+                scheduled_datetime = datetime.fromtimestamp(scheduled_time.timestamp())
+            elif isinstance(scheduled_time, dict) and '_seconds' in scheduled_time:
+                scheduled_datetime = datetime.fromtimestamp(scheduled_time['_seconds'])
+            else:
+                scheduled_datetime = scheduled_time
+            
+            if scheduled_datetime <= datetime.now():
+                return jsonify({'error': 'This scheduled session has already passed'}), 400
+        
+        # Redirect to the prayer room join page with the scheduled room info
+        room_name = scheduled_room_data.get('room_name', 'Scheduled Prayer Room')
+        room_privacy = scheduled_room_data.get('room_privacy', 'public')
+        room_code = scheduled_room_data.get('room_code', '')
+        
+        # Create a redirect URL with the scheduled room information
+        redirect_url = f"/prayer-room/join?room={scheduled_room_id}&name={room_name}&privacy={room_privacy}"
+        if room_code:
+            redirect_url += f"&code={room_code}"
+        
+        return jsonify({
+            'success': True,
+            'redirect_url': redirect_url,
+            'room_name': room_name,
+            'scheduled_time': scheduled_room_data.get('scheduled_time'),
+            'room_privacy': room_privacy,
+            'room_code': room_code
+        })
+        
+    except Exception as e:
+        logging.error(f"Error joining scheduled room: {str(e)}")
+        return jsonify({'error': 'Failed to join scheduled room'}), 500
