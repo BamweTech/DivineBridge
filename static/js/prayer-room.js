@@ -460,15 +460,25 @@ class PrayerRoomService {
             this.isAudioEnabled = true;
             this.updateAudioControls();
             
-            // Request microphone permission with minimal constraints for fastest initialization
+            // Request microphone permission with ultra-low latency constraints
             console.log('🎤 Requesting microphone permission...');
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
                     echoCancellation: { ideal: true },
                     noiseSuppression: { ideal: true },
                     autoGainControl: { ideal: true },
-                    sampleRate: { ideal: 44100 },
-                    channelCount: { ideal: 1 }
+                    sampleRate: { ideal: 48000 }, // Higher sample rate for better quality
+                    channelCount: { ideal: 1 },
+                    // Ultra-low latency audio constraints
+                    latency: { ideal: 0.01 }, // 10ms latency target
+                    googEchoCancellation: { ideal: true },
+                    googAutoGainControl: { ideal: true },
+                    googNoiseSuppression: { ideal: true },
+                    googHighpassFilter: { ideal: true },
+                    googTypingNoiseDetection: { ideal: true },
+                    googAudioMirroring: { ideal: false },
+                    googDAEchoCancellation: { ideal: true },
+                    googNoiseReduction: { ideal: true }
                 },
                 video: false
             });
@@ -1112,10 +1122,10 @@ class PrayerRoomService {
     }
 
     setupSignalPolling() {
-        // Poll for WebRTC offers and answers every 2 seconds
+        // Poll for WebRTC offers and answers every 500ms for faster connection
         this.signalPollInterval = setInterval(() => {
             this.checkForWebRTCSignals();
-        }, 2000);
+        }, 500); // Reduced from 2000ms to 500ms for faster signaling
     }
 
     async checkForWebRTCSignals() {
@@ -1167,62 +1177,43 @@ class PrayerRoomService {
             
             console.log(`🔗 Creating SimplePeer instance for ${participantId} with local stream:`, this.localStream);
             
-            // Create SimplePeer instance as initiator with improved configuration
+            // Create SimplePeer instance as initiator with ultra-low latency configuration
             const peer = new SimplePeer({
                 initiator: true, // We initiate the connection
                 stream: this.localStream,
-                trickle: false,
-                // Enhanced WebRTC configuration for better connectivity
+                trickle: true, // Enable trickle ICE for faster connection
+                // Ultra-low latency WebRTC configuration
                 config: {
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' },
-                        { urls: 'stun:stun2.l.google.com:19302' },
-                        { urls: 'stun:stun3.l.google.com:19302' },
-                        { urls: 'stun:stun4.l.google.com:19302' },
-                        // Add more STUN servers for better NAT traversal
-                        { urls: 'stun:stun.stunprotocol.org:3478' },
-                        { urls: 'stun:stun.ekiga.net' },
-                        { urls: 'stun:stun.ideasip.com' },
-                        { urls: 'stun:stun.schlund.de' },
-                        { urls: 'stun:stun.stunprotocol.org:3478' },
-                        { urls: 'stun:stun.voiparound.com' },
-                        { urls: 'stun:stun.voipbuster.com' },
-                        { urls: 'stun:stun.voipstunt.com' },
-                        { urls: 'stun:stun.counterpath.com' },
-                        { urls: 'stun:stun.1und1.de' },
-                        { urls: 'stun:stun.gmx.net' },
-                        { urls: 'stun:stun.sipgate.net' },
-                        { urls: 'stun:stun.radiojar.com' },
-                        { urls: 'stun:stun.sipnet.net' },
-                        { urls: 'stun:stun.softjoys.com' },
-                        { urls: 'stun:stun.voipgate.com' },
-                        { urls: 'stun:stun.voys.nl' },
-                        { urls: 'stun:stun.counterpath.com' },
-                        { urls: 'stun:stun.1und1.de' },
-                        { urls: 'stun:stun.gmx.net' },
-                        { urls: 'stun:stun.sipgate.net' },
-                        { urls: 'stun:stun.radiojar.com' },
-                        { urls: 'stun:stun.sipnet.net' },
-                        { urls: 'stun:stun.softjoys.com' },
-                        { urls: 'stun:stun.voipgate.com' },
-                        { urls: 'stun:stun.voys.nl' }
+                        { urls: 'stun:stun1.l.google.com:19302' }
                     ],
-                    iceCandidatePoolSize: 10,
+                    iceCandidatePoolSize: 0, // Disable candidate pooling for faster connection
                     bundlePolicy: 'max-bundle',
-                    rtcpMuxPolicy: 'require'
+                    rtcpMuxPolicy: 'require',
+                    // Ultra-low latency settings
+                    iceTransportPolicy: 'all',
+                    iceConnectionReceivingTimeout: 5000, // 5 second timeout
+                    iceBackupCandidatePairPingInterval: 2500 // 2.5 second ping interval
                 },
-                // Enhanced constraints for better audio handling
+                // Ultra-low latency constraints
                 constraints: {
                     offerToReceiveAudio: true,
                     offerToReceiveVideo: false,
-                    voiceActivityDetection: true
+                    voiceActivityDetection: false // Disable VAD for lower latency
                 },
-                // Additional options for better connectivity
+                // Low latency options
                 objectMode: false,
                 channelConfig: {
-                    ordered: false,
-                    maxRetransmits: 0
+                    ordered: false, // Disable ordering for lower latency
+                    maxRetransmits: 0 // No retransmits for lower latency
+                },
+                // Additional low latency settings
+                sdpTransform: (sdp) => {
+                    // Optimize SDP for low latency
+                    return sdp
+                        .replace(/a=fmtp:111 minptime=10;useinbandfec=1/g, 'a=fmtp:111 minptime=5;useinbandfec=0')
+                        .replace(/a=fmtp:9 minptime=10;useinbandfec=1/g, 'a=fmtp:9 minptime=5;useinbandfec=0');
                 }
             });
             
@@ -1286,62 +1277,43 @@ class PrayerRoomService {
             
             this.processedSignals.add(signalId);
             
-            // Create a new peer connection for this offer with enhanced configuration
+            // Create a new peer connection for this offer with ultra-low latency configuration
             const peer = new SimplePeer({
                 initiator: false,
                 stream: this.localStream,
-                trickle: false,
-                // Enhanced WebRTC configuration for better connectivity
+                trickle: true, // Enable trickle ICE for faster connection
+                // Ultra-low latency WebRTC configuration
                 config: {
                     iceServers: [
                         { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' },
-                        { urls: 'stun:stun2.l.google.com:19302' },
-                        { urls: 'stun:stun3.l.google.com:19302' },
-                        { urls: 'stun:stun4.l.google.com:19302' },
-                        // Add more STUN servers for better NAT traversal
-                        { urls: 'stun:stun.stunprotocol.org:3478' },
-                        { urls: 'stun:stun.ekiga.net' },
-                        { urls: 'stun:stun.ideasip.com' },
-                        { urls: 'stun:stun.schlund.de' },
-                        { urls: 'stun:stun.stunprotocol.org:3478' },
-                        { urls: 'stun:stun.voiparound.com' },
-                        { urls: 'stun:stun.voipbuster.com' },
-                        { urls: 'stun:stun.voipstunt.com' },
-                        { urls: 'stun:stun.counterpath.com' },
-                        { urls: 'stun:stun.1und1.de' },
-                        { urls: 'stun:stun.gmx.net' },
-                        { urls: 'stun:stun.sipgate.net' },
-                        { urls: 'stun:stun.radiojar.com' },
-                        { urls: 'stun:stun.sipnet.net' },
-                        { urls: 'stun:stun.softjoys.com' },
-                        { urls: 'stun:stun.voipgate.com' },
-                        { urls: 'stun:stun.voys.nl' },
-                        { urls: 'stun:stun.counterpath.com' },
-                        { urls: 'stun:stun.1und1.de' },
-                        { urls: 'stun:stun.gmx.net' },
-                        { urls: 'stun:stun.sipgate.net' },
-                        { urls: 'stun:stun.radiojar.com' },
-                        { urls: 'stun:stun.sipnet.net' },
-                        { urls: 'stun:stun.softjoys.com' },
-                        { urls: 'stun:stun.voipgate.com' },
-                        { urls: 'stun:stun.voys.nl' }
+                        { urls: 'stun:stun1.l.google.com:19302' }
                     ],
-                    iceCandidatePoolSize: 10,
+                    iceCandidatePoolSize: 0, // Disable candidate pooling for faster connection
                     bundlePolicy: 'max-bundle',
-                    rtcpMuxPolicy: 'require'
+                    rtcpMuxPolicy: 'require',
+                    // Ultra-low latency settings
+                    iceTransportPolicy: 'all',
+                    iceConnectionReceivingTimeout: 5000, // 5 second timeout
+                    iceBackupCandidatePairPingInterval: 2500 // 2.5 second ping interval
                 },
-                // Enhanced constraints for better audio handling
+                // Ultra-low latency constraints
                 constraints: {
                     offerToReceiveAudio: true,
                     offerToReceiveVideo: false,
-                    voiceActivityDetection: true
+                    voiceActivityDetection: false // Disable VAD for lower latency
                 },
-                // Additional options for better connectivity
+                // Low latency options
                 objectMode: false,
                 channelConfig: {
-                    ordered: false,
-                    maxRetransmits: 0
+                    ordered: false, // Disable ordering for lower latency
+                    maxRetransmits: 0 // No retransmits for lower latency
+                },
+                // Additional low latency settings
+                sdpTransform: (sdp) => {
+                    // Optimize SDP for low latency
+                    return sdp
+                        .replace(/a=fmtp:111 minptime=10;useinbandfec=1/g, 'a=fmtp:111 minptime=5;useinbandfec=0')
+                        .replace(/a=fmtp:9 minptime=10;useinbandfec=1/g, 'a=fmtp:9 minptime=5;useinbandfec=0');
                 }
             });
             
@@ -1758,46 +1730,32 @@ class PrayerRoomService {
                 console.log(`🎵 Removed existing audio element for ${participantId}`);
             }
             
-            // Create audio element for remote stream with improved settings
-            const audioElement = document.createElement('audio');
-            audioElement.srcObject = stream;
-            audioElement.autoplay = true;
-            audioElement.playsInline = true; // Important for mobile
-            audioElement.id = `audio-${participantId}`;
-            audioElement.volume = 0.8; // Set default volume
-            audioElement.controls = false; // Hide controls
-            audioElement.muted = false; // Ensure not muted
-            
-            // Add event listeners for debugging and handling
-            audioElement.addEventListener('loadedmetadata', () => {
-                console.log(`🎵 Audio metadata loaded for ${participantId}`);
-                console.log(`🎵 Audio duration:`, audioElement.duration);
-            });
-            
-            audioElement.addEventListener('canplay', () => {
-                console.log(`🎵 Audio can play for ${participantId}`);
-            });
-            
-            audioElement.addEventListener('play', () => {
-                console.log(`🎵 Audio started playing for ${participantId}`);
-            });
-            
-            audioElement.addEventListener('pause', () => {
-                console.log(`🎵 Audio paused for ${participantId}`);
-            });
-            
-            audioElement.addEventListener('error', (e) => {
-                console.error(`🎵 Audio error for ${participantId}:`, e);
-                console.error(`🎵 Audio error details:`, {
-                    error: audioElement.error,
-                    networkState: audioElement.networkState,
-                    readyState: audioElement.readyState
-                });
-            });
-            
-            audioElement.addEventListener('volumechange', () => {
-                console.log(`🎵 Volume changed for ${participantId}:`, audioElement.volume);
-            });
+                    // Create audio element for remote stream with ultra-low latency settings
+                    const audioElement = document.createElement('audio');
+                    audioElement.srcObject = stream;
+                    audioElement.autoplay = true;
+                    audioElement.playsInline = true; // Important for mobile
+                    audioElement.id = `audio-${participantId}`;
+                    audioElement.volume = 0.8; // Set default volume
+                    audioElement.controls = false; // Hide controls
+                    audioElement.muted = false; // Ensure not muted
+                    
+                    // Ultra-low latency audio settings
+                    audioElement.preload = 'none'; // Don't preload for faster connection
+                    audioElement.crossOrigin = 'anonymous'; // Enable CORS for better performance
+                    
+                    // Optimize for low latency playback
+                    audioElement.addEventListener('loadstart', () => {
+                        console.log(`🎵 Audio load started for ${participantId}`);
+                    });
+                    
+                    audioElement.addEventListener('loadeddata', () => {
+                        console.log(`🎵 Audio data loaded for ${participantId}`);
+                        // Try to play immediately when data is loaded
+                        audioElement.play().catch(error => {
+                            console.warn(`🎵 Auto-play failed for ${participantId}:`, error);
+                        });
+                    });
             
             // Add to a dedicated audio container or body
             let audioContainer = document.getElementById('audioContainer');
@@ -1811,23 +1769,41 @@ class PrayerRoomService {
             audioContainer.appendChild(audioElement);
             console.log(`🎵 Audio element added to container for ${participantId}`);
             
-            // Try to play the audio with user interaction fallback
-            const playAudio = async () => {
-                try {
-                    await audioElement.play();
-                    console.log(`🎵 Audio playing successfully for ${participantId}`);
-                } catch (error) {
-                    console.error(`🎵 Failed to play audio for ${participantId}:`, error);
-                    // If autoplay fails, try again after a short delay
-                    setTimeout(() => {
-                        audioElement.play().catch(e => {
-                            console.error(`🎵 Retry play failed for ${participantId}:`, e);
-                        });
-                    }, 1000);
-                }
-            };
-            
-            playAudio();
+                    // Try to play the audio immediately with optimized settings
+                    const playAudio = async () => {
+                        try {
+                            // Set audio context to low latency mode if available
+                            if (this.audioContext && this.audioContext.state === 'running') {
+                                // Optimize audio context for low latency
+                                this.audioContext.suspend().then(() => {
+                                    this.audioContext.resume();
+                                });
+                            }
+                            
+                            // Play immediately without waiting
+                            const playPromise = audioElement.play();
+                            
+                            if (playPromise !== undefined) {
+                                await playPromise;
+                                console.log(`🎵 Audio playing successfully for ${participantId}`);
+                            } else {
+                                console.log(`🎵 Audio playing for ${participantId} (no promise)`);
+                            }
+                            
+                        } catch (error) {
+                            console.error(`🎵 Failed to play audio for ${participantId}:`, error);
+                            
+                            // Retry with user interaction fallback
+                            setTimeout(() => {
+                                audioElement.play().catch(e => {
+                                    console.error(`🎵 Retry play failed for ${participantId}:`, e);
+                                });
+                            }, 100); // Very short delay for retry
+                        }
+                    };
+                    
+                    // Play immediately
+                    playAudio();
             
         } catch (error) {
             console.error('🎵 Error handling remote stream:', error);
