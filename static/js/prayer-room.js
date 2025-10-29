@@ -1236,30 +1236,42 @@ class PrayerRoomService {
         try {
             if (!this.roomId || !this.userId) return;
             
-            console.log(`Sending WebRTC signal to ${participantId}:`, signalData.type);
+            console.log(`📡 Sending signal to ${participantId}:`, signalData.type);
             
             const signalType = signalData.type;
             const endpoint = signalType === 'offer' ? 'webrtc-offer' : 'webrtc-answer';
+            
+            // Prepare the request body with correct field names
+            const requestBody = {
+                to_user: participantId
+            };
+            
+            // Add the signal data with the correct field name
+            if (signalType === 'offer') {
+                requestBody.offer = signalData;
+            } else if (signalType === 'answer') {
+                requestBody.answer = signalData;
+            }
+            
+            console.log(`📡 Request body for ${signalType}:`, requestBody);
             
             const response = await fetch(`/api/prayer-room/room/${this.roomId}/${endpoint}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    to_user: participantId,
-                    [signalType]: signalData
-                })
+                body: JSON.stringify(requestBody)
             });
             
             if (response.ok) {
-                console.log(`WebRTC ${signalType} sent successfully to ${participantId}`);
+                console.log(`📡 WebRTC ${signalType} sent successfully to ${participantId}`);
             } else {
-                console.error(`Failed to send WebRTC ${signalType}:`, await response.text());
+                const errorText = await response.text();
+                console.error(`📡 Failed to send WebRTC ${signalType}:`, errorText);
             }
             
         } catch (error) {
-            console.error('Error sending WebRTC signal:', error);
+            console.error('📡 Error sending WebRTC signal:', error);
         }
     }
     
