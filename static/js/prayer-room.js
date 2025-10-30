@@ -373,8 +373,7 @@ class PrayerRoomService {
     
     async loadParticipants() {
         try {
-            // Show loading state
-            this.showParticipantsLoading();
+            // Background load (no visible loading text)
             
             // Add timeout to prevent hanging
             const controller = new AbortController();
@@ -412,8 +411,8 @@ class PrayerRoomService {
             } else {
                 console.error('Error loading participants:', error);
             }
-            // Always hide loading indicator on error
-            this.hideParticipantsLoading();
+            // Ensure any transient indicators are cleared silently
+            this.hideParticipantsLoading && this.hideParticipantsLoading();
             // Don't show empty state on timeout, just retry on next poll
             if (!this.participantPollingInterval) {
                 // If initial load failed, set up polling anyway so we can retry
