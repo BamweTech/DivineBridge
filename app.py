@@ -253,7 +253,9 @@ def create_app():
             # Exempt using view function references
             exempt_endpoints = [
                 'prayer_room.get_webrtc_offers',
-                'prayer_room.get_webrtc_answers', 
+                'prayer_room.get_webrtc_answers',
+                'prayer_room.send_webrtc_offer',
+                'prayer_room.send_webrtc_answer',
                 'prayer_room.get_chat_messages',
                 'prayer_room.send_chat_message',
                 'prayer_room.get_room_participants',
