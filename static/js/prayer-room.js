@@ -1707,13 +1707,6 @@ class PrayerRoomService {
             // Clean up old signals if we have too many
             this.cleanupProcessedSignals();
             
-            // Only initiators should process answers; responders ignore
-            const isInitiator = this.peerInitiators.get(answer.from_user) === true;
-            if (!isInitiator) {
-                console.warn(`Ignoring answer from ${answer.from_user} because we are not initiator for this peer`);
-                return;
-            }
-
             // Check if we're ready to process the answer
             const peer = this.peers.get(answer.from_user);
             if (!peer) {
