@@ -1850,9 +1850,16 @@ def cleanup_inactive_sessions():
             for session_doc in inactive_sessions_ref.stream():
                 session_data = session_doc.to_dict()
                 ended_at = session_data.get('ended_at')
-                if ended_at and ended_at < cutoff_time:
-                    session_doc.reference.delete()
-                    cleaned_count += 1
+                if ended_at:
+                    try:
+                        ended = ended_at
+                        if hasattr(ended_at, 'tzinfo') and ended_at.tzinfo is not None:
+                            ended = ended_at.replace(tzinfo=None)
+                        if ended < cutoff_time:
+                            session_doc.reference.delete()
+                            cleaned_count += 1
+                    except Exception:
+                        continue
         
         logging.info(f"Cleaned up {cleaned_count} inactive sessions")
         return cleaned_count
