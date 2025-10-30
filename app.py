@@ -732,7 +732,7 @@ def health_check():
         return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
 
 if __name__ == '__main__':
-    if socketio:
+    if 'socketio' in locals() and socketio:
         socketio.run(app, port=5001, debug=False)
     else:
         app.run(port=5001, debug=False) 
