@@ -465,6 +465,19 @@ class PrayerRoomService {
     async initializeRealtimeDB() {
         try {
             if (!this.useRTDB) return;
+            
+            // Critical validation: Ensure IDs are valid before building RTDB paths
+            if (!this.roomId || typeof this.roomId !== 'string' || !this.roomId.trim()) {
+                console.warn('RTDB disabled: Invalid or missing roomId.');
+                this.useRTDB = false;
+                return;
+            }
+            if (!this.userId || typeof this.userId !== 'string' || !this.userId.trim()) {
+                console.warn('RTDB disabled: Invalid or missing userId.');
+                this.useRTDB = false;
+                return;
+            }
+
             if (!firebase.database || typeof firebase.database !== 'function') {
                 console.warn('Firebase RTDB not available, staying on HTTP polling');
                 this.rtdb = null;
@@ -475,9 +488,9 @@ class PrayerRoomService {
             
             // Prepare references
             this.rtdbRefs.signalsRoot = this.rtdb.ref(`/rooms/${this.roomId}/signals`);
-            this.rtdbRefs.mySignals = this.rtdbRefs.signalsRoot.child(this.userId || '');
+            this.rtdbRefs.mySignals = this.rtdbRefs.signalsRoot.child(this.userId);
             this.rtdbRefs.chat = this.rtdb.ref(`/rooms/${this.roomId}/chat`);
-            this.rtdbRefs.presence = this.rtdb.ref(`/rooms/${this.roomId}/presence/${this.userId || 'unknown'}`);
+            this.rtdbRefs.presence = this.rtdb.ref(`/rooms/${this.roomId}/presence/${this.userId}`);
             
             // Presence (best-effort)
             const presencePayload = { online: true, ts: firebase.database.ServerValue.TIMESTAMP, name: this.userName || '' };
@@ -1547,6 +1560,11 @@ class PrayerRoomService {
             
             // Prefer RTDB if available
             if (this.useRTDB && this.rtdb && this.rtdbRefs.signalsRoot) {
+                // Critical validation: Ensure participantId is valid for RTDB path
+                if (!participantId || typeof participantId !== 'string' || !participantId.trim()) {
+                    console.error('RTDB sendSignal failed: Invalid participantId', participantId);
+                    return;
+                }
                 const user = firebase.auth().currentUser;
                 await this.rtdbRefs.signalsRoot.child(participantId).push({
                     from_user: user ? user.uid : this.userId,
