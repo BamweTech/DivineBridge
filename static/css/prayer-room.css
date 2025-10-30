@@ -1,33 +1,66 @@
-/* Prayer Room Styles */
+/* Prayer Room Styles - Updated Design */
 .prayer-room-container {
     min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #ffffff;
+    background-image: 
+        linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(147, 197, 253, 0.03) 50%, rgba(219, 234, 254, 0.02) 100%);
     padding: 20px;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    position: relative;
+}
+
+.prayer-room-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(147, 197, 253, 0.05) 0%, transparent 50%),
+        radial-gradient(circle at 40% 40%, rgba(219, 234, 254, 0.04) 0%, transparent 50%);
+    pointer-events: none;
 }
 
 .prayer-room-interface {
     max-width: 1200px;
     margin: 0 auto;
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(20px);
-    border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(25px);
+    border-radius: 24px;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.9);
     overflow: hidden;
+    position: relative;
+    /* Clean glassomorphic design */
 }
 
 .prayer-room-header {
-    background: rgba(255, 255, 255, 0.15);
-    padding: 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(20px);
+    padding: 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    position: relative;
+}
+
+.prayer-room-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
 }
 
 .prayer-room-title {
-    color: white;
+    color: #1e293b;
     font-size: 24px;
     font-weight: 600;
     margin: 0;
@@ -40,20 +73,21 @@
 }
 
 .room-code {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(59, 130, 246, 0.1);
     padding: 10px 15px;
     border-radius: 10px;
-    color: white;
+    color: #1e40af;
     font-family: 'Courier New', monospace;
     font-size: 18px;
     font-weight: bold;
     letter-spacing: 2px;
+    border: 1px solid rgba(59, 130, 246, 0.2);
 }
 
 .copy-room-code-btn {
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    color: white;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: #1e40af;
     padding: 10px 15px;
     border-radius: 10px;
     cursor: pointer;
@@ -62,23 +96,39 @@
 }
 
 .copy-room-code-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(59, 130, 246, 0.2);
     transform: translateY(-2px);
 }
 
 .prayer-room-content {
     display: grid;
-    grid-template-columns: 1fr 300px;
-    gap: 20px;
-    padding: 20px;
+    grid-template-columns: 1fr 320px;
+    gap: 24px;
+    padding: 24px;
     min-height: 500px;
 }
 
 .prayer-room-main {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 15px;
-    padding: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    padding: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 
+        0 4px 16px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    position: relative;
+}
+
+.prayer-room-main::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    border-radius: 20px 20px 0 0;
 }
 
 .prayer-room-participants {
@@ -86,27 +136,49 @@
 }
 
 .participant-card {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    padding: 15px;
-    margin-bottom: 10px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 18px;
+    margin-bottom: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.participant-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    border-radius: 16px 16px 0 0;
+}
+
+.participant-card:hover {
+    background: rgba(255, 255, 255, 0.12);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .participant-avatar {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(147, 197, 253, 0.1));
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
+    color: #1e40af;
     font-weight: bold;
     font-size: 16px;
+    border: 1px solid rgba(59, 130, 246, 0.2);
 }
 
 .participant-info {
@@ -114,13 +186,13 @@
 }
 
 .participant-name {
-    color: white;
+    color: #1e293b;
     font-weight: 500;
     margin: 0 0 5px 0;
 }
 
 .participant-status {
-    color: rgba(255, 255, 255, 0.7);
+    color: #64748b;
     font-size: 14px;
     display: flex;
     align-items: center;
@@ -135,21 +207,83 @@
 }
 
 .prayer-room-chat {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 15px;
-    padding: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    padding: 24px;
+    border: 2px solid rgba(59, 130, 246, 0.3);
     display: flex;
     flex-direction: column;
-    height: 400px;
+    height: 420px;
+    box-shadow: 
+        0 4px 16px rgba(0, 0, 0, 0.1),
+        0 0 0 1px rgba(59, 130, 246, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    position: relative;
+}
+
+.prayer-room-chat::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    border-radius: 20px 20px 0 0;
 }
 
 .chat-header {
-    color: white;
+    color: #1e293b;
     font-weight: 600;
     margin-bottom: 15px;
     padding-bottom: 10px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chat-title {
+    flex: 1;
+}
+
+.mobile-chat-controls {
+    display: none;
+}
+
+/* Hide mobile controls on desktop */
+@media (min-width: 769px) {
+    .mobile-chat-controls {
+        display: none !important;
+    }
+    
+    .mobile-tab-navigation {
+        display: none !important;
+    }
+}
+
+.mobile-chat-btn {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    color: #1e40af;
+    padding: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mobile-chat-btn:hover {
+    background: rgba(59, 130, 246, 0.2);
+    transform: translateY(-1px);
+}
+
+.mobile-chat-btn svg {
+    width: 20px;
+    height: 20px;
 }
 
 .chat-messages {
@@ -157,20 +291,64 @@
     overflow-y: auto;
     margin-bottom: 15px;
     padding-right: 10px;
+    /* Improved scrolling */
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(59, 130, 246, 0.3) transparent;
+}
+
+/* Custom scrollbar for webkit browsers */
+.chat-messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.3);
+    border-radius: 3px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+    background: rgba(59, 130, 246, 0.5);
 }
 
 .chat-message {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    padding: 10px 15px;
-    margin-bottom: 10px;
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 14px 18px;
+    margin-bottom: 12px;
+    color: #1e293b;
+    border: 1px solid rgba(59, 130, 246, 0.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.chat-message::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    border-radius: 16px 16px 0 0;
+}
+
+.chat-message:hover {
+    background: rgba(255, 255, 255, 0.95);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.25);
 }
 
 .chat-message-header {
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.7);
+    color: #64748b;
     margin-bottom: 5px;
 }
 
@@ -186,22 +364,22 @@
 
 .chat-input {
     flex: 1;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(59, 130, 246, 0.3);
     border-radius: 10px;
     padding: 12px 15px;
-    color: white;
+    color: #1e293b;
     font-size: 14px;
 }
 
 .chat-input::placeholder {
-    color: rgba(255, 255, 255, 0.6);
+    color: #94a3b8;
 }
 
 .chat-send-btn {
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    color: white;
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: #1e40af;
     padding: 12px 20px;
     border-radius: 10px;
     cursor: pointer;
@@ -210,8 +388,9 @@
 }
 
 .chat-send-btn:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(59, 130, 246, 0.25);
     transform: translateY(-2px);
+    border-color: rgba(59, 130, 246, 0.4);
 }
 
 .prayer-room-controls {
@@ -222,10 +401,11 @@
 }
 
 .control-btn {
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     color: white;
-    padding: 15px 25px;
+    padding: 16px 28px;
     border-radius: 50px;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -233,9 +413,22 @@
     font-weight: 500;
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-width: 120px;
+    gap: 10px;
+    min-width: 130px;
     justify-content: center;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    position: relative;
+}
+
+.control-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    border-radius: 50px 50px 0 0;
 }
 
 .control-btn:hover {
@@ -343,37 +536,101 @@
 /* Mobile Responsive */
 @media (max-width: 768px) {
     .prayer-room-container {
-        padding: 10px;
+        padding: 12px;
     }
     
     .prayer-room-content {
         grid-template-columns: 1fr;
-        gap: 15px;
+        gap: 20px;
     }
     
     .prayer-room-header {
         flex-direction: column;
-        gap: 15px;
+        gap: 20px;
         text-align: center;
+        padding: 20px;
     }
     
     .room-code-section {
         flex-direction: column;
-        gap: 10px;
+        gap: 12px;
     }
     
     .prayer-room-controls {
         flex-direction: column;
-        gap: 10px;
+        gap: 12px;
     }
     
     .control-btn {
         min-width: auto;
         width: 100%;
+        padding: 18px 24px;
     }
     
     .prayer-room-chat {
-        height: 300px;
+        height: 320px;
+        position: relative;
+        transition: all 0.3s ease;
+    }
+    
+    /* Show mobile chat controls */
+    .mobile-chat-controls {
+        display: flex;
+        gap: 10px;
+    }
+    
+    /* Mobile chat fullscreen mode */
+    .prayer-room-chat.mobile-expanded {
+        position: fixed;
+        top: 60px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: calc(100vh - 60px);
+        width: 100vw;
+        z-index: 1000;
+        border-radius: 0;
+        background: #ffffff;
+        background-image: linear-gradient(135deg, rgba(59, 130, 246, 0.04) 0%, rgba(219, 234, 254, 0.02) 100%);
+        backdrop-filter: none;
+        border: 2px solid rgba(59, 130, 246, 0.3);
+        box-shadow: 
+            0 0 0 1px rgba(59, 130, 246, 0.1),
+            0 8px 32px rgba(0, 0, 0, 0.1);
+        padding: 0;
+        margin: 0;
+        overflow: hidden;
+    }
+    
+    /* Hide participants section when chat is expanded */
+    .prayer-room-chat.mobile-expanded ~ .prayer-room-main {
+        display: none;
+    }
+    
+    /* Adjust chat messages height in fullscreen */
+    .prayer-room-chat.mobile-expanded .chat-messages {
+        height: calc(100vh - 200px);
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Improve chat input in mobile */
+    .chat-input-container {
+        position: sticky;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.12);
+        backdrop-filter: blur(20px);
+        padding: 16px;
+        margin: 0 -20px -20px -20px;
+        border-radius: 0 0 20px 20px;
+        border-top: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    
+    .prayer-room-chat.mobile-expanded .chat-input-container {
+        border-radius: 0;
+        margin: 0;
+        background: rgba(255, 255, 255, 0.08);
     }
 }
 
@@ -384,36 +641,55 @@
     bottom: 0;
     left: 0;
     right: 0;
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(20px);
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
-    padding: 15px;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(25px);
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 20px;
     z-index: 1000;
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .mobile-tab-btn {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
     color: white;
-    padding: 12px 20px;
-    border-radius: 10px;
+    padding: 16px 24px;
+    border-radius: 16px;
     cursor: pointer;
     transition: all 0.3s ease;
     font-size: 14px;
+    font-weight: 500;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     justify-content: center;
     flex: 1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    position: relative;
+}
+
+.mobile-tab-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    border-radius: 16px 16px 0 0;
 }
 
 .mobile-tab-btn.active {
-    background: rgba(255, 255, 255, 0.3);
-    border-color: rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .mobile-tab-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px);
 }
 
 @media (max-width: 768px) {

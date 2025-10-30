@@ -1,0 +1,240 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection - users can only access their own data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Prayer rooms collection - enhanced security with room membership validation
+    match /prayer_rooms/{roomId} {
+      // Allow read for authenticated users
+      allow read: if request.auth != null;
+      
+      // Allow create only for authenticated users with proper data structure
+      allow create: if request.auth != null && 
+                  request.resource.data.host_id == request.auth.uid &&
+                  request.resource.data.keys().hasAll(['room_name', 'host_id', 'host_name', 'created_at', 'room_privacy']) &&
+                  request.resource.data.room_name is string &&
+                  request.resource.data.room_name.size() <= 100 &&
+                  request.resource.data.room_privacy in ['public', 'private'] &&
+                  request.resource.data.host_name is string &&
+                  request.resource.data.host_name.size() <= 50;
+      
+      // Allow update/delete only by room host
+      allow update, delete: if request.auth != null && 
+                          resource.data.host_id == request.auth.uid;
+      
+      // Subcollections for prayer rooms
+      match /chat_messages/{messageId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null && 
+                    request.resource.data.user_id == request.auth.uid &&
+                    request.resource.data.keys().hasAll(['user_id', 'user_name', 'message', 'timestamp', 'room_id']) &&
+                    request.resource.data.message is string &&
+                    request.resource.data.message.size() <= 1000 &&
+                    request.resource.data.user_name is string &&
+                    request.resource.data.user_name.size() <= 50;
+        allow update, delete: if request.auth != null && 
+                            resource.data.user_id == request.auth.uid;
+      }
+      
+      match /webrtc_offers/{offerId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null && 
+                    request.resource.data.from_user == request.auth.uid &&
+                    request.resource.data.keys().hasAll(['from_user', 'to_user', 'offer', 'timestamp']) &&
+                    request.resource.data.offer is map &&
+                    request.resource.data.offer.keys().hasAll(['type', 'sdp']) &&
+                    request.resource.data.offer.type in ['offer'] &&
+                    request.resource.data.offer.sdp is string &&
+                    request.resource.data.offer.sdp.size() <= 10000;
+        allow delete: if request.auth != null && 
+                    resource.data.from_user == request.auth.uid;
+      }
+      
+      match /webrtc_answers/{answerId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null && 
+                    request.resource.data.from_user == request.auth.uid &&
+                    request.resource.data.keys().hasAll(['from_user', 'to_user', 'answer', 'timestamp']) &&
+                    request.resource.data.answer is map &&
+                    request.resource.data.answer.keys().hasAll(['type', 'sdp']) &&
+                    request.resource.data.answer.type in ['answer'] &&
+                    request.resource.data.answer.sdp is string &&
+                    request.resource.data.answer.sdp.size() <= 10000;
+        allow delete: if request.auth != null && 
+                    resource.data.from_user == request.auth.uid;
+      }
+      
+      match /device_sessions/{sessionId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null && 
+                    request.resource.data.user_id == request.auth.uid &&
+                    request.resource.data.keys().hasAll(['user_id', 'device_id', 'device_info', 'is_active', 'created_at', 'last_seen']) &&
+                    request.resource.data.device_id is string &&
+                    request.resource.data.device_id.size() <= 100 &&
+                    request.resource.data.device_info is map &&
+                    request.resource.data.device_info.keys().hasAll(['user_agent', 'platform', 'language']) &&
+                    request.resource.data.is_active is bool;
+        allow update, delete: if request.auth != null && 
+                            resource.data.user_id == request.auth.uid;
+      }
+      
+      match /speaking_states/{stateId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null && 
+                    request.resource.data.user_id == request.auth.uid &&
+                    request.resource.data.keys().hasAll(['user_id', 'is_speaking', 'timestamp']) &&
+                    request.resource.data.is_speaking is bool;
+        allow update, delete: if request.auth != null && 
+                            resource.data.user_id == request.auth.uid;
+      }
+      
+      match /participants/{participantId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null && 
+                    request.resource.data.user_id == request.auth.uid &&
+                    request.resource.data.keys().hasAll(['user_id', 'user_name', 'joined_at', 'is_active']) &&
+                    request.resource.data.user_name is string &&
+                    request.resource.data.user_name.size() <= 50 &&
+                    request.resource.data.is_active is bool;
+        allow update, delete: if request.auth != null && 
+                            resource.data.user_id == request.auth.uid;
+      }
+    }
+    
+    // Scheduled rooms collection - enhanced validation
+    match /scheduled_rooms/{scheduledRoomId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+                  request.resource.data.host_id == request.auth.uid &&
+                  request.resource.data.keys().hasAll(['room_name', 'host_id', 'host_name', 'scheduled_time', 'room_privacy']) &&
+                  request.resource.data.room_name is string &&
+                  request.resource.data.room_name.size() <= 100 &&
+                  request.resource.data.room_privacy in ['public', 'private'] &&
+                  request.resource.data.host_name is string &&
+                  request.resource.data.host_name.size() <= 50 &&
+                  request.resource.data.scheduled_time is timestamp &&
+                  request.resource.data.scheduled_time > request.time;
+      allow update, delete: if request.auth != null && 
+                          resource.data.host_id == request.auth.uid;
+    }
+    
+    // Chat messages collection (legacy - for backward compatibility)
+    match /chat_messages/{messageId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+                  request.resource.data.user_id == request.auth.uid &&
+                  request.resource.data.keys().hasAll(['user_id', 'user_name', 'message', 'timestamp', 'room_id']) &&
+                  request.resource.data.message is string &&
+                  request.resource.data.message.size() <= 1000 &&
+                  request.resource.data.user_name is string &&
+                  request.resource.data.user_name.size() <= 50;
+      allow update, delete: if request.auth != null && 
+                          resource.data.user_id == request.auth.uid;
+    }
+    
+    // WebRTC signaling collections (legacy - for backward compatibility)
+    match /webrtc_offers/{offerId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+                  request.resource.data.from_user == request.auth.uid &&
+                  request.resource.data.keys().hasAll(['from_user', 'to_user', 'offer', 'timestamp']) &&
+                  request.resource.data.offer is map &&
+                  request.resource.data.offer.keys().hasAll(['type', 'sdp']) &&
+                  request.resource.data.offer.type in ['offer'] &&
+                  request.resource.data.offer.sdp is string &&
+                  request.resource.data.offer.sdp.size() <= 10000;
+      allow delete: if request.auth != null && 
+                  resource.data.from_user == request.auth.uid;
+    }
+    
+    match /webrtc_answers/{answerId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+                  request.resource.data.from_user == request.auth.uid &&
+                  request.resource.data.keys().hasAll(['from_user', 'to_user', 'answer', 'timestamp']) &&
+                  request.resource.data.answer is map &&
+                  request.resource.data.answer.keys().hasAll(['type', 'sdp']) &&
+                  request.resource.data.answer.type in ['answer'] &&
+                  request.resource.data.answer.sdp is string &&
+                  request.resource.data.answer.sdp.size() <= 10000;
+      allow delete: if request.auth != null && 
+                  resource.data.from_user == request.auth.uid;
+    }
+    
+    // Device sessions collection (legacy - for backward compatibility)
+    match /device_sessions/{sessionId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+                  request.resource.data.user_id == request.auth.uid &&
+                  request.resource.data.keys().hasAll(['user_id', 'device_id', 'device_info', 'is_active', 'created_at', 'last_seen']) &&
+                  request.resource.data.device_id is string &&
+                  request.resource.data.device_id.size() <= 100 &&
+                  request.resource.data.device_info is map &&
+                  request.resource.data.device_info.keys().hasAll(['user_agent', 'platform', 'language']) &&
+                  request.resource.data.is_active is bool;
+      allow update, delete: if request.auth != null && 
+                          resource.data.user_id == request.auth.uid;
+    }
+    
+    // Speaking state collection (legacy - for backward compatibility)
+    match /speaking_states/{stateId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+                  request.resource.data.user_id == request.auth.uid &&
+                  request.resource.data.keys().hasAll(['user_id', 'is_speaking', 'timestamp']) &&
+                  request.resource.data.is_speaking is bool;
+      allow update, delete: if request.auth != null && 
+                          resource.data.user_id == request.auth.uid;
+    }
+    
+    // Testimonies collection - public read, authenticated write
+    match /testimonies/{testimonyId} {
+      allow read: if true;
+      allow write: if request.auth != null &&
+                  request.resource.data.keys().hasAll(['user_id', 'testimony', 'timestamp', 'status']) &&
+                  request.resource.data.user_id == request.auth.uid &&
+                  request.resource.data.testimony is string &&
+                  request.resource.data.testimony.size() <= 2000 &&
+                  request.resource.data.status in ['pending', 'approved', 'rejected'];
+    }
+    
+    // Prayers collection - public read, authenticated write
+    match /prayers/{prayerId} {
+      allow read: if true;
+      allow write: if request.auth != null &&
+                  request.resource.data.keys().hasAll(['user_id', 'prayer', 'timestamp']) &&
+                  request.resource.data.user_id == request.auth.uid &&
+                  request.resource.data.prayer is string &&
+                  request.resource.data.prayer.size() <= 5000;
+    }
+    
+    // User prayed prayers - users can only access their own data
+    match /user_prayed_prayers/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Prayer requests - public read, authenticated write
+    match /prayer_requests/{requestId} {
+      allow read: if true;
+      allow write: if request.auth != null &&
+                  request.resource.data.keys().hasAll(['user_id', 'request', 'timestamp', 'status']) &&
+                  request.resource.data.user_id == request.auth.uid &&
+                  request.resource.data.request is string &&
+                  request.resource.data.request.size() <= 1000 &&
+                  request.resource.data.status in ['pending', 'fulfilled', 'closed'];
+    }
+    
+    // User interactions - users can only access their own data
+    match /user_interactions/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

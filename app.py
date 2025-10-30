@@ -8,6 +8,8 @@ from verse_cache import verse_cache
 from flask_session import Session
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from functools import wraps
 from firebase_auth import initialize_firebase
 from verse_generator import verse_generator
@@ -63,6 +65,9 @@ def create_app():
     # Load configuration
     app.config.from_object('config.Config')
     
+    # Set request size limits to prevent memory exhaustion attacks
+    app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB limit
+    
     # Session configuration
     # Determine environment
     is_production = os.getenv('FLASK_ENV') == 'production' or os.getenv('GAE_ENV', '').startswith('standard')
@@ -72,7 +77,9 @@ def create_app():
     app.config['SESSION_TYPE'] = 'filesystem'
     app.config['SESSION_PERMANENT'] = True
     app.config['SESSION_USE_SIGNER'] = True
-    app.config['SESSION_COOKIE_SECURE'] = False  # Always False for local development
+    # Secure session cookies in production
+    is_production = os.getenv('FLASK_ENV') == 'production' or os.getenv('GAE_ENV', '').startswith('standard')
+    app.config['SESSION_COOKIE_SECURE'] = is_production
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
@@ -93,6 +100,13 @@ def create_app():
     
     # Initialize CSRF protection
     csrf = CSRFProtect(app)
+    
+    # Initialize rate limiter
+    limiter = Limiter(
+        app,
+        key_func=get_remote_address,
+        default_limits=["200 per day", "50 per hour"]
+    )
     
     # Add session middleware
     @app.before_request
@@ -215,13 +229,14 @@ def create_app():
         from routes.testimony_bp import testimony_bp
         from routes.prayer_room_bp import prayer_room_bp
         
-        # Exempt auth, prayer, email, testimony, and prayer room blueprints from CSRF protection
+        # Exempt auth, prayer, email, testimony, prayer room, and nonprofit blueprints from CSRF protection
         # Auth uses Firebase token auth, Prayer/Email use Cloud Scheduler verification
         csrf.exempt(auth_bp)
         csrf.exempt(prayer_bp)
         csrf.exempt(email_bp)
         csrf.exempt(testimony_bp)
         csrf.exempt(prayer_room_bp)
+        csrf.exempt(nonprofit_bp)
         
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
         app.register_blueprint(prayer_bp, url_prefix='/api/prayer')
@@ -231,6 +246,31 @@ def create_app():
         app.register_blueprint(testimony_bp, url_prefix='/api/testimony')
         app.register_blueprint(prayer_room_bp, url_prefix='/api/prayer-room')
         app.register_blueprint(seo_bp)  # SEO routes at root level
+        
+        # Exempt prayer room polling endpoints from rate limiting
+        # These endpoints need high frequency access for WebRTC signaling and chat
+        try:
+            # Exempt using view function references
+            exempt_endpoints = [
+                'prayer_room.get_webrtc_offers',
+                'prayer_room.get_webrtc_answers', 
+                'prayer_room.get_chat_messages',
+                'prayer_room.send_chat_message',
+                'prayer_room.get_room_participants',
+                'prayer_room.update_speaking_state'
+            ]
+            
+            # Get view functions after blueprint registration
+            for endpoint_name in exempt_endpoints:
+                view_func = app.view_functions.get(endpoint_name)
+                if view_func:
+                    limiter.exempt(view_func)
+                    logger.info(f"Exempted {endpoint_name} from rate limiting")
+                else:
+                    logger.warning(f"Could not find view function {endpoint_name} to exempt")
+        except Exception as e:
+            logger.warning(f"Could not exempt prayer room endpoints: {e}", exc_info=True)
+        
         logger.info("Blueprints registered")
         
     except Exception as e:

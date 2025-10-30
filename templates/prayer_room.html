@@ -3,7 +3,10 @@
 {% block title %}Prayer Room - {{ room_name or 'Divine Bridge' }}{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room.css') }}?v={{ range(10000, 99999) | random }}">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room.css') }}?v={{ range(100000, 999999) | random }}">
 
 <!-- Firebase Configuration and Initialization -->
 <script>
@@ -111,8 +114,23 @@ window.addEventListener('load', function() {
             </div>
 
             <!-- Chat Section -->
-            <div class="prayer-room-chat">
-                <div class="chat-header">💬 Chat</div>
+            <div class="prayer-room-chat" id="chatPanel">
+                <div class="chat-header">
+                    <span class="chat-title">💬 Chat</span>
+                    <!-- Mobile-only controls -->
+                    <div class="mobile-chat-controls">
+                        <button class="mobile-chat-btn fullscreen-btn" id="fullscreenBtn" title="Expand to fullscreen">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                            </svg>
+                        </button>
+                        <button class="mobile-chat-btn back-btn" id="backBtn" title="Back to participants" style="display: none;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 12H5m7-7l-7 7 7 7"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
                 <div class="chat-messages" id="chatMessages">
                     <div class="chat-message">
                         <div class="chat-message-content">
@@ -189,6 +207,35 @@ function switchMobileTab(tabName) {
 
 // Initialize mobile tab navigation
 document.addEventListener('DOMContentLoaded', () => {
+    // AGGRESSIVE STYLE INJECTION - Force apply new design styles
+    const prayerInterface = document.querySelector('.prayer-room-interface');
+    if (prayerInterface) {
+        prayerInterface.style.setProperty('border', '10px solid #ff0000', 'important');
+        prayerInterface.style.setProperty('background', 'linear-gradient(45deg, #ff0000, #00ff00, #0000ff)', 'important');
+        prayerInterface.style.setProperty('box-shadow', '0 0 50px #ff0000', 'important');
+        console.log('✅ NEW DESIGN STYLES APPLIED DIRECTLY');
+        // Design styles loaded
+        
+        // Also add a visible text indicator
+        const indicator = document.createElement('div');
+        indicator.textContent = '🎨 NEW DESIGN LOADED';
+        indicator.style.cssText = 'position: fixed; top: 10px; right: 10px; background: #ff0000; color: white; padding: 10px; z-index: 9999; font-weight: bold; border-radius: 5px;';
+        document.body.appendChild(indicator);
+        
+        // Remove indicator after 3 seconds
+        setTimeout(() => indicator.remove(), 3000);
+    }
+    
+    // Force reload CSS to ensure latest styles are applied
+    const links = document.querySelectorAll('link[rel="stylesheet"]');
+    links.forEach(link => {
+        if (link.href.includes('prayer-room.css')) {
+            const href = link.href;
+            link.href = href.split('?')[0] + '?v=' + Date.now();
+            console.log('🔄 Reloaded CSS:', link.href);
+        }
+    });
+    
     const mobileTabNavigation = document.getElementById('mobile-tab-navigation');
     if (mobileTabNavigation && window.innerWidth <= 768) {
         mobileTabNavigation.style.display = 'flex';

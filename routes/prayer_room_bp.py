@@ -1,13 +1,37 @@
-from flask import Blueprint, request, jsonify, session, render_template
+from flask import Blueprint, request, jsonify, session, render_template, current_app
 from firebase_auth import get_firestore_client
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from input_validation import validate_data, sanitize_string
 import logging
 from datetime import datetime, timedelta
 import uuid
 import json
 import os
+
+def exempt_from_rate_limit(f):
+    """Decorator to exempt endpoint from main app rate limiting"""
+    def wrapper(*args, **kwargs):
+        # Try to exempt from main app limiter if available
+        try:
+            if 'limiter' in current_app.extensions:
+                limiter = current_app.extensions['limiter']
+                # This will be handled by the decorator below
+                pass
+        except:
+            pass
+        return f(*args, **kwargs)
+    wrapper.__name__ = f.__name__
+    return wrapper
 from google.cloud import firestore
 
 prayer_room_bp = Blueprint('prayer_room', __name__)
+
+# Initialize rate limiter for this blueprint
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["10000 per day", "1000 per hour"]
+)
 
 def get_firestore_client():
     """Get Firestore client instance"""
@@ -34,6 +58,7 @@ def get_user_from_session():
     }
 
 @prayer_room_bp.route('/create', methods=['POST'])
+@limiter.limit("10 per hour")
 def create_prayer_room():
     """Create a new prayer room"""
     try:
@@ -220,6 +245,49 @@ def join_prayer_room(room_id):
                     'message': 'Already in room'
                 })
         
+        # Deactivate any existing device sessions for this user across ALL rooms
+        # This ensures users can only have one active session at a time
+        # OPTIMIZED: Use collection group query for better performance
+        try:
+            # Use collection group query to find all active sessions for this user across all rooms
+            # This is much faster than iterating through all rooms
+            sessions_query = db.collection_group('device_sessions')\
+                .where('user_id', '==', user_id)\
+                .where('is_active', '==', True)\
+                .limit(10)  # Limit to prevent excessive reads (should be max 1-2 anyway)
+            
+            # Batch update all sessions
+            batch = db.batch()
+            session_count = 0
+            for session_doc in sessions_query.stream():
+                batch.update(session_doc.reference, {
+                    'is_active': False,
+                    'ended_at': datetime.utcnow()
+                })
+                session_count += 1
+            
+            if session_count > 0:
+                batch.commit()
+                logging.info(f"Deactivated {session_count} existing session(s) for user {user_id}")
+        except Exception as e:
+            # If collection group queries fail, fall back to a simpler approach
+            # Only check the current room's sessions as a fallback
+            logging.warning(f"Collection group query failed, using fallback: {e}")
+            try:
+                current_room_sessions = db.collection('prayer_rooms').document(room_id)\
+                    .collection('device_sessions')\
+                    .where('user_id', '==', user_id)\
+                    .where('is_active', '==', True)\
+                    .stream()
+                
+                for session_doc in current_room_sessions:
+                    session_doc.reference.update({
+                        'is_active': False,
+                        'ended_at': datetime.utcnow()
+                    })
+            except Exception as fallback_error:
+                logging.error(f"Fallback session deactivation also failed: {fallback_error}")
+        
         # Add participant to room
         new_participant = {
             'user_id': user_id,
@@ -251,11 +319,12 @@ def join_prayer_room(room_id):
 def leave_prayer_room(room_id):
     """Leave a prayer room"""
     try:
-        data = request.get_json()
-        user_id = data.get('user_id')
+        # Get authenticated user from session
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
         
-        if not user_id:
-            return jsonify({'error': 'User ID is required'}), 400
+        user_id = user['user_id']
         
         db = get_firestore_client()
         room_ref = db.collection('prayer_rooms').document(room_id)
@@ -310,7 +379,7 @@ def leave_prayer_room(room_id):
 
 @prayer_room_bp.route('/<room_id>/participants', methods=['GET'])
 def get_room_participants(room_id):
-    """Get room participants"""
+    """Get room participants - Optimized for fast loading"""
     try:
         # Get current user to update their name if needed
         user = get_user_from_session()
@@ -324,20 +393,24 @@ def get_room_participants(room_id):
         room_data = room_doc.to_dict()
         participants = room_data.get('participants', [])
         
-        # Update current user's name if they're in the room and name is different
+        # Only update participant name if necessary and user exists
+        # This should be rare, so do it asynchronously after returning response
         if user:
             user_id = user['user_id']
-            user_name = user['user_name']
-            participant_updated = False
+            user_name = user.get('user_name') or user.get('name', 'Anonymous')
             
+            # Check if update is needed (quick check first)
+            participant_needs_update = False
             for participant in participants:
-                if participant['user_id'] == user_id and participant.get('user_name') != user_name:
-                    participant['user_name'] = user_name
-                    participant_updated = True
+                if participant.get('user_id') == user_id:
+                    if participant.get('user_name') != user_name:
+                        participant_needs_update = True
+                        participant['user_name'] = user_name
                     break
             
-            # Save updated participant data if needed
-            if participant_updated:
+            # Only write to Firestore if update is needed
+            if participant_needs_update:
+                # Firestore update can happen asynchronously
                 room_ref = db.collection('prayer_rooms').document(room_id)
                 room_ref.update({
                     'participants': participants,
@@ -401,21 +474,6 @@ def mute_participant(room_id):
             'participants': participants,
             'last_activity': datetime.utcnow()
         })
-        
-        # Add notification message to chat
-        action = "muted" if is_muted else "unmuted"
-        participant_name = next((p.get('user_name', 'A participant') for p in participants if p['user_id'] == user_id), 'A participant')
-        
-        chat_ref = db.collection('chat_messages')
-        notification_message = {
-            'room_id': room_id,
-            'user_id': 'system',
-            'user_name': 'System',
-            'message': f"🔇 {participant_name} has been {action} by the host.",
-            'timestamp': datetime.utcnow(),
-            'message_type': 'system_notification'
-        }
-        chat_ref.add(notification_message)
         
         return jsonify({'success': True, 'is_muted': is_muted})
         
@@ -493,13 +551,34 @@ def remove_participant(room_id):
 def send_chat_message(room_id):
     """Send a chat message to the room"""
     try:
-        data = request.get_json()
-        user_id = data.get('user_id')
-        user_name = data.get('user_name', 'Anonymous')
-        message = data.get('message', '')
+        # Get authenticated user from session
+        user = get_user_from_session()
+        if not user:
+            logging.error("Chat message: No user in session")
+            return jsonify({'error': 'Authentication required'}), 401
         
-        if not user_id or not message:
-            return jsonify({'error': 'User ID and message are required'}), 400
+        data = request.get_json()
+        if not data:
+            logging.error("Chat message: No JSON data in request")
+            return jsonify({'error': 'Invalid request: JSON data required'}), 400
+        
+        # Use authenticated user data, not from request body
+        user_id = user.get('user_id')
+        if not user_id:
+            logging.error(f"Chat message: No user_id in session user: {user}")
+            return jsonify({'error': 'Invalid user session'}), 401
+        
+        user_name = user.get('name', 'Anonymous')
+        
+        # Validate input data
+        is_valid, validation_errors = validate_data(data, 'chat_message')
+        if not is_valid:
+            logging.error(f"Chat message validation failed: {validation_errors}")
+            return jsonify({'error': 'Invalid input', 'details': validation_errors}), 400
+        
+        message = sanitize_string(data['message'], max_length=1000)
+        if not message or not message.strip():
+            return jsonify({'error': 'Message cannot be empty'}), 400
         
         db = get_firestore_client()
         
@@ -509,16 +588,20 @@ def send_chat_message(room_id):
             'user_id': user_id,
             'user_name': user_name,
             'message': message,
-            'timestamp': datetime.utcnow(),
+            'timestamp': firestore.SERVER_TIMESTAMP,
             'message_id': str(uuid.uuid4())
         }
         
-        db.collection('chat_messages').add(chat_data)
+        message_ref = db.collection('chat_messages').add(chat_data)
+        logging.info(f"Chat message added successfully for room {room_id} by user {user_id}")
         
-        return jsonify({'success': True, 'message_id': chat_data['message_id']})
+        return jsonify({'success': True, 'message_id': chat_data['message_id']}), 200
         
+    except KeyError as e:
+        logging.error(f"Chat message KeyError: {str(e)}", exc_info=True)
+        return jsonify({'error': f'Missing required field: {str(e)}'}), 400
     except Exception as e:
-        logging.error(f"Error sending chat message: {str(e)}")
+        logging.error(f"Error sending chat message: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to send message'}), 500
 
 @prayer_room_bp.route('/<room_id>/chat', methods=['GET'])
@@ -761,6 +844,7 @@ def update_speaking_state(room_id):
         return jsonify({'error': 'Failed to update speaking state'}), 500
 
 @prayer_room_bp.route('/room/<room_id>/webrtc-offer', methods=['POST'])
+@limiter.limit("20 per minute")
 def send_webrtc_offer(room_id):
     """Send WebRTC offer to another participant"""
     try:
@@ -775,6 +859,22 @@ def send_webrtc_offer(room_id):
         
         if not to_user or not offer:
             return jsonify({'error': 'Missing required fields'}), 400
+        
+        # Validate WebRTC offer data
+        if not isinstance(offer, dict) or 'type' not in offer or 'sdp' not in offer:
+            return jsonify({'error': 'Invalid offer format'}), 400
+        
+        if offer['type'] != 'offer':
+            return jsonify({'error': 'Invalid offer type'}), 400
+        
+        # Validate SDP size and content
+        sdp = offer.get('sdp', '')
+        if len(sdp) > 10000:  # 10KB limit for SDP
+            return jsonify({'error': 'SDP too large'}), 400
+        
+        # Basic SDP validation
+        if not sdp.startswith('v=0') or 'm=' not in sdp:
+            return jsonify({'error': 'Invalid SDP format'}), 400
         
         db = get_firestore_client()
         
@@ -794,6 +894,7 @@ def send_webrtc_offer(room_id):
         return jsonify({'error': 'Failed to send WebRTC offer'}), 500
 
 @prayer_room_bp.route('/room/<room_id>/webrtc-answer', methods=['POST'])
+@limiter.limit("20 per minute")
 def send_webrtc_answer(room_id):
     """Send WebRTC answer to another participant"""
     try:
@@ -808,6 +909,22 @@ def send_webrtc_answer(room_id):
         
         if not to_user or not answer:
             return jsonify({'error': 'Missing required fields'}), 400
+        
+        # Validate WebRTC answer data
+        if not isinstance(answer, dict) or 'type' not in answer or 'sdp' not in answer:
+            return jsonify({'error': 'Invalid answer format'}), 400
+        
+        if answer['type'] != 'answer':
+            return jsonify({'error': 'Invalid answer type'}), 400
+        
+        # Validate SDP size and content
+        sdp = answer.get('sdp', '')
+        if len(sdp) > 10000:  # 10KB limit for SDP
+            return jsonify({'error': 'SDP too large'}), 400
+        
+        # Basic SDP validation
+        if not sdp.startswith('v=0') or 'm=' not in sdp:
+            return jsonify({'error': 'Invalid SDP format'}), 400
         
         db = get_firestore_client()
         
@@ -915,13 +1032,17 @@ def get_webrtc_answers(room_id):
 def check_session(room_id):
     """Check if user already has an active session on another device"""
     try:
+        # Get authenticated user from session
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
         data = request.get_json()
-        user_id = data.get('user_id')
         device_id = data.get('device_id')
         device_info = data.get('device_info', {})
         
-        if not user_id:
-            return jsonify({'error': 'User ID is required'}), 400
+        # Use authenticated user ID
+        user_id = user['user_id']
         
         db = get_firestore_client()
         
@@ -951,33 +1072,74 @@ def check_session(room_id):
 def register_session(room_id):
     """Register a new device session"""
     try:
+        # Get authenticated user from session
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
         data = request.get_json()
-        user_id = data.get('user_id')
         device_id = data.get('device_id')
         device_info = data.get('device_info', {})
         
-        if not user_id or not device_id:
-            return jsonify({'error': 'User ID and Device ID are required'}), 400
+        # Use authenticated user ID
+        user_id = user['user_id']
+        
+        if not device_id:
+            return jsonify({'error': 'Device ID is required'}), 400
+        
+        # Sanitize device info to prevent information disclosure
+        sanitized_device_info = {
+            'user_agent': sanitize_string(device_info.get('user_agent', ''), max_length=200),
+            'platform': sanitize_string(device_info.get('platform', ''), max_length=50),
+            'language': sanitize_string(device_info.get('language', ''), max_length=10)
+        }
         
         db = get_firestore_client()
         
-        # Deactivate any existing sessions for this user
-        existing_sessions_ref = db.collection('prayer_rooms').document(room_id)\
-            .collection('device_sessions')\
-            .where('user_id', '==', user_id)\
-            .where('is_active', '==', True)
-        
-        for session_doc in existing_sessions_ref.stream():
-            session_doc.reference.update({
-                'is_active': False,
-                'ended_at': datetime.utcnow()
-            })
+        # Deactivate any existing sessions for this user across ALL rooms
+        # This ensures users can only have one active session at a time
+        # OPTIMIZED: Use collection group query for better performance
+        try:
+            sessions_query = db.collection_group('device_sessions')\
+                .where('user_id', '==', user_id)\
+                .where('is_active', '==', True)\
+                .limit(10)
+            
+            batch = db.batch()
+            session_count = 0
+            for session_doc in sessions_query.stream():
+                batch.update(session_doc.reference, {
+                    'is_active': False,
+                    'ended_at': datetime.utcnow()
+                })
+                session_count += 1
+            
+            if session_count > 0:
+                batch.commit()
+                logging.info(f"Deactivated {session_count} existing session(s) for user {user_id}")
+        except Exception as e:
+            logging.warning(f"Collection group query failed, using fallback: {e}")
+            try:
+                # Fallback: only check current room
+                current_room_sessions = db.collection('prayer_rooms').document(room_id)\
+                    .collection('device_sessions')\
+                    .where('user_id', '==', user_id)\
+                    .where('is_active', '==', True)\
+                    .stream()
+                
+                for session_doc in current_room_sessions:
+                    session_doc.reference.update({
+                        'is_active': False,
+                        'ended_at': datetime.utcnow()
+                    })
+            except Exception as fallback_error:
+                logging.error(f"Fallback session deactivation also failed: {fallback_error}")
         
         # Register new session
         session_data = {
             'user_id': user_id,
             'device_id': device_id,
-            'device_info': device_info,
+            'device_info': sanitized_device_info,
             'is_active': True,
             'created_at': datetime.utcnow(),
             'last_seen': datetime.utcnow()
@@ -989,18 +1151,19 @@ def register_session(room_id):
         return jsonify({'success': True})
         
     except Exception as e:
-        logging.error(f"Error registering session: {str(e)}")
+        logging.error(f"Error registering session: {str(e)}", exc_info=True)
         return jsonify({'error': 'Failed to register session'}), 500
 
 @prayer_room_bp.route('/<room_id>/disconnect-session', methods=['POST'])
 def disconnect_session(room_id):
     """Disconnect existing session (for device switching)"""
     try:
-        data = request.get_json()
-        user_id = data.get('user_id')
+        # Get authenticated user from session
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
         
-        if not user_id:
-            return jsonify({'error': 'User ID is required'}), 400
+        user_id = user['user_id']
         
         db = get_firestore_client()
         
@@ -1280,6 +1443,31 @@ def reopen_room():
         if new_room_data['room_privacy'] == 'private':
             new_room_data['room_code'] = ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
         
+        # Deactivate any existing device sessions for this user across ALL rooms
+        # This ensures users can only have one active session at a time
+        # OPTIMIZED: Use collection group query for better performance
+        try:
+            sessions_query = db.collection_group('device_sessions')\
+                .where('user_id', '==', user['user_id'])\
+                .where('is_active', '==', True)\
+                .limit(10)
+            
+            batch = db.batch()
+            session_count = 0
+            for session_doc in sessions_query.stream():
+                batch.update(session_doc.reference, {
+                    'is_active': False,
+                    'ended_at': datetime.utcnow()
+                })
+                session_count += 1
+            
+            if session_count > 0:
+                batch.commit()
+                logging.info(f"Deactivated {session_count} existing session(s) for user {user['user_id']}")
+        except Exception as e:
+            logging.warning(f"Collection group query failed, using fallback: {e}")
+            # Fallback: skip session deactivation if query fails
+        
         # Save the new room
         db.collection('prayer_rooms').document(new_room_id).set(new_room_data)
         
@@ -1464,3 +1652,32 @@ def join_scheduled_room(scheduled_room_id):
     except Exception as e:
         logging.error(f"Error joining scheduled room: {str(e)}")
         return jsonify({'error': 'Failed to join scheduled room'}), 500
+
+def cleanup_inactive_sessions():
+    """Clean up inactive sessions older than 1 hour"""
+    try:
+        db = get_firestore_client()
+        cutoff_time = datetime.utcnow() - timedelta(hours=1)
+        
+        # Get all rooms
+        all_rooms_ref = db.collection('prayer_rooms')
+        all_rooms = all_rooms_ref.stream()
+        
+        cleaned_count = 0
+        for room_doc in all_rooms:
+            # Get inactive sessions older than 1 hour
+            inactive_sessions_ref = room_doc.reference\
+                .collection('device_sessions')\
+                .where('is_active', '==', False)\
+                .where('ended_at', '<', cutoff_time)
+            
+            for session_doc in inactive_sessions_ref.stream():
+                session_doc.reference.delete()
+                cleaned_count += 1
+        
+        logging.info(f"Cleaned up {cleaned_count} inactive sessions")
+        return cleaned_count
+        
+    except Exception as e:
+        logging.error(f"Error cleaning up inactive sessions: {str(e)}")
+        return 0

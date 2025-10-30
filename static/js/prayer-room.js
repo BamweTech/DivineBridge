@@ -97,9 +97,9 @@ class PrayerRoomService {
             // Join the room
             await this.joinRoom();
             
-            // Load initial data
-            await this.loadChatMessages();
-            await this.loadParticipants();
+            // Load initial data (non-blocking)
+            this.loadChatMessages(); // Don't await - load in background
+            this.loadParticipants(); // Don't await - load in background
             
             // Note: WebRTC initialization happens when user clicks "Join Audio"
             
@@ -308,6 +308,7 @@ class PrayerRoomService {
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                credentials: 'include',
                 body: JSON.stringify(joinData)
             });
             
@@ -346,7 +347,18 @@ class PrayerRoomService {
     
     async loadParticipants() {
         try {
-            const response = await fetch(`/api/prayer-room/${this.roomId}/participants`);
+            // Show loading state
+            this.showParticipantsLoading();
+            
+            // Add timeout to prevent hanging
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+            
+            const response = await fetch(`/api/prayer-room/${this.roomId}/participants`, {
+                credentials: 'include',
+                signal: controller.signal
+            }).finally(() => clearTimeout(timeoutId));
+            
             const data = await response.json();
             
             if (data.success) {
@@ -361,16 +373,38 @@ class PrayerRoomService {
                 this.updateParticipants([]);
             }
             
-        } catch (error) {
-            this.updateParticipants([]);
-        }
-        
             // Set up polling for real-time updates if Firestore listeners fail
             if (!this.participantPollingInterval) {
                 this.participantPollingInterval = setInterval(() => {
                     this.loadParticipants();
                 }, 3000); // Poll every 3 seconds for faster updates
             }
+            
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                console.warn('Participants request timed out, will retry...');
+            } else {
+                console.error('Error loading participants:', error);
+            }
+            // Don't show empty state on timeout, just retry on next poll
+            if (!this.participantPollingInterval) {
+                // If initial load failed, set up polling anyway so we can retry
+                this.participantPollingInterval = setInterval(() => {
+                    this.loadParticipants();
+                }, 3000);
+            }
+        }
+    }
+    
+    showParticipantsLoading() {
+        const participantsContainer = document.getElementById('participantsList');
+        if (participantsContainer && !participantsContainer.querySelector('.loading-participants')) {
+            const loadingEl = document.createElement('div');
+            loadingEl.className = 'loading-participants';
+            loadingEl.innerHTML = '<div class="loading-spinner-small"></div><span>Loading participants...</span>';
+            loadingEl.style.cssText = 'text-align: center; padding: 20px; color: #64748b; display: flex; align-items: center; justify-content: center; gap: 10px;';
+            participantsContainer.appendChild(loadingEl);
+        }
     }
 
     // Utility function to truncate names
@@ -384,6 +418,12 @@ class PrayerRoomService {
         const participantsContainer = document.getElementById('participantsList');
         if (!participantsContainer) {
             return;
+        }
+        
+        // Remove loading indicator
+        const loadingEl = participantsContainer.querySelector('.loading-participants');
+        if (loadingEl) {
+            loadingEl.remove();
         }
         
         // Get current participant IDs
@@ -406,8 +446,8 @@ class PrayerRoomService {
                 participantEl.className = 'participant';
                 participantEl.setAttribute('data-user-id', participant.user_id);
                 
-                // Add speaking class if participant is speaking
-                if (participant.is_speaking) {
+                // Add speaking class if participant is speaking and not muted
+                if (participant.is_speaking && !participant.is_muted) {
                     participantEl.classList.add('speaking');
                 }
                 
@@ -427,7 +467,7 @@ class PrayerRoomService {
                             ${participant.is_host ? '<span class="host-badge">Host</span>' : ''}
                         </div>
                         <div class="participant-status">
-                            ${participant.is_speaking ? '<span class="speaking-indicator">Speaking</span>' : ''}
+                            ${participant.is_speaking && !participant.is_muted ? '<span class="speaking-indicator">Speaking</span>' : ''}
                             ${participant.is_muted ? '<span class="mute-indicator">🔇</span>' : ''}
                         </div>
                     </div>
@@ -614,6 +654,7 @@ class PrayerRoomService {
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                credentials: 'include',
                 body: JSON.stringify({
                     user_id: this.userId,
                     is_muted: this.isMuted
@@ -741,9 +782,8 @@ class PrayerRoomService {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    user_id: this.userId
-                })
+                credentials: 'include',
+                body: JSON.stringify({})
             });
             
             // Redirect to prayers page
@@ -822,9 +862,8 @@ class PrayerRoomService {
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                credentials: 'include', // Include session cookie
                 body: JSON.stringify({
-                    user_id: this.userId,
-                    user_name: this.userName,
                     message: message
                 })
             });
@@ -842,7 +881,9 @@ class PrayerRoomService {
     
     async loadChatMessages() {
         try {
-            const response = await fetch(`/api/prayer-room/${this.roomId}/chat`);
+            const response = await fetch(`/api/prayer-room/${this.roomId}/chat`, {
+                credentials: 'include'
+            });
             const data = await response.json();
             
             if (data.success) {
@@ -921,8 +962,7 @@ class PrayerRoomService {
         }
         
         // Scroll to bottom
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-        console.log('Chat display updated, scroll position:', chatMessages.scrollTop);
+        scrollChatToBottom();
     }
     
     setupRealtimeListeners() {
@@ -930,8 +970,8 @@ class PrayerRoomService {
         // This avoids permission issues and provides better error handling
         console.log('Using API-based polling instead of direct Firestore listeners');
         
-        // Set up polling for participants and chat
-        this.setupParticipantPolling();
+        // Set up polling for chat only - participants polling is handled by loadParticipants()
+        // This avoids duplicate polling mechanisms
         this.setupChatPolling();
     }
     
@@ -943,21 +983,26 @@ class PrayerRoomService {
     }
     
     setupParticipantPolling() {
-        // Poll for participant changes every 5 seconds
+        // Poll for participant changes every 5 seconds using Firestore directly
+        // This is a fallback if REST API polling fails
+        if (this.participantPollInterval) {
+            clearInterval(this.participantPollInterval);
+        }
+        
         this.participantPollInterval = setInterval(async () => {
             try {
-                console.log("Polling for participants...");
                 const db = firebase.firestore();
                 const roomDoc = await db.collection('prayer_rooms').doc(this.roomId).get();
                 if (roomDoc.exists) {
                     const data = roomDoc.data();
-                    console.log("Polled room data:", data);
                     this.updateParticipants(data.participants || []);
-                } else {
-                    console.log("Room document not found during polling");
                 }
             } catch (error) {
-                console.error("Error polling for participants:", error);
+                console.error("Error polling for participants (Firestore):", error);
+                // Fall back to REST API if Firestore fails
+                if (!this.participantPollingInterval) {
+                    this.loadParticipants();
+                }
             }
         }, 5000);
     }
@@ -1187,7 +1232,9 @@ class PrayerRoomService {
             if (!this.roomId) return;
             
             // Check for WebRTC offers
-            const offersResponse = await fetch(`/api/prayer-room/room/${this.roomId}/webrtc-offers`);
+            const offersResponse = await fetch(`/api/prayer-room/room/${this.roomId}/webrtc-offers`, {
+                credentials: 'include'
+            });
             if (offersResponse.ok) {
                 const offers = await offersResponse.json();
                 for (const offer of offers) {
@@ -1198,7 +1245,9 @@ class PrayerRoomService {
             }
             
             // Check for WebRTC answers
-            const answersResponse = await fetch(`/api/prayer-room/room/${this.roomId}/webrtc-answers`);
+            const answersResponse = await fetch(`/api/prayer-room/room/${this.roomId}/webrtc-answers`, {
+                credentials: 'include'
+            });
             if (answersResponse.ok) {
                 const answers = await answersResponse.json();
                 for (const answer of answers) {
@@ -1666,7 +1715,9 @@ class PrayerRoomService {
             await new Promise(resolve => setTimeout(resolve, 1000));
             
             // Check if participant is still in the room
-            const response = await fetch(`/api/prayer-room/${this.roomId}/participants`);
+            const response = await fetch(`/api/prayer-room/${this.roomId}/participants`, {
+                credentials: 'include'
+            });
             if (!response.ok) {
                 console.error(`Failed to fetch participants for reconnection: ${response.status}`);
                 return;
@@ -1726,7 +1777,9 @@ class PrayerRoomService {
             await new Promise(resolve => setTimeout(resolve, 1000));
             
             // Check if participant is still in the room
-            const response = await fetch(`/api/prayer-room/${this.roomId}/participants`);
+            const response = await fetch(`/api/prayer-room/${this.roomId}/participants`, {
+                credentials: 'include'
+            });
             if (!response.ok) {
                 console.error(`Failed to fetch participants for signaling recovery: ${response.status}`);
                 return;
@@ -2356,13 +2409,49 @@ class PrayerRoomService {
             const participantElement = document.querySelector(`[data-user-id="${this.userId}"]`);
             if (participantElement) {
                 const speakingIndicator = participantElement.querySelector('.speaking-indicator');
+                const isMuted = participantElement.classList.contains('muted');
+                
                 if (speakingIndicator) {
-                    speakingIndicator.style.display = isSpeaking ? 'inline' : 'none';
+                    // Only show speaking indicator if speaking and not muted
+                    speakingIndicator.style.display = (isSpeaking && !isMuted) ? 'inline' : 'none';
+                }
+                
+                // Update speaking class only if not muted
+                if (isSpeaking && !isMuted) {
+                    participantElement.classList.add('speaking');
+                } else {
+                    participantElement.classList.remove('speaking');
                 }
             }
             
         } catch (error) {
             console.error('🎤 Error updating speaking indicator:', error);
+        }
+    }
+
+    updateAllSpeakingIndicators() {
+        try {
+            // Update speaking indicators for all participants based on their current mute status
+            const participantElements = document.querySelectorAll('.participant');
+            participantElements.forEach(element => {
+                const speakingIndicator = element.querySelector('.speaking-indicator');
+                const isMuted = element.classList.contains('muted');
+                const isSpeaking = element.classList.contains('speaking');
+                
+                if (speakingIndicator) {
+                    // Only show speaking indicator if speaking and not muted
+                    speakingIndicator.style.display = (isSpeaking && !isMuted) ? 'inline' : 'none';
+                }
+                
+                // Update speaking class only if not muted
+                if (isSpeaking && !isMuted) {
+                    element.classList.add('speaking');
+                } else {
+                    element.classList.remove('speaking');
+                }
+            });
+        } catch (error) {
+            console.error('🎤 Error updating all speaking indicators:', error);
         }
     }
 
@@ -2615,7 +2704,9 @@ class PrayerRoomService {
             }
             
             // Get current participants via API
-            const response = await fetch(`/api/prayer-room/${this.roomId}/participants`);
+            const response = await fetch(`/api/prayer-room/${this.roomId}/participants`, {
+                credentials: 'include'
+            });
             if (!response.ok) {
                 console.error('Failed to fetch participants:', await response.text());
                 return;
@@ -2641,7 +2732,9 @@ class PrayerRoomService {
     // Helper method to get current participants
     async getCurrentParticipants() {
         try {
-            const response = await fetch(`/api/prayer-room/${this.roomId}/participants`);
+            const response = await fetch(`/api/prayer-room/${this.roomId}/participants`, {
+                credentials: 'include'
+            });
             const data = await response.json();
             return data.participants || [];
         } catch (error) {
@@ -2688,6 +2781,8 @@ class PrayerRoomService {
                 console.log(`✅ Successfully ${newMuteState ? 'muted' : 'unmuted'} participant: ${participantId}`);
                 // Refresh participants to update UI
                 this.loadParticipants();
+                // Update speaking indicators for all participants
+                this.updateAllSpeakingIndicators();
             } else {
                 const error = await response.text();
                 console.error(`❌ Failed to ${newMuteState ? 'mute' : 'unmute'} participant: ${error}`);
@@ -2724,6 +2819,8 @@ class PrayerRoomService {
                 console.log(`✅ Successfully unmuted participant: ${participantId}`);
                 // Refresh participants to update UI
                 this.loadParticipants();
+                // Update speaking indicators for all participants
+                this.updateAllSpeakingIndicators();
             } else {
                 const error = await response.text();
                 console.error(`❌ Failed to unmute participant: ${error}`);
@@ -2804,24 +2901,54 @@ class PrayerRoomService {
 // Mobile Chat Expansion Functions
 function expandMobileChat() {
     const chatPanel = document.getElementById('chatPanel');
+    const fullscreenBtn = document.getElementById('mobileChatExpandBtn');
+    const backBtn = document.getElementById('mobileChatBackBtn');
+    
     if (chatPanel) {
         chatPanel.classList.add('mobile-expanded');
+        document.body.classList.add('chat-expanded');
         // Prevent body scroll when chat is expanded
         document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+        document.body.style.width = '100%';
+        document.body.style.height = '100%';
+        
+        // Toggle button visibility
+        if (fullscreenBtn) fullscreenBtn.style.display = 'none';
+        if (backBtn) backBtn.style.display = 'flex';
+        
         // Focus on chat input for better UX
         const chatInput = document.getElementById('chatInput');
         if (chatInput) {
             setTimeout(() => chatInput.focus(), 300);
         }
+        
+        // Scroll to bottom when expanding
+        setTimeout(() => {
+            scrollChatToBottom();
+        }, 100);
     }
 }
 
 function collapseMobileChat() {
     const chatPanel = document.getElementById('chatPanel');
+    const fullscreenBtn = document.getElementById('mobileChatExpandBtn');
+    const backBtn = document.getElementById('mobileChatBackBtn');
+    
     if (chatPanel) {
         chatPanel.classList.remove('mobile-expanded');
+        document.body.classList.remove('chat-expanded');
         // Restore body scroll
         document.body.style.overflow = '';
+        document.documentElement.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.width = '';
+        document.body.style.height = '';
+        
+        // Toggle button visibility
+        if (fullscreenBtn) fullscreenBtn.style.display = 'flex';
+        if (backBtn) backBtn.style.display = 'none';
     }
 }
 
@@ -2835,6 +2962,15 @@ document.addEventListener('keydown', (event) => {
     }
 });
 
+// Improved chat scrolling function
+function scrollChatToBottom() {
+    const chatMessages = document.getElementById('chatMessages');
+    if (chatMessages) {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        console.log('Chat scrolled to bottom, position:', chatMessages.scrollTop);
+    }
+}
+
 // Auto-expand chat on mobile when user clicks on chat input
 function setupMobileChatAutoExpand() {
     const chatInput = document.getElementById('chatInput');
@@ -2844,6 +2980,24 @@ function setupMobileChatAutoExpand() {
             if (chatPanel && !chatPanel.classList.contains('mobile-expanded')) {
                 expandMobileChat();
             }
+        });
+    }
+}
+
+// Setup mobile chat button event listeners
+function setupMobileChatButtons() {
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const backBtn = document.getElementById('backBtn');
+    
+    if (fullscreenBtn) {
+        fullscreenBtn.addEventListener('click', () => {
+            expandMobileChat();
+        });
+    }
+    
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            collapseMobileChat();
         });
     }
 }
@@ -2861,4 +3015,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Setup mobile chat auto-expand
     setupMobileChatAutoExpand();
+    
+    // Setup mobile chat buttons
+    setupMobileChatButtons();
 });

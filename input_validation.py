@@ -63,6 +63,15 @@ SCHEMAS = {
             'pattern': r'^[a-zA-Z\s\'-]+$'
         }
     },
+    'chat_message': {
+        'message': {
+            'type': str,
+            'required': True,
+            'min_length': 1,
+            'max_length': 1000,
+            'pattern': r'^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F]*$'  # No control characters except \t, \n, \r
+        }
+    },
     'location': {
         'latitude': {
             'type': (int, float),

@@ -44,9 +44,12 @@ class Config:
             'https://api.divinebridge.io'
         ]
         self.CORS_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
-        self.CORS_ALLOW_HEADERS = ['Content-Type', 'Authorization']
+        self.CORS_ALLOW_HEADERS = ['Content-Type', 'Authorization', 'X-Requested-With']
         self.CORS_SUPPORTS_CREDENTIALS = True
         self.CORS_MAX_AGE = 3600
+        # Additional security headers
+        self.CORS_EXPOSE_HEADERS = []
+        self.CORS_VARY_HEADER = True
         
     def validate_config(self):
         """Validate all required configuration values"""
