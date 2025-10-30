@@ -78,6 +78,8 @@ class PrayerRoomService {
         
         // Track initiator role per peer to gate answer handling
         this.peerInitiators = new Map();
+        // Track last applied SDP per peer to dedupe duplicate answers
+        this.lastAppliedAnswer = new Map();
         
         // Performance optimizations
         this.isPageVisible = true;
@@ -1675,7 +1677,7 @@ class PrayerRoomService {
             peer.signal(offer.offer);
             this.setPeerState(offer.from_user, 'offer-processed');
             
-            // Process any pending answers for this peer
+            // Process any pending answers for this peer (will only apply in have-local-offer)
             this.processPendingAnswers(offer.from_user);
             // Re-attempt flushing queued candidates after remote description is set
             this.processQueuedCandidates(offer.from_user);
@@ -1718,10 +1720,30 @@ class PrayerRoomService {
             // If underlying RTCPeerConnection state is not ready, buffer
             const pc = peer._pc || null;
             const signalingState = pc && pc.signalingState ? pc.signalingState : 'unknown';
-            if (signalingState !== 'have-local-offer' && signalingState !== 'stable') {
+            // Only apply answers when we are in have-local-offer.
+            // If stable, it's a duplicate/late answer; ignore.
+            if (signalingState === 'stable') {
+                console.warn(`📡 Ignoring duplicate/late answer while signalingState is stable for ${answer.from_user}`);
+                return;
+            }
+            if (signalingState !== 'have-local-offer') {
                 console.log(`📡 Buffering answer due to signalingState=${signalingState}`);
                 this.bufferAnswer(answer.from_user, answer.answer);
                 return;
+            }
+
+            // Dedupe by SDP hash
+            try {
+                const sdpStr = typeof answer.answer === 'string' ? answer.answer : JSON.stringify(answer.answer);
+                const sdpKey = sdpStr.length + ':' + sdpStr.slice(0, 64);
+                const last = this.lastAppliedAnswer.get(answer.from_user);
+                if (last === sdpKey) {
+                    console.warn(`📡 Skipping identical answer for ${answer.from_user}`);
+                    return;
+                }
+                this.lastAppliedAnswer.set(answer.from_user, sdpKey);
+            } catch (e) {
+                // non-fatal
             }
 
             peer.signal(answer.answer);
@@ -1830,8 +1852,8 @@ class PrayerRoomService {
         }
         const pc = peer._pc || null;
         const signalingState = pc && pc.signalingState ? pc.signalingState : 'unknown';
-        if (signalingState !== 'have-local-offer' && signalingState !== 'stable') {
-            console.log(`📡 Pending answer not applied; signalingState=${signalingState}`);
+        if (signalingState !== 'have-local-offer') {
+            console.log(`📡 Pending answer not applied; signalingState=${signalingState} (need have-local-offer)`);
             return;
         }
         
@@ -1839,6 +1861,18 @@ class PrayerRoomService {
         console.log(`📡 Processing pending answer for ${userId}`);
         
         try {
+            // Dedupe pending answer
+            try {
+                const sdpStr = typeof pendingAnswer.answer === 'string' ? pendingAnswer.answer : JSON.stringify(pendingAnswer.answer);
+                const sdpKey = sdpStr.length + ':' + sdpStr.slice(0, 64);
+                const last = this.lastAppliedAnswer.get(userId);
+                if (last === sdpKey) {
+                    console.warn(`📡 Skipping identical pending answer for ${userId}`);
+                    this.pendingAnswers.delete(userId);
+                    return;
+                }
+                this.lastAppliedAnswer.set(userId, sdpKey);
+            } catch (e) {}
             peer.signal(pendingAnswer.answer);
             this.pendingAnswers.delete(userId);
             this.setPeerState(userId, 'answer-processed');
