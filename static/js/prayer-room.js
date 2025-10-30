@@ -3137,11 +3137,24 @@ class PrayerRoomService {
     
     initializeWebSocket() {
         try {
-            if (typeof io === 'undefined') {
-                console.warn('Socket.IO not available, using REST fallback');
-                this.wsFallbackMode = true;
-                return;
-            }
+            // Wait a bit for Socket.IO script to load
+            setTimeout(() => {
+                if (typeof io === 'undefined') {
+                    console.warn('Socket.IO not available, using REST fallback');
+                    this.wsFallbackMode = true;
+                    return;
+                }
+                
+                this.setupSocketIO();
+            }, 100);
+        } catch (error) {
+            console.error('Failed to initialize WebSocket:', error);
+            this.wsFallbackMode = true;
+        }
+    }
+    
+    setupSocketIO() {
+        try {
             
             this.socket = io({
                 transports: ['websocket', 'polling'],
