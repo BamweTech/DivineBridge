@@ -1709,11 +1709,15 @@ class PrayerRoomService {
             // Clean up old signals if we have too many
             this.cleanupProcessedSignals();
             
-            // Check if we're ready to process the answer
+            // Only the initiator should ever apply an answer
             const peer = this.peers.get(answer.from_user);
             if (!peer) {
                 console.warn('No peer connection found for answer from:', answer.from_user);
                 this.bufferAnswer(answer.from_user, answer.answer);
+                return;
+            }
+            if (!peer.initiator) {
+                console.warn(`📡 Ignoring answer from ${answer.from_user} because this peer is a responder (peer.initiator=false)`);
                 return;
             }
 
