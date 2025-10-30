@@ -61,6 +61,21 @@ class PrayerRoomService {
         this.wsConnected = false;
         this.wsFallbackMode = false; // Use REST when WS fails
         
+        // WebRTC state machine for proper signaling order
+        this.peerStates = new Map(); // Track peer connection states
+        this.pendingAnswers = new Map(); // Buffer answers until offer is processed
+        this.pendingCandidates = new Map(); // Buffer candidates until connection is ready
+        
+        // Performance optimizations
+        this.isPageVisible = true;
+        this.pollingIntervals = new Map(); // Track all polling intervals
+        this.chatVirtualization = {
+            enabled: false,
+            visibleStart: 0,
+            visibleEnd: 50,
+            itemHeight: 40
+        };
+        
         this.init();
     }
     
@@ -101,6 +116,9 @@ class PrayerRoomService {
             
             // Initialize WebSocket connection
             this.initializeWebSocket();
+            
+            // Set up performance optimizations
+            this.setupPerformanceOptimizations();
             
             // Join the room
             await this.joinRoom();
@@ -1005,10 +1023,16 @@ class PrayerRoomService {
     }
     
     setupChatPolling() {
-        // Poll for new chat messages every 5 seconds
-        this.chatPollInterval = setInterval(() => {
-            this.loadChatMessages();
-        }, 5000);
+        // Only set up polling if WebSocket is not connected or in fallback mode
+        if (!this.wsConnected || this.wsFallbackMode) {
+            // Poll for new chat messages every 5 seconds
+            const intervalId = setInterval(() => {
+                if (this.isPageVisible) {
+                    this.loadChatMessages();
+                }
+            }, 5000);
+            this.addPollingInterval('chat', intervalId);
+        }
     }
     
     setupParticipantPolling() {
@@ -1018,22 +1042,30 @@ class PrayerRoomService {
             clearInterval(this.participantPollInterval);
         }
         
-        this.participantPollInterval = setInterval(async () => {
-            try {
-                const db = firebase.firestore();
-                const roomDoc = await db.collection('prayer_rooms').doc(this.roomId).get();
-                if (roomDoc.exists) {
-                    const data = roomDoc.data();
-                    this.updateParticipants(data.participants || []);
+        // Only set up polling if WebSocket is not connected or in fallback mode
+        if (!this.wsConnected || this.wsFallbackMode) {
+            this.removePollingInterval('participants');
+            
+            const intervalId = setInterval(async () => {
+                if (this.isPageVisible) {
+                    try {
+                        const db = firebase.firestore();
+                        const roomDoc = await db.collection('prayer_rooms').doc(this.roomId).get();
+                        if (roomDoc.exists) {
+                            const data = roomDoc.data();
+                            this.updateParticipants(data.participants || []);
+                        }
+                    } catch (error) {
+                        console.error("Error polling for participants (Firestore):", error);
+                        // Fall back to REST API if Firestore fails
+                        if (!this.participantPollingInterval) {
+                            this.loadParticipants();
+                        }
+                    }
                 }
-            } catch (error) {
-                console.error("Error polling for participants (Firestore):", error);
-                // Fall back to REST API if Firestore fails
-                if (!this.participantPollingInterval) {
-                    this.loadParticipants();
-                }
-            }
-        }, 5000);
+            }, 5000);
+            this.addPollingInterval('participants', intervalId);
+        }
     }
     
     showError(message) {
@@ -1265,10 +1297,16 @@ class PrayerRoomService {
     }
 
     setupSignalPolling() {
-        // Poll for WebRTC signals every 200ms for near real-time connection
-        this.signalPollInterval = setInterval(() => {
-            this.checkForWebRTCSignals();
-        }, 200); // Optimized for real-time conversation
+        // Only set up polling if WebSocket is not connected or in fallback mode
+        if (!this.wsConnected || this.wsFallbackMode) {
+            // Poll for WebRTC signals every 200ms for near real-time connection
+            const intervalId = setInterval(() => {
+                if (this.isPageVisible) {
+                    this.checkForWebRTCSignals();
+                }
+            }, 200); // Optimized for real-time conversation
+            this.addPollingInterval('signals', intervalId);
+        }
     }
 
     async checkForWebRTCSignals() {
@@ -1476,6 +1514,9 @@ class PrayerRoomService {
             // Clean up old signals if we have too many
             this.cleanupProcessedSignals();
             
+            // Set peer state to 'offer-received'
+            this.setPeerState(offer.from_user, 'offer-received');
+            
             // Create a new peer connection for this offer with ultra-low latency configuration
             const peer = new SimplePeer({
                 initiator: false,
@@ -1509,6 +1550,10 @@ class PrayerRoomService {
             
             // Handle the incoming offer
             peer.signal(offer.offer);
+            this.setPeerState(offer.from_user, 'offer-processed');
+            
+            // Process any pending answers for this peer
+            this.processPendingAnswers(offer.from_user);
             
         } catch (error) {
             console.error('📡 Error handling WebRTC offer:', error);
@@ -1537,11 +1582,20 @@ class PrayerRoomService {
             // Clean up old signals if we have too many
             this.cleanupProcessedSignals();
             
-            const peer = this.peers.get(answer.from_user);
-            if (peer) {
-                peer.signal(answer.answer);
+            // Check if we're ready to process the answer
+            const peerState = this.getPeerState(answer.from_user);
+            if (peerState === 'offer-received' || peerState === 'offer-processed') {
+                const peer = this.peers.get(answer.from_user);
+                if (peer) {
+                    peer.signal(answer.answer);
+                    this.setPeerState(answer.from_user, 'answer-processed');
+                } else {
+                    console.warn('No peer connection found for answer from:', answer.from_user);
+                }
             } else {
-                console.warn('No peer connection found for answer from:', answer.from_user);
+                // Buffer the answer until we're ready
+                console.log(`📡 Buffering answer for ${answer.from_user} (current state: ${peerState})`);
+                this.bufferAnswer(answer.from_user, answer.answer);
             }
             
         } catch (error) {
@@ -1623,6 +1677,52 @@ class PrayerRoomService {
         
         // Clear the queue for this user
         this.pendingCandidates.delete(userId);
+    }
+    
+    // WebRTC State Machine Methods
+    setPeerState(userId, state) {
+        this.peerStates.set(userId, state);
+        console.log(`📡 Peer ${userId} state: ${state}`);
+    }
+    
+    getPeerState(userId) {
+        return this.peerStates.get(userId) || 'idle';
+    }
+    
+    processPendingAnswers(userId) {
+        if (!this.pendingAnswers.has(userId)) {
+            return;
+        }
+        
+        const peer = this.peers.get(userId);
+        if (!peer) {
+            console.warn(`📡 No peer connection for ${userId}, cannot process pending answer`);
+            return;
+        }
+        
+        const pendingAnswer = this.pendingAnswers.get(userId);
+        console.log(`📡 Processing pending answer for ${userId}`);
+        
+        try {
+            peer.signal(pendingAnswer.answer);
+            this.pendingAnswers.delete(userId);
+            this.setPeerState(userId, 'answer-processed');
+        } catch (error) {
+            console.error(`❌ Error processing pending answer for ${userId}:`, error);
+        }
+    }
+    
+    bufferAnswer(userId, answer) {
+        console.log(`📡 Buffering answer for ${userId} (state: ${this.getPeerState(userId)})`);
+        this.pendingAnswers.set(userId, { answer, timestamp: Date.now() });
+        
+        // Clean up old buffered answers (older than 30 seconds)
+        const now = Date.now();
+        for (const [uid, data] of this.pendingAnswers.entries()) {
+            if (now - data.timestamp > 30000) {
+                this.pendingAnswers.delete(uid);
+            }
+        }
     }
 
     setupPeerEventHandlers(peer, participantId) {
@@ -3160,6 +3260,62 @@ class PrayerRoomService {
             
         } catch (error) {
             console.error('Error handling WebSocket speaking state:', error);
+        }
+    }
+    
+    setupPerformanceOptimizations() {
+        // Page visibility change detection
+        document.addEventListener('visibilitychange', () => {
+            this.isPageVisible = !document.hidden;
+            console.log(`📊 Page visibility changed: ${this.isPageVisible ? 'visible' : 'hidden'}`);
+            
+            if (this.isPageVisible) {
+                this.resumePolling();
+            } else {
+                this.pausePolling();
+            }
+        });
+        
+        // Window focus/blur detection
+        window.addEventListener('focus', () => {
+            this.isPageVisible = true;
+            this.resumePolling();
+        });
+        
+        window.addEventListener('blur', () => {
+            this.isPageVisible = false;
+            this.pausePolling();
+        });
+    }
+    
+    pausePolling() {
+        console.log('📊 Pausing polling for performance');
+        // Pause all polling intervals
+        for (const [name, intervalId] of this.pollingIntervals.entries()) {
+            clearInterval(intervalId);
+            this.pollingIntervals.delete(name);
+        }
+    }
+    
+    resumePolling() {
+        console.log('📊 Resuming polling');
+        // Only resume if WebSocket is not connected
+        if (!this.wsConnected || this.wsFallbackMode) {
+            this.setupSignalPolling();
+            this.setupParticipantPolling();
+            this.setupChatPolling();
+        }
+    }
+    
+    addPollingInterval(name, intervalId) {
+        this.pollingIntervals.set(name, intervalId);
+    }
+    
+    removePollingInterval(name) {
+        const intervalId = this.pollingIntervals.get(name);
+        if (intervalId) {
+            clearInterval(intervalId);
+            this.pollingIntervals.delete(name);
         }
     }
 }

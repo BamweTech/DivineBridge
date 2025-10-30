@@ -1767,6 +1767,69 @@ def join_scheduled_room(scheduled_room_id):
         logging.error(f"Error joining scheduled room: {str(e)}")
         return jsonify({'error': 'Failed to join scheduled room'}), 500
 
+@prayer_room_bp.route('/cleanup', methods=['POST'])
+def run_cleanup():
+    """Run cleanup tasks for signaling artifacts and old data"""
+    try:
+        # Run all cleanup functions
+        sessions_cleaned = cleanup_inactive_sessions()
+        signaling_cleaned = cleanup_signaling_artifacts()
+        chat_cleaned = cleanup_old_chat_messages()
+        
+        total_cleaned = sessions_cleaned + signaling_cleaned + chat_cleaned
+        
+        return jsonify({
+            'success': True,
+            'sessions_cleaned': sessions_cleaned,
+            'signaling_cleaned': signaling_cleaned,
+            'chat_cleaned': chat_cleaned,
+            'total_cleaned': total_cleaned
+        })
+        
+    except Exception as e:
+        logging.error(f"Error running cleanup: {str(e)}")
+        return jsonify({'error': 'Failed to run cleanup'}), 500
+
+@prayer_room_bp.route('/metrics', methods=['GET'])
+def get_metrics():
+    """Get basic metrics for monitoring"""
+    try:
+        db = get_firestore_client()
+        
+        # Count active rooms
+        active_rooms = db.collection('prayer_rooms')\
+            .where('is_active', '==', True)\
+            .limit(1000)\
+            .stream()
+        active_room_count = len(list(active_rooms))
+        
+        # Count total participants across all active rooms
+        total_participants = 0
+        for room_doc in db.collection('prayer_rooms').where('is_active', '==', True).stream():
+            room_data = room_doc.to_dict()
+            participants = room_data.get('participants', [])
+            total_participants += len(participants)
+        
+        # Count recent chat messages (last hour)
+        from datetime import datetime, timedelta
+        recent_cutoff = datetime.utcnow() - timedelta(hours=1)
+        recent_messages = db.collection('chat_messages')\
+            .where('timestamp', '>', recent_cutoff)\
+            .limit(1000)\
+            .stream()
+        recent_message_count = len(list(recent_messages))
+        
+        return jsonify({
+            'active_rooms': active_room_count,
+            'total_participants': total_participants,
+            'recent_messages': recent_message_count,
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        logging.error(f"Error getting metrics: {str(e)}")
+        return jsonify({'error': 'Failed to get metrics'}), 500
+
 def cleanup_inactive_sessions():
     """Clean up inactive sessions older than 1 hour"""
     try:
@@ -1794,4 +1857,82 @@ def cleanup_inactive_sessions():
         
     except Exception as e:
         logging.error(f"Error cleaning up inactive sessions: {str(e)}")
+        return 0
+
+def cleanup_signaling_artifacts():
+    """Clean up old WebRTC signaling artifacts (offers, answers, candidates)"""
+    try:
+        db = get_firestore_client()
+        cutoff_time = datetime.utcnow() - timedelta(minutes=30)  # 30 minutes TTL
+        
+        # Get all rooms
+        all_rooms_ref = db.collection('prayer_rooms')
+        all_rooms = all_rooms_ref.stream()
+        
+        cleaned_count = 0
+        
+        for room_doc in all_rooms:
+            room_id = room_doc.id
+            
+            # Clean up old offers
+            offers_ref = room_doc.reference.collection('webrtc_offers')\
+                .where('timestamp', '<', cutoff_time)
+            for offer_doc in offers_ref.stream():
+                offer_doc.reference.delete()
+                cleaned_count += 1
+            
+            # Clean up old answers
+            answers_ref = room_doc.reference.collection('webrtc_answers')\
+                .where('timestamp', '<', cutoff_time)
+            for answer_doc in answers_ref.stream():
+                answer_doc.reference.delete()
+                cleaned_count += 1
+            
+            # Clean up old candidates
+            candidates_ref = room_doc.reference.collection('webrtc_candidates')\
+                .where('timestamp', '<', cutoff_time)
+            for candidate_doc in candidates_ref.stream():
+                candidate_doc.reference.delete()
+                cleaned_count += 1
+        
+        logging.info(f"Cleaned up {cleaned_count} signaling artifacts")
+        return cleaned_count
+        
+    except Exception as e:
+        logging.error(f"Error cleaning up signaling artifacts: {str(e)}")
+        return 0
+
+def cleanup_old_chat_messages():
+    """Clean up old chat messages (keep last 1000 per room)"""
+    try:
+        db = get_firestore_client()
+        
+        # Get all rooms
+        all_rooms_ref = db.collection('prayer_rooms')
+        all_rooms = all_rooms_ref.stream()
+        
+        cleaned_count = 0
+        
+        for room_doc in all_rooms:
+            room_id = room_doc.id
+            
+            # Get chat messages for this room, ordered by timestamp
+            chat_messages_ref = db.collection('chat_messages')\
+                .where('room_id', '==', room_id)\
+                .order_by('timestamp', direction='DESCENDING')
+            
+            messages = list(chat_messages_ref.stream())
+            
+            # Keep only the last 1000 messages
+            if len(messages) > 1000:
+                messages_to_delete = messages[1000:]
+                for message_doc in messages_to_delete:
+                    message_doc.reference.delete()
+                    cleaned_count += 1
+        
+        logging.info(f"Cleaned up {cleaned_count} old chat messages")
+        return cleaned_count
+        
+    except Exception as e:
+        logging.error(f"Error cleaning up old chat messages: {str(e)}")
         return 0

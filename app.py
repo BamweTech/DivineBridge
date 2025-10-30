@@ -22,6 +22,8 @@ except ImportError:
 from functools import wraps
 from firebase_auth import initialize_firebase
 from verse_generator import verse_generator
+import threading
+import time
 
 def get_user_based_key():
     """Get user-based key for rate limiting (preferred over IP)"""
@@ -320,7 +322,11 @@ def create_app():
                 'prayer_room.mute_participant',
                 
                 # ICE/TURN config (frequent during WebRTC setup)
-                'prayer_room.get_ice_config'
+                'prayer_room.get_ice_config',
+                
+                # Metrics and cleanup (monitoring)
+                'prayer_room.get_metrics',
+                'prayer_room.run_cleanup'
             ]
             
             # Get view functions after blueprint registration
@@ -451,6 +457,27 @@ def create_app():
                     logger.error(f"Error in speaking_state: {e}")
             
             logger.info("WebSocket handlers registered")
+        
+        # Start background cleanup thread
+        def cleanup_worker():
+            while True:
+                try:
+                    time.sleep(300)  # Run every 5 minutes
+                    from routes.prayer_room_bp import cleanup_inactive_sessions, cleanup_signaling_artifacts, cleanup_old_chat_messages
+                    
+                    sessions_cleaned = cleanup_inactive_sessions()
+                    signaling_cleaned = cleanup_signaling_artifacts()
+                    chat_cleaned = cleanup_old_chat_messages()
+                    
+                    if sessions_cleaned + signaling_cleaned + chat_cleaned > 0:
+                        logger.info(f"Background cleanup: {sessions_cleaned} sessions, {signaling_cleaned} signaling, {chat_cleaned} chat messages")
+                        
+                except Exception as e:
+                    logger.error(f"Background cleanup error: {e}")
+        
+        cleanup_thread = threading.Thread(target=cleanup_worker, daemon=True)
+        cleanup_thread.start()
+        logger.info("Background cleanup thread started")
         
     except Exception as e:
         error_msg = f"Failed to initialize application components: {str(e)}"
