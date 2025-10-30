@@ -185,7 +185,7 @@ def create_app():
         # Content Security Policy
         response.headers['Content-Security-Policy'] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://www.googleapis.com https://apis.google.com https://unpkg.com https://cdn.socket.io; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://www.googleapis.com https://apis.google.com https://unpkg.com https://cdn.socket.io https://*.firebaseio.com https://*.firebasedatabase.app; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: https: blob:; "
