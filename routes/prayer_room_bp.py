@@ -1025,6 +1025,88 @@ def get_webrtc_answers(room_id):
         logging.error(f"Error getting WebRTC answers: {str(e)}")
         return jsonify({'error': 'Failed to get WebRTC answers'}), 500
 
+@prayer_room_bp.route('/room/<room_id>/webrtc-candidate', methods=['POST'])
+def send_webrtc_candidate(room_id):
+    """Send WebRTC ICE candidate to another participant"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Get authenticated user from session
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        to_user = data.get('to_user')
+        candidate = data.get('candidate')
+        
+        if not to_user or not candidate:
+            return jsonify({'error': 'Missing required fields: to_user and candidate'}), 400
+        
+        db = get_firestore_client()
+        
+        # Store the candidate in Firestore
+        candidate_data = {
+            'from_user': user['user_id'],
+            'to_user': to_user,
+            'candidate': candidate,
+            'timestamp': datetime.utcnow(),
+            'room_id': room_id
+        }
+        
+        db.collection('prayer_rooms').document(room_id)\
+            .collection('webrtc_candidates').add(candidate_data)
+        
+        logging.info(f"WebRTC candidate sent from {user['user_id']} to {to_user} in room {room_id}")
+        
+        return jsonify({'success': True, 'message': 'Candidate sent successfully'}), 200
+        
+    except Exception as e:
+        logging.error(f"Error sending WebRTC candidate: {str(e)}")
+        return jsonify({'error': 'Failed to send candidate'}), 500
+
+@prayer_room_bp.route('/room/<room_id>/webrtc-candidates', methods=['GET'])
+def get_webrtc_candidates(room_id):
+    """Get WebRTC candidates for a room"""
+    try:
+        user = get_user_from_session()
+        
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        db = get_firestore_client()
+        
+        # Get candidates for this user
+        candidates_ref = db.collection('prayer_rooms').document(room_id)\
+            .collection('webrtc_candidates')\
+            .where('to_user', '==', user['user_id'])\
+            .limit(10)
+        
+        candidates = []
+        for doc in candidates_ref.stream():
+            candidate_data = doc.to_dict()
+            candidate_data['id'] = doc.id
+            candidates.append(candidate_data)
+        
+        # Sort by timestamp descending (most recent first)
+        def get_timestamp_sort_key(item):
+            timestamp = item.get('timestamp')
+            if hasattr(timestamp, 'timestamp'):
+                return timestamp.timestamp()
+            elif isinstance(timestamp, dict) and '_seconds' in timestamp:
+                return timestamp['_seconds']
+            else:
+                return 0
+        
+        candidates.sort(key=get_timestamp_sort_key, reverse=True)
+        
+        return jsonify(candidates)
+        
+    except Exception as e:
+        logging.error(f"Error getting WebRTC candidates: {str(e)}")
+        return jsonify({'error': 'Failed to get WebRTC candidates'}), 500
+
 # Multi-Device Session Management Endpoints
 @prayer_room_bp.route('/<room_id>/check-session', methods=['POST'])
 def check_session(room_id):

@@ -1257,6 +1257,19 @@ class PrayerRoomService {
                 }
             }
             
+            // Check for WebRTC candidates
+            const candidatesResponse = await fetch(`/api/prayer-room/room/${this.roomId}/webrtc-candidates`, {
+                credentials: 'include'
+            });
+            if (candidatesResponse.ok) {
+                const candidates = await candidatesResponse.json();
+                for (const candidate of candidates) {
+                    if (candidate.to_user === this.userId) {
+                        await this.handleWebRTCCandidate(candidate);
+                    }
+                }
+            }
+            
         } catch (error) {
             console.error('Error checking for WebRTC signals:', error);
         }
@@ -1342,18 +1355,25 @@ class PrayerRoomService {
             console.log(`📡 Sending signal to ${participantId}:`, signalData.type);
             
             const signalType = signalData.type;
-            const endpoint = signalType === 'offer' ? 'webrtc-offer' : 'webrtc-answer';
+            let endpoint, requestBody;
             
-            // Prepare the request body with correct field names
-            const requestBody = {
+            // Prepare the request body with correct field names based on signal type
+            requestBody = {
                 to_user: participantId
             };
             
-            // Add the signal data with the correct field name
             if (signalType === 'offer') {
+                endpoint = 'webrtc-offer';
                 requestBody.offer = signalData;
             } else if (signalType === 'answer') {
+                endpoint = 'webrtc-answer';
                 requestBody.answer = signalData;
+            } else if (signalType === 'candidate') {
+                endpoint = 'webrtc-candidate';
+                requestBody.candidate = signalData;
+            } else {
+                console.warn(`📡 Unknown signal type: ${signalType}`);
+                return;
             }
             
             console.log(`📡 Request body for ${signalType}:`, requestBody);
@@ -1363,6 +1383,7 @@ class PrayerRoomService {
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                credentials: 'include',
                 body: JSON.stringify(requestBody)
             });
             
@@ -1497,6 +1518,39 @@ class PrayerRoomService {
             
         } catch (error) {
             console.error('Error handling WebRTC answer:', error);
+        }
+    }
+
+    async handleWebRTCCandidate(candidate) {
+        try {
+            console.log('📡 Handling WebRTC candidate from:', candidate.from_user);
+            
+            // Create a unique signal ID to prevent duplicates
+            const candidateContent = JSON.stringify(candidate.candidate);
+            const contentHash = candidateContent.length + candidateContent.slice(0, 50);
+            const signalId = `${candidate.from_user}-candidate-${contentHash}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            
+            console.log(`📡 Generated candidate signal ID: ${signalId}`);
+            
+            if (this.processedSignals.has(signalId)) {
+                console.log(`📡 Duplicate candidate detected for ${candidate.from_user}, ignoring`);
+                return;
+            }
+            
+            this.processedSignals.add(signalId);
+            
+            // Clean up old signals if we have too many
+            this.cleanupProcessedSignals();
+            
+            const peer = this.peers.get(candidate.from_user);
+            if (peer) {
+                peer.signal(candidate.candidate);
+            } else {
+                console.warn('No peer connection found for candidate from:', candidate.from_user);
+            }
+            
+        } catch (error) {
+            console.error('Error handling WebRTC candidate:', error);
         }
     }
 
