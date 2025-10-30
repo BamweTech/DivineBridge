@@ -496,6 +496,18 @@ class PrayerRoomService {
         if (participantCount) {
             participantCount.textContent = participants ? participants.length : 0;
         }
+        
+        // Create peer connections for new participants if WebRTC is initialized
+        if (this.localStream && participants) {
+            participants.forEach(participant => {
+                if (participant.user_id !== this.userId && !this.peers.has(participant.user_id)) {
+                    console.log(`🔗 Creating peer connection for new participant: ${participant.user_id}`);
+                    this.createPeerConnection(participant.user_id, participant).catch(error => {
+                        console.error(`❌ Error creating peer connection for ${participant.user_id}:`, error);
+                    });
+                }
+            });
+        }
     }
     
     async joinAudio() {
@@ -550,11 +562,7 @@ class PrayerRoomService {
             
             // Initialize WebRTC first (most critical for voice)
             this.initializeWebRTC().then(() => {
-                console.log('🎤 WebRTC initialized, starting participant connections...');
-                // Start participant connections immediately
-                this.initiateConnectionsWithParticipants().catch(error => {
-                    console.error('⚠️ Error initiating connections:', error);
-                });
+                console.log('🎤 WebRTC initialized successfully');
                 
                 // Initialize advanced audio processing in background (non-blocking)
                 this.initializeAdvancedAudioProcessing().catch(error => {
@@ -1073,6 +1081,9 @@ class PrayerRoomService {
             // Set up voice activity detection
             this.setupVoiceActivityDetection();
             
+            // Create peer connections with existing participants BEFORE starting signaling
+            await this.initiateConnectionsWithParticipants();
+            
             // Set up WebRTC signaling with SimplePeer
             this.setupWebRTCSignaling();
             
@@ -1341,6 +1352,9 @@ class PrayerRoomService {
             // Set up peer event handlers
             this.setupPeerEventHandlers(peer, participantId);
             
+            // Process any queued candidates for this user
+            this.processQueuedCandidates(participantId);
+            
             console.log(`🔗 Peer connection created with ${participantId}`);
             
         } catch (error) {
@@ -1547,11 +1561,54 @@ class PrayerRoomService {
                 peer.signal(candidate.candidate);
             } else {
                 console.warn('No peer connection found for candidate from:', candidate.from_user);
+                // Queue the candidate for when the peer connection is created
+                this.queueCandidateForLater(candidate);
             }
             
         } catch (error) {
             console.error('Error handling WebRTC candidate:', error);
         }
+    }
+    
+    queueCandidateForLater(candidate) {
+        // Initialize candidate queue if it doesn't exist
+        if (!this.pendingCandidates) {
+            this.pendingCandidates = new Map();
+        }
+        
+        // Add candidate to queue for this user
+        if (!this.pendingCandidates.has(candidate.from_user)) {
+            this.pendingCandidates.set(candidate.from_user, []);
+        }
+        
+        this.pendingCandidates.get(candidate.from_user).push(candidate.candidate);
+        console.log(`📡 Queued candidate for ${candidate.from_user}, queue size: ${this.pendingCandidates.get(candidate.from_user).length}`);
+    }
+    
+    processQueuedCandidates(userId) {
+        if (!this.pendingCandidates || !this.pendingCandidates.has(userId)) {
+            return;
+        }
+        
+        const peer = this.peers.get(userId);
+        if (!peer) {
+            return;
+        }
+        
+        const queuedCandidates = this.pendingCandidates.get(userId);
+        console.log(`📡 Processing ${queuedCandidates.length} queued candidates for ${userId}`);
+        
+        // Process all queued candidates
+        queuedCandidates.forEach(candidate => {
+            try {
+                peer.signal(candidate);
+            } catch (error) {
+                console.error(`❌ Error processing queued candidate for ${userId}:`, error);
+            }
+        });
+        
+        // Clear the queue for this user
+        this.pendingCandidates.delete(userId);
     }
 
     setupPeerEventHandlers(peer, participantId) {
