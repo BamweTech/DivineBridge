@@ -497,7 +497,7 @@ class PrayerRoomService {
             this.rtdbRefs.presence = this.rtdb.ref(`/rooms/${this.roomId}/presence/${this.userId}`);
             
             // Presence (best-effort)
-            const presencePayload = { online: true, ts: firebase.database.ServerValue.TIMESTAMP, name: this.userName || '' };
+            const presencePayload = { uid: this.userId, online: true, ts: firebase.database.ServerValue.TIMESTAMP, name: this.userName || '' };
             this.rtdbRefs.presence.set(presencePayload).catch(() => {});
             if (this.rtdbRefs.presence.onDisconnect) {
                 this.rtdbRefs.presence.onDisconnect().remove().catch(() => {});
