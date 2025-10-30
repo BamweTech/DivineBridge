@@ -942,31 +942,34 @@ class PrayerRoomService {
             const response = await fetch(`/api/prayer-room/${this.roomId}/chat`, {
                 credentials: 'include'
             });
+            if (!response.ok) {
+                console.warn('Chat fetch not ok, preserving current messages');
+                return; // keep current UI on transient HTTP errors
+            }
             const data = await response.json();
             
             console.log('Chat messages loaded:', data);
             
-            if (data.success) {
-                this.chatMessages = data.messages || [];
+            if (data && data.success && Array.isArray(data.messages)) {
+                // Avoid clearing visible chat on occasional empty payloads
+                if (data.messages.length === 0 && this.chatMessages && this.chatMessages.length > 0) {
+                    console.warn('Empty chat payload received; keeping existing messages to prevent flicker');
+                    return;
+                }
+                this.chatMessages = data.messages;
                 console.log('Chat messages array:', this.chatMessages);
                 this.updateChatDisplay();
             } else {
-                console.log('Chat load failed:', data);
-                this.chatMessages = [];
-                this.updateChatDisplay();
+                console.warn('Chat payload invalid or unsuccessful, preserving current messages');
+                // Do not clear UI on bad payloads
             }
             
         } catch (error) {
-            this.chatMessages = [];
-            this.updateChatDisplay();
+            console.warn('Chat load error, preserving current messages:', error);
+            // Do not clear UI on errors
         }
         
-            // Set up polling for real-time updates if Firestore listeners fail
-            if (!this.chatPollingInterval) {
-                this.chatPollingInterval = setInterval(() => {
-                    this.loadChatMessages();
-                }, 1000); // Poll every 1 second for real-time chat updates
-            }
+        // Polling is managed centrally by setupChatPolling via addPollingInterval('chat', ...)
     }
     
     updateChatDisplay() {
