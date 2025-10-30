@@ -1565,6 +1565,8 @@ class PrayerRoomService {
             
             // Set up peer event handlers
             this.setupPeerEventHandlers(peer, offer.from_user);
+            // Immediately try to flush any queued candidates for this peer
+            this.processQueuedCandidates(offer.from_user);
             
             // Handle the incoming offer
             peer.signal(offer.offer);
@@ -1572,6 +1574,8 @@ class PrayerRoomService {
             
             // Process any pending answers for this peer
             this.processPendingAnswers(offer.from_user);
+            // Re-attempt flushing queued candidates after remote description is set
+            this.processQueuedCandidates(offer.from_user);
             
         } catch (error) {
             console.error('📡 Error handling WebRTC offer:', error);
@@ -1762,6 +1766,8 @@ class PrayerRoomService {
         peer.on('connect', () => {
             console.log(`✅ Peer connection established with ${participantId}`);
             this.updateParticipantConnectionStatus(participantId, 'connected');
+            // Safety: process any queued candidates once DTLS is up
+            this.processQueuedCandidates(participantId);
         });
         
         // Handle connection errors with detailed logging
