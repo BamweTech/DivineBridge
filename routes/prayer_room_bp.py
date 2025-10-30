@@ -844,7 +844,6 @@ def update_speaking_state(room_id):
         return jsonify({'error': 'Failed to update speaking state'}), 500
 
 @prayer_room_bp.route('/room/<room_id>/webrtc-offer', methods=['POST'])
-@limiter.limit("20 per minute")
 def send_webrtc_offer(room_id):
     """Send WebRTC offer to another participant"""
     try:
@@ -894,7 +893,6 @@ def send_webrtc_offer(room_id):
         return jsonify({'error': 'Failed to send WebRTC offer'}), 500
 
 @prayer_room_bp.route('/room/<room_id>/webrtc-answer', methods=['POST'])
-@limiter.limit("20 per minute")
 def send_webrtc_answer(room_id):
     """Send WebRTC answer to another participant"""
     try:

@@ -793,6 +793,17 @@
                 display: none !important; /* Completely hidden on desktop */
             }
             
+            /* Additional desktop hiding rules for extra specificity */
+            .chat-panel .mobile-chat-back-btn,
+            .chat-panel .mobile-chat-expand-btn {
+                display: none !important;
+            }
+            
+            .chat-header .mobile-chat-back-btn,
+            .chat-header .mobile-chat-expand-btn {
+                display: none !important;
+            }
+            
             /* Show buttons only on mobile */
             @media (max-width: 768px) {
                 /* Base styles for mobile buttons (without display property) */

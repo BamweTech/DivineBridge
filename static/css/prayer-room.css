@@ -261,6 +261,22 @@
     .mobile-tab-navigation {
         display: none !important;
     }
+    
+    /* Hide mobile chat buttons on desktop */
+    .mobile-chat-back-btn,
+    .mobile-chat-expand-btn {
+        display: none !important;
+    }
+    
+    .chat-panel .mobile-chat-back-btn,
+    .chat-panel .mobile-chat-expand-btn {
+        display: none !important;
+    }
+    
+    .chat-header .mobile-chat-back-btn,
+    .chat-header .mobile-chat-expand-btn {
+        display: none !important;
+    }
 }
 
 .mobile-chat-btn {
