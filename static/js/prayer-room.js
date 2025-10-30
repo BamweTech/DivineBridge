@@ -1935,8 +1935,16 @@ class PrayerRoomService {
             this.peers.delete(participantId);
         });
         
-        // Enhanced ICE connection state monitoring
+        // Enhanced ICE connection state & signaling diagnostics
         if (peer._pc) {
+            peer._pc.addEventListener('signalingstatechange', () => {
+                const s = peer._pc.signalingState;
+                console.log(`🧭 Signaling state for ${participantId}: ${s}`);
+                if (s === 'have-local-offer' || s === 'stable') {
+                    this.processPendingAnswers(participantId);
+                    this.processQueuedCandidates(participantId);
+                }
+            });
             peer._pc.addEventListener('iceconnectionstatechange', () => {
                 const state = peer._pc.iceConnectionState;
                 console.log(`🧊 ICE connection state changed for ${participantId}: ${state}`);

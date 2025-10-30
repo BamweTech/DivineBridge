@@ -127,6 +127,9 @@ def create_app():
     else:
         logger.warning("SocketIO not available, WebSocket features disabled")
     
+    # Expose SocketIO instance on the app for module-level access
+    app.socketio = socketio
+    
     # Initialize rate limiter with user-based keys and Redis storage if available
     try:
         # Try to connect to Redis for distributed rate limiting
@@ -738,7 +741,8 @@ if __name__ == '__main__':
     # Respect PORT env (Cloud Run uses 8080); default to 5001 locally
     run_port = int(os.getenv('PORT', 5001))
     logger.info(f"Starting server on port {run_port}")
-    if 'socketio' in locals() and socketio:
-        socketio.run(app, port=run_port, debug=False)
+    socketio_instance = getattr(app, 'socketio', None)
+    if socketio_instance:
+        socketio_instance.run(app, port=run_port, debug=False)
     else:
         app.run(port=run_port, debug=False)
