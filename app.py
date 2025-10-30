@@ -735,7 +735,10 @@ def health_check():
         return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
 
 if __name__ == '__main__':
+    # Respect PORT env (Cloud Run uses 8080); default to 5001 locally
+    run_port = int(os.getenv('PORT', 5001))
+    logger.info(f"Starting server on port {run_port}")
     if 'socketio' in locals() and socketio:
-        socketio.run(app, port=5001, debug=False)
+        socketio.run(app, port=run_port, debug=False)
     else:
-        app.run(port=5001, debug=False) 
+        app.run(port=run_port, debug=False)
