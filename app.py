@@ -189,7 +189,7 @@ def create_app():
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: https: blob:; "
-            "connect-src 'self' https://www.gstatic.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.googleapis.com https://cdn.socket.io https://*.firebaseio.com wss://*.firebaseio.com ws://localhost:5001 wss://localhost:5001; "
+            "connect-src 'self' https://www.gstatic.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.googleapis.com https://cdn.socket.io https://*.firebaseio.com wss://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebasedatabase.app ws://localhost:5001 wss://localhost:5001; "
             "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com; "
             "frame-ancestors 'self'; "
             "base-uri 'self'; "

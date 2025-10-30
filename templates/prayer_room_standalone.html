@@ -10,12 +10,28 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
     
     <!-- SimplePeer for WebRTC -->
     <script src="https://unpkg.com/simple-peer@9.11.1/simplepeer.min.js"></script>
     
     <!-- Socket.IO for real-time communication -->
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    
+    <script>
+        // Ensure databaseURL exists for RTDB in production
+        (function() {
+            try {
+                // firebase_config injected server-side
+                var cfg = {{ firebase_config | tojson | safe }};
+                if (cfg && !cfg.databaseURL && cfg.projectId) {
+                    // Default RTDB URL for project default instance
+                    cfg.databaseURL = 'https://' + cfg.projectId + '-default-rtdb.firebaseio.com';
+                }
+                window.firebaseClientConfig = cfg;
+            } catch (e) {}
+        })();
+    </script>
     
     <!-- External CSS for prayer room styles -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room.css') }}?v={{ range(100000, 999999) | random }}">
