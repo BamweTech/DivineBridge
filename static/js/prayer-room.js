@@ -56,6 +56,11 @@ class PrayerRoomService {
         this.processedSignals = new Set();
         this.maxProcessedSignals = 1000; // Limit to prevent memory issues
         
+        // WebSocket for real-time communication
+        this.socket = null;
+        this.wsConnected = false;
+        this.wsFallbackMode = false; // Use REST when WS fails
+        
         this.init();
     }
     
@@ -93,6 +98,9 @@ class PrayerRoomService {
             
             // Initialize UI
             this.initializeUI();
+            
+            // Initialize WebSocket connection
+            this.initializeWebSocket();
             
             // Join the room
             await this.joinRoom();
@@ -377,7 +385,7 @@ class PrayerRoomService {
             if (!this.participantPollingInterval) {
                 this.participantPollingInterval = setInterval(() => {
                     this.loadParticipants();
-                }, 3000); // Poll every 3 seconds for faster updates
+                }, 1000); // Poll every 1 second for real-time updates
             }
             
         } catch (error) {
@@ -561,6 +569,7 @@ class PrayerRoomService {
             });
             
             // Initialize WebRTC first (most critical for voice)
+            await this.loadIceConfig();
             this.initializeWebRTC().then(() => {
                 console.log('🎤 WebRTC initialized successfully');
                 
@@ -865,6 +874,18 @@ class PrayerRoomService {
         if (!message) return;
         
         try {
+            // Use WebSocket if available and connected, otherwise fall back to REST
+            if (this.socket && this.wsConnected && !this.wsFallbackMode) {
+                this.socket.emit('chat_message', {
+                    room_id: this.roomId,
+                    message: message
+                });
+                chatInput.value = '';
+                console.log('Chat message sent via WebSocket');
+                return;
+            }
+            
+            // REST fallback
             const response = await fetch(`/api/prayer-room/${this.roomId}/chat`, {
                 method: 'POST',
                 headers: {
@@ -911,7 +932,7 @@ class PrayerRoomService {
             if (!this.chatPollingInterval) {
                 this.chatPollingInterval = setInterval(() => {
                     this.loadChatMessages();
-                }, 2000); // Poll every 2 seconds for faster chat updates
+                }, 1000); // Poll every 1 second for real-time chat updates
             }
     }
     
@@ -1194,11 +1215,23 @@ class PrayerRoomService {
             this.pendingSpeakingStateUpdate = false;
             this.lastSpeakingStateUpdate = now;
             
+            // Use WebSocket if available and connected, otherwise fall back to REST
+            if (this.socket && this.wsConnected && !this.wsFallbackMode) {
+                this.socket.emit('speaking_state', {
+                    room_id: this.roomId,
+                    is_speaking: this.isSpeaking
+                });
+                console.log('Speaking state sent via WebSocket');
+                return;
+            }
+            
+            // REST fallback
             const response = await fetch(`/api/prayer-room/room/${this.roomId}/speaking-state`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                credentials: 'include',
                 body: JSON.stringify({
                     is_speaking: this.isSpeaking
                 })
@@ -1232,10 +1265,10 @@ class PrayerRoomService {
     }
 
     setupSignalPolling() {
-        // Poll for WebRTC offers and answers every 500ms for faster connection
+        // Poll for WebRTC signals every 200ms for near real-time connection
         this.signalPollInterval = setInterval(() => {
             this.checkForWebRTCSignals();
-        }, 500); // Reduced from 2000ms to 500ms for faster signaling
+        }, 200); // Optimized for real-time conversation
     }
 
     async checkForWebRTCSignals() {
@@ -1311,26 +1344,11 @@ class PrayerRoomService {
                 trickle: true, // Enable trickle ICE for faster connection
                 // Ultra-low latency WebRTC configuration
                 config: {
-                    iceServers: [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' }
-                    ],
+                    iceServers: this.iceServers,
                     iceCandidatePoolSize: 0, // Disable candidate pooling for faster connection
                     bundlePolicy: 'max-bundle',
                     rtcpMuxPolicy: 'require',
-                    // Ultra-low latency settings
-                    iceTransportPolicy: 'all',
-                    iceConnectionReceivingTimeout: 5000, // 5 second timeout
-                    iceBackupCandidatePairPingInterval: 2500 // 2.5 second ping interval
                 },
-                // Ultra-low latency constraints
-                constraints: {
-                    offerToReceiveAudio: true,
-                    offerToReceiveVideo: false,
-                    voiceActivityDetection: false // Disable VAD for lower latency
-                },
-                // Low latency options
-                objectMode: false,
                 channelConfig: {
                     ordered: false, // Disable ordering for lower latency
                     maxRetransmits: 0 // No retransmits for lower latency
@@ -1368,6 +1386,19 @@ class PrayerRoomService {
             
             console.log(`📡 Sending signal to ${participantId}:`, signalData.type);
             
+            // Use WebSocket if available and connected, otherwise fall back to REST
+            if (this.socket && this.wsConnected && !this.wsFallbackMode) {
+                this.socket.emit('webrtc_signal', {
+                    room_id: this.roomId,
+                    to_user: participantId,
+                    type: signalData.type,
+                    data: signalData
+                });
+                console.log(`📡 WebRTC ${signalData.type} sent via WebSocket to ${participantId}`);
+                return;
+            }
+            
+            // REST fallback
             const signalType = signalData.type;
             let endpoint, requestBody;
             
@@ -1452,33 +1483,16 @@ class PrayerRoomService {
                 trickle: true, // Enable trickle ICE for faster connection
                 // Ultra-low latency WebRTC configuration
                 config: {
-                    iceServers: [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' }
-                    ],
+                    iceServers: this.iceServers,
                     iceCandidatePoolSize: 0, // Disable candidate pooling for faster connection
                     bundlePolicy: 'max-bundle',
                     rtcpMuxPolicy: 'require',
-                    // Ultra-low latency settings
-                    iceTransportPolicy: 'all',
-                    iceConnectionReceivingTimeout: 5000, // 5 second timeout
-                    iceBackupCandidatePairPingInterval: 2500 // 2.5 second ping interval
                 },
-                // Ultra-low latency constraints
-                constraints: {
-                    offerToReceiveAudio: true,
-                    offerToReceiveVideo: false,
-                    voiceActivityDetection: false // Disable VAD for lower latency
-                },
-                // Low latency options
-                objectMode: false,
                 channelConfig: {
-                    ordered: false, // Disable ordering for lower latency
-                    maxRetransmits: 0 // No retransmits for lower latency
+                    ordered: false,
+                    maxRetransmits: 0
                 },
-                // Additional low latency settings
                 sdpTransform: (sdp) => {
-                    // Optimize SDP for low latency
                     return sdp
                         .replace(/a=fmtp:111 minptime=10;useinbandfec=1/g, 'a=fmtp:111 minptime=5;useinbandfec=0')
                         .replace(/a=fmtp:9 minptime=10;useinbandfec=1/g, 'a=fmtp:9 minptime=5;useinbandfec=0');
@@ -3004,6 +3018,148 @@ class PrayerRoomService {
             }
         } catch (error) {
             console.error('🧹 Error cleaning up processed signals:', error);
+        }
+    }
+
+    async loadIceConfig() {
+        try {
+            const res = await fetch(`/api/prayer-room/ice-config`, { credentials: 'include' });
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data && Array.isArray(data.iceServers) && data.iceServers.length > 0) {
+                this.iceServers = data.iceServers;
+                console.log('ICE servers loaded:', this.iceServers);
+            }
+        } catch (e) {
+            console.warn('Failed to load ICE config, using defaults:', e);
+        }
+    }
+    
+    initializeWebSocket() {
+        try {
+            if (typeof io === 'undefined') {
+                console.warn('Socket.IO not available, using REST fallback');
+                this.wsFallbackMode = true;
+                return;
+            }
+            
+            this.socket = io({
+                transports: ['websocket', 'polling'],
+                upgrade: true,
+                rememberUpgrade: true
+            });
+            
+            this.socket.on('connect', () => {
+                console.log('🔌 WebSocket connected');
+                this.wsConnected = true;
+                this.wsFallbackMode = false;
+                
+                // Join the room via WebSocket
+                if (this.roomId) {
+                    this.socket.emit('join_room', { room_id: this.roomId });
+                }
+            });
+            
+            this.socket.on('disconnect', () => {
+                console.log('🔌 WebSocket disconnected');
+                this.wsConnected = false;
+                this.wsFallbackMode = true;
+            });
+            
+            this.socket.on('webrtc_signal', (data) => {
+                this.handleWebSocketSignal(data);
+            });
+            
+            this.socket.on('chat_message', (data) => {
+                this.handleWebSocketChatMessage(data);
+            });
+            
+            this.socket.on('speaking_state', (data) => {
+                this.handleWebSocketSpeakingState(data);
+            });
+            
+            this.socket.on('error', (error) => {
+                console.error('WebSocket error:', error);
+                this.wsFallbackMode = true;
+            });
+            
+        } catch (error) {
+            console.error('Failed to initialize WebSocket:', error);
+            this.wsFallbackMode = true;
+        }
+    }
+    
+    handleWebSocketSignal(data) {
+        try {
+            const { from_user, to_user, type, data: signalData } = data;
+            
+            if (to_user !== this.userId) return;
+            
+            console.log(`📡 WebSocket signal received: ${type} from ${from_user}`);
+            
+            if (type === 'offer') {
+                this.handleWebRTCOffer({
+                    from_user,
+                    offer: signalData
+                });
+            } else if (type === 'answer') {
+                this.handleWebRTCAnswer({
+                    from_user,
+                    answer: signalData
+                });
+            } else if (type === 'candidate') {
+                this.handleWebRTCCandidate({
+                    from_user,
+                    candidate: signalData
+                });
+            }
+        } catch (error) {
+            console.error('Error handling WebSocket signal:', error);
+        }
+    }
+    
+    handleWebSocketChatMessage(data) {
+        try {
+            const { user_id, user_name, message, timestamp } = data;
+            
+            // Add to chat messages
+            this.chatMessages.push({
+                user_id,
+                user_name,
+                message,
+                timestamp: new Date(timestamp)
+            });
+            
+            // Update display
+            this.updateChatDisplay();
+            
+        } catch (error) {
+            console.error('Error handling WebSocket chat message:', error);
+        }
+    }
+    
+    handleWebSocketSpeakingState(data) {
+        try {
+            const { user_id, is_speaking } = data;
+            
+            // Update participant speaking state
+            const participantElement = document.querySelector(`[data-user-id="${user_id}"]`);
+            if (participantElement) {
+                if (is_speaking) {
+                    participantElement.classList.add('speaking');
+                } else {
+                    participantElement.classList.remove('speaking');
+                }
+                
+                // Update speaking indicator
+                const speakingIndicator = participantElement.querySelector('.speaking-indicator');
+                if (speakingIndicator) {
+                    speakingIndicator.style.display = is_speaking ? 'inline' : 'none';
+                }
+            }
+            
+        } catch (error) {
+            console.error('Error handling WebSocket speaking state:', error);
         }
     }
 }

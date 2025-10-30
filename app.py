@@ -10,9 +10,25 @@ from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+import redis
+try:
+    from flask_socketio import SocketIO, emit, join_room, leave_room
+except ImportError:
+    print("Warning: Flask-SocketIO not installed. WebSocket features will be disabled.")
+    SocketIO = None
+    emit = None
+    join_room = None
+    leave_room = None
 from functools import wraps
 from firebase_auth import initialize_firebase
 from verse_generator import verse_generator
+
+def get_user_based_key():
+    """Get user-based key for rate limiting (preferred over IP)"""
+    user = session.get('user')
+    if user and user.get('uid'):
+        return f"user:{user['uid']}"
+    return get_remote_address()
 
 # Import appropriate storage handler based on environment
 USE_LOCAL_STORAGE = os.getenv('USE_LOCAL_STORAGE', 'false').lower() == 'true'
@@ -101,11 +117,34 @@ def create_app():
     # Initialize CSRF protection
     csrf = CSRFProtect(app)
     
-    # Initialize rate limiter
+    # Initialize SocketIO for real-time communication
+    socketio = None
+    if SocketIO:
+        socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+    
+    # Initialize rate limiter with user-based keys and Redis storage if available
+    try:
+        # Try to connect to Redis for distributed rate limiting
+        redis_client = redis.Redis(
+            host=os.getenv('REDIS_HOST', 'localhost'),
+            port=int(os.getenv('REDIS_PORT', 6379)),
+            password=os.getenv('REDIS_PASSWORD'),
+            decode_responses=True
+        )
+        redis_client.ping()  # Test connection
+        storage_uri = f"redis://{os.getenv('REDIS_HOST', 'localhost')}:{os.getenv('REDIS_PORT', 6379)}"
+        if os.getenv('REDIS_PASSWORD'):
+            storage_uri = f"redis://:{os.getenv('REDIS_PASSWORD')}@{os.getenv('REDIS_HOST', 'localhost')}:{os.getenv('REDIS_PORT', 6379)}"
+        logger.info("✅ Using Redis for rate limiting storage")
+    except Exception as e:
+        logger.warning(f"Redis not available, using memory storage: {e}")
+        storage_uri = "memory://"
+    
     limiter = Limiter(
         app,
-        key_func=get_remote_address,
-        default_limits=["200 per day", "50 per hour"]
+        key_func=get_user_based_key,  # Use user-based keys instead of IP
+        default_limits=["10000 per day", "2000 per hour", "100 per minute"],
+        storage_uri=storage_uri
     )
     
     # Add session middleware
@@ -252,16 +291,36 @@ def create_app():
         try:
             # Exempt using view function references
             exempt_endpoints = [
+                # WebRTC Signaling (high frequency)
                 'prayer_room.get_webrtc_offers',
                 'prayer_room.get_webrtc_answers',
                 'prayer_room.send_webrtc_offer',
                 'prayer_room.send_webrtc_answer',
                 'prayer_room.send_webrtc_candidate',
                 'prayer_room.get_webrtc_candidates',
+                
+                # Chat (real-time messaging)
                 'prayer_room.get_chat_messages',
                 'prayer_room.send_chat_message',
+                
+                # Participants (frequent polling)
                 'prayer_room.get_room_participants',
-                'prayer_room.update_speaking_state'
+                
+                # Voice activity (very high frequency)
+                'prayer_room.update_speaking_state',
+                
+                # Room management (frequent checks)
+                'prayer_room.join_prayer_room',
+                'prayer_room.leave_prayer_room',
+                'prayer_room.register_session',
+                'prayer_room.disconnect_session',
+                'prayer_room.check_session',
+                
+                # Mute/unmute (real-time control)
+                'prayer_room.mute_participant',
+                
+                # ICE/TURN config (frequent during WebRTC setup)
+                'prayer_room.get_ice_config'
             ]
             
             # Get view functions after blueprint registration
@@ -276,6 +335,122 @@ def create_app():
             logger.warning(f"Could not exempt prayer room endpoints: {e}", exc_info=True)
         
         logger.info("Blueprints registered")
+        
+        # WebSocket event handlers for real-time signaling
+        if socketio:
+            @socketio.on('join_room')
+            def handle_join_room(data):
+                """Handle user joining a room via WebSocket"""
+                try:
+                    room_id = data.get('room_id')
+                    user = session.get('user')
+                    
+                    if not user or not room_id:
+                        emit('error', {'message': 'Authentication required'})
+                        return
+                    
+                    join_room(room_id)
+                    emit('joined_room', {'room_id': room_id, 'user_id': user['uid']})
+                    logger.info(f"User {user['uid']} joined room {room_id} via WebSocket")
+                    
+                except Exception as e:
+                    logger.error(f"Error in join_room: {e}")
+                    emit('error', {'message': 'Failed to join room'})
+            
+            @socketio.on('leave_room')
+            def handle_leave_room(data):
+                """Handle user leaving a room via WebSocket"""
+                try:
+                    room_id = data.get('room_id')
+                    user = session.get('user')
+                    
+                    if not user or not room_id:
+                        return
+                    
+                    leave_room(room_id)
+                    emit('left_room', {'room_id': room_id, 'user_id': user['uid']})
+                    logger.info(f"User {user['uid']} left room {room_id} via WebSocket")
+                    
+                except Exception as e:
+                    logger.error(f"Error in leave_room: {e}")
+            
+            @socketio.on('webrtc_signal')
+            def handle_webrtc_signal(data):
+                """Handle WebRTC signaling via WebSocket"""
+                try:
+                    room_id = data.get('room_id')
+                    to_user = data.get('to_user')
+                    signal_type = data.get('type')  # 'offer', 'answer', 'candidate'
+                    signal_data = data.get('data')
+                    user = session.get('user')
+                    
+                    if not user or not room_id or not to_user or not signal_type or not signal_data:
+                        emit('error', {'message': 'Invalid signal data'})
+                        return
+                    
+                    # Broadcast to specific user in the room
+                    emit('webrtc_signal', {
+                        'from_user': user['uid'],
+                        'to_user': to_user,
+                        'type': signal_type,
+                        'data': signal_data,
+                        'timestamp': datetime.utcnow().isoformat()
+                    }, room=room_id, include_self=False)
+                    
+                    logger.info(f"WebRTC {signal_type} signal sent from {user['uid']} to {to_user} in room {room_id}")
+                    
+                except Exception as e:
+                    logger.error(f"Error in webrtc_signal: {e}")
+                    emit('error', {'message': 'Failed to send signal'})
+            
+            @socketio.on('chat_message')
+            def handle_chat_message(data):
+                """Handle chat messages via WebSocket"""
+                try:
+                    room_id = data.get('room_id')
+                    message = data.get('message')
+                    user = session.get('user')
+                    
+                    if not user or not room_id or not message:
+                        emit('error', {'message': 'Invalid message data'})
+                        return
+                    
+                    # Broadcast to all users in the room
+                    emit('chat_message', {
+                        'user_id': user['uid'],
+                        'user_name': user.get('name', 'Anonymous'),
+                        'message': message,
+                        'timestamp': datetime.utcnow().isoformat()
+                    }, room=room_id)
+                    
+                    logger.info(f"Chat message from {user['uid']} in room {room_id}")
+                    
+                except Exception as e:
+                    logger.error(f"Error in chat_message: {e}")
+                    emit('error', {'message': 'Failed to send message'})
+            
+            @socketio.on('speaking_state')
+            def handle_speaking_state(data):
+                """Handle speaking state updates via WebSocket"""
+                try:
+                    room_id = data.get('room_id')
+                    is_speaking = data.get('is_speaking', False)
+                    user = session.get('user')
+                    
+                    if not user or not room_id:
+                        return
+                    
+                    # Broadcast to all users in the room except sender
+                    emit('speaking_state', {
+                        'user_id': user['uid'],
+                        'is_speaking': is_speaking,
+                        'timestamp': datetime.utcnow().isoformat()
+                    }, room=room_id, include_self=False)
+                    
+                except Exception as e:
+                    logger.error(f"Error in speaking_state: {e}")
+            
+            logger.info("WebSocket handlers registered")
         
     except Exception as e:
         error_msg = f"Failed to initialize application components: {str(e)}"
@@ -530,4 +705,7 @@ def health_check():
         return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(port=5001) 
+    if socketio:
+        socketio.run(app, port=5001, debug=False)
+    else:
+        app.run(port=5001, debug=False) 

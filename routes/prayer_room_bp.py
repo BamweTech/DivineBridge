@@ -27,11 +27,8 @@ from google.cloud import firestore
 
 prayer_room_bp = Blueprint('prayer_room', __name__)
 
-# Initialize rate limiter for this blueprint
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=["10000 per day", "1000 per hour"]
-)
+# Rate limiting is now handled centrally in app.py
+# Blueprint-level limiter removed to prevent conflicts
 
 def get_firestore_client():
     """Get Firestore client instance"""
@@ -57,8 +54,45 @@ def get_user_from_session():
         'email': user.get('email')
     }
 
+@prayer_room_bp.route('/ice-config', methods=['GET'])
+def get_ice_config():
+    """Return ICE/TURN server configuration for WebRTC.
+    Reads TURN settings from environment variables if present; otherwise returns STUN-only.
+    Env vars supported:
+      TURN_URLS (comma-separated), TURN_USERNAME, TURN_PASSWORD
+      STUN_URLS (optional, comma-separated)
+    """
+    try:
+        # Defaults: public Google STUN
+        stun_urls = os.getenv('STUN_URLS', 'stun:stun.l.google.com:19302').split(',')
+        turn_urls = [u for u in os.getenv('TURN_URLS', '').split(',') if u.strip()]
+        turn_username = os.getenv('TURN_USERNAME')
+        turn_password = os.getenv('TURN_PASSWORD')
+
+        ice_servers = []
+        # STUN entries
+        for url in [u.strip() for u in stun_urls if u.strip()]:
+            ice_servers.append({'urls': url})
+
+        # TURN entries
+        for url in [u.strip() for u in turn_urls if u.strip()]:
+            # If credentials provided, include them
+            if turn_username and turn_password:
+                ice_servers.append({
+                    'urls': url,
+                    'username': turn_username,
+                    'credential': turn_password
+                })
+            else:
+                ice_servers.append({'urls': url})
+
+        return jsonify({'iceServers': ice_servers})
+    except Exception as e:
+        logging.error(f"Error generating ICE config: {str(e)}")
+        # Safe fallback to STUN-only
+        return jsonify({'iceServers': [{'urls': 'stun:stun.l.google.com:19302'}]}), 200
+
 @prayer_room_bp.route('/create', methods=['POST'])
-@limiter.limit("10 per hour")
 def create_prayer_room():
     """Create a new prayer room"""
     try:
