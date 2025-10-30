@@ -412,6 +412,8 @@ class PrayerRoomService {
             } else {
                 console.error('Error loading participants:', error);
             }
+            // Always hide loading indicator on error
+            this.hideParticipantsLoading();
             // Don't show empty state on timeout, just retry on next poll
             if (!this.participantPollingInterval) {
                 // If initial load failed, set up polling anyway so we can retry
@@ -430,6 +432,16 @@ class PrayerRoomService {
             loadingEl.innerHTML = '<div class="loading-spinner-small"></div><span>Loading participants...</span>';
             loadingEl.style.cssText = 'text-align: center; padding: 20px; color: #64748b; display: flex; align-items: center; justify-content: center; gap: 10px;';
             participantsContainer.appendChild(loadingEl);
+        }
+    }
+    
+    hideParticipantsLoading() {
+        const participantsContainer = document.getElementById('participantsList');
+        if (participantsContainer) {
+            const loadingEl = participantsContainer.querySelector('.loading-participants');
+            if (loadingEl) {
+                loadingEl.remove();
+            }
         }
     }
 
@@ -933,10 +945,14 @@ class PrayerRoomService {
             });
             const data = await response.json();
             
+            console.log('Chat messages loaded:', data);
+            
             if (data.success) {
                 this.chatMessages = data.messages || [];
+                console.log('Chat messages array:', this.chatMessages);
                 this.updateChatDisplay();
             } else {
+                console.log('Chat load failed:', data);
                 this.chatMessages = [];
                 this.updateChatDisplay();
             }
@@ -3145,8 +3161,9 @@ class PrayerRoomService {
                     return;
                 }
                 
+                console.log('Socket.IO script loaded, initializing connection...');
                 this.setupSocketIO();
-            }, 100);
+            }, 500); // Increased timeout to ensure script loads
         } catch (error) {
             console.error('Failed to initialize WebSocket:', error);
             this.wsFallbackMode = true;
