@@ -61,10 +61,23 @@ class PrayerRoomService {
         this.wsConnected = false;
         this.wsFallbackMode = false; // Use REST when WS fails
         
+        // Firebase Realtime Database (RTDB) for near real-time signaling/chat
+        this.rtdb = null;
+        this.useRTDB = true; // Prefer RTDB over WebSocket; REST remains fallback
+        this.rtdbRefs = {
+            signalsRoot: null,
+            mySignals: null,
+            chat: null,
+            presence: null
+        };
+        
         // WebRTC state machine for proper signaling order
         this.peerStates = new Map(); // Track peer connection states
         this.pendingAnswers = new Map(); // Buffer answers until offer is processed
         this.pendingCandidates = new Map(); // Buffer candidates until connection is ready
+        
+        // Track initiator role per peer to gate answer handling
+        this.peerInitiators = new Map();
         
         // Performance optimizations
         this.isPageVisible = true;
@@ -114,8 +127,11 @@ class PrayerRoomService {
             // Initialize UI
             this.initializeUI();
             
-            // Initialize WebSocket connection
-            this.initializeWebSocket();
+            // Disable Socket.IO path; prefer RTDB + HTTP
+            this.wsFallbackMode = true;
+            
+            // Initialize RTDB (if available) for signals/chat/presence
+            await this.initializeRealtimeDB();
             
             // Set up performance optimizations
             this.setupPerformanceOptimizations();
@@ -185,7 +201,7 @@ class PrayerRoomService {
         // Initialize Firestore
         this.firestore = firebase.firestore();
         
-        // Set up real-time listeners
+        // Set up polling listeners (chat) – RTDB will override if available
         this.setupRealtimeListeners();
     }
     
@@ -442,6 +458,79 @@ class PrayerRoomService {
                 loadingEl.remove();
             }
         }
+    }
+
+    async initializeRealtimeDB() {
+        try {
+            if (!this.useRTDB) return;
+            if (!firebase.database || typeof firebase.database !== 'function') {
+                console.warn('Firebase RTDB not available, staying on HTTP polling');
+                this.rtdb = null;
+                return;
+            }
+            this.rtdb = firebase.database();
+            if (!this.roomId) return;
+            
+            // Prepare references
+            this.rtdbRefs.signalsRoot = this.rtdb.ref(`/rooms/${this.roomId}/signals`);
+            this.rtdbRefs.mySignals = this.rtdbRefs.signalsRoot.child(this.userId || '');
+            this.rtdbRefs.chat = this.rtdb.ref(`/rooms/${this.roomId}/chat`);
+            this.rtdbRefs.presence = this.rtdb.ref(`/rooms/${this.roomId}/presence/${this.userId || 'unknown'}`);
+            
+            // Presence (best-effort)
+            const presencePayload = { online: true, ts: firebase.database.ServerValue.TIMESTAMP, name: this.userName || '' };
+            this.rtdbRefs.presence.set(presencePayload).catch(() => {});
+            if (this.rtdbRefs.presence.onDisconnect) {
+                this.rtdbRefs.presence.onDisconnect().remove().catch(() => {});
+            }
+            
+            // Attach listeners
+            this.subscribeRTDBChat();
+            this.subscribeRTDBSignals();
+        } catch (e) {
+            console.warn('Failed to initialize RTDB, falling back to HTTP:', e);
+            this.rtdb = null;
+        }
+    }
+
+    subscribeRTDBChat() {
+        if (!this.rtdb || !this.rtdbRefs.chat) return;
+        // Load recent and stream new messages
+        this.rtdbRefs.chat.limitToLast(200).on('child_added', (snap) => {
+            const val = snap.val();
+            if (!val) return;
+            // Normalize to existing message structure
+            const msg = {
+                user_id: val.user_id,
+                user_name: val.user_name,
+                message: val.message,
+                timestamp: val.timestamp ? new Date(val.timestamp) : new Date()
+            };
+            this.chatMessages.push(msg);
+            this.updateChatDisplay();
+        });
+    }
+
+    subscribeRTDBSignals() {
+        if (!this.rtdb || !this.rtdbRefs.signalsRoot) return;
+        if (!this.userId) return;
+        const myPath = this.rtdbRefs.signalsRoot.child(this.userId);
+        myPath.on('child_added', async (snap) => {
+            const val = snap.val();
+            if (!val || !val.type) return;
+            try {
+                if (val.type === 'offer') {
+                    await this.handleWebRTCOffer({ from_user: val.from_user, offer: val.data });
+                } else if (val.type === 'answer') {
+                    await this.handleWebRTCAnswer({ from_user: val.from_user, answer: val.data });
+                } else if (val.type === 'candidate') {
+                    await this.handleWebRTCCandidate({ from_user: val.from_user, candidate: val.data });
+                }
+            } finally {
+                // Clean up processed signal to prevent reprocessing
+                myPath.child(snap.key).remove().catch(() => {});
+            }
+        });
     }
 
     // Utility function to truncate names
@@ -903,14 +992,17 @@ class PrayerRoomService {
         if (!message) return;
         
         try {
-            // Use WebSocket if available and connected, otherwise fall back to REST
-            if (this.socket && this.wsConnected && !this.wsFallbackMode) {
-                this.socket.emit('chat_message', {
-                    room_id: this.roomId,
-                    message: message
+            // Prefer RTDB if available
+            if (this.useRTDB && this.rtdb && this.rtdbRefs.chat) {
+                const user = firebase.auth().currentUser;
+                await this.rtdbRefs.chat.push({
+                    user_id: user ? user.uid : this.userId,
+                    user_name: this.userName || (user && user.displayName) || 'Anonymous',
+                    message,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
                 });
                 chatInput.value = '';
-                console.log('Chat message sent via WebSocket');
+                console.log('Chat message sent via RTDB');
                 return;
             }
             
@@ -1031,16 +1123,24 @@ class PrayerRoomService {
     }
     
     setupRealtimeListeners() {
-        // Note: We're using API endpoints instead of direct Firestore access
-        // This avoids permission issues and provides better error handling
-        console.log('Using API-based polling instead of direct Firestore listeners');
+        // If RTDB is active, we'll attach RTDB listeners instead of polling
+        if (this.useRTDB && this.rtdb) {
+            console.log('Using Firebase RTDB for real-time chat/signaling');
+            this.subscribeRTDBChat();
+            this.subscribeRTDBSignals();
+            return;
+        }
         
-        // Set up polling for chat only - participants polling is handled by loadParticipants()
-        // This avoids duplicate polling mechanisms
+        // Fallback: API polling
+        console.log('Using API-based polling instead of direct Firestore listeners');
         this.setupChatPolling();
     }
     
     setupChatPolling() {
+        // If RTDB is active, skip polling
+        if (this.useRTDB && this.rtdb) {
+            return;
+        }
         // Only set up polling if WebSocket is not connected or in fallback mode
         if (!this.wsConnected || this.wsFallbackMode) {
             // Poll for new chat messages every 5 seconds
@@ -1422,6 +1522,7 @@ class PrayerRoomService {
             
             // Store the peer connection
             this.peers.set(participantId, peer);
+            this.peerInitiators.set(participantId, true);
             
             // Set up peer event handlers
             this.setupPeerEventHandlers(peer, participantId);
@@ -1442,15 +1543,16 @@ class PrayerRoomService {
             
             console.log(`📡 Sending signal to ${participantId}:`, signalData.type);
             
-            // Use WebSocket if available and connected, otherwise fall back to REST
-            if (this.socket && this.wsConnected && !this.wsFallbackMode) {
-                this.socket.emit('webrtc_signal', {
-                    room_id: this.roomId,
-                    to_user: participantId,
+            // Prefer RTDB if available
+            if (this.useRTDB && this.rtdb && this.rtdbRefs.signalsRoot) {
+                const user = firebase.auth().currentUser;
+                await this.rtdbRefs.signalsRoot.child(participantId).push({
+                    from_user: user ? user.uid : this.userId,
                     type: signalData.type,
-                    data: signalData
+                    data: signalData,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
                 });
-                console.log(`📡 WebRTC ${signalData.type} sent via WebSocket to ${participantId}`);
+                console.log(`📡 WebRTC ${signalData.type} sent via RTDB to ${participantId}`);
                 return;
             }
             
@@ -1562,6 +1664,7 @@ class PrayerRoomService {
             
             // Store the peer connection
             this.peers.set(offer.from_user, peer);
+            this.peerInitiators.set(offer.from_user, false);
             
             // Set up peer event handlers
             this.setupPeerEventHandlers(peer, offer.from_user);
@@ -1604,21 +1707,32 @@ class PrayerRoomService {
             // Clean up old signals if we have too many
             this.cleanupProcessedSignals();
             
-            // Check if we're ready to process the answer
-            const peerState = this.getPeerState(answer.from_user);
-            if (peerState === 'offer-received' || peerState === 'offer-processed') {
-                const peer = this.peers.get(answer.from_user);
-                if (peer) {
-                    peer.signal(answer.answer);
-                    this.setPeerState(answer.from_user, 'answer-processed');
-                } else {
-                    console.warn('No peer connection found for answer from:', answer.from_user);
-                }
-            } else {
-                // Buffer the answer until we're ready
-                console.log(`📡 Buffering answer for ${answer.from_user} (current state: ${peerState})`);
-                this.bufferAnswer(answer.from_user, answer.answer);
+            // Only initiators should process answers; responders ignore
+            const isInitiator = this.peerInitiators.get(answer.from_user) === true;
+            if (!isInitiator) {
+                console.warn(`Ignoring answer from ${answer.from_user} because we are not initiator for this peer`);
+                return;
             }
+
+            // Check if we're ready to process the answer
+            const peer = this.peers.get(answer.from_user);
+            if (!peer) {
+                console.warn('No peer connection found for answer from:', answer.from_user);
+                this.bufferAnswer(answer.from_user, answer.answer);
+                return;
+            }
+
+            // If underlying RTCPeerConnection state is not ready, buffer
+            const pc = peer._pc || null;
+            const signalingState = pc && pc.signalingState ? pc.signalingState : 'unknown';
+            if (signalingState !== 'have-local-offer' && signalingState !== 'stable') {
+                console.log(`📡 Buffering answer due to signalingState=${signalingState}`);
+                this.bufferAnswer(answer.from_user, answer.answer);
+                return;
+            }
+
+            peer.signal(answer.answer);
+            this.setPeerState(answer.from_user, 'answer-processed');
             
         } catch (error) {
             console.error('Error handling WebRTC answer:', error);
@@ -1719,6 +1833,12 @@ class PrayerRoomService {
         const peer = this.peers.get(userId);
         if (!peer) {
             console.warn(`📡 No peer connection for ${userId}, cannot process pending answer`);
+            return;
+        }
+        const pc = peer._pc || null;
+        const signalingState = pc && pc.signalingState ? pc.signalingState : 'unknown';
+        if (signalingState !== 'have-local-offer' && signalingState !== 'stable') {
+            console.log(`📡 Pending answer not applied; signalingState=${signalingState}`);
             return;
         }
         
