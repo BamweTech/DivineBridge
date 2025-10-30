@@ -123,6 +123,9 @@ def create_app():
     socketio = None
     if SocketIO:
         socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+        logger.info("SocketIO initialized successfully")
+    else:
+        logger.warning("SocketIO not available, WebSocket features disabled")
     
     # Initialize rate limiter with user-based keys and Redis storage if available
     try:

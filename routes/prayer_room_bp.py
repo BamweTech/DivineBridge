@@ -1842,15 +1842,17 @@ def cleanup_inactive_sessions():
         
         cleaned_count = 0
         for room_doc in all_rooms:
-            # Get inactive sessions older than 1 hour
+            # Get all inactive sessions and filter by timestamp in Python
             inactive_sessions_ref = room_doc.reference\
                 .collection('device_sessions')\
-                .where('is_active', '==', False)\
-                .where('ended_at', '<', cutoff_time)
+                .where('is_active', '==', False)
             
             for session_doc in inactive_sessions_ref.stream():
-                session_doc.reference.delete()
-                cleaned_count += 1
+                session_data = session_doc.to_dict()
+                ended_at = session_data.get('ended_at')
+                if ended_at and ended_at < cutoff_time:
+                    session_doc.reference.delete()
+                    cleaned_count += 1
         
         logging.info(f"Cleaned up {cleaned_count} inactive sessions")
         return cleaned_count
