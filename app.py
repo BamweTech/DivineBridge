@@ -742,7 +742,7 @@ if __name__ == '__main__':
     run_port = int(os.getenv('PORT', 5001))
     logger.info(f"Starting server on port {run_port}")
     socketio_instance = getattr(app, 'socketio', None)
-    if socketio_instance:
-        socketio_instance.run(app, port=run_port, debug=False)
+            if socketio_instance:
+                socketio_instance.run(app, port=run_port, debug=False, allow_unsafe_werkzeug=True)
     else:
         app.run(port=run_port, debug=False)
