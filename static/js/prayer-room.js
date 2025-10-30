@@ -133,7 +133,8 @@ class PrayerRoomService {
             this.wsFallbackMode = true;
             
             // Initialize RTDB (if available) for signals/chat/presence
-            await this.initializeRealtimeDB();
+            // MOVED: This is now called from joinPrayerRoom() after userId is confirmed
+            // await this.initializeRealtimeDB();
             
             // Set up performance optimizations
             this.setupPerformanceOptimizations();
@@ -333,6 +334,9 @@ class PrayerRoomService {
             this.userId = user.uid;
             this.userName = user.displayName || 'Anonymous';
             
+            // --> ADDED: Initialize RTDB now that we have a confirmed userId
+            await this.initializeRealtimeDB();
+
             // Update UI to show user info
             this.updateUserInfo();
             
