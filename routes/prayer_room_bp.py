@@ -65,28 +65,38 @@ def get_ice_config():
     try:
         # Defaults: public Google STUN
         stun_urls = os.getenv('STUN_URLS', 'stun:stun.l.google.com:19302').split(',')
-        turn_urls = [u for u in os.getenv('TURN_URLS', '').split(',') if u.strip()]
+        turn_urls_env = os.getenv('TURN_URLS', '')
         turn_username = os.getenv('TURN_USERNAME')
         turn_password = os.getenv('TURN_PASSWORD')
 
-        ice_servers = []
-        # STUN entries
-        for url in [u.strip() for u in stun_urls if u.strip()]:
-            ice_servers.append({'urls': url})
+        ice_servers = [{'urls': url.strip()} for url in stun_urls if url.strip()]
 
-        # TURN entries
-        for url in [u.strip() for u in turn_urls if u.strip()]:
-            # If credentials provided, include them
-            if turn_username and turn_password:
-                ice_servers.append({
-                    'urls': url,
-                    'username': turn_username,
-                    'credential': turn_password
-                })
-            else:
-                ice_servers.append({'urls': url})
+        # Handle complex, comma-separated TURN URLs
+        if turn_urls_env:
+            for url in turn_urls_env.split(','):
+                url = url.strip()
+                if not url:
+                    continue
+                
+                # If username/password are provided as env vars, use them
+                if turn_username and turn_password:
+                    ice_servers.append({
+                        'urls': url,
+                        'username': turn_username,
+                        'credential': turn_password
+                    })
+                else:
+                    # Otherwise, assume credentials might be in the URL (e.g., Twilio)
+                    # or it's a TURN server without authentication.
+                    ice_servers.append({'urls': url})
 
+        # If no servers were configured at all, provide a fallback
+        if not ice_servers:
+             ice_servers.append({'urls': 'stun:stun.l.google.com:19302'})
+
+        logging.info(f"Generated ICE Servers. Count: {len(ice_servers)}")
         return jsonify({'iceServers': ice_servers})
+        
     except Exception as e:
         logging.error(f"Error generating ICE config: {str(e)}")
         # Safe fallback to STUN-only
