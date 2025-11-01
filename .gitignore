@@ -61,4 +61,4 @@ local_storage_data/
 
 # Service Account Keys
 *.json
-!static/bible_verses.json
+!static/bible_verses.jsonturn-credentials.txt

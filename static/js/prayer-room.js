@@ -736,6 +736,9 @@ class PrayerRoomService {
             this.initializeWebRTC().then(() => {
                 console.log('🎤 WebRTC initialized successfully');
                 
+                // Add stream to any existing peer connections that were created before audio was joined
+                this.addStreamToExistingPeers();
+                
                 // If there was a pending offer, handle it now that the stream is ready
                 if (this.pendingOffer) {
                     console.log('[WebRTC] Handling pending offer...');
@@ -1531,11 +1534,27 @@ class PrayerRoomService {
     async createPeerConnection(participantId, isInitiator) {
         try {
             console.log(`[WebRTC] Creating peer connection for ${participantId}. Initiator: ${isInitiator}`);
+            console.log(`[WebRTC] Local stream available: ${!!this.localStream}, Active: ${this.localStream?.active}`);
             
             if (this.peers.has(participantId)) {
                 console.warn(`[WebRTC] Peer connection already exists for ${participantId}. Aborting creation.`);
                 return;
             }
+            
+            // Critical: Check if we have an active local stream
+            if (!this.localStream || !this.localStream.active) {
+                console.error(`[WebRTC] Cannot create peer connection for ${participantId}: No active local stream!`);
+                console.error(`[WebRTC] User must join audio before connecting to peers.`);
+                return;
+            }
+            
+            // Verify the stream has audio tracks
+            const audioTracks = this.localStream.getAudioTracks();
+            if (audioTracks.length === 0) {
+                console.error(`[WebRTC] Local stream has no audio tracks!`);
+                return;
+            }
+            console.log(`[WebRTC] Local stream has ${audioTracks.length} audio track(s), enabled: ${audioTracks[0].enabled}`);
             
             const peer = new SimplePeer({
                 initiator: isInitiator,
@@ -1550,9 +1569,41 @@ class PrayerRoomService {
             this.peers.set(participantId, peer);
             this.setupPeerEventHandlers(peer, participantId);
             
+            console.log(`✅ [WebRTC] Peer connection created for ${participantId} with local audio stream`);
+            
         } catch (error) {
             console.error(`[WebRTC] Error creating peer connection for ${participantId}:`, error);
         }
+    }
+    
+    addStreamToExistingPeers() {
+        // Add the local stream to any existing peer connections that don't have it
+        if (!this.localStream) {
+            console.warn('[WebRTC] Cannot add stream to peers: no local stream available');
+            return;
+        }
+        
+        console.log(`[WebRTC] Adding stream to ${this.peers.size} existing peer(s)`);
+        
+        this.peers.forEach((peer, participantId) => {
+            try {
+                if (peer._pc && peer._pc.getSenders) {
+                    const senders = peer._pc.getSenders();
+                    const hasAudio = senders.some(sender => sender.track?.kind === 'audio');
+                    
+                    if (!hasAudio) {
+                        console.log(`[WebRTC] Adding audio track to existing peer ${participantId}`);
+                        this.localStream.getAudioTracks().forEach(track => {
+                            peer.addTrack(track, this.localStream);
+                        });
+                    } else {
+                        console.log(`[WebRTC] Peer ${participantId} already has audio track`);
+                    }
+                }
+            } catch (error) {
+                console.error(`[WebRTC] Error adding stream to peer ${participantId}:`, error);
+            }
+        });
     }
 
     setupPeerEventHandlers(peer, participantId) {
