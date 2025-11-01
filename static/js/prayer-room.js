@@ -1556,6 +1556,17 @@ class PrayerRoomService {
             }
             console.log(`[WebRTC] Local stream has ${audioTracks.length} audio track(s), enabled: ${audioTracks[0].enabled}`);
             
+            // Log local stream details before creating peer
+            console.log(`[WebRTC] Creating SimplePeer with stream:`, {
+                streamId: this.localStream.id,
+                audioTracks: this.localStream.getAudioTracks().map(t => ({
+                    id: t.id,
+                    enabled: t.enabled,
+                    muted: t.muted,
+                    readyState: t.readyState
+                }))
+            });
+            
             const peer = new SimplePeer({
                 initiator: isInitiator,
                 stream: this.localStream,
@@ -1616,6 +1627,24 @@ class PrayerRoomService {
         // Handle incoming media stream from the remote peer
         peer.on('stream', (stream) => {
             console.log(`🎵 [WebRTC] Received remote stream from ${participantId}`);
+            console.log(`🎵 Stream details:`, {
+                id: stream.id,
+                active: stream.active,
+                audioTracks: stream.getAudioTracks().length,
+                videoTracks: stream.getVideoTracks().length
+            });
+            
+            // Log audio track details
+            stream.getAudioTracks().forEach((track, index) => {
+                console.log(`🎵 Audio track ${index}:`, {
+                    id: track.id,
+                    kind: track.kind,
+                    enabled: track.enabled,
+                    muted: track.muted,
+                    readyState: track.readyState
+                });
+            });
+            
             this.handleRemoteStream(participantId, stream);
         });
 
@@ -1661,33 +1690,102 @@ class PrayerRoomService {
         try {
             console.log(`🎵 Setting up audio for participant ${participantId}`);
             
-            // Create or get the audio element for this participant
-            let audioElement = document.getElementById(`audio-${participantId}`);
-            
-            if (!audioElement) {
-                audioElement = document.createElement('audio');
-                audioElement.id = `audio-${participantId}`;
-                audioElement.autoplay = true;
-                audioElement.playsInline = true;
-                document.body.appendChild(audioElement);
-                console.log(`🎵 Created new audio element for ${participantId}`);
+            // Validate stream
+            if (!stream) {
+                console.error(`🎵 No stream provided for ${participantId}`);
+                return;
             }
             
-            // Attach the stream to the audio element
+            if (!stream.active) {
+                console.error(`🎵 Stream is not active for ${participantId}`);
+                return;
+            }
+            
+            const audioTracks = stream.getAudioTracks();
+            if (audioTracks.length === 0) {
+                console.error(`🎵 No audio tracks in stream from ${participantId}`);
+                return;
+            }
+            
+            console.log(`🎵 Valid stream with ${audioTracks.length} audio track(s) from ${participantId}`);
+            
+            // Remove existing audio element if it exists
+            const existingAudio = document.getElementById(`audio-${participantId}`);
+            if (existingAudio) {
+                console.log(`🎵 Removing existing audio element for ${participantId}`);
+                existingAudio.srcObject = null;
+                existingAudio.remove();
+            }
+            
+            // Create new audio element
+            const audioElement = document.createElement('audio');
+            audioElement.id = `audio-${participantId}`;
+            audioElement.autoplay = true;
+            audioElement.playsInline = true;
+            audioElement.controls = false;
+            audioElement.volume = 1.0;
+            
+            // IMPORTANT: Don't mute initially - let updateParticipantAudioMuteState handle it
+            audioElement.muted = false;
+            
+            // Attach stream before appending to DOM
             audioElement.srcObject = stream;
             
-            // Check if this participant is muted and set audio element accordingly
-            this.updateParticipantAudioMuteState(participantId);
-            
-            // Ensure it plays
-            audioElement.play().then(() => {
-                console.log(`🎵 Audio playing for ${participantId}`);
-            }).catch(err => {
-                console.error(`🎵 Error playing audio for ${participantId}:`, err);
+            // Add event listeners for debugging
+            audioElement.addEventListener('loadedmetadata', () => {
+                console.log(`🎵 Audio metadata loaded for ${participantId}`);
             });
             
+            audioElement.addEventListener('canplay', () => {
+                console.log(`🎵 Audio can play for ${participantId}`);
+            });
+            
+            audioElement.addEventListener('playing', () => {
+                console.log(`✅ Audio is playing for ${participantId}`);
+            });
+            
+            audioElement.addEventListener('pause', () => {
+                console.warn(`⚠️ Audio paused for ${participantId}`);
+            });
+            
+            audioElement.addEventListener('error', (e) => {
+                console.error(`❌ Audio error for ${participantId}:`, e);
+            });
+            
+            // Append to DOM
+            document.body.appendChild(audioElement);
+            console.log(`🎵 Audio element created and attached to DOM for ${participantId}`);
+            
+            // Try to play
+            const playPromise = audioElement.play();
+            
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        console.log(`✅ Audio playback started successfully for ${participantId}`);
+                        
+                        // Now check mute state after playback started
+                        this.updateParticipantAudioMuteState(participantId);
+                    })
+                    .catch(err => {
+                        console.error(`❌ Audio playback failed for ${participantId}:`, err);
+                        
+                        if (err.name === 'NotAllowedError') {
+                            console.error(`🔇 Browser blocked autoplay. User must interact with page first.`);
+                            this.showError('Click anywhere on the page to enable audio playback');
+                            
+                            // Try again on next user interaction
+                            document.addEventListener('click', () => {
+                                audioElement.play().then(() => {
+                                    console.log(`✅ Audio started after user interaction for ${participantId}`);
+                                }).catch(e => console.error(`Still failed:`, e));
+                            }, { once: true });
+                        }
+                    });
+            }
+            
         } catch (error) {
-            console.error(`🎵 Error handling remote stream for ${participantId}:`, error);
+            console.error(`❌ Error handling remote stream for ${participantId}:`, error);
         }
     }
 
