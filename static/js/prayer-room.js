@@ -56,6 +56,11 @@ class PrayerRoomService {
         this.processedSignals = new Set();
         this.maxProcessedSignals = 1000; // Limit to prevent memory issues
         
+        // Connection retry tracking
+        this.connectionRetries = new Map(); // participantId -> retry count
+        this.maxRetries = 3;
+        this.retryDelay = 2000; // Start with 2 seconds
+        
         // WebSocket for real-time communication
         this.socket = null;
         this.wsConnected = false;
@@ -1567,6 +1572,12 @@ class PrayerRoomService {
         peer.on('connect', () => {
             console.log(`✅ [WebRTC] Connected to ${participantId}`);
             
+            // Clear retry count on successful connection
+            if (this.connectionRetries.has(participantId)) {
+                console.log(`✅ Connection successful after ${this.connectionRetries.get(participantId)} retries`);
+                this.connectionRetries.delete(participantId);
+            }
+            
             // Process any queued ICE candidates for this peer
             this.processQueuedCandidates(participantId);
         });
@@ -1582,12 +1593,14 @@ class PrayerRoomService {
             console.error(`❌ [WebRTC] Error with ${participantId}:`, err);
             
             // Handle specific error types
-            if (err.code === 'ERR_CONNECTION_FAILURE') {
+            if (err.code === 'ERR_CONNECTION_FAILURE' || err.message?.includes('Connection failed')) {
                 console.log(`🔄 [WebRTC] Connection failure with ${participantId}, will retry...`);
+                this.retryConnection(participantId);
             } else if (err.message && err.message.includes('InvalidStateError')) {
                 this.handleSignalingStateError(participantId, err);
             } else {
                 // For other errors, clean up and let the system retry naturally
+                console.warn(`⚠️ [WebRTC] Unhandled error with ${participantId}, cleaning up`);
                 this.cleanupPeerConnection(participantId);
             }
         });
@@ -1653,6 +1666,59 @@ class PrayerRoomService {
             console.log(`🔇 ${shouldMute ? 'Muted' : 'Unmuted'} audio for participant ${participantId}`);
         } else {
             console.warn(`Audio element not found for participant ${participantId}`);
+        }
+    }
+
+    async retryConnection(participantId) {
+        try {
+            // Get current retry count
+            const retryCount = this.connectionRetries.get(participantId) || 0;
+            
+            if (retryCount >= this.maxRetries) {
+                console.error(`❌ Max retries (${this.maxRetries}) reached for ${participantId}. Giving up.`);
+                this.connectionRetries.delete(participantId);
+                this.cleanupPeerConnection(participantId);
+                this.showError(`Unable to connect to participant. They may have network issues.`);
+                return;
+            }
+            
+            // Increment retry count
+            this.connectionRetries.set(participantId, retryCount + 1);
+            
+            // Calculate exponential backoff delay
+            const delay = this.retryDelay * Math.pow(2, retryCount);
+            console.log(`🔄 Retry attempt ${retryCount + 1}/${this.maxRetries} for ${participantId} in ${delay}ms`);
+            
+            // Clean up existing connection
+            this.cleanupPeerConnection(participantId);
+            
+            // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, delay));
+            
+            // Check if participant is still in the room
+            const participants = await this.getCurrentParticipants();
+            const stillInRoom = participants.some(p => p.user_id === participantId);
+            
+            if (!stillInRoom) {
+                console.log(`👋 Participant ${participantId} left during retry, aborting`);
+                this.connectionRetries.delete(participantId);
+                return;
+            }
+            
+            // Determine who should initiate
+            const isInitiator = this.userId < participantId;
+            
+            if (isInitiator) {
+                console.log(`🔄 Recreating connection as initiator for ${participantId}`);
+                await this.createPeerConnection(participantId, true);
+            } else {
+                console.log(`🔄 Waiting for new offer from ${participantId}`);
+                // Non-initiator waits for the initiator to retry
+            }
+            
+        } catch (error) {
+            console.error(`❌ Error retrying connection for ${participantId}:`, error);
+            this.connectionRetries.delete(participantId);
         }
     }
 
