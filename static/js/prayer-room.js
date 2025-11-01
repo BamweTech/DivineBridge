@@ -1567,6 +1567,17 @@ class PrayerRoomService {
                 }))
             });
             
+            // Check if local audio track is muted
+            const localTrack = this.localStream.getAudioTracks()[0];
+            if (localTrack.muted) {
+                console.error(`❌ YOUR microphone track is muted! Check:
+- Is your microphone physically muted?
+- Is your microphone muted in system settings?
+- Is your microphone disconnected?
+- Does your browser have microphone access?`);
+                this.showError('Your microphone appears to be muted. Check your microphone settings.');
+            }
+            
             const peer = new SimplePeer({
                 initiator: isInitiator,
                 stream: this.localStream,
@@ -1643,6 +1654,15 @@ class PrayerRoomService {
                     muted: track.muted,
                     readyState: track.readyState
                 });
+                
+                // Warn if track is muted (no audio being produced)
+                if (track.muted) {
+                    console.warn(`⚠️ Remote audio track from ${participantId} is muted! The user's microphone may be:
+- Physically muted or disconnected
+- Muted at OS/system level
+- Not producing audio
+They should check their microphone settings.`);
+                }
             });
             
             this.handleRemoteStream(participantId, stream);
