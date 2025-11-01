@@ -582,10 +582,19 @@ class PrayerRoomService {
             }
         });
         
-        // 2. Create connections for new participants
+        // 2. Create connections for new participants and update mute states for existing ones
         if (this.localStream && participants) {
             participants.forEach(participant => {
                 const participantId = participant.user_id;
+                
+                // Update mute state for existing audio elements
+                if (participantId !== this.userId) {
+                    const audioElement = document.getElementById(`audio-${participantId}`);
+                    if (audioElement) {
+                        audioElement.muted = participant.is_muted || false;
+                    }
+                }
+                
                 // Don't connect to self or existing peers
                 if (participantId !== this.userId && !this.peers.has(participantId)) {
                     // **Deterministic Initiator Logic**
@@ -673,25 +682,31 @@ class PrayerRoomService {
             this.isAudioEnabled = true;
             this.updateAudioControls();
             
-            // Request microphone permission with ultra-low latency constraints
+            // Request microphone permission with enhanced noise suppression
             console.log('🎤 Requesting microphone permission...');
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
-                    echoCancellation: { ideal: true },
-                    noiseSuppression: { ideal: true },
-                    autoGainControl: { ideal: true },
-                    sampleRate: { ideal: 48000 }, // Higher sample rate for better quality
-                    channelCount: { ideal: 1 },
-                    // Ultra-low latency audio constraints
-                    latency: { ideal: 0.01 }, // 10ms latency target
-                    googEchoCancellation: { ideal: true },
-                    googAutoGainControl: { ideal: true },
-                    googNoiseSuppression: { ideal: true },
-                    googHighpassFilter: { ideal: true },
-                    googTypingNoiseDetection: { ideal: true },
-                    googAudioMirroring: { ideal: false },
-                    googDAEchoCancellation: { ideal: true },
-                    googNoiseReduction: { ideal: true }
+                    // Core audio processing - these are critical for quality
+                    echoCancellation: true,        // Required: Remove echo
+                    noiseSuppression: true,        // Required: Remove background noise
+                    autoGainControl: true,         // Required: Normalize volume levels
+                    
+                    // Audio quality settings
+                    sampleRate: { ideal: 48000 },  // Higher sample rate for better quality
+                    channelCount: 1,               // Mono is sufficient for voice
+                    
+                    // Latency optimization
+                    latency: { ideal: 0.01 },      // 10ms latency target
+                    
+                    // Google-specific enhanced audio processing (Chrome/Edge)
+                    googEchoCancellation: true,
+                    googAutoGainControl: true,
+                    googNoiseSuppression: true,
+                    googHighpassFilter: true,       // Remove low-frequency noise
+                    googTypingNoiseDetection: true, // Detect and suppress typing
+                    googAudioMirroring: false,
+                    googDAEchoCancellation: true,   // Domain-specific echo cancellation
+                    googNoiseReduction: true        // Additional noise reduction
                 },
                 video: false
             });
@@ -1348,7 +1363,8 @@ class PrayerRoomService {
             const average = sum / bufferLength;
             
             const wasSpeaking = this.isSpeaking;
-            this.isSpeaking = average > this.voiceActivityThreshold;
+            // Only set speaking to true if not muted
+            this.isSpeaking = !this.isMuted && average > this.voiceActivityThreshold;
             
             // Update speaking indicator if state changed
             if (wasSpeaking !== this.isSpeaking) {
@@ -1596,6 +1612,9 @@ class PrayerRoomService {
             // Attach the stream to the audio element
             audioElement.srcObject = stream;
             
+            // Check if this participant is muted and set audio element accordingly
+            this.updateParticipantAudioMuteState(participantId);
+            
             // Ensure it plays
             audioElement.play().then(() => {
                 console.log(`🎵 Audio playing for ${participantId}`);
@@ -1605,6 +1624,35 @@ class PrayerRoomService {
             
         } catch (error) {
             console.error(`🎵 Error handling remote stream for ${participantId}:`, error);
+        }
+    }
+
+    async updateParticipantAudioMuteState(participantId) {
+        try {
+            // Get current participant data to check mute state
+            const participants = await this.getCurrentParticipants();
+            const participant = participants.find(p => p.user_id === participantId);
+            
+            if (participant) {
+                const audioElement = document.getElementById(`audio-${participantId}`);
+                if (audioElement) {
+                    // Mute the audio element if participant is muted
+                    audioElement.muted = participant.is_muted || false;
+                    console.log(`🔇 Audio element for ${participantId} muted: ${audioElement.muted}`);
+                }
+            }
+        } catch (error) {
+            console.error(`Error updating audio mute state for ${participantId}:`, error);
+        }
+    }
+
+    muteRemoteParticipantAudio(participantId, shouldMute) {
+        const audioElement = document.getElementById(`audio-${participantId}`);
+        if (audioElement) {
+            audioElement.muted = shouldMute;
+            console.log(`🔇 ${shouldMute ? 'Muted' : 'Unmuted'} audio for participant ${participantId}`);
+        } else {
+            console.warn(`Audio element not found for participant ${participantId}`);
         }
     }
 
@@ -2887,6 +2935,10 @@ class PrayerRoomService {
             
             if (response.ok) {
                 console.log(`✅ Successfully ${newMuteState ? 'muted' : 'unmuted'} participant: ${participantId}`);
+                
+                // Actually mute/unmute the audio element for this participant
+                this.muteRemoteParticipantAudio(participantId, newMuteState);
+                
                 // Refresh participants to update UI
                 this.loadParticipants();
                 // Update speaking indicators for all participants
