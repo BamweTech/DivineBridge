@@ -487,6 +487,7 @@ class PrayerRoomService {
                 return;
             }
             this.rtdb = firebase.database();
+            console.log('[RTDB] Database object initialized.');
             if (!this.roomId) return;
             
             // Prepare references
@@ -494,6 +495,7 @@ class PrayerRoomService {
             this.rtdbRefs.mySignals = this.rtdbRefs.signalsRoot.child(this.userId);
             this.rtdbRefs.chat = this.rtdb.ref(`/rooms/${this.roomId}/chat`);
             this.rtdbRefs.presence = this.rtdb.ref(`/rooms/${this.roomId}/presence/${this.userId}`);
+            console.log(`[RTDB] My signals path: ${this.rtdbRefs.mySignals.toString()}`);
             
             // Presence (best-effort)
             const presencePayload = { uid: this.userId, online: true, ts: firebase.database.ServerValue.TIMESTAMP, name: this.userName || '' };
@@ -532,8 +534,10 @@ class PrayerRoomService {
     subscribeRTDBSignals() {
         if (!this.rtdb || !this.rtdbRefs.signalsRoot) return;
         if (!this.userId) return;
+        console.log('[RTDB] Subscribing to signals...');
         const myPath = this.rtdbRefs.signalsRoot.child(this.userId);
         myPath.on('child_added', async (snap) => {
+            console.log('[RTDB] Received a signal via child_added');
             const val = snap.val();
             if (!val || !val.type) return;
             try {
@@ -712,6 +716,13 @@ class PrayerRoomService {
             this.initializeWebRTC().then(() => {
                 console.log('🎤 WebRTC initialized successfully');
                 
+                // If there was a pending offer, handle it now that the stream is ready
+                if (this.pendingOffer) {
+                    console.log('[WebRTC] Handling pending offer...');
+                    this.handleWebRTCOffer(this.pendingOffer);
+                    this.pendingOffer = null; // Clear the pending offer
+                }
+
                 // Initialize advanced audio processing in background (non-blocking)
                 this.initializeAdvancedAudioProcessing().catch(error => {
                     console.warn('⚠️ Advanced audio processing failed:', error);
@@ -1602,6 +1613,17 @@ class PrayerRoomService {
             const areWeInitiator = this.userId < fromUser;
             if (areWeInitiator) {
                 console.warn(`[WebRTC] Ignoring offer from ${fromUser} because I am the designated initiator.`);
+                return;
+            }
+
+            // Ensure we have a local stream before accepting an offer.
+            // If not, it means the current user hasn't joined audio yet.
+            if (!this.localStream) {
+                console.log(`[WebRTC] Received an offer but local audio is not ready. Joining audio first.`);
+                // The `joinAudio` function will get the stream and then set up connections.
+                // We need to make sure the offer is handled after the stream is acquired.
+                this.pendingOffer = offer; // Store the offer
+                await this.joinAudio(); // This will now handle the pending offer
                 return;
             }
 

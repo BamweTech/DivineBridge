@@ -196,6 +196,11 @@ Please regenerate the prayer ensuring you address this issue. Remember:
                     
                     logger.debug(f"Prayer generated on attempt {attempt}")
                     
+                    # Pre-process the response to remove any <think> tags or other noise
+                    if response and "<think>" in response:
+                        import re
+                        response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL).strip()
+
                     # Validate and process the response
                     response = self._validate_response(response)
                     logger.info(f"Prayer validation passed on attempt {attempt}")
