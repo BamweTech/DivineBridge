@@ -1534,6 +1534,117 @@ class PrayerRoomService {
         }
     }
 
+    setupPeerEventHandlers(peer, participantId) {
+        // Handle the 'signal' event - this is fired when SimplePeer generates SDP offer/answer or ICE candidates
+        peer.on('signal', async (data) => {
+            console.log(`📡 [WebRTC] Signal generated for ${participantId}:`, data.type);
+            await this.sendSignal(participantId, data);
+        });
+
+        // Handle incoming media stream from the remote peer
+        peer.on('stream', (stream) => {
+            console.log(`🎵 [WebRTC] Received remote stream from ${participantId}`);
+            this.handleRemoteStream(participantId, stream);
+        });
+
+        // Handle successful connection
+        peer.on('connect', () => {
+            console.log(`✅ [WebRTC] Connected to ${participantId}`);
+            
+            // Process any queued ICE candidates for this peer
+            this.processQueuedCandidates(participantId);
+        });
+
+        // Handle peer disconnection
+        peer.on('close', () => {
+            console.log(`🔌 [WebRTC] Connection closed with ${participantId}`);
+            this.cleanupPeerConnection(participantId);
+        });
+
+        // Handle errors
+        peer.on('error', (err) => {
+            console.error(`❌ [WebRTC] Error with ${participantId}:`, err);
+            
+            // Handle specific error types
+            if (err.code === 'ERR_CONNECTION_FAILURE') {
+                console.log(`🔄 [WebRTC] Connection failure with ${participantId}, will retry...`);
+            } else if (err.message && err.message.includes('InvalidStateError')) {
+                this.handleSignalingStateError(participantId, err);
+            } else {
+                // For other errors, clean up and let the system retry naturally
+                this.cleanupPeerConnection(participantId);
+            }
+        });
+    }
+
+    handleRemoteStream(participantId, stream) {
+        try {
+            console.log(`🎵 Setting up audio for participant ${participantId}`);
+            
+            // Create or get the audio element for this participant
+            let audioElement = document.getElementById(`audio-${participantId}`);
+            
+            if (!audioElement) {
+                audioElement = document.createElement('audio');
+                audioElement.id = `audio-${participantId}`;
+                audioElement.autoplay = true;
+                audioElement.playsInline = true;
+                document.body.appendChild(audioElement);
+                console.log(`🎵 Created new audio element for ${participantId}`);
+            }
+            
+            // Attach the stream to the audio element
+            audioElement.srcObject = stream;
+            
+            // Ensure it plays
+            audioElement.play().then(() => {
+                console.log(`🎵 Audio playing for ${participantId}`);
+            }).catch(err => {
+                console.error(`🎵 Error playing audio for ${participantId}:`, err);
+            });
+            
+        } catch (error) {
+            console.error(`🎵 Error handling remote stream for ${participantId}:`, error);
+        }
+    }
+
+    cleanupPeerConnection(participantId) {
+        try {
+            console.log(`🧹 Cleaning up peer connection for ${participantId}`);
+            
+            // Get the peer connection
+            const peer = this.peers.get(participantId);
+            
+            if (peer) {
+                // Destroy the peer connection
+                peer.destroy();
+                console.log(`🧹 Peer destroyed for ${participantId}`);
+            }
+            
+            // Remove from peers map
+            this.peers.delete(participantId);
+            
+            // Remove the audio element
+            const audioElement = document.getElementById(`audio-${participantId}`);
+            if (audioElement) {
+                audioElement.srcObject = null;
+                audioElement.remove();
+                console.log(`🧹 Audio element removed for ${participantId}`);
+            }
+            
+            // Clean up any pending candidates for this user
+            if (this.pendingCandidates && this.pendingCandidates.has(participantId)) {
+                this.pendingCandidates.delete(participantId);
+                console.log(`🧹 Pending candidates cleared for ${participantId}`);
+            }
+            
+            console.log(`✅ Peer connection cleanup complete for ${participantId}`);
+            
+        } catch (error) {
+            console.error(`🧹 Error cleaning up peer connection for ${participantId}:`, error);
+        }
+    }
+
     async sendSignal(participantId, signalData) {
         try {
             if (!this.roomId || !this.userId) return;

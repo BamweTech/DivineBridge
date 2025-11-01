@@ -300,7 +300,7 @@
         }
 
         /* Larger touch targets for mobile */
-        .prayer-card {
+    .prayer-card {
             min-height: 200px;
             padding: 1.75rem;
             width: 100%;
@@ -328,7 +328,7 @@
 
         /* Larger tap area for expand hint */
         .expand-hint {
-            font-size: 1.5rem;
+        font-size: 1.5rem;
             padding: 8px;
         }
 
@@ -1023,7 +1023,7 @@
             opacity: 0;
         }
         50% {
-            transform: scale(1.1);
+        transform: scale(1.1);
         }
         100% {
             transform: scale(1);
@@ -1775,13 +1775,13 @@
                                     <span class="stat-item"><span class="stat-value">${analytics.views}</span> views</span>
                                     <span class="stat-item"><span class="stat-value">${analytics.prayers}</span> prayers</span>
                                 </div>
-                                <div class="prayer-meta">
+            <div class="prayer-meta">
                                     <span class="prayer-date">${new Date(prayer.created_at).toLocaleDateString()}</span>
-                                </div>
+            </div>
                                 <span class="expand-hint">↗</span>
                                 <button class="pray-button" style="display: none;" onclick="prayForThis(event, '${prayer.id}')">
                                     I Prayed for This
-                                </button>
+                </button>
                             </div>
                         `;
                         prayersList.insertAdjacentHTML('beforeend', cardHTML);
@@ -2072,7 +2072,7 @@
                     <div class="prayer-stats">
                         <span class="stat-item"><span class="stat-value">${analytics.views}</span> views</span>
                         <span class="stat-item"><span class="stat-value">${analytics.prayers}</span> prayers</span>
-                    </div>
+        </div>
                     <div class="card-actions" style="display: none;">
                         <button class="pray-button" onclick="prayForThis(event, '${prayer.id}')">
                             I Prayed for This
@@ -2080,7 +2080,7 @@
                         <button class="share-button-icon" onclick="sharePrayerRequest(event, '${prayer.id}', '${escapeHtml(title).replace(/'/g, "\\'")}')">
                             ↗
                         </button>
-                    </div>
+    </div>
                 </div>
             `;
         }).join('');
