@@ -39,30 +39,20 @@ class PrayerRoomsDirectory {
                 const userData = await response.json();
                 if (userData.authenticated) {
                     this.currentUser = userData.user;
-                    console.log('User authenticated:', this.currentUser);
-                    // User is authenticated, no redirect needed
-                    return;
+                    console.log('✅ User authenticated:', this.currentUser);
                 } else {
-                    console.log('User not authenticated');
-                    // Only redirect to login if not already on login page
-                    // Set redirect-path to /prayer-room instead of current path
-                    if (window.location.pathname !== '/login') {
-                        const targetPath = '/prayer-room';
-                        window.location.href = '/login?redirect=' + encodeURIComponent(targetPath);
-                    }
+                    console.log('ℹ️ User not authenticated - will prompt for login only when performing authenticated actions');
+                    this.currentUser = null;
                 }
             } else {
-                console.log('User not authenticated');
-                // Only redirect to login if not already on login page
-                // Set redirect-path to /prayer-room instead of current path
-                if (window.location.pathname !== '/login') {
-                    const targetPath = '/prayer-room';
-                    window.location.href = '/login?redirect=' + encodeURIComponent(targetPath);
-                }
+                console.log('ℹ️ Auth check returned non-OK status - will prompt for login when needed');
+                this.currentUser = null;
             }
         } catch (error) {
-            console.error('Auth check failed:', error);
+            console.error('⚠️ Auth check failed:', error);
+            this.currentUser = null;
             // Don't redirect on error - let the page load normally
+            // User will be prompted to login when trying to perform authenticated actions
         }
     }
 
@@ -772,9 +762,8 @@ class PrayerRoomsDirectory {
 
 // Global functions for modal management
 function showCreateRoomModal() {
-    // Let the global authentication system handle auth checks
-    // The modal will be shown, and if user is not authenticated,
-    // the API call will fail and redirect to login automatically
+    // Using global authentication system - no page load redirect
+    // Modal opens for all users, auth is checked when submitting
     document.getElementById('createRoomModal').style.display = 'block';
 }
 
@@ -795,9 +784,8 @@ function hideJoinRoomModal() {
 }
 
 function showScheduleModal() {
-    // Let the global authentication system handle auth checks
-    // The modal will be shown, and if user is not authenticated,
-    // the API call will fail and redirect to login automatically
+    // Using global authentication system - no page load redirect
+    // Modal opens for all users, auth is checked when submitting
     document.getElementById('scheduleModal').style.display = 'block';
 }
 
