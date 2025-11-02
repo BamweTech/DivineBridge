@@ -256,19 +256,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    const mobileTabNavigation = document.getElementById('mobile-tab-navigation');
-    if (mobileTabNavigation && window.innerWidth <= 768) {
-        mobileTabNavigation.style.display = 'flex';
+    const mobileBottomTabs = document.getElementById('mobileBottomTabs');
+    if (mobileBottomTabs && window.innerWidth <= 768) {
+        mobileBottomTabs.style.display = 'flex';
         // Set initial active tab
-        document.querySelector('[data-tab="main"]')?.classList.add('active');
+        document.querySelector('[data-tab="participants"]')?.classList.add('active');
     }
     
     // Handle window resize
     window.addEventListener('resize', () => {
         if (window.innerWidth <= 768) {
-            mobileTabNavigation.style.display = 'flex';
+            if (mobileBottomTabs) mobileBottomTabs.style.display = 'flex';
         } else {
-            mobileTabNavigation.style.display = 'none';
+            if (mobileBottomTabs) mobileBottomTabs.style.display = 'none';
             // Show all sections on desktop
             document.querySelectorAll('.mobile-hidden').forEach(el => {
                 el.classList.remove('mobile-hidden');

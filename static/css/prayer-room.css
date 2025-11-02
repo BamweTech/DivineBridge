@@ -258,7 +258,7 @@
         display: none !important;
     }
     
-    .mobile-tab-navigation {
+    .mobile-bottom-tabs {
         display: none !important;
     }
     
@@ -651,7 +651,7 @@
 }
 
 /* Mobile Tab Navigation */
-.mobile-tab-navigation {
+.mobile-bottom-tabs {
     display: none;
     position: fixed;
     bottom: 0;
@@ -709,7 +709,7 @@
 }
 
 @media (max-width: 768px) {
-    .mobile-tab-navigation {
+    .mobile-bottom-tabs {
         display: flex;
         gap: 10px;
     }
