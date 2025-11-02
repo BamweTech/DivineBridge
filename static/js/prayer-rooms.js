@@ -418,36 +418,24 @@ class PrayerRoomsDirectory {
     async handleCreateRoom(e) {
         e.preventDefault();
 
-        // Check if user is authenticated
-        if (!this.currentUser) {
-            console.log('User not authenticated, redirecting to login');
-            window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
-            return;
-        }
-
+        // Using global authentication - let backend handle auth check
+        // No premature redirect - allow form submission
+        
         const formData = new FormData(e.target);
         const roomName = formData.get('room_name');
         const roomPrivacy = formData.get('room_privacy');
-        const hostName = this.currentUser.displayName || this.currentUser.name || 'Anonymous';
         
-        // Validate room name length
+        // Basic validation
         if (roomName && roomName.length > 50) {
             alert('Room name must be 50 characters or less');
-            return;
-        }
-        
-        // Validate host name length
-        if (hostName && hostName.length > 30) {
-            alert('Host name must be 30 characters or less');
             return;
         }
         
         const roomData = {
             room_name: roomName,
             room_description: formData.get('room_description'),
-            room_privacy: roomPrivacy,
-            host_id: this.currentUser.uid,
-            host_name: hostName
+            room_privacy: roomPrivacy
+            // Backend will use authenticated user's info from session
         };
 
         try {
@@ -456,6 +444,7 @@ class PrayerRoomsDirectory {
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                credentials: 'include',  // Include session cookies
                 body: JSON.stringify(roomData)
             });
 
@@ -469,6 +458,10 @@ class PrayerRoomsDirectory {
                 
                 // Redirect to the created room
                 window.location.href = `/prayer-room/join?room=${result.room_id}&name=${encodeURIComponent(roomData.room_name)}`;
+            } else if (response.status === 401) {
+                // Authentication required - redirect to login
+                console.log('Authentication required, redirecting to login');
+                window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
             } else {
                 alert('Failed to create room: ' + (result.error || 'Unknown error'));
             }
@@ -512,16 +505,11 @@ class PrayerRoomsDirectory {
         console.log('Event target:', e.target);
         e.preventDefault();
 
-        // Check if user is authenticated
-        if (!this.currentUser) {
-            console.log('User not authenticated, redirecting to login');
-            window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
-            return;
-        }
+        // Using global authentication - let backend handle auth check
+        // No premature redirect - allow form submission
 
         const formData = new FormData(e.target);
         const roomName = formData.get('room_name');
-        const hostName = this.currentUser.displayName || this.currentUser.name || 'Anonymous';
         
         console.log('Form data debug:', {
             roomName: roomName,
@@ -536,19 +524,12 @@ class PrayerRoomsDirectory {
             return;
         }
         
-        // Validate host name length
-        if (hostName && hostName.length > 30) {
-            alert('Host name must be 30 characters or less');
-            return;
-        }
-        
         const scheduleData = {
             room_name: roomName,
             room_description: formData.get('room_description'),
             scheduled_time: formData.get('scheduled_time'),
-            room_privacy: 'public', // Default to public for now
-            host_id: this.currentUser.uid,
-            host_name: hostName
+            room_privacy: 'public' // Default to public for now
+            // Backend will use authenticated user's info from session
         };
         
         console.log('Schedule data being sent:', scheduleData);
@@ -566,6 +547,7 @@ class PrayerRoomsDirectory {
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                credentials: 'include',  // Include session cookies
                 body: JSON.stringify(scheduleData)
             });
 
@@ -581,12 +563,16 @@ class PrayerRoomsDirectory {
                     if (submitBtn) {
                         submitBtn.textContent = 'Schedule Room';
                     }
-                } else {
-                    alert('Room scheduled successfully!');
-                }
+            } else {
+                alert('Room scheduled successfully!');
+            }
                 this.hideScheduleModal();
                 // Refresh the scheduled rooms list
                 this.loadMyScheduledRooms();
+            } else if (response.status === 401) {
+                // Authentication required - redirect to login
+                console.log('Authentication required, redirecting to login');
+                window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
             } else {
                 alert(`Failed to ${isEditing ? 'update' : 'schedule'} room: ` + (result.error || 'Unknown error'));
             }
