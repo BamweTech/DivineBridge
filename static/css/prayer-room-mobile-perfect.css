@@ -26,6 +26,7 @@
         flex-direction: column;
         overflow: hidden;
         padding: 0 !important;
+        padding-bottom: 56px !important; /* Space for fixed bottom tabs */
         margin: 0 !important;
         background: #f8f9fa !important;
     }
@@ -121,12 +122,32 @@
         flex-shrink: 0;
     }
     
-    /* Hide other header elements on mobile */
-    .header-actions,
-    .participant-count,
-    .audio-quality-indicator,
-    .header-content > .control-buttons {
+    /* Hide only non-essential header elements on mobile */
+    .audio-quality-indicator {
         display: none !important;
+    }
+    
+    /* Show participant count in header */
+    .header-actions {
+        display: flex !important;
+        gap: 8px !important;
+        align-items: center !important;
+    }
+    
+    .participant-count {
+        display: flex !important;
+        align-items: center !important;
+        gap: 4px !important;
+        font-size: 12px !important;
+        padding: 4px 8px !important;
+        background: rgba(59, 130, 246, 0.1) !important;
+        color: #3b82f6 !important;
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+    }
+    
+    .participant-count span {
+        font-size: 12px !important;
     }
     
     /* ===== CONTENT AREA - FLEXIBLE HEIGHT ===== */
@@ -341,7 +362,7 @@
         background: #2563eb !important;
     }
     
-    /* ===== CONTROLS - COMPACT ===== */
+    /* ===== CONTROLS - VISIBLE & COMPACT ===== */
     .prayer-room-controls {
         flex-shrink: 0 !important;
         width: 100% !important;
@@ -349,36 +370,72 @@
         background: #ffffff !important;
         border-top: 1px solid #e5e7eb !important;
         display: flex !important;
+        flex-wrap: wrap !important;
         gap: 6px !important;
         z-index: 30 !important;
+        box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.05) !important;
+    }
+    
+    .control-buttons {
+        display: flex !important;
+        width: 100% !important;
+        gap: 6px !important;
     }
     
     .control-btn {
         flex: 1 !important;
-        padding: 9px 12px !important;
+        padding: 10px 12px !important;
         font-size: 13px !important;
         font-weight: 600 !important;
         border-radius: 8px !important;
-        min-height: 38px !important;
+        min-height: 42px !important;
         white-space: nowrap !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 4px !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+        border: none !important;
     }
     
-    .join-audio-btn {
+    .control-btn:active {
+        transform: scale(0.96) !important;
+    }
+    
+    .join-audio-btn,
+    .control-btn.join-audio-btn {
         background: #3b82f6 !important;
         color: #ffffff !important;
         border: none !important;
     }
     
-    .mute-btn {
+    .mute-btn,
+    .control-btn.mute-btn {
         background: #ef4444 !important;
         color: #ffffff !important;
         border: none !important;
     }
     
-    .control-btn.leave {
+    .control-btn.leave,
+    #leaveBtn {
         background: #f3f4f6 !important;
         color: #6b7280 !important;
         border: 1px solid #e5e7eb !important;
+    }
+    
+    #shareBtn {
+        background: #10b981 !important;
+        color: #ffffff !important;
+        border: none !important;
+    }
+    
+    /* Control button icons */
+    .control-btn svg,
+    .control-btn .icon {
+        width: 16px !important;
+        height: 16px !important;
+        flex-shrink: 0 !important;
     }
     
     /* ===== BOTTOM TABS - FIXED ===== */
