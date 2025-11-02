@@ -7,6 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room.css') }}?v={{ range(100000, 999999) | random }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-mobile.css') }}?v={{ range(100000, 999999) | random }}">
 
 <!-- Firebase Configuration and Initialization -->
 <script>
@@ -88,9 +89,13 @@ window.addEventListener('load', function() {
         <div class="prayer-room-header">
             <div class="header-left">
                 <div class="prayer-room-logo">
-                    <img src="{{ url_for('static', filename='images/LogowithName.svg') }}" alt="Divine Bridge" style="height: 40px;">
+                    <img src="{{ url_for('static', filename='images/LogowithName.svg') }}" alt="Divine Bridge" class="header-logo-img">
                 </div>
-                <h1 class="prayer-room-title">{{ room_name or 'Prayer Room' }}</h1>
+                <div class="room-name-container">
+                    <h1 class="prayer-room-title" id="roomTitle">
+                        <span class="room-title-text">{{ room_name or 'Prayer Room' }}</span>
+                    </h1>
+                </div>
             </div>
             <div class="room-code-section">
                 <div class="room-code" id="roomCode">{{ room_id or 'Loading...' }}</div>
@@ -165,13 +170,28 @@ window.addEventListener('load', function() {
         </div>
     </div>
 
-    <!-- Mobile Tab Navigation -->
-    <div class="mobile-tab-navigation" id="mobile-tab-navigation">
-        <button class="mobile-tab-btn" data-tab="main">
-            👥 Participants
+    <!-- Mobile Bottom Tab Navigation -->
+    <div class="mobile-bottom-tabs" id="mobileBottomTabs">
+        <button class="mobile-tab-btn active" data-tab="participants" id="participantsTab">
+            <div class="tab-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+            </div>
+            <span class="tab-label">Participants</span>
+            <div class="participant-count-badge" id="participantCountBadge">0</div>
         </button>
-        <button class="mobile-tab-btn" data-tab="chat">
-            💬 Chat
+        <button class="mobile-tab-btn" data-tab="chat" id="chatTab">
+            <div class="tab-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+            </div>
+            <span class="tab-label">Chat</span>
+            <div class="unread-badge" id="unreadBadge" style="display: none;">0</div>
         </button>
     </div>
 </div>
@@ -255,6 +275,142 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     });
+    
+    // ===== MODERN MOBILE TAB SYSTEM =====
+    window.mobileTabSystem = {
+        currentTab: 'participants',
+        unreadCount: 0,
+        lastMessageCount: 0,
+        
+        init() {
+            this.setupTabs();
+            this.setupMarquee();
+            this.monitorChat();
+            this.updateParticipantBadge();
+        },
+        
+        setupTabs() {
+            const tabs = document.querySelectorAll('.mobile-tab-btn');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', (e) => {
+                    this.switchTab(tab.dataset.tab);
+                    // Haptic feedback
+                    if (navigator.vibrate) {
+                        navigator.vibrate(10);
+                    }
+                });
+            });
+            
+            // Start with participants tab
+            this.switchTab('participants');
+        },
+        
+        switchTab(tabName) {
+            this.currentTab = tabName;
+            
+            const participantsSection = document.querySelector('.prayer-room-main');
+            const chatSection = document.querySelector('.prayer-room-chat');
+            const participantsTab = document.getElementById('participantsTab');
+            const chatTab = document.getElementById('chatTab');
+            const unreadBadge = document.getElementById('unreadBadge');
+            
+            if (tabName === 'participants') {
+                participantsSection?.classList.remove('mobile-hidden');
+                chatSection?.classList.add('mobile-hidden');
+                participantsTab?.classList.add('active');
+                chatTab?.classList.remove('active');
+            } else if (tabName === 'chat') {
+                participantsSection?.classList.add('mobile-hidden');
+                chatSection?.classList.remove('mobile-hidden');
+                participantsTab?.classList.remove('active');
+                chatTab?.classList.add('active');
+                
+                // Clear unread when opening chat
+                this.unreadCount = 0;
+                if (unreadBadge) {
+                    unreadBadge.style.display = 'none';
+                }
+                chatTab?.classList.remove('has-unread');
+                
+                // Scroll chat to bottom
+                setTimeout(() => {
+                    const chatMessages = document.getElementById('chatMessages');
+                    if (chatMessages) {
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                }, 100);
+            }
+        },
+        
+        incrementUnread() {
+            if (this.currentTab !== 'chat') {
+                this.unreadCount++;
+                const unreadBadge = document.getElementById('unreadBadge');
+                const chatTab = document.getElementById('chatTab');
+                
+                if (unreadBadge) {
+                    unreadBadge.textContent = this.unreadCount > 99 ? '99+' : this.unreadCount;
+                    unreadBadge.style.display = 'flex';
+                }
+                
+                chatTab?.classList.add('has-unread');
+            }
+        },
+        
+        updateParticipantBadge() {
+            // Update count from prayer room service
+            setInterval(() => {
+                if (window.prayerRoomService) {
+                    const participants = document.querySelectorAll('.participant');
+                    const count = participants.length;
+                    const badge = document.getElementById('participantCountBadge');
+                    if (badge) {
+                        badge.textContent = count;
+                    }
+                }
+            }, 1000);
+        },
+        
+        monitorChat() {
+            // Monitor for new chat messages
+            setInterval(() => {
+                const chatMessages = document.querySelectorAll('.chat-message');
+                const currentCount = chatMessages.length;
+                
+                if (currentCount > this.lastMessageCount) {
+                    this.incrementUnread();
+                }
+                
+                this.lastMessageCount = currentCount;
+            }, 500);
+        },
+        
+        setupMarquee() {
+            const roomTitleText = document.querySelector('.room-title-text');
+            const roomTitle = document.querySelector('.prayer-room-title');
+            
+            if (!roomTitleText || !roomTitle) return;
+            
+            const checkOverflow = () => {
+                if (window.innerWidth <= 768) {
+                    const isOverflowing = roomTitleText.scrollWidth > roomTitle.clientWidth;
+                    if (isOverflowing) {
+                        roomTitleText.classList.add('marquee');
+                    } else {
+                        roomTitleText.classList.remove('marquee');
+                    }
+                }
+            };
+            
+            checkOverflow();
+            window.addEventListener('resize', checkOverflow);
+        }
+    };
+    
+    // Initialize mobile system
+    if (window.innerWidth <= 768) {
+        window.mobileTabSystem.init();
+    }
 });
 </script>
 
