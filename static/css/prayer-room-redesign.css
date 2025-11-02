@@ -1,0 +1,442 @@
+/* ========================================
+   PRAYER ROOM - EXPERT REDESIGN
+   Modern, Accessible, Beautiful UX
+   ======================================== */
+
+/* ===== DESKTOP IMPROVEMENTS ===== */
+@media (min-width: 769px) {
+    .prayer-room-main {
+        display: grid;
+        grid-template-columns: minmax(280px, 320px) 1fr !important;
+        gap: 24px !important;
+        max-width: 1400px !important;
+        margin: 0 auto !important;
+        padding: 24px !important;
+    }
+    
+    /* Better panel styling */
+    .participants-panel,
+    .chat-panel {
+        border-radius: 16px !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08) !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .participants-panel:hover,
+    .chat-panel:hover {
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12) !important;
+        transform: translateY(-2px) !important;
+    }
+    
+    /* Better header on desktop */
+    .prayer-room-header {
+        padding: 20px 32px !important;
+    }
+    
+    /* Improve controls spacing */
+    .prayer-room-controls {
+        padding: 16px 32px !important;
+        gap: 12px !important;
+        background: rgba(255, 255, 255, 0.8) !important;
+        border-top: 1px solid rgba(0, 0, 0, 0.06) !important;
+    }
+}
+
+/* ===== TABLET OPTIMIZATION ===== */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .prayer-room-main {
+        grid-template-columns: 280px 1fr !important;
+        gap: 20px !important;
+        padding: 20px !important;
+    }
+    
+    .prayer-room-header {
+        padding: 16px 24px !important;
+    }
+    
+    .prayer-room-title {
+        font-size: 20px !important;
+    }
+}
+
+/* ===== ENHANCED MOBILE UX ===== */
+@media (max-width: 768px) {
+    /* Optimize vertical space usage */
+    .prayer-room-container {
+        padding: 0 !important;
+        background: #f8f9fa !important;
+    }
+    
+    .prayer-room-interface {
+        border-radius: 0 !important;
+        box-shadow: none !important;
+    }
+    
+    /* Compact header */
+    .prayer-room-header {
+        padding: 12px 16px !important;
+        background: rgba(255, 255, 255, 0.98) !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 50 !important;
+    }
+    
+    .header-left {
+        gap: 10px !important;
+    }
+    
+    .header-logo-img {
+        height: 24px !important;
+    }
+    
+    .prayer-room-title {
+        font-size: 15px !important;
+        font-weight: 600 !important;
+    }
+    
+    .room-code-section {
+        gap: 6px !important;
+    }
+    
+    .room-code {
+        font-size: 12px !important;
+        padding: 6px 10px !important;
+    }
+    
+    .copy-room-code-btn {
+        font-size: 11px !important;
+        padding: 6px 10px !important;
+    }
+    
+    /* Content area optimization */
+    .prayer-room-content {
+        height: calc(100vh - 160px) !important;
+        background: #f8f9fa !important;
+    }
+    
+    /* Participants panel */
+    .participants-panel,
+    .participants-section {
+        background: #ffffff !important;
+        padding: 16px !important;
+    }
+    
+    .participants-title {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        margin-bottom: 12px !important;
+        color: #1e293b !important;
+    }
+    
+    /* Chat panel improvements */
+    .chat-panel,
+    .prayer-room-chat {
+        background: #ffffff !important;
+    }
+    
+    .chat-header {
+        padding: 12px 16px !important;
+        background: #ffffff !important;
+        border-bottom: 1px solid #e5e7eb !important;
+    }
+    
+    .chat-title {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        color: #1e293b !important;
+    }
+    
+    .chat-messages {
+        background: #f8f9fa !important;
+        padding: 16px !important;
+        padding-bottom: 90px !important;
+    }
+    
+    /* Improved message bubbles */
+    .chat-message,
+    .message {
+        background: #ffffff !important;
+        border-radius: 12px !important;
+        padding: 12px 16px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+        margin-bottom: 8px !important;
+    }
+    
+    .message-sender {
+        font-weight: 600 !important;
+        color: #3b82f6 !important;
+        font-size: 13px !important;
+        margin-bottom: 4px !important;
+    }
+    
+    .message-content {
+        color: #1e293b !important;
+        font-size: 14px !important;
+        line-height: 1.5 !important;
+    }
+    
+    /* Fixed chat input */
+    .chat-input-section,
+    .chat-input-container {
+        position: fixed !important;
+        bottom: 60px !important;
+        left: 0 !important;
+        right: 0 !important;
+        padding: 12px 16px !important;
+        background: #ffffff !important;
+        border-top: 1px solid #e5e7eb !important;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08) !important;
+        z-index: 90 !important;
+    }
+    
+    .chat-input {
+        flex: 1 !important;
+        padding: 12px 16px !important;
+        border: 1.5px solid #e5e7eb !important;
+        border-radius: 24px !important;
+        font-size: 15px !important;
+        background: #f8f9fa !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    .chat-input:focus {
+        outline: none !important;
+        border-color: #3b82f6 !important;
+        background: #ffffff !important;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+    }
+    
+    .chat-send-btn,
+    .send-btn {
+        padding: 12px 20px !important;
+        background: #3b82f6 !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 24px !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    .chat-send-btn:active,
+    .send-btn:active {
+        transform: scale(0.96) !important;
+        background: #2563eb !important;
+    }
+    
+    /* Compact controls */
+    .prayer-room-controls {
+        padding: 10px 16px !important;
+        background: #ffffff !important;
+        border-top: 1px solid #e5e7eb !important;
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04) !important;
+    }
+    
+    .control-btn {
+        padding: 10px 16px !important;
+        font-size: 13px !important;
+        border-radius: 10px !important;
+        font-weight: 600 !important;
+    }
+    
+    .join-audio-btn {
+        background: #3b82f6 !important;
+        color: white !important;
+        border: none !important;
+    }
+    
+    .mute-btn {
+        background: #ef4444 !important;
+        color: white !important;
+        border: none !important;
+    }
+    
+    .control-btn.leave {
+        background: #f3f4f6 !important;
+        color: #6b7280 !important;
+        border: 1px solid #e5e7eb !important;
+    }
+    
+    /* Modern bottom tabs */
+    .mobile-bottom-tabs {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        background: #ffffff !important;
+        border-top: 1px solid #e5e7eb !important;
+        padding: 8px 16px !important;
+        padding-bottom: env(safe-area-inset-bottom, 8px) !important;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08) !important;
+        z-index: 100 !important;
+        display: flex !important;
+        justify-content: space-around !important;
+        gap: 8px !important;
+    }
+    
+    .mobile-tab-btn {
+        flex: 1 !important;
+        padding: 10px 16px !important;
+        background: transparent !important;
+        border: none !important;
+        border-radius: 12px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: all 0.2s ease !important;
+        position: relative !important;
+        min-height: 48px !important;
+    }
+    
+    .mobile-tab-btn.active {
+        background: rgba(59, 130, 246, 0.1) !important;
+    }
+    
+    .tab-icon {
+        width: 24px !important;
+        height: 24px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    
+    .tab-icon svg {
+        width: 24px !important;
+        height: 24px !important;
+        stroke: #6b7280 !important;
+        transition: stroke 0.2s ease !important;
+    }
+    
+    .mobile-tab-btn.active .tab-icon svg {
+        stroke: #3b82f6 !important;
+    }
+    
+    .tab-label {
+        display: none !important;
+    }
+    
+    /* Badges */
+    .participant-count-badge,
+    .unread-badge {
+        position: absolute !important;
+        top: 6px !important;
+        right: 12px !important;
+        min-width: 18px !important;
+        height: 18px !important;
+        padding: 2px 6px !important;
+        border-radius: 10px !important;
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    
+    .participant-count-badge {
+        background: #3b82f6 !important;
+        color: white !important;
+    }
+    
+    .unread-badge {
+        background: #ef4444 !important;
+        color: white !important;
+        animation: badgePulse 2s infinite !important;
+    }
+    
+    @keyframes badgePulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.1); opacity: 0.8; }
+    }
+    
+    /* Participant cards */
+    .participant {
+        background: #f8f9fa !important;
+        border: 1px solid #e5e7eb !important;
+        border-radius: 12px !important;
+        padding: 12px !important;
+        margin-bottom: 8px !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    .participant:active {
+        transform: scale(0.98) !important;
+        background: #f1f3f5 !important;
+    }
+    
+    .participant.speaking {
+        background: rgba(34, 197, 94, 0.1) !important;
+        border-color: #22c55e !important;
+        box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2) !important;
+    }
+    
+    .participant-name {
+        font-weight: 600 !important;
+        color: #1e293b !important;
+        font-size: 14px !important;
+    }
+    
+    .speaking-indicator {
+        font-size: 12px !important;
+        color: #22c55e !important;
+        font-weight: 600 !important;
+    }
+}
+
+/* ===== ACCESSIBILITY IMPROVEMENTS ===== */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+/* ===== DARK MODE SUPPORT ===== */
+@media (prefers-color-scheme: dark) {
+    @media (max-width: 768px) {
+        .prayer-room-container {
+            background: #0f172a !important;
+        }
+        
+        .prayer-room-header,
+        .mobile-bottom-tabs,
+        .chat-input-section,
+        .prayer-room-controls {
+            background: #1e293b !important;
+            border-color: #334155 !important;
+        }
+        
+        .participants-panel,
+        .chat-panel,
+        .prayer-room-chat {
+            background: #1e293b !important;
+        }
+        
+        .chat-messages {
+            background: #0f172a !important;
+        }
+        
+        .chat-message,
+        .message,
+        .participant {
+            background: #1e293b !important;
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
+        }
+        
+        .prayer-room-title,
+        .chat-title,
+        .participants-title,
+        .participant-name,
+        .message-content {
+            color: #f1f5f9 !important;
+        }
+        
+        .chat-input {
+            background: #0f172a !important;
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
+        }
+    }
+}
+
