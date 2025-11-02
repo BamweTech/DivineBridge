@@ -227,35 +227,6 @@ function switchMobileTab(tabName) {
 
 // Initialize mobile tab navigation
 document.addEventListener('DOMContentLoaded', () => {
-    // AGGRESSIVE STYLE INJECTION - Force apply new design styles
-    const prayerInterface = document.querySelector('.prayer-room-interface');
-    if (prayerInterface) {
-        prayerInterface.style.setProperty('border', '10px solid #ff0000', 'important');
-        prayerInterface.style.setProperty('background', 'linear-gradient(45deg, #ff0000, #00ff00, #0000ff)', 'important');
-        prayerInterface.style.setProperty('box-shadow', '0 0 50px #ff0000', 'important');
-        console.log('✅ NEW DESIGN STYLES APPLIED DIRECTLY');
-        // Design styles loaded
-        
-        // Also add a visible text indicator
-        const indicator = document.createElement('div');
-        indicator.textContent = '🎨 NEW DESIGN LOADED';
-        indicator.style.cssText = 'position: fixed; top: 10px; right: 10px; background: #ff0000; color: white; padding: 10px; z-index: 9999; font-weight: bold; border-radius: 5px;';
-        document.body.appendChild(indicator);
-        
-        // Remove indicator after 3 seconds
-        setTimeout(() => indicator.remove(), 3000);
-    }
-    
-    // Force reload CSS to ensure latest styles are applied
-    const links = document.querySelectorAll('link[rel="stylesheet"]');
-    links.forEach(link => {
-        if (link.href.includes('prayer-room.css')) {
-            const href = link.href;
-            link.href = href.split('?')[0] + '?v=' + Date.now();
-            console.log('🔄 Reloaded CSS:', link.href);
-        }
-    });
-    
     const mobileBottomTabs = document.getElementById('mobileBottomTabs');
     if (mobileBottomTabs && window.innerWidth <= 768) {
         mobileBottomTabs.style.display = 'flex';
