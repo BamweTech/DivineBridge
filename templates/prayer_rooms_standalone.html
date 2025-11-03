@@ -754,6 +754,17 @@
             .prayer-rooms-content {
                 grid-template-columns: 1fr;
                 gap: 20px;
+                display: flex;
+                flex-direction: column;
+            }
+            
+            /* Move active rooms (right-panel) to top on mobile */
+            .right-panel {
+                order: 1;
+            }
+            
+            .left-panel {
+                order: 2;
             }
             
             .prayer-rooms-header {
