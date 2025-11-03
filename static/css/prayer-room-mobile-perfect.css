@@ -205,6 +205,12 @@
         transition: all 0.2s ease !important;
     }
     
+    /* Allow JavaScript to hide buttons */
+    .header-actions .control-btn[style*="display: none"],
+    .header-actions .control-btn[style*="display:none"] {
+        display: none !important;
+    }
+    
     /* Hide text labels on very small screens, keep icons */
     .header-actions .control-btn .join-text,
     .header-actions .control-btn span:not(.mic-icon):not(.muted-icon) {
@@ -491,6 +497,12 @@
         cursor: pointer !important;
         transition: all 0.2s ease !important;
         border: none !important;
+    }
+    
+    /* Allow JavaScript to hide buttons when audio state changes */
+    .control-btn[style*="display: none"],
+    .control-btn[style*="display:none"] {
+        display: none !important;
     }
     
     .control-btn:active {
