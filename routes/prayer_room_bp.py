@@ -1576,21 +1576,36 @@ def reopen_room():
         
         # Create new room with same settings
         new_room_data = {
+            'room_id': new_room_id,
             'room_name': original_room_data.get('room_name', 'Prayer Room'),
             'room_description': original_room_data.get('room_description', ''),
             'room_privacy': original_room_data.get('room_privacy', 'public'),
             'host_id': user['user_id'],
             'host_name': user['user_name'],
-            'is_active': True,
             'created_at': datetime.utcnow(),
             'last_activity': datetime.utcnow(),
-            'participants': [],
+            'participants': [{
+                'user_id': user['user_id'],
+                'user_name': user['user_name'],
+                'joined_at': datetime.utcnow(),
+                'is_muted': False,
+                'is_host': True
+            }],
+            'is_active': True,
+            'is_locked': False,
+            'settings': {
+                'allow_anonymous': original_room_data.get('room_privacy', 'public') == 'public',
+                'max_participants': 50,
+                'auto_mute_new_participants': False
+            },
             'original_room_id': original_room_id  # Track the original room
         }
         
         # Generate room code for private rooms
         if new_room_data['room_privacy'] == 'private':
-            new_room_data['room_code'] = ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
+            new_room_data['room_code'] = ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:8]])
+        else:
+            new_room_data['room_code'] = None
         
         # Deactivate any existing device sessions for this user across ALL rooms
         # This ensures users can only have one active session at a time
