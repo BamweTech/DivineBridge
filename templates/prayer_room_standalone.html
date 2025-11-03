@@ -1323,6 +1323,30 @@
                     this.setupMarquee();
                     this.monitorChat();
                     this.updateParticipantBadge();
+                    this.setupChatInputFocus();
+                },
+                
+                setupChatInputFocus() {
+                    const chatInput = document.getElementById('chatInput');
+                    const bottomTabs = document.getElementById('mobileBottomTabs');
+                    
+                    if (!chatInput || !bottomTabs) return;
+                    
+                    // Hide bottom tabs when chat input is focused (WhatsApp style)
+                    chatInput.addEventListener('focus', () => {
+                        document.body.classList.add('chat-input-focused');
+                        bottomTabs.style.transform = 'translateY(100%)';
+                        bottomTabs.style.opacity = '0';
+                        bottomTabs.style.pointerEvents = 'none';
+                    });
+                    
+                    // Show bottom tabs when chat input loses focus
+                    chatInput.addEventListener('blur', () => {
+                        document.body.classList.remove('chat-input-focused');
+                        bottomTabs.style.transform = 'translateY(0)';
+                        bottomTabs.style.opacity = '1';
+                        bottomTabs.style.pointerEvents = 'auto';
+                    });
                 },
                 
                 setupTabs() {

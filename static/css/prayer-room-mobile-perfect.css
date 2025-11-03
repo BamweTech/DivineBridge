@@ -399,9 +399,15 @@
         overflow-x: hidden !important;
         padding: 12px !important;
         padding-top: 16px !important; /* Extra space from header */
-        padding-bottom: 90px !important; /* Space for fixed input + buffer */
+        padding-bottom: 140px !important; /* Space for fixed input + extra buffer for keyboard */
         background: #f8f9fa !important;
         -webkit-overflow-scrolling: touch !important;
+        scroll-behavior: smooth !important;
+    }
+    
+    /* When chat input is focused, adjust padding */
+    .chat-input-focused .chat-messages {
+        padding-bottom: 80px !important; /* Less padding when tabs are hidden */
     }
     
     .message,
@@ -420,21 +426,37 @@
         bottom: 56px !important; /* Above bottom tabs */
         left: 0 !important;
         right: 0 !important;
-        padding: 8px 12px !important;
+        padding: 10px 12px !important;
         background: #ffffff !important;
         border-top: 1px solid #e5e7eb !important;
         box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08) !important;
-        z-index: 80 !important;
+        z-index: 150 !important; /* Above bottom tabs */
         display: flex !important;
-        gap: 6px !important;
+        gap: 8px !important;
         align-items: center !important;
+        transition: bottom 0.2s ease !important;
     }
     
-    /* When keyboard is active, ensure input stays above it */
-    .chat-input-section:focus-within,
-    .chat-input-container:focus-within {
-        bottom: 0 !important; /* Move to bottom of viewport when keyboard opens */
-        padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    /* When keyboard is active - WhatsApp style */
+    .chat-panel:not(.mobile-hidden) .chat-input-section:focus-within,
+    .chat-panel:not(.mobile-hidden) .chat-input-container:focus-within {
+        bottom: 0 !important; /* Stick to keyboard */
+        z-index: 200 !important; /* Above everything */
+    }
+    
+    /* Hide bottom tabs when chat input is focused */
+    .chat-input:focus ~ * .mobile-bottom-tabs,
+    body:has(.chat-input:focus) .mobile-bottom-tabs {
+        transform: translateY(100%) !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+    
+    /* Alternative: use data attribute approach */
+    .chat-input-focused .mobile-bottom-tabs {
+        transform: translateY(100%) !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
     }
     
     .chat-input {
@@ -575,6 +597,9 @@
         justify-content: space-around !important;
         align-items: center !important;
         gap: 8px !important;
+        transition: transform 0.3s ease, opacity 0.3s ease !important;
+        transform: translateY(0) !important;
+        opacity: 1 !important;
     }
     
     .mobile-tab-btn {
