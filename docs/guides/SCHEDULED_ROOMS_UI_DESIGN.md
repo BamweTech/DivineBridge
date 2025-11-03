@@ -237,8 +237,7 @@ When user clicks "Details" or the session card:
 │                                                      │
 │  ┌──────────────────────────────────────────────┐   │
 │  │  🔔 Notification Preferences                 │   │
-│  │  ☑ 24 hours before                           │   │
-│  │  ☑ 15 minutes before                         │   │
+│  │  ☑ 1 hour before                             │   │
 │  │  ☑ When session goes live                    │   │
 │  └──────────────────────────────────────────────┘   │
 │                                                      │
@@ -395,7 +394,7 @@ You're registered for:
 🕐 Tomorrow, November 4 at 9:00 AM EST
 
 We'll send you reminders:
-• 15 minutes before it starts
+• 1 hour before it starts
 • When the session goes live
 
 Can't make it? Change your RSVP:
@@ -631,7 +630,7 @@ the session.
 - [ ] Share functionality
 
 ### Phase 3: Notifications & Calendar
-- [ ] Reminder emails (15 min, 24 hour)
+- [ ] Reminder emails (1 hour before, when live)
 - [ ] Calendar integration (.ics)
 - [ ] Google Calendar quick add
 - [ ] Notification preference settings

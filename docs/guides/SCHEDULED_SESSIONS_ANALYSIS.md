@@ -214,9 +214,9 @@ def send_session_live_notifications(scheduled_data, room_id):
   rsvp_status: "interested" | "going" | "maybe" | "not_going",
   rsvp_at: timestamp,
   reminder_preferences: {
-    email_15min: true,
     email_1hour: true,
-    push: true
+    email_live: true,
+    push: false
   }
 }
 ```
@@ -239,9 +239,7 @@ GET /api/prayer-room/scheduled/<room_id>/participants
 ### Phase 3: Reminder System 🟡
 
 #### A. Reminder Schedule
-- **24 hours before**: "Reminder: Prayer session tomorrow"
-- **1 hour before**: "Starting in 1 hour"
-- **15 minutes before**: "Starting soon - be ready!"
+- **1 hour before**: "Starting in 1 hour - be ready!"
 - **At start time**: "Session is LIVE - Join now!"
 
 #### B. Implementation
@@ -378,9 +376,8 @@ Track for each scheduled session:
   completed_at: timestamp,
   
   // New fields for Phase 3
-  reminder_15min_sent: boolean,
   reminder_1hour_sent: boolean,
-  reminder_24hour_sent: boolean,
+  reminder_live_sent: boolean,
   
   // New fields for Phase 4
   recurrence: {
