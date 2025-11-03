@@ -55,6 +55,28 @@ class PrayerRoomsDirectory {
             // User will be prompted to login when trying to perform authenticated actions
         }
     }
+    
+    async getFirebaseIdToken() {
+        /**
+         * Get Firebase ID token for authenticated requests
+         * This ensures auth persists across deployments
+         */
+        try {
+            if (typeof firebase !== 'undefined' && firebase.auth) {
+                const user = firebase.auth().currentUser;
+                if (user) {
+                    const token = await user.getIdToken(true); // Force refresh
+                    console.log('✅ Firebase ID token obtained');
+                    return token;
+                }
+            }
+            console.warn('⚠️ No Firebase user found');
+            return null;
+        } catch (error) {
+            console.error('❌ Error getting Firebase ID token:', error);
+            return null;
+        }
+    }
 
     async loadActiveRooms() {
         try {
@@ -418,8 +440,7 @@ class PrayerRoomsDirectory {
     async handleCreateRoom(e) {
         e.preventDefault();
 
-        // Using global authentication - let backend handle auth check
-        // No premature redirect - allow form submission
+        // Using Firebase ID token for persistent authentication across deployments
         
         const formData = new FormData(e.target);
         const roomName = formData.get('room_name');
@@ -435,16 +456,28 @@ class PrayerRoomsDirectory {
             room_name: roomName,
             room_description: formData.get('room_description'),
             room_privacy: roomPrivacy
-            // Backend will use authenticated user's info from session
         };
 
         try {
+            // Get Firebase ID token
+            const idToken = await this.getFirebaseIdToken();
+            
+            if (!idToken) {
+                // No Firebase auth - redirect to login
+                console.log('Not authenticated, redirecting to login');
+                window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+                return;
+            }
+            
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}` // Send Firebase ID token
+            };
+            
             const response = await fetch('/api/prayer-room/create', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include',  // Include session cookies
+                headers: headers,
+                credentials: 'include',  // Also include session cookies as fallback
                 body: JSON.stringify(roomData)
             });
 
@@ -505,8 +538,7 @@ class PrayerRoomsDirectory {
         console.log('Event target:', e.target);
         e.preventDefault();
 
-        // Using global authentication - let backend handle auth check
-        // No premature redirect - allow form submission
+        // Using Firebase ID token for persistent authentication across deployments
 
         const formData = new FormData(e.target);
         const roomName = formData.get('room_name');
@@ -529,12 +561,26 @@ class PrayerRoomsDirectory {
             room_description: formData.get('room_description'),
             scheduled_time: formData.get('scheduled_time'),
             room_privacy: 'public' // Default to public for now
-            // Backend will use authenticated user's info from session
         };
         
         console.log('Schedule data being sent:', scheduleData);
 
         try {
+            // Get Firebase ID token
+            const idToken = await this.getFirebaseIdToken();
+            
+            if (!idToken) {
+                // No Firebase auth - redirect to login
+                console.log('Not authenticated, redirecting to login');
+                window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+                return;
+            }
+            
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${idToken}` // Send Firebase ID token
+            };
+            
             // Check if we're editing an existing scheduled room
             const isEditing = window.editingScheduledRoomId;
             const url = isEditing ? 
@@ -544,10 +590,8 @@ class PrayerRoomsDirectory {
             
             const response = await fetch(url, {
                 method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include',  // Include session cookies
+                headers: headers,
+                credentials: 'include',  // Also include session cookies as fallback
                 body: JSON.stringify(scheduleData)
             });
 

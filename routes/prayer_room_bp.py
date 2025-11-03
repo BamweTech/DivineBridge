@@ -36,7 +36,32 @@ def get_firestore_client():
     return _get_firestore_client()
 
 def get_user_from_session():
-    """Get user information from session"""
+    """Get user information from session or Firebase ID token"""
+    
+    # First, try to get user from Firebase ID token (survives deployments)
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        id_token = auth_header.split('Bearer ')[1]
+        try:
+            # Verify the Firebase ID token
+            from firebase_admin import auth
+            decoded_token = auth.verify_id_token(id_token)
+            
+            user_name = decoded_token.get('name') or decoded_token.get('email', '').split('@')[0] or 'Anonymous'
+            
+            logging.info(f"✅ User authenticated via Firebase ID token: {decoded_token.get('uid')}")
+            
+            return {
+                'user_id': decoded_token.get('uid'),
+                'user_name': user_name,
+                'name': user_name,
+                'email': decoded_token.get('email')
+            }
+        except Exception as e:
+            logging.warning(f"⚠️ Firebase ID token verification failed: {str(e)}")
+            # Fall through to session check
+    
+    # Fallback to session-based authentication
     user = session.get('user')
     if not user:
         return None
