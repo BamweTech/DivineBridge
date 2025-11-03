@@ -1541,6 +1541,154 @@ def cancel_scheduled_room(scheduled_room_id):
         logging.error(f"Error canceling scheduled room: {str(e)}")
         return jsonify({'error': 'Failed to cancel scheduled room'}), 500
 
+def notify_subscribers_about_reopened_room(original_room_id, new_room_id, room_name, room_code, host_name):
+    """Send email notifications to room subscribers when room is reopened"""
+    try:
+        from email_service import send_email
+        
+        db = get_firestore_client()
+        
+        # Get all active subscribers for this room
+        subscriptions = db.collection('room_subscriptions')\
+            .where('original_room_id', '==', original_room_id)\
+            .where('is_active', '==', True)\
+            .where('notification_preferences.email', '==', True)\
+            .stream()
+        
+        subscriber_count = 0
+        base_url = request.url_root.rstrip('/')
+        
+        for sub_doc in subscriptions:
+            try:
+                sub_data = sub_doc.to_dict()
+                user_email = sub_data.get('user_email')
+                user_name = sub_data.get('user_name', 'Friend')
+                
+                if not user_email:
+                    continue
+                
+                # Build join URL
+                join_url = f"{base_url}/prayer-room/join?room={new_room_id}"
+                if room_code:
+                    join_url += f"&code={room_code}"
+                
+                # Build unsubscribe URL (using subscription document ID)
+                unsubscribe_url = f"{base_url}/prayer-room/unsubscribe-link?sub_id={sub_doc.id}"
+                
+                # Email subject
+                subject = f"🙏 {room_name} is Live! Join the Prayer Session"
+                
+                # Email body
+                body = f"""
+                <html>
+                <head>
+                    <style>
+                        body {{
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                            line-height: 1.6;
+                            color: #333;
+                            max-width: 600px;
+                            margin: 0 auto;
+                        }}
+                        .header {{
+                            background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
+                            padding: 30px;
+                            text-align: center;
+                            color: white;
+                        }}
+                        .content {{
+                            padding: 30px;
+                            background: #f8f9fa;
+                        }}
+                        .card {{
+                            background: white;
+                            border-radius: 10px;
+                            padding: 25px;
+                            margin: 20px 0;
+                            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                        }}
+                        .button {{
+                            display: inline-block;
+                            padding: 15px 40px;
+                            background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
+                            color: white !important;
+                            text-decoration: none;
+                            border-radius: 50px;
+                            font-weight: 600;
+                            font-size: 16px;
+                            margin: 20px 0;
+                        }}
+                        .room-code {{
+                            background: rgba(15, 86, 255, 0.1);
+                            color: #0f56ff;
+                            padding: 15px;
+                            border-radius: 8px;
+                            text-align: center;
+                            font-size: 24px;
+                            font-weight: bold;
+                            letter-spacing: 3px;
+                            margin: 15px 0;
+                        }}
+                        .footer {{
+                            padding: 20px;
+                            text-align: center;
+                            color: #666;
+                            font-size: 14px;
+                        }}
+                        .unsubscribe {{
+                            color: #999;
+                            font-size: 12px;
+                        }}
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>🙏 Prayer Room is Live!</h1>
+                    </div>
+                    <div class="content">
+                        <div class="card">
+                            <h2>Hello {user_name}!</h2>
+                            <p><strong>{host_name}</strong> has opened <strong>{room_name}</strong> for prayer.</p>
+                            <p>You're receiving this because you subscribed to updates for this prayer room.</p>
+                            
+                            {"<div class='room-code'>Room Code: " + room_code + "</div>" if room_code else ""}
+                            
+                            <div style="text-align: center;">
+                                <a href="{join_url}" class="button">
+                                    Join Prayer Room Now
+                                </a>
+                            </div>
+                            
+                            <p style="margin-top: 20px; color: #666; font-size: 14px;">
+                                🌟 <em>"For where two or three gather in my name, there am I with them." - Matthew 18:20</em>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="footer">
+                        <p>Divine Bridge - Connecting Hearts in Prayer</p>
+                        <p class="unsubscribe">
+                            Don't want these notifications? 
+                            <a href="{unsubscribe_url}" style="color: #0f56ff;">Unsubscribe from this room</a>
+                        </p>
+                    </div>
+                </body>
+                </html>
+                """
+                
+                # Send email (non-blocking, log errors but don't fail)
+                send_email(user_email, subject, body)
+                subscriber_count += 1
+                
+            except Exception as e:
+                logging.error(f"Error sending notification to subscriber: {str(e)}")
+                continue
+        
+        logging.info(f"Sent {subscriber_count} email notifications for reopened room {new_room_id}")
+        
+    except Exception as e:
+        logging.error(f"Error in notify_subscribers_about_reopened_room: {str(e)}")
+        # Don't raise - this is a non-critical background task
+
 @prayer_room_bp.route('/reopen-room', methods=['POST'])
 def reopen_room():
     """Reopen a previous room as a live session"""
@@ -1635,6 +1783,18 @@ def reopen_room():
         # Save the new room
         db.collection('prayer_rooms').document(new_room_id).set(new_room_data)
         
+        # Notify subscribers asynchronously (don't block room creation)
+        try:
+            notify_subscribers_about_reopened_room(
+                original_room_id=original_room_id,
+                new_room_id=new_room_id,
+                room_name=new_room_data['room_name'],
+                room_code=new_room_data.get('room_code'),
+                host_name=user['user_name']
+            )
+        except Exception as notify_error:
+            logging.error(f"Error sending notifications (non-blocking): {str(notify_error)}")
+        
         return jsonify({
             'success': True,
             'room_id': new_room_id,
@@ -1645,6 +1805,246 @@ def reopen_room():
     except Exception as e:
         logging.error(f"Error reopening room: {str(e)}")
         return jsonify({'error': 'Failed to reopen room'}), 500
+
+@prayer_room_bp.route('/<room_id>/subscribe', methods=['POST'])
+def subscribe_to_room(room_id):
+    """Subscribe to room notifications"""
+    try:
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        db = get_firestore_client()
+        
+        # Get room info
+        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_doc = room_ref.get()
+        
+        if not room_doc.exists:
+            return jsonify({'error': 'Room not found'}), 404
+        
+        room_data = room_doc.to_dict()
+        original_room_id = room_data.get('original_room_id', room_id)
+        
+        # Check if already subscribed
+        existing_subs = db.collection('room_subscriptions')\
+            .where('original_room_id', '==', original_room_id)\
+            .where('user_id', '==', user['user_id'])\
+            .where('is_active', '==', True)\
+            .limit(1)\
+            .stream()
+        
+        if list(existing_subs):
+            return jsonify({'message': 'Already subscribed', 'subscribed': True}), 200
+        
+        # Create subscription
+        subscription_data = {
+            'room_id': room_id,
+            'original_room_id': original_room_id,
+            'user_id': user['user_id'],
+            'user_email': user.get('email', ''),
+            'user_name': user['user_name'],
+            'room_name': room_data.get('room_name', 'Prayer Room'),
+            'host_id': room_data.get('host_id'),
+            'host_name': room_data.get('host_name'),
+            'subscribed_at': datetime.utcnow(),
+            'is_active': True,
+            'notification_preferences': {
+                'email': True,
+                'push': False
+            }
+        }
+        
+        db.collection('room_subscriptions').add(subscription_data)
+        
+        logging.info(f"User {user['user_id']} subscribed to room {room_id}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Successfully subscribed to room notifications',
+            'subscribed': True
+        })
+        
+    except Exception as e:
+        logging.error(f"Error subscribing to room: {str(e)}")
+        return jsonify({'error': 'Failed to subscribe'}), 500
+
+@prayer_room_bp.route('/<room_id>/unsubscribe', methods=['POST'])
+def unsubscribe_from_room(room_id):
+    """Unsubscribe from room notifications"""
+    try:
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        db = get_firestore_client()
+        
+        # Get room's original_room_id
+        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_doc = room_ref.get()
+        
+        if room_doc.exists:
+            original_room_id = room_doc.to_dict().get('original_room_id', room_id)
+        else:
+            original_room_id = room_id
+        
+        # Find and deactivate subscriptions
+        subscriptions = db.collection('room_subscriptions')\
+            .where('original_room_id', '==', original_room_id)\
+            .where('user_id', '==', user['user_id'])\
+            .where('is_active', '==', True)\
+            .stream()
+        
+        unsubscribed_count = 0
+        for sub_doc in subscriptions:
+            sub_doc.reference.update({
+                'is_active': False,
+                'unsubscribed_at': datetime.utcnow()
+            })
+            unsubscribed_count += 1
+        
+        logging.info(f"User {user['user_id']} unsubscribed from room {room_id}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Successfully unsubscribed from room notifications',
+            'subscribed': False
+        })
+        
+    except Exception as e:
+        logging.error(f"Error unsubscribing from room: {str(e)}")
+        return jsonify({'error': 'Failed to unsubscribe'}), 500
+
+@prayer_room_bp.route('/<room_id>/subscription-status', methods=['GET'])
+def get_subscription_status(room_id):
+    """Check if user is subscribed to room"""
+    try:
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'subscribed': False})
+        
+        db = get_firestore_client()
+        
+        # Get room's original_room_id
+        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_doc = room_ref.get()
+        
+        if room_doc.exists:
+            original_room_id = room_doc.to_dict().get('original_room_id', room_id)
+        else:
+            original_room_id = room_id
+        
+        # Check if subscribed
+        subscriptions = db.collection('room_subscriptions')\
+            .where('original_room_id', '==', original_room_id)\
+            .where('user_id', '==', user['user_id'])\
+            .where('is_active', '==', True)\
+            .limit(1)\
+            .stream()
+        
+        subscribed = len(list(subscriptions)) > 0
+        
+        return jsonify({
+            'subscribed': subscribed,
+            'user_id': user['user_id']
+        })
+        
+    except Exception as e:
+        logging.error(f"Error checking subscription status: {str(e)}")
+        return jsonify({'subscribed': False}), 500
+
+@prayer_room_bp.route('/unsubscribe-link', methods=['GET'])
+def unsubscribe_via_email_link():
+    """Unsubscribe from room via email link (no auth required)"""
+    try:
+        sub_id = request.args.get('sub_id')
+        
+        if not sub_id:
+            return "Invalid unsubscribe link", 400
+        
+        db = get_firestore_client()
+        sub_ref = db.collection('room_subscriptions').document(sub_id)
+        sub_doc = sub_ref.get()
+        
+        if not sub_doc.exists:
+            return "Subscription not found", 404
+        
+        sub_data = sub_doc.to_dict()
+        room_name = sub_data.get('room_name', 'Prayer Room')
+        
+        # Deactivate subscription
+        sub_ref.update({
+            'is_active': False,
+            'unsubscribed_at': datetime.utcnow()
+        })
+        
+        logging.info(f"User unsubscribed via email link: {sub_id}")
+        
+        # Return a simple HTML page
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Unsubscribed - Divine Bridge</title>
+            <style>
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    min-height: 100vh;
+                    margin: 0;
+                }}
+                .container {{
+                    background: white;
+                    padding: 50px;
+                    border-radius: 20px;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+                    text-align: center;
+                    max-width: 500px;
+                }}
+                h1 {{
+                    color: #0f56ff;
+                    margin-bottom: 20px;
+                }}
+                p {{
+                    color: #666;
+                    line-height: 1.6;
+                    margin-bottom: 30px;
+                }}
+                .button {{
+                    display: inline-block;
+                    padding: 12px 30px;
+                    background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
+                    color: white;
+                    text-decoration: none;
+                    border-radius: 50px;
+                    font-weight: 600;
+                    margin-top: 20px;
+                }}
+                .emoji {{
+                    font-size: 48px;
+                    margin-bottom: 20px;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="emoji">✓</div>
+                <h1>Unsubscribed Successfully</h1>
+                <p>You've been unsubscribed from <strong>{room_name}</strong> notifications.</p>
+                <p>You won't receive any more emails when this room reopens.</p>
+                <p>If you change your mind, you can always resubscribe by joining the room and clicking the subscribe button.</p>
+                <a href="/" class="button">Return to Divine Bridge</a>
+            </div>
+        </body>
+        </html>
+        """, 200
+        
+    except Exception as e:
+        logging.error(f"Error unsubscribing via link: {str(e)}")
+        return "An error occurred", 500
 
 @prayer_room_bp.route('/delete-room/<room_id>', methods=['DELETE'])
 def delete_room(room_id):

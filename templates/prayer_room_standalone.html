@@ -61,6 +61,39 @@
             max-width: 100vw;
         }
 
+        /* Toast Animations */
+        @keyframes slideInRight {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOutRight {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+
+        /* Subscribe button styling */
+        .subscribe-btn.subscribed {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+            color: white !important;
+        }
+
+        .subscribe-btn.subscribed:hover {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+        }
+
         html::before {
             content: '';
             position: fixed;
@@ -1147,6 +1180,12 @@
                             </svg>
                         </button>
                         <button class="control-btn" id="shareBtn">Share</button>
+                        <button class="control-btn subscribe-btn" id="subscribeBtn" title="Subscribe to room updates" style="display: none;">
+                            <svg class="bell-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+                            </svg>
+                            <span class="subscribe-text">Subscribe</span>
+                        </button>
                         <button class="control-btn leave" id="leaveBtn">Leave</button>
                     </div>
                 </div>
@@ -1313,6 +1352,148 @@
 
         // ===== MODERN MOBILE TAB SYSTEM =====
         document.addEventListener('DOMContentLoaded', () => {
+            // Initialize room subscription system
+            window.roomSubscription = {
+                isSubscribed: false,
+                roomId: '{{ room_id }}',
+                
+                async init() {
+                    await this.checkSubscriptionStatus();
+                    this.setupSubscribeButton();
+                },
+                
+                async checkSubscriptionStatus() {
+                    try {
+                        const response = await fetch(`/api/prayer-room/${this.roomId}/subscription-status`, {
+                            credentials: 'include'
+                        });
+                        const data = await response.json();
+                        this.isSubscribed = data.subscribed || false;
+                        this.updateSubscribeButton();
+                    } catch (error) {
+                        console.error('Error checking subscription status:', error);
+                    }
+                },
+                
+                setupSubscribeButton() {
+                    const subscribeBtn = document.getElementById('subscribeBtn');
+                    if (!subscribeBtn) return;
+                    
+                    // Show the button (it's hidden by default)
+                    subscribeBtn.style.display = '';
+                    
+                    subscribeBtn.addEventListener('click', async () => {
+                        if (this.isSubscribed) {
+                            await this.unsubscribe();
+                        } else {
+                            await this.subscribe();
+                        }
+                    });
+                },
+                
+                async subscribe() {
+                    try {
+                        const response = await fetch(`/api/prayer-room/${this.roomId}/subscribe`, {
+                            method: 'POST',
+                            credentials: 'include',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (response.ok) {
+                            this.isSubscribed = true;
+                            this.updateSubscribeButton();
+                            this.showToast('✓ Subscribed! You\'ll get notified when this room reopens.', 'success');
+                        } else {
+                            if (response.status === 401) {
+                                this.showToast('Please sign in to subscribe to room updates', 'error');
+                            } else {
+                                this.showToast('Failed to subscribe: ' + (data.error || 'Unknown error'), 'error');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error subscribing:', error);
+                        this.showToast('Failed to subscribe. Please try again.', 'error');
+                    }
+                },
+                
+                async unsubscribe() {
+                    try {
+                        const response = await fetch(`/api/prayer-room/${this.roomId}/unsubscribe`, {
+                            method: 'POST',
+                            credentials: 'include',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (response.ok) {
+                            this.isSubscribed = false;
+                            this.updateSubscribeButton();
+                            this.showToast('✓ Unsubscribed from room notifications', 'success');
+                        } else {
+                            this.showToast('Failed to unsubscribe: ' + (data.error || 'Unknown error'), 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error unsubscribing:', error);
+                        this.showToast('Failed to unsubscribe. Please try again.', 'error');
+                    }
+                },
+                
+                updateSubscribeButton() {
+                    const subscribeBtn = document.getElementById('subscribeBtn');
+                    if (!subscribeBtn) return;
+                    
+                    const bellIcon = subscribeBtn.querySelector('.bell-icon');
+                    const subscribeText = subscribeBtn.querySelector('.subscribe-text');
+                    
+                    if (this.isSubscribed) {
+                        subscribeBtn.classList.add('subscribed');
+                        subscribeBtn.title = 'Unsubscribe from room updates';
+                        if (subscribeText) subscribeText.textContent = 'Subscribed';
+                        if (bellIcon) bellIcon.style.fill = '#10b981'; // Green color
+                    } else {
+                        subscribeBtn.classList.remove('subscribed');
+                        subscribeBtn.title = 'Subscribe to room updates';
+                        if (subscribeText) subscribeText.textContent = 'Subscribe';
+                        if (bellIcon) bellIcon.style.fill = 'currentColor';
+                    }
+                },
+                
+                showToast(message, type = 'info') {
+                    // Create toast notification
+                    const toast = document.createElement('div');
+                    toast.className = `toast toast-${type}`;
+                    toast.textContent = message;
+                    toast.style.cssText = `
+                        position: fixed;
+                        top: 20px;
+                        right: 20px;
+                        background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+                        color: white;
+                        padding: 16px 24px;
+                        border-radius: 12px;
+                        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+                        z-index: 10000;
+                        animation: slideInRight 0.3s ease;
+                        max-width: 400px;
+                        font-weight: 500;
+                    `;
+                    
+                    document.body.appendChild(toast);
+                    
+                    setTimeout(() => {
+                        toast.style.animation = 'slideOutRight 0.3s ease';
+                        setTimeout(() => toast.remove(), 300);
+                    }, 3000);
+                }
+            };
+            
             window.mobileTabSystem = {
                 currentTab: 'participants',
                 unreadCount: 0,
@@ -1468,6 +1649,9 @@
                     window.addEventListener('resize', checkOverflow);
                 }
             };
+            
+            // Initialize subscription system (desktop and mobile)
+            window.roomSubscription.init();
             
             // Initialize mobile system
             if (window.innerWidth <= 768) {
