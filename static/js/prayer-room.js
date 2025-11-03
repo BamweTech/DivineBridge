@@ -1641,6 +1641,55 @@ class PrayerRoomService {
                 console.error(`[WebRTC] Error adding stream to peer ${participantId}:`, error);
             }
         });
+        
+        // CRITICAL FIX: Create peer connections with participants who don't have connections yet
+        // This handles the case where user joined audio AFTER other participants joined the room
+        this.connectToExistingParticipants();
+    }
+    
+    async connectToExistingParticipants() {
+        // Fetch current participants and create connections if needed
+        try {
+            console.log('[WebRTC] 🔍 Checking for participants without peer connections...');
+            
+            const response = await fetch(`/api/prayer-room/${this.roomId}/participants`, {
+                credentials: 'include'
+            });
+            
+            const data = await response.json();
+            
+            if (data.success && data.participants) {
+                let connectionsCreated = 0;
+                
+                data.participants.forEach(participant => {
+                    const participantId = participant.user_id;
+                    
+                    // Skip self and existing peers
+                    if (participantId === this.userId || this.peers.has(participantId)) {
+                        return;
+                    }
+                    
+                    // Determine if we should initiate (same logic as updateParticipants)
+                    const isInitiator = this.userId < participantId;
+                    
+                    if (isInitiator) {
+                        console.log(`[WebRTC] ✨ Creating peer connection with ${participantId} (I am initiator)`);
+                        this.createPeerConnection(participantId, true);
+                        connectionsCreated++;
+                    } else {
+                        console.log(`[WebRTC] ⏳ Waiting for ${participantId} to initiate connection`);
+                    }
+                });
+                
+                if (connectionsCreated > 0) {
+                    console.log(`[WebRTC] ✅ Created ${connectionsCreated} new peer connection(s)`);
+                } else {
+                    console.log('[WebRTC] ℹ️ No new peer connections needed');
+                }
+            }
+        } catch (error) {
+            console.error('[WebRTC] Error fetching participants for connection:', error);
+        }
     }
 
     setupPeerEventHandlers(peer, participantId) {
