@@ -3,6 +3,7 @@ from firebase_auth import get_firestore_client
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from input_validation import validate_data, sanitize_string
+from auth_decorators import verify_cloud_scheduler
 import logging
 from datetime import datetime, timedelta
 import uuid
@@ -2045,6 +2046,269 @@ def unsubscribe_via_email_link():
     except Exception as e:
         logging.error(f"Error unsubscribing via link: {str(e)}")
         return "An error occurred", 500
+
+def create_active_room_from_scheduled(scheduled_data, scheduled_room_id):
+    """
+    Create an active prayer room from scheduled room data
+    Returns the new room_id
+    """
+    try:
+        db = get_firestore_client()
+        
+        # Generate new room ID
+        room_id = ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
+        
+        # Create active room data
+        room_data = {
+            'room_id': room_id,
+            'room_name': scheduled_data.get('room_name', 'Prayer Room'),
+            'room_description': scheduled_data.get('room_description', ''),
+            'room_privacy': scheduled_data.get('room_privacy', 'public'),
+            'room_code': scheduled_data.get('room_code'),
+            'host_id': scheduled_data['host_id'],
+            'host_name': scheduled_data['host_name'],
+            'created_at': datetime.utcnow(),
+            'last_activity': datetime.utcnow(),
+            'participants': [{
+                'user_id': scheduled_data['host_id'],
+                'user_name': scheduled_data['host_name'],
+                'joined_at': datetime.utcnow(),
+                'is_muted': False,
+                'is_host': True
+            }],
+            'is_active': True,
+            'is_locked': False,
+            'scheduled_room_id': scheduled_room_id,  # Link back to scheduled room
+            'settings': {
+                'allow_anonymous': scheduled_data.get('room_privacy', 'public') == 'public',
+                'max_participants': 50,
+                'auto_mute_new_participants': False
+            }
+        }
+        
+        # Save the active room
+        db.collection('prayer_rooms').document(room_id).set(room_data)
+        
+        logging.info(f"Created active room {room_id} from scheduled room {scheduled_room_id}")
+        
+        return room_id
+        
+    except Exception as e:
+        logging.error(f"Error creating active room from scheduled: {str(e)}")
+        raise
+
+def send_session_live_notifications(scheduled_data, room_id, scheduled_room_id):
+    """
+    Send email notifications that scheduled session is now live
+    """
+    try:
+        from email_service import send_email
+        
+        room_name = scheduled_data.get('room_name', 'Prayer Room')
+        host_name = scheduled_data.get('host_name', 'Host')
+        room_code = scheduled_data.get('room_code')
+        base_url = request.url_root.rstrip('/')
+        
+        # Build join URL
+        join_url = f"{base_url}/prayer-room/join?room={room_id}"
+        if room_code:
+            join_url += f"&code={room_code}"
+        
+        # Send notification to host
+        host_id = scheduled_data.get('host_id')
+        if host_id:
+            # Get host email from Firebase Auth
+            try:
+                import firebase_admin.auth
+                host_user = firebase_admin.auth.get_user(host_id)
+                host_email = host_user.email
+                
+                if host_email:
+                    subject = f"🙏 {room_name} is Now Live!"
+                    body = f"""
+                    <html>
+                    <head>
+                        <style>
+                            body {{
+                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                                line-height: 1.6;
+                                color: #333;
+                                max-width: 600px;
+                                margin: 0 auto;
+                            }}
+                            .header {{
+                                background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
+                                padding: 30px;
+                                text-align: center;
+                                color: white;
+                            }}
+                            .content {{
+                                padding: 30px;
+                                background: #f8f9fa;
+                            }}
+                            .card {{
+                                background: white;
+                                border-radius: 10px;
+                                padding: 25px;
+                                margin: 20px 0;
+                                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                            }}
+                            .button {{
+                                display: inline-block;
+                                padding: 15px 40px;
+                                background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
+                                color: white !important;
+                                text-decoration: none;
+                                border-radius: 50px;
+                                font-weight: 600;
+                                font-size: 18px;
+                                margin: 20px 0;
+                            }}
+                            .room-code {{
+                                background: rgba(15, 86, 255, 0.1);
+                                color: #0f56ff;
+                                padding: 15px;
+                                border-radius: 8px;
+                                text-align: center;
+                                font-size: 24px;
+                                font-weight: bold;
+                                letter-spacing: 3px;
+                                margin: 15px 0;
+                            }}
+                            .footer {{
+                                padding: 20px;
+                                text-align: center;
+                                color: #666;
+                                font-size: 14px;
+                            }}
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            <h1>🙏 Your Prayer Session is Live!</h1>
+                        </div>
+                        <div class="content">
+                            <div class="card">
+                                <h2>Hello {host_name}!</h2>
+                                <p>Your scheduled prayer session <strong>{room_name}</strong> is now active and ready for participants.</p>
+                                
+                                {"<div class='room-code'>Room Code: " + room_code + "</div>" if room_code else ""}
+                                
+                                <div style="text-align: center;">
+                                    <a href="{join_url}" class="button">
+                                        Join Your Room Now
+                                    </a>
+                                </div>
+                                
+                                <p style="margin-top: 20px; color: #666; font-size: 14px;">
+                                    Your participants will be notified that the session is live.
+                                </p>
+                                
+                                <p style="color: #666; font-size: 14px;">
+                                    🌟 <em>"For where two or three gather in my name, there am I with them." - Matthew 18:20</em>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="footer">
+                            <p>Divine Bridge - Connecting Hearts in Prayer</p>
+                        </div>
+                    </body>
+                    </html>
+                    """
+                    
+                    send_email(host_email, subject, body)
+                    logging.info(f"Sent session live notification to host {host_email}")
+                    
+            except Exception as e:
+                logging.error(f"Error sending notification to host: {str(e)}")
+        
+        # TODO: In Phase 2, also notify RSVPed participants here
+        
+    except Exception as e:
+        logging.error(f"Error in send_session_live_notifications: {str(e)}")
+        # Don't raise - this is a non-critical background task
+
+@prayer_room_bp.route('/activate-scheduled-rooms', methods=['POST'])
+@verify_cloud_scheduler()
+def activate_scheduled_rooms():
+    """
+    Check for scheduled rooms whose time has arrived and activate them
+    Triggered by Cloud Scheduler every 5 minutes
+    Protected by Cloud Scheduler verification
+    """
+    try:
+        db = get_firestore_client()
+        now = datetime.utcnow()
+        
+        logging.info(f"Checking for scheduled rooms to activate at {now}")
+        
+        # Find scheduled rooms whose time has arrived (within last 10 minutes)
+        # We check a 10-minute window to catch any that might have been missed
+        ten_minutes_ago = now - timedelta(minutes=10)
+        
+        scheduled_rooms = db.collection('scheduled_rooms')\
+            .where('status', '==', 'scheduled')\
+            .where('scheduled_time', '<=', now)\
+            .where('scheduled_time', '>=', ten_minutes_ago)\
+            .stream()
+        
+        activated_count = 0
+        errors = []
+        
+        for scheduled_doc in scheduled_rooms:
+            try:
+                scheduled_data = scheduled_doc.to_dict()
+                scheduled_room_id = scheduled_doc.id
+                room_name = scheduled_data.get('room_name', 'Prayer Room')
+                
+                logging.info(f"Activating scheduled room: {scheduled_room_id} - {room_name}")
+                
+                # Create active room
+                room_id = create_active_room_from_scheduled(scheduled_data, scheduled_room_id)
+                
+                # Update scheduled room status
+                scheduled_doc.reference.update({
+                    'status': 'active',
+                    'activated_at': now,
+                    'active_room_id': room_id
+                })
+                
+                # Send notifications (non-blocking)
+                try:
+                    send_session_live_notifications(scheduled_data, room_id, scheduled_room_id)
+                except Exception as notify_error:
+                    logging.error(f"Error sending notifications (non-blocking): {str(notify_error)}")
+                
+                activated_count += 1
+                logging.info(f"Successfully activated {room_name} as room {room_id}")
+                
+            except Exception as room_error:
+                error_msg = f"Error activating room {scheduled_doc.id}: {str(room_error)}"
+                logging.error(error_msg)
+                errors.append(error_msg)
+                continue
+        
+        result = {
+            'success': True,
+            'timestamp': now.isoformat(),
+            'activated_count': activated_count,
+            'checked_rooms': activated_count + len(errors)
+        }
+        
+        if errors:
+            result['errors'] = errors
+        
+        logging.info(f"Activation check complete: {activated_count} rooms activated")
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logging.error(f"Error in activate_scheduled_rooms: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat()
+        }), 500
 
 @prayer_room_bp.route('/delete-room/<room_id>', methods=['DELETE'])
 def delete_room(room_id):
