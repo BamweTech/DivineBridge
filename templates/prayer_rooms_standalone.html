@@ -6,6 +6,7 @@
     <title>Live Prayer Rooms - Divine Bridge</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/scheduled-sessions.css') }}?v={{ range(100000, 999999) | random }}">
     
     <style>
         * {
@@ -451,6 +452,38 @@
             font-size: 0.85rem;
             font-weight: 500;
             line-height: 1.2;
+        }
+        
+        /* Tab Content Switching */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .scheduled-sessions-panel {
+            padding: 0;
+            background: transparent;
+            border: none;
+            box-shadow: none;
+        }
+        
+        .scheduled-sessions-panel::before {
+            display: none;
         }
         
         .active-rooms h3 {
@@ -1188,13 +1221,44 @@
             </div>
             
             <div class="right-panel">
-                <div class="active-rooms">
-                    <h3>Active Rooms</h3>
-                    <div class="rooms-container">
-                        <div id="roomsList">
-                            <!-- Active rooms will be loaded here by JavaScript -->
-                            <div class="no-rooms-message">
-                                <p>No active rooms. Be the first to start one!</p>
+                <!-- Tabs Navigation -->
+                <div class="sessions-tabs">
+                    <button class="session-tab-btn active" data-tab="live">
+                        <svg style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 6px;" fill="currentColor" viewBox="0 0 20 20">
+                            <circle cx="10" cy="10" r="5"/>
+                        </svg>
+                        Live Now
+                    </button>
+                    <button class="session-tab-btn" data-tab="upcoming">
+                        <svg style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 6px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        Upcoming
+                    </button>
+                </div>
+                
+                <!-- Live Tab Content -->
+                <div id="liveTab" class="tab-content active">
+                    <div class="active-rooms">
+                        <h3>Active Rooms</h3>
+                        <div class="rooms-container">
+                            <div id="roomsList">
+                                <!-- Active rooms will be loaded here by JavaScript -->
+                                <div class="no-rooms-message">
+                                    <p>No active rooms. Be the first to start one!</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Upcoming Tab Content -->
+                <div id="upcomingTab" class="tab-content" style="display: none;">
+                    <div class="scheduled-sessions-panel">
+                        <div id="scheduledSessionsList">
+                            <!-- Scheduled sessions will be loaded here by JavaScript -->
+                            <div class="sessions-loading">
+                                <div class="loading-spinner"></div>
                             </div>
                         </div>
                     </div>
@@ -1302,5 +1366,6 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/prayer-rooms.js') }}?v={{ range(100000, 999999) | random }}"></script>
+    <script src="{{ url_for('static', filename='js/scheduled-sessions.js') }}?v={{ range(100000, 999999) | random }}"></script>
 </body>
 </html>

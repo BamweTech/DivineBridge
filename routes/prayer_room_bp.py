@@ -2310,6 +2310,233 @@ def activate_scheduled_rooms():
             'timestamp': datetime.utcnow().isoformat()
         }), 500
 
+@prayer_room_bp.route('/public-scheduled-sessions', methods=['GET'])
+def get_public_scheduled_sessions():
+    """
+    Get all upcoming public scheduled sessions
+    Available to all users (no auth required)
+    """
+    try:
+        db = get_firestore_client()
+        now = datetime.utcnow()
+        
+        # Get query parameters
+        time_filter = request.args.get('time', 'all')  # today, tomorrow, week, all
+        limit = int(request.args.get('limit', 20))
+        sort_by = request.args.get('sort', 'soonest')  # soonest, popular
+        
+        # Base query - only scheduled (not active/completed), only public
+        query = db.collection('scheduled_rooms')\
+            .where('status', '==', 'scheduled')\
+            .where('room_privacy', '==', 'public')\
+            .where('scheduled_time', '>=', now)
+        
+        # Get all matching sessions
+        sessions = []
+        for doc in query.stream():
+            session_data = doc.to_dict()
+            session_data['scheduled_room_id'] = doc.id
+            
+            # Convert timestamp to ISO string for JSON
+            if hasattr(session_data.get('scheduled_time'), 'timestamp'):
+                session_data['scheduled_time'] = session_data['scheduled_time'].timestamp()
+            if hasattr(session_data.get('created_at'), 'timestamp'):
+                session_data['created_at'] = session_data['created_at'].timestamp()
+            
+            # Get RSVP count for this session
+            rsvp_count = db.collection('scheduled_room_rsvps')\
+                .where('scheduled_room_id', '==', doc.id)\
+                .where('is_active', '==', True)\
+                .stream()
+            
+            rsvp_stats = {'going': 0, 'maybe': 0, 'interested': 0}
+            for rsvp_doc in rsvp_count:
+                rsvp_data = rsvp_doc.to_dict()
+                status = rsvp_data.get('rsvp_status', 'interested')
+                rsvp_stats[status] = rsvp_stats.get(status, 0) + 1
+            
+            session_data['rsvp_count'] = rsvp_stats
+            session_data['total_rsvps'] = sum(rsvp_stats.values())
+            
+            # Check if current user has RSVPed
+            user = get_user_from_session()
+            if user:
+                user_rsvp = db.collection('scheduled_room_rsvps')\
+                    .where('scheduled_room_id', '==', doc.id)\
+                    .where('user_id', '==', user['user_id'])\
+                    .where('is_active', '==', True)\
+                    .limit(1)\
+                    .stream()
+                
+                user_rsvp_list = list(user_rsvp)
+                if user_rsvp_list:
+                    session_data['user_rsvp_status'] = user_rsvp_list[0].to_dict().get('rsvp_status')
+                else:
+                    session_data['user_rsvp_status'] = None
+            else:
+                session_data['user_rsvp_status'] = None
+            
+            sessions.append(session_data)
+        
+        # Apply time filter
+        if time_filter == 'today':
+            end_of_today = datetime.utcnow().replace(hour=23, minute=59, second=59)
+            sessions = [s for s in sessions if s['scheduled_time'] <= end_of_today.timestamp()]
+        elif time_filter == 'tomorrow':
+            start_of_tomorrow = (datetime.utcnow() + timedelta(days=1)).replace(hour=0, minute=0, second=0)
+            end_of_tomorrow = start_of_tomorrow.replace(hour=23, minute=59, second=59)
+            sessions = [s for s in sessions if start_of_tomorrow.timestamp() <= s['scheduled_time'] <= end_of_tomorrow.timestamp()]
+        elif time_filter == 'week':
+            end_of_week = datetime.utcnow() + timedelta(days=7)
+            sessions = [s for s in sessions if s['scheduled_time'] <= end_of_week.timestamp()]
+        
+        # Sort
+        if sort_by == 'popular':
+            sessions.sort(key=lambda x: x['total_rsvps'], reverse=True)
+        else:  # soonest
+            sessions.sort(key=lambda x: x['scheduled_time'])
+        
+        # Apply limit
+        sessions = sessions[:limit]
+        
+        return jsonify({
+            'success': True,
+            'sessions': sessions,
+            'total': len(sessions),
+            'filters': {
+                'time': time_filter,
+                'sort': sort_by
+            }
+        })
+        
+    except Exception as e:
+        logging.error(f"Error getting public scheduled sessions: {str(e)}")
+        return jsonify({'error': 'Failed to get sessions'}), 500
+
+@prayer_room_bp.route('/scheduled-session/<scheduled_room_id>/rsvp', methods=['POST'])
+def rsvp_to_scheduled_session(scheduled_room_id):
+    """RSVP to a scheduled session"""
+    try:
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        data = request.get_json() or {}
+        rsvp_status = data.get('rsvp_status', 'interested')  # going, maybe, interested
+        
+        # Validate RSVP status
+        if rsvp_status not in ['going', 'maybe', 'interested']:
+            return jsonify({'error': 'Invalid RSVP status'}), 400
+        
+        db = get_firestore_client()
+        
+        # Get the scheduled room
+        scheduled_room_ref = db.collection('scheduled_rooms').document(scheduled_room_id)
+        scheduled_room_doc = scheduled_room_ref.get()
+        
+        if not scheduled_room_doc.exists:
+            return jsonify({'error': 'Scheduled session not found'}), 404
+        
+        scheduled_data = scheduled_room_doc.to_dict()
+        
+        # Check if already RSVPed
+        existing_rsvp = db.collection('scheduled_room_rsvps')\
+            .where('scheduled_room_id', '==', scheduled_room_id)\
+            .where('user_id', '==', user['user_id'])\
+            .limit(1)\
+            .stream()
+        
+        existing_rsvp_list = list(existing_rsvp)
+        
+        if existing_rsvp_list:
+            # Update existing RSVP
+            existing_rsvp_list[0].reference.update({
+                'rsvp_status': rsvp_status,
+                'updated_at': datetime.utcnow(),
+                'is_active': True
+            })
+            logging.info(f"Updated RSVP for user {user['user_id']} to session {scheduled_room_id}")
+        else:
+            # Create new RSVP
+            rsvp_data = {
+                'scheduled_room_id': scheduled_room_id,
+                'user_id': user['user_id'],
+                'user_email': user.get('email', ''),
+                'user_name': user['user_name'],
+                'room_name': scheduled_data.get('room_name'),
+                'rsvp_status': rsvp_status,
+                'rsvp_at': datetime.utcnow(),
+                'is_active': True,
+                'reminder_preferences': {
+                    'email_1hour': data.get('reminder_1hour', True),
+                    'email_live': data.get('reminder_live', True)
+                }
+            }
+            
+            db.collection('scheduled_room_rsvps').add(rsvp_data)
+            logging.info(f"Created RSVP for user {user['user_id']} to session {scheduled_room_id}")
+        
+        # Get updated RSVP counts
+        rsvp_count = db.collection('scheduled_room_rsvps')\
+            .where('scheduled_room_id', '==', scheduled_room_id)\
+            .where('is_active', '==', True)\
+            .stream()
+        
+        rsvp_stats = {'going': 0, 'maybe': 0, 'interested': 0}
+        for rsvp_doc in rsvp_count:
+            rsvp_data = rsvp_doc.to_dict()
+            status = rsvp_data.get('rsvp_status', 'interested')
+            rsvp_stats[status] = rsvp_stats.get(status, 0) + 1
+        
+        return jsonify({
+            'success': True,
+            'message': 'RSVP confirmed',
+            'rsvp_status': rsvp_status,
+            'rsvp_count': rsvp_stats,
+            'total_rsvps': sum(rsvp_stats.values())
+        })
+        
+    except Exception as e:
+        logging.error(f"Error creating RSVP: {str(e)}")
+        return jsonify({'error': 'Failed to RSVP'}), 500
+
+@prayer_room_bp.route('/scheduled-session/<scheduled_room_id>/rsvp', methods=['DELETE'])
+def remove_rsvp_from_scheduled_session(scheduled_room_id):
+    """Remove RSVP from a scheduled session"""
+    try:
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        db = get_firestore_client()
+        
+        # Find and deactivate RSVP
+        rsvps = db.collection('scheduled_room_rsvps')\
+            .where('scheduled_room_id', '==', scheduled_room_id)\
+            .where('user_id', '==', user['user_id'])\
+            .where('is_active', '==', True)\
+            .stream()
+        
+        removed_count = 0
+        for rsvp_doc in rsvps:
+            rsvp_doc.reference.update({
+                'is_active': False,
+                'removed_at': datetime.utcnow()
+            })
+            removed_count += 1
+        
+        logging.info(f"Removed RSVP for user {user['user_id']} from session {scheduled_room_id}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'RSVP removed',
+            'removed': removed_count > 0
+        })
+        
+    except Exception as e:
+        logging.error(f"Error removing RSVP: {str(e)}")
+        return jsonify({'error': 'Failed to remove RSVP'}), 500
+
 @prayer_room_bp.route('/delete-room/<room_id>', methods=['DELETE'])
 def delete_room(room_id):
     """Delete a room created by the current user"""
