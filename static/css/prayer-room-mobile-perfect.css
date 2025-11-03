@@ -141,22 +141,18 @@
         white-space: nowrap !important;
     }
     
-    /* Hide duplicate control buttons in header on mobile */
-    .header-actions .control-buttons {
-        display: none !important;
-    }
-    
     /* Hide only non-essential header elements on mobile */
     .audio-quality-indicator {
         display: none !important;
     }
     
-    /* Show participant count in header - compact */
+    /* Second row: Participant count + Control buttons */
     .header-actions {
-        flex-shrink: 0 !important;
+        width: 100% !important;
         display: flex !important;
-        gap: 4px !important;
+        gap: 6px !important;
         align-items: center !important;
+        flex-wrap: wrap !important;
     }
     
     .participant-count {
@@ -170,6 +166,7 @@
         border-radius: 4px !important;
         font-weight: 600 !important;
         white-space: nowrap !important;
+        flex-shrink: 0 !important;
     }
     
     .participant-count span,
@@ -181,6 +178,70 @@
     .participant-count svg {
         width: 12px !important;
         height: 12px !important;
+    }
+    
+    /* Control buttons in header - compact horizontal row */
+    .header-actions .control-buttons {
+        display: flex !important;
+        flex: 1 !important;
+        gap: 4px !important;
+        min-width: 0 !important;
+    }
+    
+    .header-actions .control-btn {
+        flex: 1 !important;
+        min-width: 0 !important;
+        padding: 6px 8px !important;
+        font-size: 11px !important;
+        font-weight: 600 !important;
+        border-radius: 6px !important;
+        min-height: 32px !important;
+        white-space: nowrap !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 3px !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    /* Hide text labels on very small screens, keep icons */
+    .header-actions .control-btn .join-text,
+    .header-actions .control-btn span:not(.mic-icon):not(.muted-icon) {
+        display: none !important;
+    }
+    
+    .header-actions .control-btn svg {
+        width: 14px !important;
+        height: 14px !important;
+        flex-shrink: 0 !important;
+    }
+    
+    .header-actions .join-audio-btn,
+    .header-actions .control-btn.join-audio-btn {
+        background: #3b82f6 !important;
+        color: #ffffff !important;
+        border: none !important;
+    }
+    
+    .header-actions .mute-btn,
+    .header-actions .control-btn.mute-btn {
+        background: #ef4444 !important;
+        color: #ffffff !important;
+        border: none !important;
+    }
+    
+    .header-actions .control-btn.leave,
+    .header-actions #leaveBtn {
+        background: #f3f4f6 !important;
+        color: #6b7280 !important;
+        border: 1px solid #e5e7eb !important;
+    }
+    
+    .header-actions #shareBtn {
+        background: #10b981 !important;
+        color: #ffffff !important;
+        border: none !important;
     }
     
     /* ===== CONTENT AREA - FLEXIBLE HEIGHT ===== */
