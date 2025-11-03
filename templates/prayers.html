@@ -285,11 +285,18 @@
             max-width: 100% !important;
         }
         
-        /* Make buttons wrap properly */
+        /* Make buttons wrap into two rows on mobile */
         .header-content > div[style*="display: flex"] {
-            flex-wrap: wrap;
-            justify-content: flex-start;
+            flex-wrap: wrap !important;
+            justify-content: flex-start !important;
             gap: 0.75rem !important;
+            max-width: 100% !important;
+        }
+        
+        /* Force buttons to take up roughly half width for two-row layout */
+        .header-content .icon-button {
+            flex: 0 1 calc(50% - 0.4rem) !important;
+            max-width: calc(50% - 0.4rem) !important;
         }
         
         #prayers-list {
@@ -318,7 +325,7 @@
         
         /* Live Prayer button specific mobile styles */
         .icon-button[href="/prayer-room"] {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%) !important;
             color: white !important;
         }
 
@@ -1116,19 +1123,19 @@
             font-size: 0.9rem;
         }
         
-        /* Keep buttons horizontal but make them smaller */
+        /* Keep buttons in two rows on small screens */
         .header-content > div[style*="display: flex"] {
-            flex-wrap: nowrap !important;
-            justify-content: space-between;
-            gap: 0.4rem !important;
+            flex-wrap: wrap !important;
+            justify-content: flex-start !important;
+            gap: 0.5rem !important;
             width: 100%;
         }
         
-        .icon-button {
+        .header-content .icon-button {
             padding: 10px 8px;
-            flex: 1 1 0;
+            flex: 0 1 calc(50% - 0.3rem) !important;
+            max-width: calc(50% - 0.3rem) !important;
             min-width: 0;
-            max-width: 34%;
         }
         
         .icon-button .button-label {
@@ -1162,12 +1169,14 @@
         }
         
         .header-content > div[style*="display: flex"] {
-            gap: 0.3rem !important;
+            gap: 0.4rem !important;
         }
         
-        .icon-button {
+        .header-content .icon-button {
             padding: 8px 6px;
             gap: 0.3rem;
+            flex: 0 1 calc(50% - 0.2rem) !important;
+            max-width: calc(50% - 0.2rem) !important;
         }
         
         .icon-button .button-label {
@@ -1215,7 +1224,7 @@
                     </svg>
                     <span class="button-label">Daily Prayer</span>
                 </a>
-                <a href="/prayer-room" class="icon-button" title="Join Live Prayer Room" style="text-decoration: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <a href="/prayer-room" class="icon-button" title="Join Live Prayer Room" style="text-decoration: none; background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%); color: white;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
