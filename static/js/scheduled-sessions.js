@@ -300,7 +300,7 @@ class ScheduledSessionsManager {
             });
             
             if (response.status === 401) {
-                window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+                window.location.href = '/login?redirect=' + encodeURIComponent('/prayer-room');
                 return;
             }
             

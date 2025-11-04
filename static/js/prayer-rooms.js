@@ -493,7 +493,7 @@ class PrayerRoomsDirectory {
             } else if (response.status === 401) {
                 // Only redirect to login if backend says not authenticated
                 console.log('❌ Not authenticated, redirecting to login');
-                window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+                window.location.href = '/login?redirect=' + encodeURIComponent('/prayer-room');
             } else {
                 alert('Failed to create room: ' + (result.error || 'Unknown error'));
             }
@@ -639,7 +639,7 @@ class PrayerRoomsDirectory {
             } else if (response.status === 401) {
                 // Only redirect to login if backend says not authenticated
                 console.log('❌ Not authenticated, redirecting to login');
-                window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+                window.location.href = '/login?redirect=' + encodeURIComponent('/prayer-room');
             } else {
                 alert(`Failed to ${isEditing ? 'update' : 'schedule'} room: ` + (result.error || 'Unknown error'));
             }
@@ -904,7 +904,7 @@ function showMyRooms() {
     const prayerRoomsDirectory = window.prayerRoomsDirectory;
     if (!prayerRoomsDirectory || !prayerRoomsDirectory.currentUser) {
         console.log('User not authenticated, redirecting to login');
-        window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+        window.location.href = '/login?redirect=' + encodeURIComponent('/prayer-room');
         return;
     }
     
