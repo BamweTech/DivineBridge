@@ -1436,6 +1436,12 @@ def schedule_room():
         
         db = get_firestore_client()
         
+        # Get recurring pattern data
+        is_recurring = data.get('is_recurring', False)
+        recurrence_pattern = data.get('recurrence_pattern')  # 'weekly', 'biweekly', 'monthly'
+        recurrence_end_date = data.get('recurrence_end_date')
+        recurrence_days = data.get('recurrence_days', [])  # For weekly: [0, 2, 4] = Monday, Wednesday, Friday
+        
         # Create scheduled room data
         scheduled_room_data = {
             'room_name': room_name,
@@ -1445,8 +1451,26 @@ def schedule_room():
             'host_name': host_name,
             'scheduled_time': scheduled_datetime,
             'created_at': datetime.utcnow(),
-            'status': 'scheduled'
+            'status': 'scheduled',
+            'is_recurring': is_recurring
         }
+        
+        # Add recurring pattern data
+        if is_recurring and recurrence_pattern:
+            scheduled_room_data['recurrence_pattern'] = recurrence_pattern
+            scheduled_room_data['recurrence_days'] = recurrence_days
+            
+            # Parse end date if provided
+            if recurrence_end_date:
+                try:
+                    end_datetime = datetime.fromisoformat(recurrence_end_date)
+                    scheduled_room_data['recurrence_end_date'] = end_datetime
+                except ValueError:
+                    logging.warning(f"Invalid recurrence end date: {recurrence_end_date}")
+            
+            # If no end date, default to 3 months from now
+            if 'recurrence_end_date' not in scheduled_room_data:
+                scheduled_room_data['recurrence_end_date'] = scheduled_datetime + timedelta(days=90)
         
         # Generate room code for private rooms
         if room_privacy == 'private':
@@ -2222,11 +2246,361 @@ def send_session_live_notifications(scheduled_data, room_id, scheduled_room_id):
             except Exception as e:
                 logging.error(f"Error sending notification to host: {str(e)}")
         
-        # TODO: In Phase 2, also notify RSVPed participants here
+        # Notify RSVPed participants
+        try:
+            db = get_firestore_client()
+            rsvps = db.collection('scheduled_room_rsvps')\
+                .where('scheduled_room_id', '==', scheduled_room_id)\
+                .where('is_active', '==', True)\
+                .stream()
+            
+            for rsvp_doc in rsvps:
+                rsvp_data = rsvp_doc.to_dict()
+                
+                # Skip if user doesn't want live notifications
+                if not rsvp_data.get('reminder_preferences', {}).get('email_live', True):
+                    continue
+                
+                user_email = rsvp_data.get('user_email')
+                user_name = rsvp_data.get('user_name', 'Prayer Partner')
+                rsvp_status = rsvp_data.get('rsvp_status', 'interested')
+                
+                if user_email:
+                    subject = f"🙏 {room_name} is Live Now!"
+                    body = f"""
+                    <html>
+                    <head>
+                        <style>
+                            body {{
+                                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                                line-height: 1.6;
+                                color: #333;
+                                max-width: 600px;
+                                margin: 0 auto;
+                            }}
+                            .header {{
+                                background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
+                                padding: 30px;
+                                text-align: center;
+                                color: white;
+                            }}
+                            .content {{
+                                padding: 30px;
+                                background: #f8f9fa;
+                            }}
+                            .card {{
+                                background: white;
+                                border-radius: 10px;
+                                padding: 25px;
+                                margin: 20px 0;
+                                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                            }}
+                            .button {{
+                                display: inline-block;
+                                padding: 15px 40px;
+                                background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
+                                color: white !important;
+                                text-decoration: none;
+                                border-radius: 50px;
+                                font-weight: 600;
+                                font-size: 18px;
+                                margin: 20px 0;
+                            }}
+                            .badge {{
+                                display: inline-block;
+                                padding: 8px 16px;
+                                background: rgba(15, 86, 255, 0.1);
+                                color: #0f56ff;
+                                border-radius: 20px;
+                                font-size: 14px;
+                                font-weight: 600;
+                                margin: 10px 0;
+                            }}
+                            .footer {{
+                                padding: 20px;
+                                text-align: center;
+                                color: #666;
+                                font-size: 14px;
+                            }}
+                            .unsubscribe {{
+                                font-size: 12px;
+                                color: #999;
+                                margin-top: 20px;
+                            }}
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            <h1>🙏 Your Prayer Session is Live!</h1>
+                        </div>
+                        <div class="content">
+                            <div class="card">
+                                <h2>Hello {user_name}!</h2>
+                                <p>The prayer session you RSVPed to is now live and ready to join.</p>
+                                
+                                <div style="margin: 20px 0;">
+                                    <strong style="font-size: 20px; color: #0f56ff;">{room_name}</strong><br>
+                                    <span style="color: #666;">Hosted by {host_name}</span>
+                                </div>
+                                
+                                <div class="badge">Your Status: {rsvp_status.title()}</div>
+                                
+                                <div style="text-align: center;">
+                                    <a href="{join_url}" class="button">
+                                        Join the Room Now
+                                    </a>
+                                </div>
+                                
+                                <p style="margin-top: 20px; color: #666; font-size: 14px;">
+                                    Don't keep your prayer partners waiting! Click the button above to join the session.
+                                </p>
+                                
+                                <p style="color: #666; font-size: 14px;">
+                                    🌟 <em>"For where two or three gather in my name, there am I with them." - Matthew 18:20</em>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="footer">
+                            <p>Divine Bridge - Connecting Hearts in Prayer</p>
+                            <p class="unsubscribe">
+                                You received this email because you RSVPed to this prayer session.
+                            </p>
+                        </div>
+                    </body>
+                    </html>
+                    """
+                    
+                    send_email(user_email, subject, body)
+                    logging.info(f"Sent session live notification to RSVPed user {user_email}")
+                    
+        except Exception as rsvp_notify_error:
+            logging.error(f"Error notifying RSVPed participants (non-blocking): {str(rsvp_notify_error)}")
         
     except Exception as e:
         logging.error(f"Error in send_session_live_notifications: {str(e)}")
         # Don't raise - this is a non-critical background task
+
+@prayer_room_bp.route('/send-session-reminders', methods=['POST'])
+@verify_cloud_scheduler()
+def send_session_reminders():
+    """
+    Send reminder emails to RSVPed users for sessions starting in 1 hour
+    Triggered by Cloud Scheduler every 15 minutes
+    Protected by Cloud Scheduler verification
+    """
+    try:
+        from email_service import send_email
+        import firebase_admin.auth
+        
+        db = get_firestore_client()
+        now = datetime.utcnow()
+        
+        # Find sessions starting in approximately 1 hour (55-65 minutes from now)
+        one_hour_from_now = now + timedelta(hours=1)
+        window_start = one_hour_from_now - timedelta(minutes=5)
+        window_end = one_hour_from_now + timedelta(minutes=5)
+        
+        logging.info(f"Checking for sessions starting between {window_start} and {window_end}")
+        
+        scheduled_rooms = db.collection('scheduled_rooms')\
+            .where('status', '==', 'scheduled')\
+            .where('scheduled_time', '>=', window_start)\
+            .where('scheduled_time', '<=', window_end)\
+            .stream()
+        
+        reminded_count = 0
+        errors = []
+        
+        for scheduled_doc in scheduled_rooms:
+            try:
+                scheduled_data = scheduled_doc.to_dict()
+                scheduled_room_id = scheduled_doc.id
+                room_name = scheduled_data.get('room_name', 'Prayer Room')
+                host_name = scheduled_data.get('host_name', 'Host')
+                scheduled_time = scheduled_data.get('scheduled_time')
+                room_code = scheduled_data.get('room_code')
+                base_url = request.url_root.rstrip('/')
+                
+                # Check if we already sent reminders for this session
+                if scheduled_data.get('reminders_sent'):
+                    logging.info(f"Reminders already sent for {scheduled_room_id}")
+                    continue
+                
+                # Build join URL (will work when room activates)
+                join_url = f"{base_url}/prayer-room"
+                
+                # Get all RSVPs
+                rsvps = db.collection('scheduled_room_rsvps')\
+                    .where('scheduled_room_id', '==', scheduled_room_id)\
+                    .where('is_active', '==', True)\
+                    .stream()
+                
+                email_count = 0
+                for rsvp_doc in rsvps:
+                    rsvp_data = rsvp_doc.to_dict()
+                    
+                    # Skip if user doesn't want 1-hour reminders
+                    if not rsvp_data.get('reminder_preferences', {}).get('email_1hour', True):
+                        continue
+                    
+                    user_email = rsvp_data.get('user_email')
+                    user_name = rsvp_data.get('user_name', 'Prayer Partner')
+                    rsvp_status = rsvp_data.get('rsvp_status', 'interested')
+                    
+                    if user_email:
+                        subject = f"⏰ Reminder: {room_name} starts in 1 hour"
+                        
+                        time_display = scheduled_time.strftime('%I:%M %p') if hasattr(scheduled_time, 'strftime') else 'soon'
+                        
+                        body = f"""
+                        <html>
+                        <head>
+                            <style>
+                                body {{
+                                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                                    line-height: 1.6;
+                                    color: #333;
+                                    max-width: 600px;
+                                    margin: 0 auto;
+                                }}
+                                .header {{
+                                    background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
+                                    padding: 30px;
+                                    text-align: center;
+                                    color: white;
+                                }}
+                                .content {{
+                                    padding: 30px;
+                                    background: #f8f9fa;
+                                }}
+                                .card {{
+                                    background: white;
+                                    border-radius: 10px;
+                                    padding: 25px;
+                                    margin: 20px 0;
+                                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                                }}
+                                .button {{
+                                    display: inline-block;
+                                    padding: 15px 40px;
+                                    background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
+                                    color: white !important;
+                                    text-decoration: none;
+                                    border-radius: 50px;
+                                    font-weight: 600;
+                                    font-size: 18px;
+                                    margin: 20px 0;
+                                }}
+                                .time-badge {{
+                                    display: inline-block;
+                                    padding: 12px 20px;
+                                    background: rgba(15, 86, 255, 0.1);
+                                    color: #0f56ff;
+                                    border-radius: 10px;
+                                    font-size: 24px;
+                                    font-weight: 700;
+                                    margin: 15px 0;
+                                }}
+                                .status-badge {{
+                                    display: inline-block;
+                                    padding: 8px 16px;
+                                    background: rgba(16, 185, 129, 0.1);
+                                    color: #10b981;
+                                    border-radius: 20px;
+                                    font-size: 14px;
+                                    font-weight: 600;
+                                    margin: 10px 0;
+                                }}
+                                .footer {{
+                                    padding: 20px;
+                                    text-align: center;
+                                    color: #666;
+                                    font-size: 14px;
+                                }}
+                            </style>
+                        </head>
+                        <body>
+                            <div class="header">
+                                <h1>⏰ Starting Soon!</h1>
+                            </div>
+                            <div class="content">
+                                <div class="card">
+                                    <h2>Hello {user_name}!</h2>
+                                    <p>Your prayer session is starting in about <strong>1 hour</strong>.</p>
+                                    
+                                    <div style="margin: 20px 0; text-align: center;">
+                                        <strong style="font-size: 20px; color: #0f56ff;">{room_name}</strong><br>
+                                        <span style="color: #666;">Hosted by {host_name}</span>
+                                        <div class="time-badge">⏰ {time_display}</div>
+                                        <div class="status-badge">✓ You're {rsvp_status.title()}</div>
+                                    </div>
+                                    
+                                    <p style="text-align: center; color: #666;">
+                                        Get ready to join! The room will be available at the scheduled time.
+                                    </p>
+                                    
+                                    <div style="text-align: center;">
+                                        <a href="{join_url}" class="button">
+                                            View Prayer Rooms
+                                        </a>
+                                    </div>
+                                    
+                                    <p style="margin-top: 20px; color: #666; font-size: 14px; text-align: center;">
+                                        We'll send you another notification when the session goes live.
+                                    </p>
+                                    
+                                    <p style="color: #666; font-size: 14px; text-align: center;">
+                                        🌟 <em>"Be joyful in hope, patient in affliction, faithful in prayer." - Romans 12:12</em>
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="footer">
+                                <p>Divine Bridge - Connecting Hearts in Prayer</p>
+                            </div>
+                        </body>
+                        </html>
+                        """
+                        
+                        send_email(user_email, subject, body)
+                        email_count += 1
+                        logging.info(f"Sent 1-hour reminder to {user_email} for session {scheduled_room_id}")
+                
+                # Mark this session as having reminders sent
+                scheduled_doc.reference.update({
+                    'reminders_sent': True,
+                    'reminders_sent_at': now
+                })
+                
+                if email_count > 0:
+                    reminded_count += 1
+                    logging.info(f"Sent {email_count} reminder emails for session {scheduled_room_id}")
+                
+            except Exception as session_error:
+                error_msg = f"Error sending reminders for session {scheduled_doc.id}: {str(session_error)}"
+                logging.error(error_msg)
+                errors.append(error_msg)
+                continue
+        
+        result = {
+            'success': True,
+            'timestamp': now.isoformat(),
+            'sessions_reminded': reminded_count
+        }
+        
+        if errors:
+            result['errors'] = errors
+        
+        logging.info(f"Reminder check complete: {reminded_count} sessions processed")
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logging.error(f"Error in send_session_reminders: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat()
+        }), 500
 
 @prayer_room_bp.route('/activate-scheduled-rooms', methods=['POST'])
 @verify_cloud_scheduler()
@@ -2304,6 +2678,167 @@ def activate_scheduled_rooms():
         
     except Exception as e:
         logging.error(f"Error in activate_scheduled_rooms: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat()
+        }), 500
+
+@prayer_room_bp.route('/generate-recurring-instances', methods=['POST'])
+@verify_cloud_scheduler()
+def generate_recurring_instances():
+    """
+    Generate next instances of recurring sessions
+    Triggered by Cloud Scheduler daily
+    Protected by Cloud Scheduler verification
+    """
+    try:
+        db = get_firestore_client()
+        now = datetime.utcnow()
+        
+        # Look ahead 7 days
+        look_ahead_days = 7
+        check_until = now + timedelta(days=look_ahead_days)
+        
+        logging.info(f"Generating recurring instances up to {check_until}")
+        
+        # Find all recurring sessions
+        recurring_sessions = db.collection('scheduled_rooms')\
+            .where('is_recurring', '==', True)\
+            .where('status', '==', 'scheduled')\
+            .stream()
+        
+        generated_count = 0
+        errors = []
+        
+        for rec_doc in recurring_sessions:
+            try:
+                rec_data = rec_doc.to_dict()
+                rec_id = rec_doc.id
+                
+                recurrence_pattern = rec_data.get('recurrence_pattern')
+                recurrence_end_date = rec_data.get('recurrence_end_date')
+                last_generated_time = rec_data.get('last_generated_time', rec_data.get('scheduled_time'))
+                recurrence_days = rec_data.get('recurrence_days', [])
+                
+                # Stop if we've passed the end date
+                if recurrence_end_date and now > recurrence_end_date:
+                    logging.info(f"Recurring session {rec_id} has ended, skipping")
+                    continue
+                
+                # Calculate next instance times
+                next_times = []
+                current_check = last_generated_time if isinstance(last_generated_time, datetime) else last_generated_time
+                
+                if recurrence_pattern == 'weekly':
+                    # Generate instances for next 7 days
+                    for day in range(1, look_ahead_days + 1):
+                        next_time = current_check + timedelta(days=day)
+                        
+                        # Check if this day of week matches recurrence_days
+                        if not recurrence_days or next_time.weekday() in recurrence_days:
+                            if next_time <= check_until and (not recurrence_end_date or next_time <= recurrence_end_date):
+                                # Check if instance doesn't already exist
+                                existing = db.collection('scheduled_rooms')\
+                                    .where('parent_recurring_id', '==', rec_id)\
+                                    .where('scheduled_time', '==', next_time)\
+                                    .limit(1)\
+                                    .stream()
+                                
+                                if not list(existing):
+                                    next_times.append(next_time)
+                
+                elif recurrence_pattern == 'biweekly':
+                    # Every 2 weeks
+                    next_time = current_check + timedelta(weeks=2)
+                    while next_time <= check_until and (not recurrence_end_date or next_time <= recurrence_end_date):
+                        existing = db.collection('scheduled_rooms')\
+                            .where('parent_recurring_id', '==', rec_id)\
+                            .where('scheduled_time', '==', next_time)\
+                            .limit(1)\
+                            .stream()
+                        
+                        if not list(existing):
+                            next_times.append(next_time)
+                        next_time += timedelta(weeks=2)
+                
+                elif recurrence_pattern == 'monthly':
+                    # Same day each month
+                    next_time = current_check
+                    for month in range(1, 4):  # Look ahead 3 months
+                        # Add one month
+                        if next_time.month == 12:
+                            next_time = next_time.replace(year=next_time.year + 1, month=1)
+                        else:
+                            next_month = next_time.month + 1
+                            # Handle day not existing in next month (e.g., Jan 31 -> Feb 28)
+                            try:
+                                next_time = next_time.replace(month=next_month)
+                            except ValueError:
+                                # Day doesn't exist, use last day of month
+                                if next_month == 2:
+                                    next_time = next_time.replace(month=2, day=28)
+                                else:
+                                    next_time = next_time.replace(month=next_month, day=30)
+                        
+                        if next_time <= check_until and (not recurrence_end_date or next_time <= recurrence_end_date):
+                            existing = db.collection('scheduled_rooms')\
+                                .where('parent_recurring_id', '==', rec_id)\
+                                .where('scheduled_time', '==', next_time)\
+                                .limit(1)\
+                                .stream()
+                            
+                            if not list(existing):
+                                next_times.append(next_time)
+                
+                # Create instances
+                for next_time in next_times:
+                    instance_data = {
+                        'room_name': rec_data['room_name'],
+                        'room_description': rec_data.get('room_description', ''),
+                        'room_privacy': rec_data.get('room_privacy', 'public'),
+                        'room_code': rec_data.get('room_code'),
+                        'host_id': rec_data['host_id'],
+                        'host_name': rec_data['host_name'],
+                        'scheduled_time': next_time,
+                        'created_at': now,
+                        'status': 'scheduled',
+                        'is_recurring': False,  # This is an instance, not the template
+                        'parent_recurring_id': rec_id,  # Link back to recurring template
+                        'is_recurring_instance': True
+                    }
+                    
+                    db.collection('scheduled_rooms').add(instance_data)
+                    generated_count += 1
+                    logging.info(f"Generated instance for {rec_data['room_name']} at {next_time}")
+                
+                # Update last_generated_time
+                if next_times:
+                    rec_doc.reference.update({
+                        'last_generated_time': max(next_times)
+                    })
+                
+            except Exception as session_error:
+                error_msg = f"Error generating instances for session {rec_doc.id}: {str(session_error)}"
+                logging.error(error_msg)
+                errors.append(error_msg)
+                continue
+        
+        result = {
+            'success': True,
+            'timestamp': now.isoformat(),
+            'instances_generated': generated_count
+        }
+        
+        if errors:
+            result['errors'] = errors
+        
+        logging.info(f"Recurring instance generation complete: {generated_count} instances created")
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        logging.error(f"Error in generate_recurring_instances: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e),

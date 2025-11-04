@@ -1328,14 +1328,98 @@
                         <input type="text" id="scheduleRoomName" name="room_name" required maxlength="50" placeholder="Enter session name (max 50 characters)">
                     </div>
                     <div class="form-group">
+                        <label for="scheduleRoomDescription">Description (Optional):</label>
+                        <textarea id="scheduleRoomDescription" name="room_description" maxlength="200" placeholder="Brief description of the session" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
                         <label for="scheduleDateTime">Date and Time:</label>
                         <input type="datetime-local" id="scheduleDateTime" name="scheduled_time" required>
                     </div>
-                    <button type="submit" class="btn primary">Schedule</button>
+                    <div class="form-group">
+                        <label for="schedulePrivacy">Privacy:</label>
+                        <select id="schedulePrivacy" name="room_privacy">
+                            <option value="public">Public - Anyone can join</option>
+                            <option value="private">Private - Requires code</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Recurring Options -->
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="scheduleIsRecurring" name="is_recurring" onchange="toggleRecurringOptions()">
+                            <span>Recurring Session</span>
+                        </label>
+                    </div>
+                    
+                    <div id="recurringOptions" style="display: none; margin-left: 20px; padding: 15px; background: rgba(15, 86, 255, 0.05); border-radius: 10px; margin-bottom: 15px;">
+                        <div class="form-group">
+                            <label for="recurrencePattern">Repeat:</label>
+                            <select id="recurrencePattern" name="recurrence_pattern" onchange="toggleRecurrenceDays()">
+                                <option value="weekly">Weekly</option>
+                                <option value="biweekly">Every 2 weeks</option>
+                                <option value="monthly">Monthly</option>
+                            </select>
+                        </div>
+                        
+                        <div id="recurrenceDaysSection" class="form-group">
+                            <label>Repeat on:</label>
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 8px;">
+                                <label style="display: flex; align-items: center; gap: 4px; font-size: 0.9rem; cursor: pointer;">
+                                    <input type="checkbox" name="recurrence_days" value="0">Mon
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 4px; font-size: 0.9rem; cursor: pointer;">
+                                    <input type="checkbox" name="recurrence_days" value="1">Tue
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 4px; font-size: 0.9rem; cursor: pointer;">
+                                    <input type="checkbox" name="recurrence_days" value="2">Wed
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 4px; font-size: 0.9rem; cursor: pointer;">
+                                    <input type="checkbox" name="recurrence_days" value="3">Thu
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 4px; font-size: 0.9rem; cursor: pointer;">
+                                    <input type="checkbox" name="recurrence_days" value="4">Fri
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 4px; font-size: 0.9rem; cursor: pointer;">
+                                    <input type="checkbox" name="recurrence_days" value="5">Sat
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 4px; font-size: 0.9rem; cursor: pointer;">
+                                    <input type="checkbox" name="recurrence_days" value="6">Sun
+                                </label>
+                            </div>
+                            <small style="color: #666; margin-top: 6px; display: block;">Leave empty to repeat on the same day each week</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="recurrenceEndDate">End Date (Optional):</label>
+                            <input type="date" id="recurrenceEndDate" name="recurrence_end_date">
+                            <small style="color: #666; margin-top: 4px; display: block;">If not specified, will default to 3 months</small>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn primary">Schedule Session</button>
                 </form>
             </div>
         </div>
     </div>
+    
+    <script>
+        function toggleRecurringOptions() {
+            const isRecurring = document.getElementById('scheduleIsRecurring').checked;
+            const recurringOptions = document.getElementById('recurringOptions');
+            recurringOptions.style.display = isRecurring ? 'block' : 'none';
+            
+            if (isRecurring) {
+                toggleRecurrenceDays();
+            }
+        }
+        
+        function toggleRecurrenceDays() {
+            const pattern = document.getElementById('recurrencePattern').value;
+            const daysSection = document.getElementById('recurrenceDaysSection');
+            // Only show day selection for weekly pattern
+            daysSection.style.display = pattern === 'weekly' ? 'block' : 'none';
+        }
+    </script>
 
     <!-- My Rooms Modal -->
     <div id="myRoomsModal" class="modal" style="display: none;">

@@ -556,12 +556,35 @@ class PrayerRoomsDirectory {
             return;
         }
         
+        // Get recurring data
+        const isRecurring = formData.get('is_recurring') === 'on';
+        const recurrenceDays = [];
+        
+        if (isRecurring) {
+            // Get all checked days
+            formData.getAll('recurrence_days').forEach(day => {
+                recurrenceDays.push(parseInt(day));
+            });
+        }
+        
         const scheduleData = {
             room_name: roomName,
             room_description: formData.get('room_description'),
             scheduled_time: formData.get('scheduled_time'),
-            room_privacy: 'public' // Default to public for now
+            room_privacy: formData.get('room_privacy') || 'public',
+            is_recurring: isRecurring
         };
+        
+        // Add recurring data if applicable
+        if (isRecurring) {
+            scheduleData.recurrence_pattern = formData.get('recurrence_pattern');
+            scheduleData.recurrence_days = recurrenceDays;
+            
+            const endDate = formData.get('recurrence_end_date');
+            if (endDate) {
+                scheduleData.recurrence_end_date = endDate;
+            }
+        }
         
         console.log('Schedule data being sent:', scheduleData);
 
