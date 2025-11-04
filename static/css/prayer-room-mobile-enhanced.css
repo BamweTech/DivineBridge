@@ -1,0 +1,559 @@
+/* ========================================
+   PRAYER ROOM - ENHANCED MOBILE EXPERIENCE
+   Phase 1 + 2 Implementation
+   World-class, modern, elegant design
+   ======================================== */
+
+/* ===== CSS VARIABLES FOR THEMING ===== */
+:root {
+    /* Primary Colors - Spiritual Blue & Purple Gradients */
+    --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --gradient-primary-hover: linear-gradient(135deg, #5568d3 0%, #65408b 100%);
+    --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    --gradient-danger: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --gradient-warning: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    
+    /* Background Gradients */
+    --gradient-background: linear-gradient(180deg, #ffffff 0%, #f8f9fa 100%);
+    --gradient-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 100%);
+    
+    /* Speaking/Audio Colors */
+    --gradient-speaking: radial-gradient(circle, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.1) 100%);
+    --glow-speaking: 0 0 20px rgba(16, 185, 129, 0.4);
+    
+    /* Semantic Colors */
+    --color-text-primary: #1e293b;
+    --color-text-secondary: #64748b;
+    --color-text-tertiary: #94a3b8;
+    --color-border: #e5e7eb;
+    --color-border-light: rgba(229, 231, 235, 0.5);
+    
+    /* Brand Colors */
+    --color-brand-blue: #667eea;
+    --color-brand-purple: #764ba2;
+    --color-host-gold: #fbbf24;
+    
+    /* Spacing System (4px grid) */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 12px;
+    --space-lg: 16px;
+    --space-xl: 24px;
+    --space-2xl: 32px;
+    
+    /* Border Radius */
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --radius-full: 9999px;
+    
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+    --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.1);
+    --shadow-xl: 0 12px 24px rgba(0, 0, 0, 0.12);
+    --shadow-glow: 0 0 20px rgba(102, 126, 234, 0.3);
+    
+    /* Animation Timing */
+    --timing-fast: 0.15s;
+    --timing-normal: 0.3s;
+    --timing-slow: 0.5s;
+    --easing-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* Typography */
+    --font-primary: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Roboto', system-ui, sans-serif;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+}
+
+@media (max-width: 768px) {
+    
+/* ==========================================
+   PHASE 1.1: GLASSMORPHIC UI ELEMENTS
+   ========================================== */
+
+/* ===== GLASSMORPHIC HEADER ===== */
+.prayer-room-header {
+    background: rgba(255, 255, 255, 0.85) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    border-bottom: 1px solid rgba(229, 231, 235, 0.5) !important;
+    box-shadow: 
+        0 1px 3px rgba(0, 0, 0, 0.05),
+        0 10px 20px rgba(0, 0, 0, 0.02) !important;
+}
+
+/* ===== GLASSMORPHIC BOTTOM TABS ===== */
+.mobile-bottom-tabs {
+    background: rgba(255, 255, 255, 0.9) !important;
+    backdrop-filter: blur(30px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(30px) saturate(180%) !important;
+    border-top: 1px solid rgba(229, 231, 235, 0.6) !important;
+    box-shadow: 
+        0 -2px 10px rgba(0, 0, 0, 0.05),
+        0 -1px 3px rgba(0, 0, 0, 0.02) !important;
+}
+
+/* Tab buttons with glass effect when active */
+.mobile-tab-btn.active {
+    background: var(--gradient-glass) !important;
+    backdrop-filter: blur(10px) !important;
+    box-shadow: 
+        inset 0 1px 0 rgba(255, 255, 255, 0.5),
+        0 2px 8px rgba(102, 126, 234, 0.15) !important;
+    border: 1px solid rgba(102, 126, 234, 0.2) !important;
+}
+
+/* ===== GLASSMORPHIC CHAT INPUT ===== */
+.chat-input-section {
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(30px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(30px) saturate(180%) !important;
+    border-top: 1px solid rgba(229, 231, 235, 0.5) !important;
+    box-shadow: 
+        0 -4px 12px rgba(0, 0, 0, 0.08),
+        0 -1px 3px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* ===== GLASSMORPHIC SPEAKING PARTICIPANT ===== */
+.participant.speaking {
+    background: var(--gradient-speaking) !important;
+    backdrop-filter: blur(10px) !important;
+    border: 2px solid rgba(16, 185, 129, 0.4) !important;
+    box-shadow: 
+        0 4px 12px rgba(16, 185, 129, 0.2),
+        0 0 20px rgba(16, 185, 129, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+    animation: speakingGlow 2s ease-in-out infinite !important;
+}
+
+@keyframes speakingGlow {
+    0%, 100% { 
+        box-shadow: 
+            0 4px 12px rgba(16, 185, 129, 0.2),
+            0 0 20px rgba(16, 185, 129, 0.15),
+            inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+    50% { 
+        box-shadow: 
+            0 4px 16px rgba(16, 185, 129, 0.3),
+            0 0 30px rgba(16, 185, 129, 0.25),
+            inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+}
+
+/* ==========================================
+   PHASE 1.2: ENHANCED COLOR SYSTEM
+   ========================================== */
+
+/* ===== GRADIENT BUTTONS ===== */
+.join-audio-btn,
+.control-btn.join-audio-btn,
+.header-actions .join-audio-btn {
+    background: var(--gradient-primary) !important;
+    color: #ffffff !important;
+    border: none !important;
+    box-shadow: 
+        0 4px 12px rgba(102, 126, 234, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+}
+
+.join-audio-btn:active,
+.control-btn.join-audio-btn:active {
+    background: var(--gradient-primary-hover) !important;
+    transform: scale(0.96) translateY(1px) !important;
+    box-shadow: 
+        0 2px 8px rgba(102, 126, 234, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+.mute-btn,
+.control-btn.mute-btn,
+.header-actions .mute-btn {
+    background: var(--gradient-danger) !important;
+    color: #ffffff !important;
+    border: none !important;
+    box-shadow: 
+        0 4px 12px rgba(240, 147, 251, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+}
+
+.mute-btn:active,
+.control-btn.mute-btn:active {
+    transform: scale(0.96) translateY(1px) !important;
+    box-shadow: 
+        0 2px 8px rgba(240, 147, 251, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+#shareBtn,
+.header-actions #shareBtn {
+    background: var(--gradient-success) !important;
+    color: #ffffff !important;
+    border: none !important;
+    box-shadow: 
+        0 4px 12px rgba(16, 185, 129, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+}
+
+#shareBtn:active {
+    transform: scale(0.96) translateY(1px) !important;
+    box-shadow: 
+        0 2px 8px rgba(16, 185, 129, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+.control-btn.leave,
+#leaveBtn,
+.header-actions #leaveBtn {
+    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%) !important;
+    color: #6b7280 !important;
+    border: 1px solid rgba(229, 231, 235, 0.8) !important;
+    box-shadow: 
+        0 2px 8px rgba(0, 0, 0, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+}
+
+#leaveBtn:active {
+    background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%) !important;
+    transform: scale(0.96) translateY(1px) !important;
+}
+
+/* ===== ROOM CODE WITH GRADIENT ===== */
+.room-code,
+.room-code-display {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%) !important;
+    color: var(--color-brand-blue) !important;
+    border: 1px solid rgba(102, 126, 234, 0.2) !important;
+    box-shadow: inset 0 1px 2px rgba(102, 126, 234, 0.05) !important;
+}
+
+/* ===== PARTICIPANT COUNT BADGE ===== */
+.participant-count {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%) !important;
+    color: var(--color-brand-blue) !important;
+    border: 1px solid rgba(102, 126, 234, 0.25) !important;
+    box-shadow: 
+        0 2px 4px rgba(102, 126, 234, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+}
+
+/* ==========================================
+   PHASE 1.3: TYPOGRAPHY HIERARCHY
+   ========================================== */
+
+/* ===== FONT FAMILY ===== */
+body,
+.prayer-room-container {
+    font-family: var(--font-primary) !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+}
+
+/* ===== ROOM TITLE - DISPLAY ===== */
+.prayer-room-title,
+.room-title {
+    font-size: 14px !important;
+    font-weight: var(--font-weight-semibold) !important;
+    letter-spacing: -0.01em !important;
+    color: var(--color-text-primary) !important;
+    line-height: 1.3 !important;
+}
+
+/* ===== PARTICIPANT NAME - HEADING ===== */
+.participant-name {
+    font-size: 14px !important;
+    font-weight: var(--font-weight-semibold) !important;
+    color: var(--color-text-primary) !important;
+    line-height: 1.4 !important;
+    letter-spacing: -0.01em !important;
+}
+
+/* ===== CHAT MESSAGE - BODY ===== */
+.message,
+.chat-message {
+    font-size: 15px !important;
+    font-weight: var(--font-weight-normal) !important;
+    line-height: 1.5 !important;
+    letter-spacing: -0.01em !important;
+}
+
+/* ===== TIMESTAMPS - CAPTION ===== */
+.message-time,
+.timestamp {
+    font-size: 11px !important;
+    font-weight: var(--font-weight-normal) !important;
+    color: var(--color-text-tertiary) !important;
+    line-height: 1.3 !important;
+}
+
+/* ===== TAB LABELS - CAPTION ===== */
+.tab-label {
+    font-size: 10px !important;
+    font-weight: var(--font-weight-medium) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+}
+
+/* ===== SECTION TITLES ===== */
+.participants-title,
+.chat-title {
+    font-size: 16px !important;
+    font-weight: var(--font-weight-bold) !important;
+    color: var(--color-text-primary) !important;
+    letter-spacing: -0.02em !important;
+    line-height: 1.2 !important;
+}
+
+/* ===== BUTTON TEXT ===== */
+.control-btn,
+.send-btn {
+    font-size: 14px !important;
+    font-weight: var(--font-weight-semibold) !important;
+    letter-spacing: -0.01em !important;
+}
+
+.header-actions .control-btn {
+    font-size: 11px !important;
+    font-weight: var(--font-weight-semibold) !important;
+}
+
+/* ==========================================
+   PHASE 2.1: WHATSAPP-STYLE CHAT BUBBLES
+   ========================================== */
+
+/* ===== CHAT MESSAGES CONTAINER ===== */
+.chat-messages {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+}
+
+/* ===== BASE MESSAGE STYLES ===== */
+.message,
+.chat-message {
+    max-width: 75% !important;
+    padding: 10px 14px !important;
+    border-radius: var(--radius-lg) !important;
+    margin-bottom: 4px !important;
+    word-wrap: break-word !important;
+    position: relative !important;
+    box-shadow: var(--shadow-sm) !important;
+    animation: messageSlideIn 0.3s var(--easing-smooth) !important;
+}
+
+@keyframes messageSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* ===== OWN MESSAGES (Right-aligned, Blue) ===== */
+.message.message-own,
+.chat-message.message-own {
+    align-self: flex-end !important;
+    background: var(--gradient-primary) !important;
+    color: #ffffff !important;
+    border-radius: 18px 18px 4px 18px !important;
+    margin-left: auto !important;
+    margin-right: 0 !important;
+    box-shadow: 
+        0 2px 8px rgba(102, 126, 234, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Chat bubble tail for own messages */
+.message.message-own::after,
+.chat-message.message-own::after {
+    content: '' !important;
+    position: absolute !important;
+    bottom: 0 !important;
+    right: -6px !important;
+    width: 12px !important;
+    height: 12px !important;
+    background: var(--color-brand-purple) !important;
+    clip-path: polygon(0 0, 100% 0, 100% 100%) !important;
+    border-radius: 0 0 3px 0 !important;
+}
+
+/* ===== OTHER MESSAGES (Left-aligned, Gray) ===== */
+.message.message-other,
+.chat-message.message-other {
+    align-self: flex-start !important;
+    background: #f3f4f6 !important;
+    color: var(--color-text-primary) !important;
+    border-radius: 18px 18px 18px 4px !important;
+    margin-right: auto !important;
+    margin-left: 0 !important;
+    box-shadow: var(--shadow-sm) !important;
+    border: 1px solid #e5e7eb !important;
+}
+
+/* Chat bubble tail for other messages */
+.message.message-other::after,
+.chat-message.message-other::after {
+    content: '' !important;
+    position: absolute !important;
+    bottom: 0 !important;
+    left: -6px !important;
+    width: 12px !important;
+    height: 12px !important;
+    background: #f3f4f6 !important;
+    clip-path: polygon(0 0, 100% 0, 0 100%) !important;
+    border-radius: 0 0 0 3px !important;
+}
+
+/* ==========================================
+   PHASE 2.2: MESSAGE METADATA
+   ========================================== */
+
+/* ===== MESSAGE WRAPPER ===== */
+.message-wrapper {
+    display: flex !important;
+    flex-direction: column !important;
+    max-width: 75% !important;
+    margin-bottom: var(--space-sm) !important;
+}
+
+.message-wrapper.message-own {
+    align-items: flex-end !important;
+    margin-left: auto !important;
+}
+
+.message-wrapper.message-other {
+    align-items: flex-start !important;
+    margin-right: auto !important;
+}
+
+/* ===== SENDER NAME (Only for other messages) ===== */
+.message-sender {
+    font-size: 12px !important;
+    font-weight: var(--font-weight-semibold) !important;
+    color: var(--color-brand-blue) !important;
+    margin-bottom: 2px !important;
+    padding-left: 4px !important;
+}
+
+/* ===== MESSAGE META (Timestamp + Status) ===== */
+.message-meta {
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    margin-top: 2px !important;
+    padding: 0 4px !important;
+}
+
+.message-time {
+    font-size: 11px !important;
+    color: var(--color-text-tertiary) !important;
+    opacity: 0.8 !important;
+}
+
+.message-own .message-time {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* ===== MESSAGE STATUS (Read Receipts) ===== */
+.message-status {
+    display: inline-flex !important;
+    align-items: center !important;
+    font-size: 14px !important;
+    line-height: 1 !important;
+    opacity: 0.8 !important;
+}
+
+/* Checkmark icons */
+.status-sent::before {
+    content: '✓' !important;
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.status-delivered::before {
+    content: '✓✓' !important;
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.status-read::before {
+    content: '✓✓' !important;
+    color: #60d5ff !important;
+}
+
+/* ==========================================
+   PHASE 2.3: TYPING INDICATORS
+   ========================================== */
+
+.typing-indicator {
+    display: flex !important;
+    align-items: center !important;
+    gap: var(--space-sm) !important;
+    padding: 12px 14px !important;
+    max-width: 75% !important;
+    background: #f3f4f6 !important;
+    border-radius: 18px 18px 18px 4px !important;
+    margin-bottom: var(--space-sm) !important;
+    animation: fadeIn 0.3s var(--easing-smooth) !important;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.typing-name {
+    font-size: 12px !important;
+    font-weight: var(--font-weight-medium) !important;
+    color: var(--color-text-secondary) !important;
+}
+
+.typing-dots {
+    display: flex !important;
+    gap: 3px !important;
+    align-items: center !important;
+}
+
+.typing-dots span {
+    width: 6px !important;
+    height: 6px !important;
+    background: var(--color-brand-blue) !important;
+    border-radius: 50% !important;
+    animation: typingBounce 1.4s infinite !important;
+}
+
+.typing-dots span:nth-child(1) {
+    animation-delay: 0s !important;
+}
+
+.typing-dots span:nth-child(2) {
+    animation-delay: 0.2s !important;
+}
+
+.typing-dots span:nth-child(3) {
+    animation-delay: 0.4s !important;
+}
+
+@keyframes typingBounce {
+    0%, 60%, 100% {
+        transform: translateY(0);
+        opacity: 0.7;
+    }
+    30% {
+        transform: translateY(-8px);
+        opacity: 1;
+    }
+}
+
+/* Continue in next file due to size... */
+
+}
+

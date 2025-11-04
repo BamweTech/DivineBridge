@@ -39,6 +39,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-redesign.css') }}?v={{ range(100000, 999999) | random }}">
     <!-- MOBILE PERFECT - Must load last to override everything -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-mobile-perfect.css') }}?v={{ range(100000, 999999) | random }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-mobile-enhanced.css') }}?v={{ range(100000, 999999) | random }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-mobile-enhanced-part2.css') }}?v={{ range(100000, 999999) | random }}">
     
     <!-- Cache-busting meta tags -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -1339,6 +1341,7 @@
 
     <!-- Prayer Room JavaScript -->
     <script src="{{ url_for('static', filename='js/prayer-room.js') }}?v={{ range(10000, 99999) | random }}"></script>
+    <script src="{{ url_for('static', filename='js/prayer-room-enhancements.js') }}?v={{ range(10000, 99999) | random }}"></script>
     
     <script>
         // Initialize prayer room service
@@ -1352,6 +1355,24 @@
 
         // ===== MODERN MOBILE TAB SYSTEM =====
         document.addEventListener('DOMContentLoaded', () => {
+            // Initialize UI Enhancements
+            // Wait for Firebase auth to get user ID
+            setTimeout(() => {
+                if (firebase.auth && firebase.auth().currentUser) {
+                    const userId = firebase.auth().currentUser.uid;
+                    console.log('[PrayerRoom] Initializing enhancements with user ID:', userId);
+                    window.currentUserId = userId;
+                    if (window.PrayerRoomEnhancements) {
+                        window.PrayerRoomEnhancements.init(userId);
+                    }
+                } else {
+                    console.log('[PrayerRoom] No user logged in, initializing enhancements without user ID');
+                    if (window.PrayerRoomEnhancements) {
+                        window.PrayerRoomEnhancements.init('guest-' + Date.now());
+                    }
+                }
+            }, 500);
+
             // Initialize room subscription system
             window.roomSubscription = {
                 isSubscribed: false,

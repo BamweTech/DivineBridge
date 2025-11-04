@@ -1,0 +1,657 @@
+/* ========================================
+   PRAYER ROOM - ENHANCED MOBILE (Part 2)
+   Continued from prayer-room-mobile-enhanced.css
+   ======================================== */
+
+@media (max-width: 768px) {
+
+/* ==========================================
+   PHASE 2.4: ENHANCED EMPTY STATES
+   ========================================== */
+
+/* ===== EMPTY CHAT STATE ===== */
+.empty-chat-state {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: var(--space-2xl) var(--space-lg) !important;
+    text-align: center !important;
+    min-height: 300px !important;
+    animation: fadeIn 0.5s var(--easing-smooth) !important;
+}
+
+.empty-icon {
+    font-size: 64px !important;
+    margin-bottom: var(--space-lg) !important;
+    animation: floatAnimation 3s ease-in-out infinite !important;
+}
+
+@keyframes floatAnimation {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+}
+
+.empty-chat-state h3 {
+    font-size: 18px !important;
+    font-weight: var(--font-weight-bold) !important;
+    color: var(--color-text-primary) !important;
+    margin: 0 0 var(--space-sm) 0 !important;
+    letter-spacing: -0.02em !important;
+}
+
+.empty-chat-state p {
+    font-size: 14px !important;
+    color: var(--color-text-secondary) !important;
+    line-height: 1.6 !important;
+    margin: 0 0 var(--space-lg) 0 !important;
+}
+
+.quick-messages {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: var(--space-sm) !important;
+    width: 100% !important;
+    max-width: 280px !important;
+}
+
+.quick-messages button {
+    padding: 12px var(--space-lg) !important;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%) !important;
+    border: 1px solid rgba(102, 126, 234, 0.2) !important;
+    border-radius: var(--radius-md) !important;
+    font-size: 14px !important;
+    font-weight: var(--font-weight-medium) !important;
+    color: var(--color-brand-blue) !important;
+    cursor: pointer !important;
+    transition: all var(--timing-fast) var(--easing-smooth) !important;
+}
+
+.quick-messages button:active {
+    transform: scale(0.97) !important;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%) !important;
+}
+
+/* ===== EMPTY PARTICIPANTS STATE ===== */
+.no-participants {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: var(--space-2xl) var(--space-lg) !important;
+    text-align: center !important;
+    min-height: 200px !important;
+}
+
+.no-participants-icon {
+    font-size: 48px !important;
+    margin-bottom: var(--space-md) !important;
+    opacity: 0.6 !important;
+}
+
+.no-participants-text {
+    font-size: 14px !important;
+    color: var(--color-text-secondary) !important;
+    line-height: 1.6 !important;
+}
+
+/* ==========================================
+   PHASE 2.5: AVATAR SYSTEM
+   ========================================== */
+
+/* ===== PARTICIPANT AVATAR ===== */
+.participant-avatar {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 16px !important;
+    font-weight: var(--font-weight-semibold) !important;
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+    flex-shrink: 0 !important;
+    box-shadow: 
+        0 2px 8px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+    border: 2px solid #ffffff !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+/* Avatar glow for speaking */
+.participant.speaking .participant-avatar {
+    box-shadow: 
+        0 0 0 3px rgba(16, 185, 129, 0.3),
+        0 2px 12px rgba(16, 185, 129, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+    animation: avatarPulse 2s ease-in-out infinite !important;
+}
+
+@keyframes avatarPulse {
+    0%, 100% {
+        box-shadow: 
+            0 0 0 3px rgba(16, 185, 129, 0.3),
+            0 2px 12px rgba(16, 185, 129, 0.4),
+            inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    50% {
+        box-shadow: 
+            0 0 0 4px rgba(16, 185, 129, 0.4),
+            0 4px 16px rgba(16, 185, 129, 0.5),
+            inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+}
+
+/* Small avatar for messages */
+.message-avatar {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 12px !important;
+    font-weight: var(--font-weight-semibold) !important;
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+    flex-shrink: 0 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    border: 2px solid #ffffff !important;
+    margin-right: var(--space-sm) !important;
+}
+
+/* Avatar gradient classes (generated dynamically) */
+.avatar-gradient-1 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important; }
+.avatar-gradient-2 { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important; }
+.avatar-gradient-3 { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important; }
+.avatar-gradient-4 { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%) !important; }
+.avatar-gradient-5 { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%) !important; }
+.avatar-gradient-6 { background: linear-gradient(135deg, #30cfd0 0%, #330867 100%) !important; }
+.avatar-gradient-7 { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%) !important; }
+.avatar-gradient-8 { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%) !important; }
+.avatar-gradient-9 { background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%) !important; }
+.avatar-gradient-10 { background: linear-gradient(135deg, #ff6e7f 0%, #bfe9ff 100%) !important; }
+
+/* ==========================================
+   PHASE 2.6: AUDIO WAVE ANIMATION
+   ========================================== */
+
+/* ===== SPEAKING INDICATOR WITH WAVES ===== */
+.speaking-indicator {
+    display: flex !important;
+    gap: 2px !important;
+    align-items: center !important;
+    height: 24px !important;
+    padding: 0 var(--space-sm) !important;
+}
+
+.wave-bar {
+    width: 3px !important;
+    background: linear-gradient(180deg, #10b981 0%, #059669 100%) !important;
+    border-radius: 3px !important;
+    animation: waveAnimation 0.8s ease-in-out infinite !important;
+    box-shadow: 0 0 4px rgba(16, 185, 129, 0.3) !important;
+}
+
+.wave-bar:nth-child(1) {
+    animation-delay: 0s !important;
+}
+
+.wave-bar:nth-child(2) {
+    animation-delay: 0.1s !important;
+}
+
+.wave-bar:nth-child(3) {
+    animation-delay: 0.2s !important;
+}
+
+.wave-bar:nth-child(4) {
+    animation-delay: 0.3s !important;
+}
+
+.wave-bar:nth-child(5) {
+    animation-delay: 0.4s !important;
+}
+
+@keyframes waveAnimation {
+    0%, 100% {
+        height: 8px;
+        opacity: 0.6;
+    }
+    50% {
+        height: 24px;
+        opacity: 1;
+    }
+}
+
+/* ===== MIC ICON WITH ANIMATION ===== */
+.mic-icon {
+    position: relative !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.participant.speaking .mic-icon {
+    animation: micPulse 1.5s ease-in-out infinite !important;
+}
+
+@keyframes micPulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+/* ==========================================
+   PHASE 2.7: BUTTON RIPPLE EFFECTS
+   ========================================== */
+
+/* ===== RIPPLE EFFECT ===== */
+.control-btn,
+.mobile-tab-btn,
+.send-btn,
+.quick-messages button {
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+.control-btn::before,
+.mobile-tab-btn::before,
+.send-btn::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    width: 0 !important;
+    height: 0 !important;
+    border-radius: 50% !important;
+    background: rgba(255, 255, 255, 0.5) !important;
+    transform: translate(-50%, -50%) !important;
+    transition: width 0.6s, height 0.6s !important;
+}
+
+.control-btn:active::before,
+.mobile-tab-btn:active::before,
+.send-btn:active::before {
+    width: 300px !important;
+    height: 300px !important;
+}
+
+/* Ripple for dark buttons */
+.control-btn.leave::before,
+#leaveBtn::before {
+    background: rgba(0, 0, 0, 0.1) !important;
+}
+
+/* ===== BUTTON LOADING STATE ===== */
+.control-btn.loading,
+.send-btn.loading {
+    pointer-events: none !important;
+    opacity: 0.7 !important;
+    position: relative !important;
+}
+
+.control-btn.loading::after,
+.send-btn.loading::after {
+    content: '' !important;
+    position: absolute !important;
+    width: 16px !important;
+    height: 16px !important;
+    border: 2px solid currentColor !important;
+    border-top-color: transparent !important;
+    border-radius: 50% !important;
+    animation: spin 0.6s linear infinite !important;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ===== BUTTON SUCCESS STATE ===== */
+.control-btn.success {
+    animation: successPulse 0.6s var(--easing-smooth) !important;
+}
+
+@keyframes successPulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+/* ===== BUTTON ERROR STATE ===== */
+.control-btn.error {
+    animation: errorShake 0.5s var(--easing-smooth) !important;
+}
+
+@keyframes errorShake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    10%, 30%, 50%, 70%, 90% {
+        transform: translateX(-5px);
+    }
+    20%, 40%, 60%, 80% {
+        transform: translateX(5px);
+    }
+}
+
+/* ==========================================
+   PHASE 2.8: SKELETON LOADERS
+   ========================================== */
+
+/* ===== BASE SKELETON STYLES ===== */
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        #f0f0f0 0%,
+        #f0f0f0 40%,
+        #e8e8e8 50%,
+        #f0f0f0 60%,
+        #f0f0f0 100%
+    ) !important;
+    background-size: 200% 100% !important;
+    animation: shimmer 1.5s ease-in-out infinite !important;
+    border-radius: var(--radius-md) !important;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* ===== SKELETON PARTICIPANT CARD ===== */
+.skeleton-participant {
+    display: flex !important;
+    align-items: center !important;
+    gap: var(--space-md) !important;
+    padding: 12px !important;
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: var(--radius-md) !important;
+    margin-bottom: var(--space-sm) !important;
+}
+
+.skeleton-avatar {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 50% !important;
+    flex-shrink: 0 !important;
+}
+
+.skeleton-participant-info {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+}
+
+.skeleton-name {
+    width: 120px !important;
+    height: 16px !important;
+    border-radius: 4px !important;
+}
+
+.skeleton-status {
+    width: 80px !important;
+    height: 12px !important;
+    border-radius: 4px !important;
+}
+
+/* ===== SKELETON MESSAGE ===== */
+.skeleton-message {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: var(--space-sm) !important;
+    margin-bottom: var(--space-sm) !important;
+}
+
+.skeleton-message-avatar {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 50% !important;
+    flex-shrink: 0 !important;
+}
+
+.skeleton-message-bubble {
+    flex: 1 !important;
+    max-width: 75% !important;
+    height: 60px !important;
+    border-radius: 18px 18px 18px 4px !important;
+}
+
+.skeleton-message.skeleton-own .skeleton-message-bubble {
+    margin-left: auto !important;
+    border-radius: 18px 18px 4px 18px !important;
+}
+
+/* ===== SKELETON ROOM INFO ===== */
+.skeleton-room-info {
+    display: flex !important;
+    align-items: center !important;
+    gap: var(--space-sm) !important;
+}
+
+.skeleton-logo {
+    width: 20px !important;
+    height: 20px !important;
+    border-radius: 4px !important;
+}
+
+.skeleton-room-name {
+    width: 140px !important;
+    height: 14px !important;
+    border-radius: 4px !important;
+}
+
+/* ==========================================
+   ADDITIONAL ENHANCEMENTS
+   ========================================== */
+
+/* ===== SMOOTH SCROLLING ===== */
+.chat-messages,
+.participants-list {
+    scroll-behavior: smooth !important;
+}
+
+/* ===== IMPROVED FOCUS STATES ===== */
+.control-btn:focus-visible,
+.mobile-tab-btn:focus-visible,
+.send-btn:focus-visible,
+.chat-input:focus-visible {
+    outline: 2px solid var(--color-brand-blue) !important;
+    outline-offset: 2px !important;
+}
+
+/* ===== BETTER TAP HIGHLIGHTS ===== */
+* {
+    -webkit-tap-highlight-color: transparent !important;
+}
+
+button,
+a,
+.mobile-tab-btn,
+.control-btn {
+    -webkit-tap-highlight-color: rgba(102, 126, 234, 0.1) !important;
+}
+
+/* ===== PARTICIPANT CARD IMPROVEMENTS ===== */
+.participant {
+    display: flex !important;
+    align-items: center !important;
+    gap: var(--space-md) !important;
+    transition: all var(--timing-fast) var(--easing-smooth) !important;
+}
+
+.participant:active {
+    transform: scale(0.98) !important;
+}
+
+.participant-info {
+    flex: 1 !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+}
+
+.participant-status {
+    font-size: 11px !important;
+    color: var(--color-text-tertiary) !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+}
+
+/* ===== ROLE BADGES ===== */
+.role-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 2px !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    font-size: 10px !important;
+    font-weight: var(--font-weight-semibold) !important;
+    line-height: 1 !important;
+}
+
+.role-badge.host {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.2) 0%, rgba(245, 158, 11, 0.2) 100%) !important;
+    color: #d97706 !important;
+    border: 1px solid rgba(251, 191, 36, 0.3) !important;
+}
+
+.role-badge.speaking {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.2) 100%) !important;
+    color: #059669 !important;
+    border: 1px solid rgba(16, 185, 129, 0.3) !important;
+    animation: badgePulse 2s ease-in-out infinite !important;
+}
+
+@keyframes badgePulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.role-badge.muted {
+    background: rgba(156, 163, 175, 0.2) !important;
+    color: #6b7280 !important;
+    border: 1px solid rgba(156, 163, 175, 0.3) !important;
+}
+
+/* ===== TOAST NOTIFICATIONS ===== */
+.toast-notification {
+    position: fixed !important;
+    top: var(--space-lg) !important;
+    left: 50% !important;
+    transform: translateX(-50%) translateY(-100px) !important;
+    min-width: 280px !important;
+    max-width: 90% !important;
+    background: rgba(30, 41, 59, 0.95) !important;
+    backdrop-filter: blur(20px) !important;
+    color: #ffffff !important;
+    padding: 12px var(--space-lg) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: 
+        0 10px 40px rgba(0, 0, 0, 0.3),
+        0 0 0 1px rgba(255, 255, 255, 0.1) !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: var(--space-md) !important;
+    z-index: 9999 !important;
+    animation: toastSlideIn 0.3s var(--easing-smooth) forwards !important;
+}
+
+@keyframes toastSlideIn {
+    to {
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.toast-notification.toast-hide {
+    animation: toastSlideOut 0.3s var(--easing-smooth) forwards !important;
+}
+
+@keyframes toastSlideOut {
+    to {
+        transform: translateX(-50%) translateY(-100px);
+        opacity: 0;
+    }
+}
+
+.toast-icon {
+    font-size: 24px !important;
+    flex-shrink: 0 !important;
+}
+
+.toast-content {
+    flex: 1 !important;
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+}
+
+.toast-content strong {
+    font-weight: var(--font-weight-semibold) !important;
+}
+
+/* ===== UNREAD MESSAGE BADGE ===== */
+.unread-badge {
+    animation: badgePulse 2s ease-in-out infinite !important;
+}
+
+/* ===== CHAT INPUT ENHANCEMENTS ===== */
+.chat-input {
+    transition: all var(--timing-fast) var(--easing-smooth) !important;
+}
+
+.chat-input::placeholder {
+    color: var(--color-text-tertiary) !important;
+    opacity: 0.6 !important;
+}
+
+.send-btn {
+    transition: all var(--timing-fast) var(--easing-smooth) !important;
+}
+
+.send-btn:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+}
+
+/* ===== PERFORMANCE OPTIMIZATIONS ===== */
+.participant,
+.message,
+.chat-message,
+.mobile-tab-btn,
+.control-btn {
+    will-change: transform !important;
+}
+
+/* ===== REDUCED MOTION SUPPORT ===== */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+}
+
