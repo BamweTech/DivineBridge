@@ -440,8 +440,6 @@ class PrayerRoomsDirectory {
     async handleCreateRoom(e) {
         e.preventDefault();
 
-        // Using Firebase ID token for persistent authentication across deployments
-        
         const formData = new FormData(e.target);
         const roomName = formData.get('room_name');
         const roomPrivacy = formData.get('room_privacy');
@@ -459,25 +457,26 @@ class PrayerRoomsDirectory {
         };
 
         try {
-            // Get Firebase ID token
+            // Try to get Firebase ID token (for persistent auth)
             const idToken = await this.getFirebaseIdToken();
             
-            if (!idToken) {
-                // No Firebase auth - redirect to login
-                console.log('Not authenticated, redirecting to login');
-                window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
-                return;
-            }
-            
+            // Prepare headers - include Firebase token if available
             const headers = {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${idToken}` // Send Firebase ID token
+                'Content-Type': 'application/json'
             };
             
+            if (idToken) {
+                headers['Authorization'] = `Bearer ${idToken}`;
+                console.log('✅ Using Firebase ID token for authentication');
+            } else {
+                console.log('⚠️ No Firebase token, will use session authentication');
+            }
+            
+            // Always try the request - backend will check session if no Firebase token
             const response = await fetch('/api/prayer-room/create', {
                 method: 'POST',
                 headers: headers,
-                credentials: 'include',  // Also include session cookies as fallback
+                credentials: 'include',  // Include session cookies for fallback auth
                 body: JSON.stringify(roomData)
             });
 
@@ -492,8 +491,8 @@ class PrayerRoomsDirectory {
                 // Redirect to the created room
                 window.location.href = `/prayer-room/join?room=${result.room_id}&name=${encodeURIComponent(roomData.room_name)}`;
             } else if (response.status === 401) {
-                // Authentication required - redirect to login
-                console.log('Authentication required, redirecting to login');
+                // Only redirect to login if backend says not authenticated
+                console.log('❌ Not authenticated, redirecting to login');
                 window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
             } else {
                 alert('Failed to create room: ' + (result.error || 'Unknown error'));
@@ -589,20 +588,20 @@ class PrayerRoomsDirectory {
         console.log('Schedule data being sent:', scheduleData);
 
         try {
-            // Get Firebase ID token
+            // Try to get Firebase ID token (for persistent auth)
             const idToken = await this.getFirebaseIdToken();
             
-            if (!idToken) {
-                // No Firebase auth - redirect to login
-                console.log('Not authenticated, redirecting to login');
-                window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
-                return;
-            }
-            
+            // Prepare headers - include Firebase token if available
             const headers = {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${idToken}` // Send Firebase ID token
+                'Content-Type': 'application/json'
             };
+            
+            if (idToken) {
+                headers['Authorization'] = `Bearer ${idToken}`;
+                console.log('✅ Using Firebase ID token for authentication');
+            } else {
+                console.log('⚠️ No Firebase token, will use session authentication');
+            }
             
             // Check if we're editing an existing scheduled room
             const isEditing = window.editingScheduledRoomId;
@@ -611,10 +610,11 @@ class PrayerRoomsDirectory {
                 '/api/prayer-room/schedule';
             const method = isEditing ? 'PUT' : 'POST';
             
+            // Always try the request - backend will check session if no Firebase token
             const response = await fetch(url, {
                 method: method,
                 headers: headers,
-                credentials: 'include',  // Also include session cookies as fallback
+                credentials: 'include',  // Include session cookies for fallback auth
                 body: JSON.stringify(scheduleData)
             });
 
@@ -637,8 +637,8 @@ class PrayerRoomsDirectory {
                 // Refresh the scheduled rooms list
                 this.loadMyScheduledRooms();
             } else if (response.status === 401) {
-                // Authentication required - redirect to login
-                console.log('Authentication required, redirecting to login');
+                // Only redirect to login if backend says not authenticated
+                console.log('❌ Not authenticated, redirecting to login');
                 window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
             } else {
                 alert(`Failed to ${isEditing ? 'update' : 'schedule'} room: ` + (result.error || 'Unknown error'));
