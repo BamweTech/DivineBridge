@@ -429,7 +429,14 @@ def send_daily_report_email(email_summary):
         from email.utils import formataddr
         import smtplib
         
+        logger.info("Initializing EmailSender for daily report...")
         sender = EmailSender()
+        
+        if not sender.sender_email or not sender.sender_password:
+            logger.error("Email credentials not configured - sender_email or sender_password is missing")
+            return False
+        
+        logger.info(f"Sending email to jeancalmere.kubwayo@divinebridge.io from {sender.sender_email}")
         
         msg = MIMEMultipart('alternative')
         msg['From'] = formataddr(("Divine Bridge AI Assistant", sender.sender_email))
@@ -439,16 +446,23 @@ def send_daily_report_email(email_summary):
         msg.attach(MIMEText(email_summary['text'], 'plain'))
         msg.attach(MIMEText(email_summary['html'], 'html'))
         
+        logger.info(f"Connecting to SMTP server: {sender.smtp_server}:{sender.smtp_port}")
         with smtplib.SMTP(sender.smtp_server, sender.smtp_port) as server:
             server.starttls()
+            logger.info("SMTP TLS started, logging in...")
             server.login(sender.sender_email, sender.sender_password)
+            logger.info("SMTP login successful, sending message...")
             server.send_message(msg)
+            logger.info("Email message sent successfully")
         
-        logger.info("Daily report email sent successfully")
+        logger.info("Daily report email sent successfully to jeancalmere.kubwayo@divinebridge.io")
         return True
         
     except Exception as e:
-        logger.error(f"Error sending daily report email: {e}", exc_info=True)
+        logger.error(f"Error sending daily report email: {str(e)}", exc_info=True)
+        logger.error(f"Error type: {type(e).__name__}")
+        if hasattr(e, 'args'):
+            logger.error(f"Error args: {e.args}")
         return False
 
 def fetch_recent_logs(hours=1):
