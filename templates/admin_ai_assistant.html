@@ -248,9 +248,10 @@
             <div class="info-text">
                 <strong>📋 How it works:</strong><br>
                 1. Type your task or question in the input below<br>
-                2. I'll fetch and analyze logs from the last hour<br>
-                3. I'll send a detailed summary to jeancalmere.kubwayo@divinebridge.io<br>
-                4. You'll see confirmation here when done
+                2. Task is added to queue for automated processing<br>
+                3. AI automatically analyzes logs, implements fixes, and deploys<br>
+                4. You'll receive an email summary at jeancalmere.kubwayo@divinebridge.io<br>
+                5. Tasks are processed every 5 minutes automatically
             </div>
         </div>
         
@@ -346,11 +347,10 @@
                     const bubble = document.createElement('div');
                     bubble.className = 'message-bubble';
                     bubble.innerHTML = `
-                        ✅ <strong>Task processed successfully!</strong><br><br>
-                        📊 Logs analyzed: ${data.logs_fetched} entries<br>
-                        ❌ Errors found: ${data.errors_found}<br>
-                        📧 Email sent: ${data.email_sent ? 'Yes' : 'No'}<br><br>
-                        <span class="success-badge">Check your email for the detailed summary!</span>
+                        ✅ <strong>Task queued successfully!</strong><br><br>
+                        📝 Task ID: ${data.task_id}<br>
+                        ⏳ Status: ${data.status}<br><br>
+                        <span class="success-badge">AI will process this automatically within 5 minutes. You'll receive an email summary when complete!</span>
                     `;
                     
                     successDiv.appendChild(bubble);
