@@ -9,6 +9,7 @@ import os
 import logging
 from datetime import datetime, timedelta
 from google.cloud import logging as cloud_logging
+from google.cloud import firestore
 import json
 
 admin_bp = Blueprint('admin', __name__)
@@ -73,6 +74,62 @@ def ai_assistant():
         return redirect(url_for('admin.admin_login'))
     
     return render_template('admin_ai_assistant.html')
+
+@admin_bp.route('/admin/api/task-list/<task_list_id>', methods=['GET'])
+@admin_required
+def get_task_list(task_list_id):
+    """Retrieve a specific task list by ID"""
+    try:
+        db = get_firestore_client()
+        task_list_doc = db.collection('daily_task_lists').document(task_list_id).get()
+        
+        if not task_list_doc.exists:
+            return jsonify({'error': 'Task list not found'}), 404
+        
+        task_list_data = task_list_doc.to_dict()
+        return jsonify({
+            'success': True,
+            'task_list': task_list_data
+        })
+        
+    except Exception as e:
+        logger.error(f"Error retrieving task list: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/admin/api/task-lists', methods=['GET'])
+@admin_required
+def list_task_lists():
+    """List all daily task lists"""
+    try:
+        db = get_firestore_client()
+        limit = request.args.get('limit', 10, type=int)
+        
+        task_lists = db.collection('daily_task_lists')\
+            .order_by('generated_at', direction=firestore.Query.DESCENDING)\
+            .limit(limit)\
+            .stream()
+        
+        lists = []
+        for doc in task_lists:
+            data = doc.to_dict()
+            lists.append({
+                'id': doc.id,
+                'date': data.get('date'),
+                'generated_at': data.get('generated_at').isoformat() if data.get('generated_at') else None,
+                'tasks_count': len(data.get('task_list', [])),
+                'admin_tasks_count': data.get('admin_tasks_count', 0),
+                'errors_count': data.get('errors_count', 0),
+                'warnings_count': data.get('warnings_count', 0)
+            })
+        
+        return jsonify({
+            'success': True,
+            'task_lists': lists
+        })
+        
+    except Exception as e:
+        logger.error(f"Error listing task lists: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 @admin_bp.route('/admin/api/message', methods=['POST'])
 @admin_required
@@ -423,34 +480,55 @@ Low Priority ({len(low_priority)}):
 def send_daily_report_email(email_summary):
     """Send daily report email to admin"""
     try:
-        from email_sender import EmailSender
+        from config import get_config
         from email.mime.multipart import MIMEMultipart
         from email.mime.text import MIMEText
         from email.utils import formataddr
         import smtplib
+        import json
         
-        logger.info("Initializing EmailSender for daily report...")
-        sender = EmailSender()
+        logger.info("Initializing email configuration for daily report...")
+        config = get_config()
         
-        if not sender.sender_email or not sender.sender_password:
-            logger.error("Email credentials not configured - sender_email or sender_password is missing")
+        # Get email credentials from config (lowercase attributes)
+        email_user = config.email_user
+        email_password = config.email_password
+        
+        # Parse if JSON string
+        if isinstance(email_user, str):
+            try:
+                email_user = json.loads(email_user)
+            except json.JSONDecodeError:
+                pass
+        
+        if isinstance(email_password, str):
+            try:
+                email_password = json.loads(email_password)
+            except json.JSONDecodeError:
+                pass
+        
+        if not email_user or not email_password:
+            logger.error("Email credentials not configured - email_user or email_password is missing")
             return False
         
-        logger.info(f"Sending email to jeancalmere.kubwayo@divinebridge.io from {sender.sender_email}")
+        smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
+        smtp_port = int(os.getenv('SMTP_PORT', '587'))
+        
+        logger.info(f"Sending email to jeancalmere.kubwayo@divinebridge.io from {email_user}")
         
         msg = MIMEMultipart('alternative')
-        msg['From'] = formataddr(("Divine Bridge AI Assistant", sender.sender_email))
+        msg['From'] = formataddr(("Divine Bridge AI Assistant", email_user))
         msg['To'] = 'jeancalmere.kubwayo@divinebridge.io'
         msg['Subject'] = f'Daily Task List - {datetime.utcnow().strftime("%Y-%m-%d")}'
         
         msg.attach(MIMEText(email_summary['text'], 'plain'))
         msg.attach(MIMEText(email_summary['html'], 'html'))
         
-        logger.info(f"Connecting to SMTP server: {sender.smtp_server}:{sender.smtp_port}")
-        with smtplib.SMTP(sender.smtp_server, sender.smtp_port) as server:
+        logger.info(f"Connecting to SMTP server: {smtp_server}:{smtp_port}")
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
             server.starttls()
             logger.info("SMTP TLS started, logging in...")
-            server.login(sender.sender_email, sender.sender_password)
+            server.login(email_user, email_password)
             logger.info("SMTP login successful, sending message...")
             server.send_message(msg)
             logger.info("Email message sent successfully")
