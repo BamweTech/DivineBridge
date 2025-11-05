@@ -83,38 +83,92 @@ def get_firestore_client():
     return _get_firestore_client()
 
 def get_user_from_session():
-    """Get user information from session or Firebase ID token"""
+    """Get user information from session or Firebase ID token
+    
+    Priority:
+    1. Firebase ID token (most reliable, survives deployments)
+    2. Flask session (regenerated if Firebase token is valid)
+    """
+    from firebase_admin import auth
+    from flask import session
     
     # First, try to get user from Firebase ID token (survives deployments)
     auth_header = request.headers.get('Authorization')
     if auth_header and auth_header.startswith('Bearer '):
         id_token = auth_header.split('Bearer ')[1]
         try:
-            # Verify the Firebase ID token
-            from firebase_admin import auth
-            decoded_token = auth.verify_id_token(id_token)
+            # Verify the Firebase ID token with retry logic
+            max_retries = 3
+            decoded_token = None
             
-            user_name = decoded_token.get('name') or decoded_token.get('email', '').split('@')[0] or 'Anonymous'
+            for attempt in range(max_retries):
+                try:
+                    decoded_token = auth.verify_id_token(id_token)
+                    break  # Success
+                except Exception as e:
+                    error_str = str(e)
+                    # Check if it's a transient error (network, timeout, etc.)
+                    is_transient = any(keyword in error_str.lower() for keyword in 
+                                     ['timeout', 'connection', 'network', 'unavailable', '503', '500'])
+                    
+                    if is_transient and attempt < max_retries - 1:
+                        logging.warning(f"⚠️ Transient Firebase token verification error (attempt {attempt + 1}/{max_retries}): {error_str}")
+                        import time
+                        time.sleep(0.5 * (attempt + 1))  # Exponential backoff
+                        continue
+                    else:
+                        # Non-transient error or last attempt
+                        raise
             
-            logging.info(f"✅ User authenticated via Firebase ID token: {decoded_token.get('uid')}")
-            
-            return {
-                'user_id': decoded_token.get('uid'),
-                'user_name': user_name,
-                'name': user_name,
-                'email': decoded_token.get('email')
-            }
+            if decoded_token:
+                user_name = decoded_token.get('name') or decoded_token.get('email', '').split('@')[0] or 'Anonymous'
+                user_id = decoded_token.get('uid')
+                
+                logging.info(f"✅ User authenticated via Firebase ID token: {user_id}")
+                
+                # CRITICAL FIX: Regenerate Flask session if it's missing or invalid
+                # This allows session-based auth to work again after deployments
+                if not session.get('user') or session.get('user', {}).get('uid') != user_id:
+                    logging.info(f"🔄 Regenerating Flask session for user {user_id}")
+                    session['user'] = {
+                        'uid': user_id,
+                        'email': decoded_token.get('email', ''),
+                        'name': user_name,
+                        'emailVerified': decoded_token.get('email_verified', False)
+                    }
+                    session.permanent = True
+                    session.modified = True
+                    logging.info(f"✅ Flask session regenerated successfully")
+                
+                return {
+                    'user_id': user_id,
+                    'user_name': user_name,
+                    'name': user_name,
+                    'email': decoded_token.get('email')
+                }
+        except auth.ExpiredIdTokenError:
+            logging.warning(f"⚠️ Firebase ID token expired - user needs to refresh")
+            # Don't fall through - let frontend handle token refresh
+            return None
+        except auth.InvalidIdTokenError as e:
+            logging.warning(f"⚠️ Firebase ID token invalid: {str(e)}")
+            # Don't fall through - invalid token means user needs to login
+            return None
         except Exception as e:
-            logging.warning(f"⚠️ Firebase ID token verification failed: {str(e)}")
-            # Fall through to session check
+            # Log full error for debugging
+            import traceback
+            error_details = traceback.format_exc()
+            logging.error(f"❌ Firebase ID token verification failed: {str(e)}\n{error_details}")
+            # For other errors (network, etc.), fall through to session check as fallback
     
     # Fallback to session-based authentication
     user = session.get('user')
     if not user:
+        logging.info("🔍 No user in session and no valid Firebase token")
         return None
     
     # Debug logging to see what's in the session
-    logging.info(f"🔍 Session user data: {user}")
+    logging.info(f"🔍 Using Flask session for user: {user.get('uid', 'unknown')}")
     
     # Try multiple possible name fields
     user_name = user.get('name') or user.get('displayName') or user.get('user_name') or 'Anonymous'
@@ -170,9 +224,13 @@ def get_ice_config():
         return jsonify({'iceServers': ice_servers})
         
     except Exception as e:
-        logging.error(f"Error generating ICE config: {str(e)}")
+        logging.error(f"Error generating ICE config: {str(e)}", exc_info=True)
         # Safe fallback to STUN-only
-        return jsonify({'iceServers': [{'urls': 'stun:stun.l.google.com:19302'}]}), 200
+        fallback_servers = [
+            {'urls': 'stun:stun.l.google.com:19302'},
+            {'urls': 'stun:stun1.l.google.com:19302'}
+        ]
+        return jsonify({'iceServers': fallback_servers}), 200
 
 @prayer_room_bp.route('/create', methods=['POST'])
 def create_prayer_room():

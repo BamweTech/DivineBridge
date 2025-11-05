@@ -3377,16 +3377,54 @@ Listening for unmute event...`);
     }
 
     async loadIceConfig() {
-        try {
-            const res = await fetch(`/api/prayer-room/ice-config`, { credentials: 'include' });
-            if (!res.ok) return;
-            const data = await res.json();
-            if (data && Array.isArray(data.iceServers) && data.iceServers.length > 0) {
-                this.iceServers = data.iceServers;
-                console.log('ICE servers loaded:', this.iceServers);
+        const maxRetries = 3;
+        const retryDelay = 1000; // 1 second
+        
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                // Add timeout to fetch request
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+                
+                const res = await fetch(`/api/prayer-room/ice-config`, { 
+                    credentials: 'include',
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!res.ok) {
+                    if (attempt < maxRetries - 1) {
+                        console.warn(`ICE config fetch failed (attempt ${attempt + 1}/${maxRetries}), retrying...`);
+                        await new Promise(resolve => setTimeout(resolve, retryDelay * (attempt + 1)));
+                        continue;
+                    }
+                    console.warn('ICE config fetch failed after all retries, using defaults');
+                    return;
+                }
+                
+                const data = await res.json();
+                if (data && Array.isArray(data.iceServers) && data.iceServers.length > 0) {
+                    this.iceServers = data.iceServers;
+                    console.log('✅ ICE servers loaded:', this.iceServers.length, 'servers');
+                    return; // Success
+                } else {
+                    console.warn('ICE config returned empty servers, using defaults');
+                    return;
+                }
+            } catch (e) {
+                if (e.name === 'AbortError') {
+                    console.warn(`ICE config fetch timed out (attempt ${attempt + 1}/${maxRetries})`);
+                } else {
+                    console.warn(`Failed to load ICE config (attempt ${attempt + 1}/${maxRetries}):`, e);
+                }
+                
+                if (attempt < maxRetries - 1) {
+                    await new Promise(resolve => setTimeout(resolve, retryDelay * (attempt + 1)));
+                } else {
+                    console.warn('Failed to load ICE config after all retries, using defaults');
+                }
             }
-        } catch (e) {
-            console.warn('Failed to load ICE config, using defaults:', e);
         }
     }
     

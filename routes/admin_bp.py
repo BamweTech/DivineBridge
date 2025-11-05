@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from google.cloud import logging as cloud_logging
 from google.cloud import firestore
 import json
+import time
 
 admin_bp = Blueprint('admin', __name__)
 logger = logging.getLogger(__name__)
@@ -544,90 +545,125 @@ def send_daily_report_email(email_summary):
         return False
 
 def fetch_recent_logs(hours=1):
-    """Fetch logs from Cloud Logging for the specified time range"""
-    try:
-        # Initialize Cloud Logging client
-        client = cloud_logging.Client()
-        
-        # Calculate time range
-        end_time = datetime.utcnow()
-        start_time = end_time - timedelta(hours=hours)
-        
-        # Format timestamps for Cloud Logging filter
-        start_str = start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
-        end_str = end_time.strftime('%Y-%m-%dT%H:%M:%SZ')
-        
-        # Filter for errors and warnings
-        # Cloud Logging filter syntax: https://cloud.google.com/logging/docs/view/logging-query-language
-        filter_str = f'timestamp >= "{start_str}" AND timestamp <= "{end_str}" AND (severity >= "ERROR" OR severity = "WARNING")'
-        
-        logger.info(f"Fetching logs from {start_time} to {end_time}")
-        
-        entries = []
+    """Fetch logs from Cloud Logging for the specified time range with retry logic"""
+    max_retries = 3
+    retry_delay = 2
+    
+    for attempt in range(max_retries):
         try:
-            for entry in client.list_entries(filter_=filter_str, page_size=100, order_by="timestamp desc"):
-                # Extract text payload
-                text_payload = None
-                if isinstance(entry.payload, str):
-                    text_payload = entry.payload
-                elif hasattr(entry.payload, 'get'):
-                    text_payload = entry.payload.get('message', str(entry.payload))
-                else:
-                    text_payload = str(entry.payload)
-                
-                entry_data = {
-                    'timestamp': entry.timestamp.isoformat() if entry.timestamp else None,
-                    'severity': str(entry.severity),
-                    'resource': entry.resource.type if entry.resource else None,
-                    'text': text_payload[:1000] if text_payload else '',  # Limit length
-                    'labels': dict(entry.labels) if entry.labels else {}
-                }
-                entries.append(entry_data)
-        except Exception as e:
-            logger.warning(f"Error fetching error/warning logs: {e}")
-        
-        # Also get recent INFO logs for context (deployments, auth, etc.)
-        info_filter = f'timestamp >= "{start_str}" AND timestamp <= "{end_str}" AND severity = "INFO"'
-        
-        info_entries = []
-        try:
-            for entry in client.list_entries(filter_=info_filter, page_size=50, order_by="timestamp desc"):
-                text_payload = None
-                if isinstance(entry.payload, str):
-                    text_payload = entry.payload
-                elif hasattr(entry.payload, 'get'):
-                    text_payload = entry.payload.get('message', str(entry.payload))
-                else:
-                    text_payload = str(entry.payload)
-                
-                # Filter for important INFO messages
-                text_lower = text_payload.lower()
-                if any(keyword in text_lower for keyword in ['deploy', 'firebase', 'auth', 'error', 'critical', 'scheduler']):
+            # Initialize Cloud Logging client with retry
+            client = cloud_logging.Client()
+            
+            # Calculate time range
+            end_time = datetime.utcnow()
+            start_time = end_time - timedelta(hours=hours)
+            
+            # Format timestamps for Cloud Logging filter
+            start_str = start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+            end_str = end_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+            
+            # Filter for errors and warnings
+            filter_str = f'timestamp >= "{start_str}" AND timestamp <= "{end_str}" AND (severity >= "ERROR" OR severity = "WARNING")'
+            
+            logger.info(f"Fetching logs from {start_time} to {end_time} (attempt {attempt + 1}/{max_retries})")
+            
+            entries = []
+            try:
+                for entry in client.list_entries(filter_=filter_str, page_size=100, order_by="timestamp desc"):
+                    # Extract text payload with better error handling
+                    text_payload = None
+                    try:
+                        if isinstance(entry.payload, str):
+                            text_payload = entry.payload
+                        elif isinstance(entry.payload, dict):
+                            # Try common fields
+                            text_payload = entry.payload.get('message') or \
+                                          entry.payload.get('textPayload') or \
+                                          entry.payload.get('jsonPayload', {}).get('message') or \
+                                          str(entry.payload)
+                        elif hasattr(entry.payload, 'get'):
+                            text_payload = entry.payload.get('message', str(entry.payload))
+                        else:
+                            text_payload = str(entry.payload)
+                    except Exception as e:
+                        logger.warning(f"Error extracting payload: {e}")
+                        text_payload = str(entry.payload)[:500]
+                    
                     entry_data = {
                         'timestamp': entry.timestamp.isoformat() if entry.timestamp else None,
                         'severity': str(entry.severity),
-                        'text': text_payload[:1000] if text_payload else '',
+                        'resource': entry.resource.type if entry.resource else None,
+                        'text': text_payload[:1000] if text_payload else 'No message available',
+                        'labels': dict(entry.labels) if entry.labels else {}
                     }
-                    info_entries.append(entry_data)
-        except Exception as e:
-            logger.warning(f"Error fetching info logs: {e}")
-        
-        return {
-            'entries': entries,
-            'info_entries': info_entries,
-            'time_range': {
-                'start': start_time.isoformat(),
-                'end': end_time.isoformat()
+                    entries.append(entry_data)
+            except Exception as e:
+                logger.warning(f"Error fetching error/warning logs (attempt {attempt + 1}): {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay * (attempt + 1))
+                    continue
+                else:
+                    raise
+            
+            # Also get recent INFO logs for context
+            info_filter = f'timestamp >= "{start_str}" AND timestamp <= "{end_str}" AND severity = "INFO"'
+            
+            info_entries = []
+            try:
+                for entry in client.list_entries(filter_=info_filter, page_size=50, order_by="timestamp desc"):
+                    text_payload = None
+                    try:
+                        if isinstance(entry.payload, str):
+                            text_payload = entry.payload
+                        elif isinstance(entry.payload, dict):
+                            text_payload = entry.payload.get('message') or \
+                                          entry.payload.get('textPayload') or \
+                                          str(entry.payload)
+                        else:
+                            text_payload = str(entry.payload)
+                    except:
+                        text_payload = str(entry.payload)[:500]
+                    
+                    # Filter for important INFO messages
+                    text_lower = text_payload.lower() if text_payload else ''
+                    if any(keyword in text_lower for keyword in ['deploy', 'firebase', 'auth', 'error', 'critical', 'scheduler']):
+                        entry_data = {
+                            'timestamp': entry.timestamp.isoformat() if entry.timestamp else None,
+                            'severity': str(entry.severity),
+                            'text': text_payload[:1000] if text_payload else '',
+                        }
+                        info_entries.append(entry_data)
+            except Exception as e:
+                logger.warning(f"Error fetching info logs: {e}")
+            
+            return {
+                'entries': entries,
+                'info_entries': info_entries,
+                'time_range': {
+                    'start': start_time.isoformat(),
+                    'end': end_time.isoformat()
+                }
             }
-        }
-        
-    except Exception as e:
-        logger.error(f"Error fetching logs from Cloud Logging: {e}", exc_info=True)
-        return {
-            'entries': [],
-            'info_entries': [],
-            'error': str(e)
-        }
+            
+        except Exception as e:
+            logger.error(f"Error fetching logs from Cloud Logging (attempt {attempt + 1}/{max_retries}): {e}", exc_info=True)
+            if attempt < max_retries - 1:
+                logger.info(f"Retrying in {retry_delay * (attempt + 1)} seconds...")
+                time.sleep(retry_delay * (attempt + 1))
+            else:
+                logger.error("All retry attempts failed for Cloud Logging")
+                return {
+                    'entries': [],
+                    'info_entries': [],
+                    'error': str(e)
+                }
+    
+    # Should not reach here, but just in case
+    return {
+        'entries': [],
+        'info_entries': [],
+        'error': 'Failed after all retries'
+    }
 
 def analyze_logs(logs_summary):
     """Analyze logs for errors, patterns, and issues"""
@@ -636,30 +672,44 @@ def analyze_logs(logs_summary):
     patterns = {}
     
     for entry in logs_summary.get('entries', []):
-        text = entry.get('text', '').lower()
-        severity = entry.get('severity', '')
+        # Extract text payload properly
+        text_raw = entry.get('text', '')
+        if not text_raw:
+            # Try to get from labels or other fields
+            text_raw = entry.get('labels', {}).get('message', '') or str(entry)
+        
+        text = text_raw.lower() if text_raw else ''
+        severity = str(entry.get('severity', '')).upper()
+        
+        # Extract a meaningful message
+        message = text_raw[:500] if text_raw else 'No message available'
         
         if severity == 'ERROR':
             errors.append({
                 'timestamp': entry.get('timestamp'),
-                'message': entry.get('text', '')[:200],
-                'resource': entry.get('resource')
+                'message': message,
+                'resource': entry.get('resource'),
+                'severity': severity
             })
         elif severity == 'WARNING':
-            warnings.append({
-                'timestamp': entry.get('timestamp'),
-                'message': entry.get('text', '')[:200]
-            })
+            # Only add warnings with actual messages
+            if message and message != 'none' and len(message.strip()) > 0:
+                warnings.append({
+                    'timestamp': entry.get('timestamp'),
+                    'message': message,
+                    'severity': severity
+                })
         
-        # Detect patterns
-        if 'authentication' in text or 'auth' in text:
-            patterns['authentication_issues'] = patterns.get('authentication_issues', 0) + 1
-        if 'webrtc' in text or 'audio' in text:
-            patterns['audio_issues'] = patterns.get('audio_issues', 0) + 1
-        if 'scheduler' in text:
-            patterns['scheduler_issues'] = patterns.get('scheduler_issues', 0) + 1
-        if 'firestore' in text or 'database' in text:
-            patterns['database_issues'] = patterns.get('database_issues', 0) + 1
+        # Detect patterns (only if we have text)
+        if text:
+            if 'authentication' in text or 'auth' in text:
+                patterns['authentication_issues'] = patterns.get('authentication_issues', 0) + 1
+            if 'webrtc' in text or 'audio' in text:
+                patterns['audio_issues'] = patterns.get('audio_issues', 0) + 1
+            if 'scheduler' in text:
+                patterns['scheduler_issues'] = patterns.get('scheduler_issues', 0) + 1
+            if 'firestore' in text or 'database' in text:
+                patterns['database_issues'] = patterns.get('database_issues', 0) + 1
     
     return {
         'errors': errors,

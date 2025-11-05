@@ -69,32 +69,76 @@ class PrayerRoomsDirectory {
                 return null;
             }
             
-            // Wait for Firebase auth state to be ready
+            // Wait for Firebase auth state to be ready (increased timeout to 5 seconds)
             const user = await new Promise((resolve) => {
+                let resolved = false;
                 const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
-                    unsubscribe(); // Unsubscribe immediately
-                    resolve(user);
+                    if (!resolved) {
+                        resolved = true;
+                        unsubscribe(); // Unsubscribe immediately
+                        resolve(user);
+                    }
                 });
                 
-                // Timeout after 2 seconds
-                setTimeout(() => {
+                // Check if user is already available (faster path)
+                const currentUser = firebase.auth().currentUser;
+                if (currentUser && !resolved) {
+                    resolved = true;
                     unsubscribe();
-                    resolve(null);
-                }, 2000);
+                    resolve(currentUser);
+                }
+                
+                // Timeout after 5 seconds (increased from 2)
+                setTimeout(() => {
+                    if (!resolved) {
+                        resolved = true;
+                        unsubscribe();
+                        console.warn('⚠️ Firebase auth state check timed out');
+                        resolve(null);
+                    }
+                }, 5000);
             });
             
-            if (user) {
-                const token = await user.getIdToken(forceRefresh); // Force refresh if requested
+            if (!user) {
+                console.warn('⚠️ No Firebase user found - user may need to sign in');
+                return null;
+            }
+            
+            // Get token with retry logic for network errors
+            let token = null;
+            let retries = 0;
+            const maxRetries = 3;
+            
+            while (retries < maxRetries && !token) {
+                try {
+                    token = await Promise.race([
+                        user.getIdToken(forceRefresh),
+                        new Promise((_, reject) => 
+                            setTimeout(() => reject(new Error('Token fetch timeout')), 5000)
+                        )
+                    ]);
+                    break; // Success
+                } catch (error) {
+                    retries++;
+                    if (retries < maxRetries) {
+                        console.warn(`⚠️ Token fetch failed (attempt ${retries}/${maxRetries}), retrying...`, error);
+                        await new Promise(resolve => setTimeout(resolve, 1000 * retries)); // Exponential backoff
+                    } else {
+                        console.error('❌ Failed to get Firebase ID token after all retries:', error);
+                        throw error;
+                    }
+                }
+            }
+            
+            if (token) {
                 if (forceRefresh) {
                     console.log('✅ Firebase ID token refreshed for user:', user.email);
                 } else {
                     console.log('✅ Firebase ID token obtained for user:', user.email);
                 }
-                return token;
             }
             
-            console.warn('⚠️ No Firebase user found - user may need to sign in');
-            return null;
+            return token;
         } catch (error) {
             console.error('❌ Error getting Firebase ID token:', error);
             return null;
