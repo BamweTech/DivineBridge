@@ -31,6 +31,52 @@ prayer_room_bp = Blueprint('prayer_room', __name__)
 # Rate limiting is now handled centrally in app.py
 # Blueprint-level limiter removed to prevent conflicts
 
+def send_email(recipient_email, subject, html_body):
+    """
+    Helper function to send generic HTML emails.
+    Uses the email_sender module to send emails with HTML content.
+    
+    Args:
+        recipient_email: Email address of recipient
+        subject: Email subject line
+        html_body: HTML content of the email
+    """
+    try:
+        from email_sender import EmailSender
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        from email.utils import formataddr
+        import smtplib
+        
+        # Create EmailSender instance
+        sender = EmailSender()
+        
+        # Create message
+        msg = MIMEMultipart('alternative')
+        msg['From'] = formataddr(("Divine Bridge", sender.sender_email))
+        msg['To'] = recipient_email
+        msg['Subject'] = subject
+        
+        # Add plain text fallback (extract from HTML if needed)
+        plain_text = f"Please view this email in an HTML-enabled email client.\n\n{subject}"
+        
+        # Attach both versions
+        msg.attach(MIMEText(plain_text, 'plain'))
+        msg.attach(MIMEText(html_body, 'html'))
+        
+        # Send using SMTP
+        with smtplib.SMTP(sender.smtp_server, sender.smtp_port) as server:
+            server.starttls()
+            server.login(sender.sender_email, sender.sender_password)
+            server.send_message(msg)
+            
+        logging.info(f"Email sent successfully to {recipient_email}")
+        return True
+        
+    except Exception as e:
+        logging.error(f"Error sending email to {recipient_email}: {e}")
+        return False
+
 def get_firestore_client():
     """Get Firestore client instance"""
     from firebase_auth import get_firestore_client as _get_firestore_client
@@ -1569,8 +1615,6 @@ def cancel_scheduled_room(scheduled_room_id):
 def notify_subscribers_about_reopened_room(original_room_id, new_room_id, room_name, room_code, host_name):
     """Send email notifications to room subscribers when room is reopened"""
     try:
-        from email_service import send_email
-        
         db = get_firestore_client()
         
         # Get all active subscribers for this room
@@ -2126,8 +2170,6 @@ def send_session_live_notifications(scheduled_data, room_id, scheduled_room_id):
     Send email notifications that scheduled session is now live
     """
     try:
-        from email_service import send_email
-        
         room_name = scheduled_data.get('room_name', 'Prayer Room')
         host_name = scheduled_data.get('host_name', 'Host')
         room_code = scheduled_data.get('room_code')
@@ -2389,7 +2431,6 @@ def send_session_reminders():
     Protected by Cloud Scheduler verification
     """
     try:
-        from email_service import send_email
         import firebase_admin.auth
         
         db = get_firestore_client()
