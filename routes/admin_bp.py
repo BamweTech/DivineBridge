@@ -10,8 +10,6 @@ import logging
 from datetime import datetime, timedelta
 from google.cloud import logging as cloud_logging
 import json
-import subprocess
-import re
 
 admin_bp = Blueprint('admin', __name__)
 logger = logging.getLogger(__name__)
