@@ -56,10 +56,12 @@ class PrayerRoomsDirectory {
         }
     }
     
-    async getFirebaseIdToken() {
+    async getFirebaseIdToken(forceRefresh = false) {
         /**
          * Get Firebase ID token for authenticated requests
          * This ensures auth persists across deployments
+         * 
+         * @param {boolean} forceRefresh - Force token refresh (useful after 401 errors)
          */
         try {
             if (typeof firebase === 'undefined' || !firebase.auth) {
@@ -82,8 +84,12 @@ class PrayerRoomsDirectory {
             });
             
             if (user) {
-                const token = await user.getIdToken(true); // Force refresh
-                console.log('✅ Firebase ID token obtained for user:', user.email);
+                const token = await user.getIdToken(forceRefresh); // Force refresh if requested
+                if (forceRefresh) {
+                    console.log('✅ Firebase ID token refreshed for user:', user.email);
+                } else {
+                    console.log('✅ Firebase ID token obtained for user:', user.email);
+                }
                 return token;
             }
             
@@ -92,6 +98,81 @@ class PrayerRoomsDirectory {
         } catch (error) {
             console.error('❌ Error getting Firebase ID token:', error);
             return null;
+        }
+    }
+
+    async makeAuthenticatedRequest(url, options = {}) {
+        /**
+         * Make an authenticated request with automatic token refresh on 401
+         * This prevents the "login loop" after deployments
+         * 
+         * @param {string} url - The URL to request
+         * @param {object} options - Fetch options (method, body, etc.)
+         * @returns {object} - { success: boolean, data: object, error: string, needsLogin: boolean }
+         */
+        
+        // Helper to make the actual request
+        const makeRequest = async (idToken) => {
+            const headers = {
+                'Content-Type': 'application/json',
+                ...options.headers
+            };
+            
+            if (idToken) {
+                headers['Authorization'] = `Bearer ${idToken}`;
+                console.log('✅ Using Firebase ID token for request');
+            } else {
+                console.log('⚠️ No Firebase token, using session authentication');
+            }
+            
+            return await fetch(url, {
+                ...options,
+                headers,
+                credentials: 'include' // Always include session cookies
+            });
+        };
+        
+        try {
+            // First attempt: Get token (cached)
+            let idToken = await this.getFirebaseIdToken(false);
+            let response = await makeRequest(idToken);
+            
+            // If 401, try refreshing the token
+            if (response.status === 401) {
+                console.log('⚠️ 401 error, attempting token refresh...');
+                
+                // Force refresh the Firebase token
+                idToken = await this.getFirebaseIdToken(true);
+                
+                if (idToken) {
+                    // Retry with fresh token
+                    console.log('🔄 Retrying request with refreshed token...');
+                    response = await makeRequest(idToken);
+                    
+                    if (response.status === 401) {
+                        // Still 401 after refresh - user needs to login
+                        console.log('❌ Still unauthorized after token refresh');
+                        return { success: false, needsLogin: true };
+                    }
+                } else {
+                    // No Firebase user - needs to login
+                    console.log('❌ No Firebase user available for token refresh');
+                    return { success: false, needsLogin: true };
+                }
+            }
+            
+            // Parse response
+            const result = await response.json();
+            
+            if (response.ok) {
+                return { success: true, data: result };
+            } else {
+                return { success: false, error: result.error || 'Unknown error' };
+            }
+            
+        } catch (error) {
+            console.error('❌ Request error:', error);
+            return { success: false, error: error.message };
         }
     }
 
@@ -474,42 +555,23 @@ class PrayerRoomsDirectory {
         };
 
         try {
-            // Try to get Firebase ID token (for persistent auth)
-            const idToken = await this.getFirebaseIdToken();
-            
-            // Prepare headers - include Firebase token if available
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            
-            if (idToken) {
-                headers['Authorization'] = `Bearer ${idToken}`;
-                console.log('✅ Using Firebase ID token for authentication');
-            } else {
-                console.log('⚠️ No Firebase token, will use session authentication');
-            }
-            
-            // Always try the request - backend will check session if no Firebase token
-            const response = await fetch('/api/prayer-room/create', {
+            // Make the authenticated request with automatic retry on 401
+            const result = await this.makeAuthenticatedRequest('/api/prayer-room/create', {
                 method: 'POST',
-                headers: headers,
-                credentials: 'include',  // Include session cookies for fallback auth
                 body: JSON.stringify(roomData)
             });
-
-            const result = await response.json();
             
-            if (response.ok) {
+            if (result.success) {
                 // Show room code for private rooms
-                if (result.room_code) {
-                    alert(`Room created successfully!\n\nRoom Code: ${result.room_code}\n\nShare this code with others to let them join your private room.`);
+                if (result.data.room_code) {
+                    alert(`Room created successfully!\n\nRoom Code: ${result.data.room_code}\n\nShare this code with others to let them join your private room.`);
                 }
                 
                 // Redirect to the created room
-                window.location.href = `/prayer-room/join?room=${result.room_id}&name=${encodeURIComponent(roomData.room_name)}`;
-            } else if (response.status === 401) {
-                // Only redirect to login if backend says not authenticated
-                console.log('❌ Not authenticated, redirecting to login');
+                window.location.href = `/prayer-room/join?room=${result.data.room_id}&name=${encodeURIComponent(roomData.room_name)}`;
+            } else if (result.needsLogin) {
+                // User needs to login
+                console.log('❌ Authentication required, redirecting to login');
                 window.location.href = '/login?redirect=' + encodeURIComponent('/prayer-room');
             } else {
                 alert('Failed to create room: ' + (result.error || 'Unknown error'));
@@ -605,21 +667,6 @@ class PrayerRoomsDirectory {
         console.log('Schedule data being sent:', scheduleData);
 
         try {
-            // Try to get Firebase ID token (for persistent auth)
-            const idToken = await this.getFirebaseIdToken();
-            
-            // Prepare headers - include Firebase token if available
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            
-            if (idToken) {
-                headers['Authorization'] = `Bearer ${idToken}`;
-                console.log('✅ Using Firebase ID token for authentication');
-            } else {
-                console.log('⚠️ No Firebase token, will use session authentication');
-            }
-            
             // Check if we're editing an existing scheduled room
             const isEditing = window.editingScheduledRoomId;
             const url = isEditing ? 
@@ -627,17 +674,13 @@ class PrayerRoomsDirectory {
                 '/api/prayer-room/schedule';
             const method = isEditing ? 'PUT' : 'POST';
             
-            // Always try the request - backend will check session if no Firebase token
-            const response = await fetch(url, {
+            // Make the authenticated request with automatic retry on 401
+            const result = await this.makeAuthenticatedRequest(url, {
                 method: method,
-                headers: headers,
-                credentials: 'include',  // Include session cookies for fallback auth
                 body: JSON.stringify(scheduleData)
             });
-
-            const result = await response.json();
             
-            if (response.ok) {
+            if (result.success) {
                 if (isEditing) {
                     alert('Scheduled room updated successfully!');
                     // Clear the editing state
@@ -647,15 +690,15 @@ class PrayerRoomsDirectory {
                     if (submitBtn) {
                         submitBtn.textContent = 'Schedule Room';
                     }
-            } else {
-                alert('Room scheduled successfully!');
-            }
+                } else {
+                    alert('Room scheduled successfully!');
+                }
                 this.hideScheduleModal();
                 // Refresh the scheduled rooms list
                 this.loadMyScheduledRooms();
-            } else if (response.status === 401) {
-                // Only redirect to login if backend says not authenticated
-                console.log('❌ Not authenticated, redirecting to login');
+            } else if (result.needsLogin) {
+                // User needs to login
+                console.log('❌ Authentication required, redirecting to login');
                 window.location.href = '/login?redirect=' + encodeURIComponent('/prayer-room');
             } else {
                 alert(`Failed to ${isEditing ? 'update' : 'schedule'} room: ` + (result.error || 'Unknown error'));

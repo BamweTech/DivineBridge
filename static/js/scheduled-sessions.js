@@ -17,6 +17,100 @@ class ScheduledSessionsManager {
         this.setupEventListeners();
     }
     
+    async getFirebaseIdToken(forceRefresh = false) {
+        /**
+         * Get Firebase ID token for authenticated requests
+         * @param {boolean} forceRefresh - Force token refresh (useful after 401 errors)
+         */
+        try {
+            if (typeof firebase === 'undefined' || !firebase.auth) {
+                console.warn('⚠️ Firebase not initialized');
+                return null;
+            }
+            
+            // Wait for Firebase auth state to be ready
+            const user = await new Promise((resolve) => {
+                const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
+                    unsubscribe();
+                    resolve(user);
+                });
+                
+                setTimeout(() => {
+                    unsubscribe();
+                    resolve(null);
+                }, 2000);
+            });
+            
+            if (user) {
+                const token = await user.getIdToken(forceRefresh);
+                return token;
+            }
+            
+            return null;
+        } catch (error) {
+            console.error('❌ Error getting Firebase ID token:', error);
+            return null;
+        }
+    }
+
+    async makeAuthenticatedRequest(url, options = {}) {
+        /**
+         * Make an authenticated request with automatic token refresh on 401
+         * @returns {object} - { success: boolean, data: object, error: string, needsLogin: boolean }
+         */
+        const makeRequest = async (idToken) => {
+            const headers = {
+                'Content-Type': 'application/json',
+                ...options.headers
+            };
+            
+            if (idToken) {
+                headers['Authorization'] = `Bearer ${idToken}`;
+            }
+            
+            return await fetch(url, {
+                ...options,
+                headers,
+                credentials: 'include'
+            });
+        };
+        
+        try {
+            // First attempt: Get token (cached)
+            let idToken = await this.getFirebaseIdToken(false);
+            let response = await makeRequest(idToken);
+            
+            // If 401, try refreshing the token
+            if (response.status === 401) {
+                console.log('⚠️ 401 error, attempting token refresh...');
+                idToken = await this.getFirebaseIdToken(true);
+                
+                if (idToken) {
+                    console.log('🔄 Retrying request with refreshed token...');
+                    response = await makeRequest(idToken);
+                    
+                    if (response.status === 401) {
+                        return { success: false, needsLogin: true };
+                    }
+                } else {
+                    return { success: false, needsLogin: true };
+                }
+            }
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                return { success: true, data: result };
+            } else {
+                return { success: false, error: result.error || 'Unknown error' };
+            }
+            
+        } catch (error) {
+            console.error('❌ Request error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+    
     setupTabs() {
         const tabButtons = document.querySelectorAll('.session-tab-btn');
         tabButtons.forEach(btn => {
@@ -286,29 +380,28 @@ class ScheduledSessionsManager {
     
     async rsvpToSession(sessionId, status) {
         try {
-            const response = await fetch(`/api/prayer-room/scheduled-session/${sessionId}/rsvp`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'include',
-                body: JSON.stringify({
-                    rsvp_status: status,
-                    reminder_1hour: true,
-                    reminder_live: true
-                })
-            });
+            const result = await this.makeAuthenticatedRequest(
+                `/api/prayer-room/scheduled-session/${sessionId}/rsvp`,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        rsvp_status: status,
+                        reminder_1hour: true,
+                        reminder_live: true
+                    })
+                }
+            );
             
-            if (response.status === 401) {
+            if (result.needsLogin) {
                 window.location.href = '/login?redirect=' + encodeURIComponent('/prayer-room');
                 return;
             }
             
-            if (!response.ok) {
-                throw new Error('Failed to RSVP');
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to RSVP');
             }
             
-            const data = await response.json();
+            const data = result.data;
             
             // Show success toast
             this.showToast('✓ RSVP confirmed! You\'ll get reminders before the session.', 'success');
@@ -332,13 +425,20 @@ class ScheduledSessionsManager {
     
     async removeRsvp(sessionId) {
         try {
-            const response = await fetch(`/api/prayer-room/scheduled-session/${sessionId}/rsvp`, {
-                method: 'DELETE',
-                credentials: 'include'
-            });
+            const result = await this.makeAuthenticatedRequest(
+                `/api/prayer-room/scheduled-session/${sessionId}/rsvp`,
+                {
+                    method: 'DELETE'
+                }
+            );
             
-            if (!response.ok) {
-                throw new Error('Failed to remove RSVP');
+            if (result.needsLogin) {
+                window.location.href = '/login?redirect=' + encodeURIComponent('/prayer-room');
+                return;
+            }
+            
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to remove RSVP');
             }
             
             // Show success toast
