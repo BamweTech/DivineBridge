@@ -248,10 +248,10 @@
             <div class="info-text">
                 <strong>📋 How it works:</strong><br>
                 1. Type your task or question in the input below<br>
-                2. Task is added to queue for automated processing<br>
-                3. AI automatically analyzes logs, implements fixes, and deploys<br>
-                4. You'll receive an email summary at jeancalmere.kubwayo@divinebridge.io<br>
-                5. Tasks are processed every 5 minutes automatically
+                2. Task is added to queue for daily review<br>
+                3. Daily at 5pm, system reviews all tasks and production errors<br>
+                4. Creates a combined task list saved to Firebase<br>
+                5. You'll receive an email with the task list at jeancalmere.kubwayo@divinebridge.io
             </div>
         </div>
         
@@ -350,7 +350,7 @@
                         ✅ <strong>Task queued successfully!</strong><br><br>
                         📝 Task ID: ${data.task_id}<br>
                         ⏳ Status: ${data.status}<br><br>
-                        <span class="success-badge">AI will process this automatically within 5 minutes. You'll receive an email summary when complete!</span>
+                        <span class="success-badge">Task will be included in tomorrow's daily report at 5pm. You'll receive an email with the combined task list!</span>
                     `;
                     
                     successDiv.appendChild(bubble);

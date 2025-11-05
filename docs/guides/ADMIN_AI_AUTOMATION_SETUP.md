@@ -1,12 +1,13 @@
-# Admin AI Automation Setup Guide
+# Admin AI Daily Report Setup Guide
 
 ## Overview
 
-The Admin AI Assistant now features **fully automated processing**:
+The Admin AI Assistant generates **daily task lists**:
 1. Tasks are queued in Firestore
-2. Cloud Scheduler triggers processing every 5 minutes
-3. AI automatically analyzes logs, implements fixes, and deploys
-4. Email summary sent after completion
+2. Cloud Scheduler triggers daily at 5pm
+3. System reviews admin tasks and production errors (last 24 hours)
+4. Creates combined task list saved to Firebase
+5. Email sent with prioritized task list to jeancalmere.kubwayo@divinebridge.io
 
 ## Cloud Scheduler Setup
 
@@ -30,12 +31,12 @@ gcloud run services add-iam-policy-binding divinebridge \
 # Get your Cloud Run URL
 CLOUD_RUN_URL=$(gcloud run services describe divinebridge --region=us-central1 --format="value(status.url)")
 
-# Create scheduler job (runs every 5 minutes)
-gcloud scheduler jobs create http process-admin-tasks \
+# Create scheduler job (runs daily at 5pm UTC)
+gcloud scheduler jobs create http generate-daily-report \
     --location=us-central1 \
-    --schedule="*/5 * * * *" \
+    --schedule="0 17 * * *" \
     --time-zone="UTC" \
-    --uri="${CLOUD_RUN_URL}/admin/api/process-queue" \
+    --uri="${CLOUD_RUN_URL}/admin/api/generate-daily-report" \
     --http-method=POST \
     --oidc-service-account-email=admin-scheduler@divinebridge.iam.gserviceaccount.com \
     --oidc-token-audience="${CLOUD_RUN_URL}"
@@ -45,15 +46,17 @@ gcloud scheduler jobs create http process-admin-tasks \
 
 ```bash
 # Trigger manually to test
-gcloud scheduler jobs run process-admin-tasks --location=us-central1
+gcloud scheduler jobs run generate-daily-report --location=us-central1
 
 # Check logs
-gcloud logging read "resource.type=cloud_scheduler_job AND resource.labels.job_id=process-admin-tasks" --limit=10
+gcloud logging read "resource.type=cloud_scheduler_job AND resource.labels.job_id=generate-daily-report" --limit=10
 ```
 
 ## Firestore Index Setup
 
-### Required Index
+### Required Indexes
+
+#### 1. Admin Tasks Index
 
 Create a composite index for `admin_tasks` collection:
 
@@ -62,6 +65,16 @@ Create a composite index for `admin_tasks` collection:
 **Fields:**
 - `status` (Ascending)
 - `created_at` (Ascending)
+
+#### 2. Daily Task Lists Index (Optional)
+
+For querying daily task lists by date:
+
+**Index Name:** `daily_task_lists_date_generated_at`
+
+**Fields:**
+- `date` (Ascending)
+- `generated_at` (Descending)
 
 **Create via Firebase Console:**
 1. Go to Firebase Console → Firestore → Indexes
@@ -81,83 +94,96 @@ gcloud firestore indexes composite create \
 
 ## How It Works
 
-### Task Flow
+### Daily Report Flow
 
 ```
-1. Admin posts task → Added to Firestore queue (status: 'pending')
+1. Admin posts tasks → Added to Firestore queue (status: 'pending')
    ↓
-2. Cloud Scheduler triggers every 5 minutes
+2. Cloud Scheduler triggers daily at 5pm UTC
    ↓
-3. Processing endpoint finds pending tasks
-   ↓
-4. For each task:
-   a. Mark as 'processing'
-   b. Fetch logs (last hour)
-   c. Analyze errors and issues
-   d. Identify issues from message keywords
-   e. Implement fixes
-   f. Commit changes to git
-   g. Deploy to Cloud Run
-   h. Create summary
-   i. Send email
-   j. Mark as 'completed'
+3. Daily report generation:
+   a. Fetch all pending admin tasks
+   b. Fetch production errors/warnings (last 24 hours)
+   c. Analyze logs for patterns
+   d. Create combined task list with priorities:
+      - High: Admin tasks + Critical errors
+      - Medium: General errors + Patterns
+      - Low: Warnings
+   e. Save task list to Firestore (daily_task_lists collection)
+   f. Mark admin tasks as 'reviewed'
+   g. Send email with task list
 ```
 
 ### Task Statuses
 
-- **pending**: Task queued, waiting for processing
-- **processing**: Currently being processed
-- **completed**: Successfully processed and deployed
-- **failed**: Processing failed (error logged)
+- **pending**: Task queued, waiting for daily review
+- **reviewed**: Task included in daily report
+- **completed**: (Manual status update if needed)
 
-## Automated Fixes
+### Task List Structure
 
-The system can automatically fix:
+Each daily task list contains:
+- **date**: Date of report
+- **generated_at**: Timestamp
+- **task_list**: Array of tasks with:
+  - `type`: admin_task, error, warning, pattern
+  - `priority`: high, medium, low
+  - `description`: Task description
+  - `source`: Admin, Production Error, etc.
+  - `category`: authentication, audio, scheduler, database, general
+- **admin_tasks_count**: Number of admin tasks
+- **errors_count**: Number of errors found
+- **warnings_count**: Number of warnings found
 
-### Authentication Issues
-- Token expiration handling
-- Session management verification
+## Task List Categories
 
-### Audio/WebRTC Issues
-- Connection handling verification
-- TURN server configuration checks
+Tasks are automatically categorized:
 
-### Scheduler Issues
-- Firestore index detection
-- Import error detection
+### High Priority
+- Admin tasks (from admin panel)
+- Critical errors (authentication, database, scheduler)
+- Audio/WebRTC errors
 
-### Database Issues
-- Index requirement detection
-- Permission issue detection
+### Medium Priority
+- General errors
+- Frequent error patterns (>5 occurrences)
+
+### Low Priority
+- Warnings
+- Non-critical issues
+
+### Categories
+- **authentication**: Auth, login, token, session errors
+- **audio**: Audio, WebRTC, peer connection errors
+- **scheduler**: Scheduler, cron, job errors
+- **database**: Firestore, database, query, index errors
+- **general**: Other errors
 
 ## Security
 
 - **Cloud Scheduler Protection**: Endpoint verified via OIDC token
 - **Passcode Protection**: Admin login still required
 - **Firestore Security**: Tasks stored securely in Firestore
-- **Git Access**: Service account needs Cloud Source Repositories access for commits
 
 ## Required Permissions
 
 The Cloud Run service account needs:
 - `logging.logEntries.list` - Read Cloud Logging
 - `firestore.databases.get` - Access Firestore
-- `source.repos.get` - Read git repository
-- `source.repos.commit` - Commit changes
-- `run.services.update` - Deploy to Cloud Run
+- `firestore.databases.write` - Write to Firestore
 
 ## Troubleshooting
 
-### Tasks Not Processing
+### Report Not Generated
 
 1. Check Cloud Scheduler job is running:
    ```bash
-   gcloud scheduler jobs describe process-admin-tasks --location=us-central1
+   gcloud scheduler jobs describe generate-daily-report --location=us-central1
    ```
 
 2. Check Cloud Run logs:
    ```bash
-   gcloud logging read "resource.type=cloud_run_revision AND textPayload=~'admin'" --limit=20
+   gcloud logging read "resource.type=cloud_run_revision AND textPayload=~'daily-report'" --limit=20
    ```
 
 3. Verify Firestore index exists:
@@ -165,29 +191,24 @@ The Cloud Run service account needs:
    gcloud firestore indexes list
    ```
 
-### Deployment Fails
-
-1. Check git permissions
-2. Verify gcloud CLI is available in Cloud Run
-3. Check Cloud Build service account permissions
-
 ### Email Not Sending
 
 1. Verify email credentials in Secret Manager
 2. Check SMTP settings
 3. Review Cloud Run logs for email errors
+4. Verify recipient email: jeancalmere.kubwayo@divinebridge.io
 
 ## Manual Processing (Testing)
 
-You can manually trigger processing:
+You can manually trigger daily report generation:
 
 ```bash
 # Get auth token
 TOKEN=$(gcloud auth print-identity-token)
 
-# Trigger processing
+# Trigger report generation
 curl -X POST \
-  https://divinebridge-853408757178.us-central1.run.app/admin/api/process-queue \
+  https://divinebridge-853408757178.us-central1.run.app/admin/api/generate-daily-report \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json"
 ```
@@ -200,36 +221,43 @@ curl -X POST \
 from google.cloud import firestore
 
 db = firestore.Client()
-tasks = db.collection('admin_tasks').stream()
 
+# View pending admin tasks
+tasks = db.collection('admin_tasks').where('status', '==', 'pending').stream()
 for task in tasks:
     data = task.to_dict()
-    print(f"{task.id}: {data.get('status')} - {data.get('message', '')[:50]}")
+    print(f"{task.id}: {data.get('message', '')[:50]}")
+
+# View daily task lists
+task_lists = db.collection('daily_task_lists').order_by('generated_at', direction=firestore.Query.DESCENDING).limit(10).stream()
+for task_list in task_lists:
+    data = task_list.to_dict()
+    print(f"{data.get('date')}: {len(data.get('task_list', []))} tasks")
 ```
 
-### Check Recent Tasks
+### Check Recent Reports
 
 ```bash
-# View pending tasks
-gcloud firestore databases get --database=(default)
-
-# Or use Firebase Console:
+# View in Firebase Console:
+# Firestore → daily_task_lists collection
 # Firestore → admin_tasks collection
 ```
 
 ## Schedule Details
 
-- **Frequency**: Every 5 minutes
-- **Cron Expression**: `*/5 * * * *`
+- **Frequency**: Daily at 5pm
+- **Cron Expression**: `0 17 * * *` (5pm UTC)
 - **Timezone**: UTC
 - **Method**: HTTP POST
 - **Authentication**: OIDC (Cloud IAM)
+- **Email Recipient**: jeancalmere.kubwayo@divinebridge.io
 
 ## Next Steps
 
-1. ✅ Set up Cloud Scheduler job
-2. ✅ Create Firestore index
-3. ✅ Test with a sample task
-4. ✅ Monitor first automated processing
-5. ✅ Verify email delivery
+1. ✅ Set up Cloud Scheduler job (daily at 5pm)
+2. ✅ Create Firestore indexes
+3. ✅ Test with sample admin tasks
+4. ✅ Wait for 5pm or trigger manually
+5. ✅ Verify email delivery to jeancalmere.kubwayo@divinebridge.io
+6. ✅ Check Firestore for saved task list
 
