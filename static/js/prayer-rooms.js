@@ -62,15 +62,32 @@ class PrayerRoomsDirectory {
          * This ensures auth persists across deployments
          */
         try {
-            if (typeof firebase !== 'undefined' && firebase.auth) {
-                const user = firebase.auth().currentUser;
-                if (user) {
-                    const token = await user.getIdToken(true); // Force refresh
-                    console.log('✅ Firebase ID token obtained');
-                    return token;
-                }
+            if (typeof firebase === 'undefined' || !firebase.auth) {
+                console.warn('⚠️ Firebase not initialized');
+                return null;
             }
-            console.warn('⚠️ No Firebase user found');
+            
+            // Wait for Firebase auth state to be ready
+            const user = await new Promise((resolve) => {
+                const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
+                    unsubscribe(); // Unsubscribe immediately
+                    resolve(user);
+                });
+                
+                // Timeout after 2 seconds
+                setTimeout(() => {
+                    unsubscribe();
+                    resolve(null);
+                }, 2000);
+            });
+            
+            if (user) {
+                const token = await user.getIdToken(true); // Force refresh
+                console.log('✅ Firebase ID token obtained for user:', user.email);
+                return token;
+            }
+            
+            console.warn('⚠️ No Firebase user found - user may need to sign in');
             return null;
         } catch (error) {
             console.error('❌ Error getting Firebase ID token:', error);

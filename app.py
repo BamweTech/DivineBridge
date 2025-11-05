@@ -515,7 +515,14 @@ def create_app():
     def prayer_room():
         """Serve the Live Prayer Room directory page"""
         logger.info("🔍 DEBUG: Rendering prayer_rooms_standalone.html template")
-        return render_template('prayer_rooms_standalone.html')
+        
+        # Get Firebase configuration for authentication
+        firebase_config = config.FIREBASE_CLIENT_CONFIG
+        if isinstance(firebase_config, str):
+            import json
+            firebase_config = json.loads(firebase_config)
+        
+        return render_template('prayer_rooms_standalone.html', firebase_config=firebase_config)
 
     @app.route('/prayer-room/join')
     def join_prayer_room():

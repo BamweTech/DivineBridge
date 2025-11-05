@@ -1449,6 +1449,44 @@
         </div>
     </div>
 
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    
+    <!-- Firebase Configuration and Initialization -->
+    <script>
+        // Firebase configuration
+        {% if firebase_config %}
+        const firebaseConfig = {
+            apiKey: "{{ firebase_config.apiKey }}",
+            authDomain: "{{ firebase_config.authDomain }}",
+            projectId: "{{ firebase_config.projectId }}",
+            storageBucket: "{{ firebase_config.storageBucket }}",
+            messagingSenderId: "{{ firebase_config.messagingSenderId }}",
+            appId: "{{ firebase_config.appId }}"
+        };
+
+        // Initialize Firebase when it's loaded
+        if (typeof firebase !== 'undefined' && firebase.initializeApp) {
+            try {
+                firebase.initializeApp(firebaseConfig);
+                console.log('✅ Firebase initialized successfully on prayer rooms page');
+                
+                // Initialize Auth
+                firebase.auth();
+                console.log('✅ Firebase Auth initialized');
+            } catch (error) {
+                console.error('❌ Error initializing Firebase:', error);
+            }
+        } else {
+            console.error('❌ Firebase not loaded');
+        }
+        {% else %}
+        console.warn('⚠️ Firebase config not provided - authentication may not work correctly');
+        {% endif %}
+    </script>
+    
     <script src="{{ url_for('static', filename='js/prayer-rooms.js') }}?v={{ range(100000, 999999) | random }}"></script>
     <script src="{{ url_for('static', filename='js/scheduled-sessions.js') }}?v={{ range(100000, 999999) | random }}"></script>
 </body>
