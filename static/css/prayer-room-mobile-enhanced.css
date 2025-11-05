@@ -346,6 +346,7 @@ body,
     position: relative !important;
     box-shadow: var(--shadow-sm) !important;
     animation: messageSlideIn 0.3s var(--easing-smooth) !important;
+    color: var(--color-text-primary) !important; /* Ensure text is visible */
 }
 
 @keyframes messageSlideIn {
@@ -392,12 +393,18 @@ body,
 .chat-message.message-other {
     align-self: flex-start !important;
     background: #f3f4f6 !important;
-    color: var(--color-text-primary) !important;
+    color: #1e293b !important; /* Dark text for light background */
     border-radius: 18px 18px 18px 4px !important;
     margin-right: auto !important;
     margin-left: 0 !important;
     box-shadow: var(--shadow-sm) !important;
     border: 1px solid #e5e7eb !important;
+}
+
+/* Ensure message content is visible */
+.message.message-other .message-content,
+.chat-message.message-other .message-content {
+    color: #1e293b !important;
 }
 
 /* Chat bubble tail for other messages */
@@ -445,48 +452,17 @@ body,
     padding-left: 4px !important;
 }
 
-/* ===== MESSAGE META (Timestamp + Status) ===== */
+/* ===== MESSAGE META (Timestamp + Status) - HIDDEN FOR NOW ===== */
 .message-meta {
-    display: flex !important;
-    align-items: center !important;
-    gap: 4px !important;
-    margin-top: 2px !important;
-    padding: 0 4px !important;
+    display: none !important; /* Hide timestamps completely */
 }
 
 .message-time {
-    font-size: 11px !important;
-    color: var(--color-text-tertiary) !important;
-    opacity: 0.8 !important;
+    display: none !important;
 }
 
-.message-own .message-time {
-    color: rgba(255, 255, 255, 0.8) !important;
-}
-
-/* ===== MESSAGE STATUS (Read Receipts) ===== */
 .message-status {
-    display: inline-flex !important;
-    align-items: center !important;
-    font-size: 14px !important;
-    line-height: 1 !important;
-    opacity: 0.8 !important;
-}
-
-/* Checkmark icons */
-.status-sent::before {
-    content: '✓' !important;
-    color: rgba(255, 255, 255, 0.7) !important;
-}
-
-.status-delivered::before {
-    content: '✓✓' !important;
-    color: rgba(255, 255, 255, 0.7) !important;
-}
-
-.status-read::before {
-    content: '✓✓' !important;
-    color: #60d5ff !important;
+    display: none !important;
 }
 
 /* ==========================================

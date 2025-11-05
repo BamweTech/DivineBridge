@@ -38,11 +38,19 @@
          * Generate initials from name
          */
         getInitials(name) {
-            if (!name) return '?';
-            const parts = name.trim().split(' ');
+            if (!name || name === 'Unknown' || name.trim() === '') return '?';
+            
+            const cleanName = name.trim();
+            const parts = cleanName.split(' ').filter(p => p.length > 0);
+            
+            if (parts.length === 0) return '?';
+            
             if (parts.length === 1) {
+                // Single name - take first 2 letters
                 return parts[0].substring(0, 2).toUpperCase();
             }
+            
+            // Multiple names - take first letter of first and last name
             return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
         },
 
@@ -80,6 +88,11 @@
          * Add avatar to participant card
          */
         addToParticipant(participantElement, name, userId) {
+            // Don't add avatar for unknown/invalid names
+            if (!name || name === 'Unknown' || name.trim() === '') {
+                return;
+            }
+
             // Check if avatar already exists
             if (participantElement.querySelector('.participant-avatar')) {
                 return;
@@ -108,7 +121,13 @@
          * Add avatar to message
          */
         addToMessage(messageElement, senderName, senderId, isOwn = false) {
-            if (isOwn || messageElement.querySelector('.message-avatar')) {
+            // Don't add avatar for own messages or unknown senders
+            if (isOwn || !senderName || senderName === 'Unknown' || senderName.trim() === '') {
+                return;
+            }
+
+            // Don't add if avatar already exists
+            if (messageElement.querySelector('.message-avatar')) {
                 return;
             }
 
@@ -156,8 +175,8 @@
                 messageElement.appendChild(content);
             }
 
-            // Add sender name for other messages
-            if (!isOwn && senderName) {
+            // Add sender name for other messages (but not for "Unknown")
+            if (!isOwn && senderName && senderName !== 'Unknown' && senderName.trim() !== '') {
                 let senderLabel = messageElement.querySelector('.message-sender');
                 if (!senderLabel) {
                     senderLabel = document.createElement('div');
@@ -172,8 +191,7 @@
                 AvatarSystem.addToMessage(messageElement, senderName, senderId, isOwn);
             }
 
-            // Add timestamp and status
-            this.addMetadata(messageElement, isOwn);
+            // Note: Metadata (timestamps) are disabled for now
         },
 
         /**
