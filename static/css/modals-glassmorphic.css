@@ -303,10 +303,15 @@
     accent-color: #0f56ff;
 }
 
-.recurrence-day-item:has(input:checked) {
-    background: rgba(15, 86, 255, 0.15);
-    border-color: #0f56ff;
-    box-shadow: 0 0 0 3px rgba(15, 86, 255, 0.1);
+.recurrence-day-item input[type="checkbox"]:checked + .recurrence-day-label,
+.recurrence-day-item.checked .recurrence-day-label {
+    color: #0f56ff;
+    font-weight: 700;
+}
+
+.recurrence-day-item input[type="checkbox"]:checked ~ .recurrence-day-label {
+    color: #0f56ff;
+    font-weight: 700;
 }
 
 .recurrence-day-label {
@@ -316,8 +321,19 @@
     text-align: center;
     white-space: nowrap;
     min-width: 28px;
+    pointer-events: none;
+    user-select: none;
 }
 
+/* Checked state styling - using class instead of :has() for better browser support */
+.recurrence-day-item.checked,
+.recurrence-day-item:has(input:checked) {
+    background: rgba(15, 86, 255, 0.15);
+    border-color: #0f56ff;
+    box-shadow: 0 0 0 3px rgba(15, 86, 255, 0.1);
+}
+
+.recurrence-day-item.checked .recurrence-day-label,
 .recurrence-day-item:has(input:checked) .recurrence-day-label {
     color: #0f56ff;
     font-weight: 700;

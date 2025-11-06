@@ -1334,6 +1334,60 @@
             // Only show day selection for weekly pattern
             daysSection.style.display = pattern === 'weekly' ? 'block' : 'none';
         }
+        
+        // Handle day checkbox state changes for styling
+        function setupRecurrenceDayCheckboxes() {
+            const dayCheckboxes = document.querySelectorAll('.recurrence-day-item input[type="checkbox"]');
+            dayCheckboxes.forEach(checkbox => {
+                // Update initial state
+                updateDayItemState(checkbox);
+                
+                // Add change listener
+                checkbox.addEventListener('change', function() {
+                    updateDayItemState(this);
+                });
+                
+                // Make entire day item clickable
+                const dayItem = checkbox.closest('.recurrence-day-item');
+                if (dayItem) {
+                    dayItem.addEventListener('click', function(e) {
+                        if (e.target !== checkbox) {
+                            checkbox.click();
+                        }
+                    });
+                }
+            });
+        }
+        
+        function updateDayItemState(checkbox) {
+            const dayItem = checkbox.closest('.recurrence-day-item');
+            if (dayItem) {
+                if (checkbox.checked) {
+                    dayItem.classList.add('checked');
+                } else {
+                    dayItem.classList.remove('checked');
+                }
+            }
+        }
+        
+        // Initialize on modal open
+        document.addEventListener('DOMContentLoaded', function() {
+            // Watch for modal opens
+            const scheduleModal = document.getElementById('scheduleModal');
+            if (scheduleModal) {
+                const observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                            const isVisible = scheduleModal.style.display !== 'none';
+                            if (isVisible) {
+                                setTimeout(setupRecurrenceDayCheckboxes, 100);
+                            }
+                        }
+                    });
+                });
+                observer.observe(scheduleModal, { attributes: true });
+            }
+        });
     </script>
 
     <!-- My Rooms Modal -->
