@@ -908,9 +908,13 @@
             border-radius: 20px;
             width: 90%;
             max-width: 500px;
+            max-height: 90vh; /* Limit modal height to viewport */
+            display: flex;
+            flex-direction: column;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.2);
+            overflow: hidden; /* Prevent content from overflowing */
         }
 
         .modal-header {
@@ -919,6 +923,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-shrink: 0; /* Prevent header from shrinking */
         }
 
         .modal-header h2 {
@@ -942,6 +947,22 @@
 
         .modal-body {
             padding: 30px;
+            overflow-y: auto; /* Make body scrollable */
+            flex: 1; /* Take remaining space */
+            min-height: 0; /* Allow flex item to shrink below content size */
+        }
+        
+        /* Ensure form button stays visible when scrolling */
+        .modal-body form {
+            display: flex;
+            flex-direction: column;
+            min-height: 100%; /* Ensure form takes full height */
+        }
+        
+        /* Button container at bottom - always visible */
+        .modal-body form > div:last-of-type {
+            margin-top: auto; /* Push to bottom */
+            flex-shrink: 0; /* Prevent from shrinking */
         }
 
         .form-group {
@@ -1396,7 +1417,9 @@
                         </div>
                     </div>
                     
-                    <button type="submit" class="btn primary">Schedule Session</button>
+                    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(0, 0, 0, 0.1); flex-shrink: 0;">
+                        <button type="submit" class="btn primary" style="width: 100%;">Schedule Session</button>
+                    </div>
                 </form>
             </div>
         </div>
