@@ -630,7 +630,15 @@ class PrayerRoomsDirectory {
         e.preventDefault();
         
         const formData = new FormData(e.target);
-        const roomCode = formData.get('joinRoomCode').trim().toUpperCase();
+        const roomCodeValue = formData.get('joinRoomCode');
+        
+        // Handle null/undefined values and empty strings
+        if (!roomCodeValue || typeof roomCodeValue !== 'string') {
+            alert('Please enter a room code');
+            return;
+        }
+        
+        const roomCode = roomCodeValue.trim().toUpperCase();
         
         if (!roomCode) {
             alert('Please enter a room code');
