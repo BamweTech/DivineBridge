@@ -437,7 +437,13 @@ class PrayerRoomsDirectory {
                     </div>
                     <div class="room-actions">
                         ${isUpcoming ? 
-                            `<button class="btn btn-danger" onclick="cancelScheduledRoom('${room.scheduled_room_id}')">
+                            `<button class="btn btn-primary" onclick="editScheduledRoom('${room.scheduled_room_id}', '${this.escapeHtml(room.room_name)}', '${this.escapeHtml(room.room_description || '')}', '${room.scheduled_time}', '${room.room_privacy}')">
+                                Edit
+                            </button>
+                            <button class="btn btn-outline" onclick="shareScheduledRoom('${room.scheduled_room_id}', '${this.escapeHtml(room.room_name)}', '${room.scheduled_time}', '${room.room_code || ''}', '${room.room_privacy}')">
+                                Share
+                            </button>
+                            <button class="btn btn-danger" onclick="cancelScheduledRoom('${room.scheduled_room_id}')">
                                 Cancel
                             </button>` :
                             `<button class="btn btn-secondary" onclick="reopenRoom('${room.room_id || room.scheduled_room_id}')">
@@ -604,6 +610,13 @@ class PrayerRoomsDirectory {
         } else {
             return date.toLocaleDateString();
         }
+    }
+    
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     setupEventListeners() {

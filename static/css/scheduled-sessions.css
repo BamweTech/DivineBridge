@@ -246,18 +246,24 @@
     align-items: center;
     gap: 6px;
     font-size: 0.875rem;
-    color: #475569;
+    color: #1e293b; /* Changed from #475569 to darker color for better visibility */
+    font-weight: 500;
 }
 
 .rsvp-stat svg {
     width: 18px;
     height: 18px;
+    color: #0f56ff; /* Make icon blue for better visibility */
 }
 
 .rsvp-stat .count {
     font-weight: 700;
     color: #0f56ff;
     font-size: 1rem;
+}
+
+.rsvp-stat span:not(.count) {
+    color: #1e293b; /* Darker text for "people interested" text */
 }
 
 /* RSVP Buttons - Glassmorphic */
