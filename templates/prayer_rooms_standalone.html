@@ -7,6 +7,7 @@
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/scheduled-sessions.css') }}?v={{ range(100000, 999999) | random }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-rooms-cards.css') }}?v={{ range(100000, 999999) | random }}">
     
     <style>
         * {
@@ -1274,7 +1275,7 @@
                 </div>
                 
                 <!-- Upcoming Tab Content -->
-                <div id="upcomingTab" class="tab-content" style="display: none;">
+                <div id="upcomingTab" class="tab-content">
                     <div class="scheduled-sessions-panel">
                         <div id="scheduledSessionsList">
                             <!-- Scheduled sessions will be loaded here by JavaScript -->

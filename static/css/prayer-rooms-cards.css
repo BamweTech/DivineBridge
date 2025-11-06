@@ -1,0 +1,316 @@
+/* =================================================================
+   PRAYER ROOMS CARDS - MODERN GLASSMORPHIC DESIGN
+   Redesign for My Rooms and Scheduled Rooms cards
+   ================================================================= */
+
+/* Glassmorphic Room Item Card */
+.room-item {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 
+        0 8px 32px rgba(15, 86, 255, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    padding: 24px;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+}
+
+.room-item::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(15, 86, 255, 0.05) 0%, transparent 70%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+}
+
+.room-item:hover {
+    transform: translateY(-4px);
+    box-shadow: 
+        0 12px 48px rgba(15, 86, 255, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
+    border-color: rgba(15, 86, 255, 0.2);
+}
+
+.room-item:hover::before {
+    opacity: 1;
+}
+
+/* Room Info Section */
+.room-item .room-info {
+    position: relative;
+    z-index: 1;
+    margin-bottom: 16px;
+}
+
+.room-item .room-info h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 8px 0;
+    line-height: 1.3;
+    background: linear-gradient(135deg, #1e293b 0%, #0f56ff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.room-item .room-description {
+    font-size: 0.95rem;
+    color: #64748b;
+    margin: 0 0 16px 0;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Room Meta - Modern Badge Design */
+.room-item .room-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.room-item .room-meta span {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+/* Privacy Badge */
+.room-item .room-privacy {
+    background: rgba(15, 86, 255, 0.1);
+    color: #0f56ff;
+    border: 1px solid rgba(15, 86, 255, 0.2);
+}
+
+.room-item .room-privacy.private {
+    background: rgba(139, 92, 246, 0.1);
+    color: #8b5cf6;
+    border: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+/* Status Badge */
+.room-item .room-status {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.room-item .room-status.ended,
+.room-item .room-status.past {
+    background: rgba(107, 114, 128, 0.1);
+    color: #6b7280;
+    border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+.room-item .room-status.upcoming {
+    background: rgba(249, 115, 22, 0.1);
+    color: #f97316;
+    border: 1px solid rgba(249, 115, 22, 0.2);
+}
+
+/* Date Badge */
+.room-item .room-date,
+.room-item .room-activity {
+    background: rgba(148, 163, 184, 0.1);
+    color: #64748b;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    font-size: 0.8rem;
+}
+
+/* Room Actions */
+.room-item .room-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 1;
+    padding-top: 16px;
+    border-top: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+/* Modern Button Styles */
+.room-item .room-actions .btn,
+.room-item .room-actions button {
+    flex: 1;
+    min-width: 120px;
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.room-item .room-actions .btn::before,
+.room-item .room-actions button::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.room-item .room-actions .btn:hover::before,
+.room-item .room-actions button:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+/* Primary Button */
+.room-item .room-actions .btn-primary,
+.room-item .room-actions .btn.btn-primary {
+    background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(15, 86, 255, 0.25);
+}
+
+.room-item .room-actions .btn-primary:hover,
+.room-item .room-actions .btn.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(15, 86, 255, 0.35);
+}
+
+/* Secondary Button */
+.room-item .room-actions .btn-secondary,
+.room-item .room-actions .btn.btn-secondary {
+    background: rgba(148, 163, 184, 0.1);
+    color: #64748b;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.room-item .room-actions .btn-secondary:hover,
+.room-item .room-actions .btn.btn-secondary:hover {
+    background: rgba(148, 163, 184, 0.2);
+    transform: translateY(-2px);
+}
+
+/* Danger Button */
+.room-item .room-actions .btn-danger,
+.room-item .room-actions .btn.btn-danger {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.room-item .room-actions .btn-danger:hover,
+.room-item .room-actions .btn.btn-danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+    transform: translateY(-2px);
+}
+
+/* Outline Button */
+.room-item .room-actions .btn-outline,
+.room-item .room-actions .btn.btn-outline {
+    background: transparent;
+    color: #0f56ff;
+    border: 1px solid rgba(15, 86, 255, 0.3);
+}
+
+.room-item .room-actions .btn-outline:hover,
+.room-item .room-actions .btn.btn-outline:hover {
+    background: rgba(15, 86, 255, 0.1);
+    border-color: rgba(15, 86, 255, 0.5);
+}
+
+/* Empty State */
+.no-rooms {
+    text-align: center;
+    padding: 60px 20px;
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    border: 1px dashed rgba(148, 163, 184, 0.3);
+}
+
+.no-rooms p {
+    color: #64748b;
+    font-size: 1rem;
+    margin: 8px 0;
+}
+
+.no-rooms h3 {
+    color: #1e293b;
+    font-size: 1.25rem;
+    margin-bottom: 12px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .room-item {
+        padding: 20px;
+        margin-bottom: 16px;
+    }
+    
+    .room-item .room-info h3 {
+        font-size: 1.1rem;
+    }
+    
+    .room-item .room-actions {
+        flex-direction: column;
+    }
+    
+    .room-item .room-actions .btn,
+    .room-item .room-actions button {
+        width: 100%;
+        min-width: unset;
+    }
+    
+    .room-item .room-meta {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+/* Animation for card appearance */
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.room-item {
+    animation: slideInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.room-item:nth-child(1) { animation-delay: 0.05s; }
+.room-item:nth-child(2) { animation-delay: 0.1s; }
+.room-item:nth-child(3) { animation-delay: 0.15s; }
+.room-item:nth-child(4) { animation-delay: 0.2s; }
+.room-item:nth-child(5) { animation-delay: 0.25s; }
+

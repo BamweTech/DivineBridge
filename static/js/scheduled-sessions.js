@@ -113,6 +113,9 @@ class ScheduledSessionsManager {
     
     setupTabs() {
         const tabButtons = document.querySelectorAll('.session-tab-btn');
+        const liveTab = document.getElementById('liveTab');
+        const upcomingTab = document.getElementById('upcomingTab');
+        
         tabButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 // Update active state
@@ -122,19 +125,36 @@ class ScheduledSessionsManager {
                 // Switch content
                 const tab = btn.dataset.tab;
                 if (tab === 'live') {
-                    document.getElementById('liveTab').classList.add('active');
-                    document.getElementById('upcomingTab').classList.remove('active');
-                } else if (tab === 'upcoming') {
-                    document.getElementById('liveTab').classList.remove('active');
-                    document.getElementById('upcomingTab').classList.add('active');
-                    
-                    // Load scheduled sessions if not already loaded
-                    if (this.sessions.length === 0) {
-                        this.loadSessions();
+                    if (liveTab) {
+                        liveTab.classList.add('active');
+                        liveTab.style.display = 'block';
                     }
+                    if (upcomingTab) {
+                        upcomingTab.classList.remove('active');
+                        upcomingTab.style.display = 'none';
+                    }
+                } else if (tab === 'upcoming') {
+                    if (liveTab) {
+                        liveTab.classList.remove('active');
+                        liveTab.style.display = 'none';
+                    }
+                    if (upcomingTab) {
+                        upcomingTab.classList.add('active');
+                        upcomingTab.style.display = 'block';
+                    }
+                    
+                    // Always reload scheduled sessions when switching to upcoming tab
+                    console.log('🔄 Switching to upcoming tab, loading sessions...');
+                    this.loadSessions();
                 }
             });
         });
+        
+        // Check if upcoming tab is initially active (shouldn't be, but just in case)
+        if (upcomingTab && upcomingTab.classList.contains('active')) {
+            console.log('📅 Upcoming tab is active on init, loading sessions...');
+            this.loadSessions();
+        }
     }
     
     async loadSessions(filter = 'all', sort = 'soonest') {
@@ -149,17 +169,24 @@ class ScheduledSessionsManager {
         `;
         
         try {
+            console.log('Loading public scheduled sessions...', { filter, sort });
             const response = await fetch(
                 `/api/prayer-room/public-scheduled-sessions?time=${filter}&sort=${sort}&limit=20`,
                 { credentials: 'include' }
             );
             
+            console.log('Response status:', response.status);
+            
             if (!response.ok) {
-                throw new Error('Failed to load sessions');
+                const errorText = await response.text().catch(() => '');
+                console.error('Failed to load sessions:', response.status, errorText);
+                throw new Error(`Failed to load sessions: ${response.status}`);
             }
             
             const data = await response.json();
+            console.log('Sessions data received:', data);
             this.sessions = data.sessions || [];
+            console.log('Number of sessions:', this.sessions.length);
             this.currentFilter = filter;
             this.currentSort = sort;
             
@@ -174,6 +201,7 @@ class ScheduledSessionsManager {
                     </svg>
                     <h3>Unable to load sessions</h3>
                     <p>Please try again later</p>
+                    <p style="font-size: 0.85rem; color: #94a3b8; margin-top: 8px;">Error: ${error.message}</p>
                 </div>
             `;
         }
