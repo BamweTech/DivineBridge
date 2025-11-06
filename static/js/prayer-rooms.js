@@ -30,6 +30,51 @@ class PrayerRoomsDirectory {
 
     async checkAuth() {
         try {
+            // First, wait for Firebase to be initialized (if it exists)
+            if (typeof firebase !== 'undefined' && firebase.auth) {
+                // Wait for Firebase auth state to be ready
+                const firebaseUser = await new Promise((resolve) => {
+                    let resolved = false;
+                    
+                    // Check if user is already available (fast path)
+                    const currentUser = firebase.auth().currentUser;
+                    if (currentUser) {
+                        resolved = true;
+                        resolve(currentUser);
+                        return;
+                    }
+                    
+                    // Wait for auth state change
+                    const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
+                        if (!resolved) {
+                            resolved = true;
+                            unsubscribe();
+                            resolve(user);
+                        }
+                    });
+                    
+                    // Timeout after 3 seconds
+                    setTimeout(() => {
+                        if (!resolved) {
+                            resolved = true;
+                            unsubscribe();
+                            resolve(null);
+                        }
+                    }, 3000);
+                });
+                
+                if (firebaseUser) {
+                    this.currentUser = {
+                        uid: firebaseUser.uid,
+                        email: firebaseUser.email,
+                        displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Anonymous'
+                    };
+                    console.log('✅ User authenticated via Firebase:', this.currentUser.email);
+                    return; // Firebase auth is the source of truth
+                }
+            }
+            
+            // Fallback to session-based auth check
             const response = await fetch('/api/auth/status', {
                 method: 'GET',
                 credentials: 'include'
@@ -39,7 +84,7 @@ class PrayerRoomsDirectory {
                 const userData = await response.json();
                 if (userData.authenticated) {
                     this.currentUser = userData.user;
-                    console.log('✅ User authenticated:', this.currentUser);
+                    console.log('✅ User authenticated via session:', this.currentUser);
                 } else {
                     console.log('ℹ️ User not authenticated - will prompt for login only when performing authenticated actions');
                     this.currentUser = null;
@@ -1018,10 +1063,60 @@ function switchMyRoomsTab(tabName) {
     }
 }
 
-function showMyRooms() {
+async function showMyRooms() {
     // Check if user is authenticated
     const prayerRoomsDirectory = window.prayerRoomsDirectory;
-    if (!prayerRoomsDirectory || !prayerRoomsDirectory.currentUser) {
+    
+    // First check class property
+    if (prayerRoomsDirectory && prayerRoomsDirectory.currentUser) {
+        // User is authenticated, proceed
+    } else if (typeof firebase !== 'undefined' && firebase.auth) {
+        // Check Firebase auth directly as fallback
+        const firebaseUser = firebase.auth().currentUser;
+        if (firebaseUser) {
+            // Update the directory's currentUser
+            if (prayerRoomsDirectory) {
+                prayerRoomsDirectory.currentUser = {
+                    uid: firebaseUser.uid,
+                    email: firebaseUser.email,
+                    displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Anonymous'
+                };
+            }
+            console.log('✅ User authenticated via Firebase (fallback check):', firebaseUser.email);
+        } else {
+            // Wait for auth state change (might be initializing)
+            const user = await new Promise((resolve) => {
+                let resolved = false;
+                const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
+                    if (!resolved) {
+                        resolved = true;
+                        unsubscribe();
+                        resolve(user);
+                    }
+                });
+                setTimeout(() => {
+                    if (!resolved) {
+                        resolved = true;
+                        unsubscribe();
+                        resolve(null);
+                    }
+                }, 2000);
+            });
+            
+            if (user && prayerRoomsDirectory) {
+                prayerRoomsDirectory.currentUser = {
+                    uid: user.uid,
+                    email: user.email,
+                    displayName: user.displayName || user.email?.split('@')[0] || 'Anonymous'
+                };
+                console.log('✅ User authenticated via Firebase (after wait):', user.email);
+            } else {
+                console.log('User not authenticated, redirecting to login');
+                window.location.href = '/login?redirect=' + encodeURIComponent('/prayer-room');
+                return;
+            }
+        }
+    } else {
         console.log('User not authenticated, redirecting to login');
         window.location.href = '/login?redirect=' + encodeURIComponent('/prayer-room');
         return;
