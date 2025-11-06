@@ -224,11 +224,18 @@ class PrayerRoomsDirectory {
         try {
             // First attempt: Get token (cached)
             let idToken = await this.getFirebaseIdToken(false);
+            
+            if (!idToken) {
+                console.warn('⚠️ makeAuthenticatedRequest: No Firebase ID token available - request may fail');
+            } else {
+                console.log('✅ makeAuthenticatedRequest: Firebase ID token obtained, making request to:', url);
+            }
+            
             let response = await makeRequest(idToken);
             
             // If 401, try refreshing the token
             if (response.status === 401) {
-                console.log('⚠️ 401 error, attempting token refresh...');
+                console.log('⚠️ 401 error on', url, '- attempting token refresh...');
                 
                 // Force refresh the Firebase token
                 idToken = await this.getFirebaseIdToken(true);
@@ -240,8 +247,12 @@ class PrayerRoomsDirectory {
                     
                     if (response.status === 401) {
                         // Still 401 after refresh - user needs to login
-                        console.log('❌ Still unauthorized after token refresh');
+                        console.log('❌ Still unauthorized after token refresh for:', url);
+                        const errorText = await response.text().catch(() => '');
+                        console.error('❌ 401 Error response:', errorText);
                         return { success: false, needsLogin: true };
+                    } else {
+                        console.log('✅ Request succeeded after token refresh');
                     }
                 } else {
                     // No Firebase user - needs to login
