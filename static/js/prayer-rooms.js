@@ -352,10 +352,21 @@ class PrayerRoomsDirectory {
         }
         
         scheduledContainer.innerHTML = scheduledRooms.map(room => {
+            // scheduled_time is stored as UTC timestamp, JavaScript Date automatically converts to local time
             const scheduledDate = new Date(room.scheduled_time * 1000);
             const isUpcoming = scheduledDate > new Date();
             const statusClass = isUpcoming ? 'upcoming' : 'past';
             const statusText = isUpcoming ? 'Upcoming' : 'Past';
+            
+            // Format date in user's local timezone with better formatting
+            const dateDisplay = scheduledDate.toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            });
             
             return `
                 <div class="room-item">
@@ -365,7 +376,7 @@ class PrayerRoomsDirectory {
                         <div class="room-meta">
                             <span class="room-privacy ${room.room_privacy}">${room.room_privacy}</span>
                             <span class="room-status ${statusClass}">${statusText}</span>
-                            <span class="room-date">Scheduled: ${scheduledDate.toLocaleString()}</span>
+                            <span class="room-date">Scheduled: ${dateDisplay}</span>
                         </div>
                     </div>
                     <div class="room-actions">
@@ -689,10 +700,14 @@ class PrayerRoomsDirectory {
             });
         }
         
+        // Get user's timezone offset in minutes
+        const timezoneOffset = new Date().getTimezoneOffset();
+        
         const scheduleData = {
             room_name: roomName,
             room_description: formData.get('room_description'),
             scheduled_time: formData.get('scheduled_time'),
+            timezone_offset: timezoneOffset, // Send timezone offset to backend
             room_privacy: formData.get('room_privacy') || 'public',
             is_recurring: isRecurring
         };

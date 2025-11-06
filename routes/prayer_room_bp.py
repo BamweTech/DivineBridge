@@ -1516,13 +1516,25 @@ def schedule_room():
         
         # Parse scheduled time - handle local timezone
         try:
+            # Get timezone offset from request (in minutes, negative for timezones ahead of UTC)
+            timezone_offset_minutes = data.get('timezone_offset', 0)
+            
             # The datetime-local input provides local time without timezone info
-            # We need to treat it as local time, not UTC
+            # We need to convert it to UTC for storage
             if 'T' in scheduled_time and '+' not in scheduled_time and 'Z' not in scheduled_time:
                 # This is a local datetime from datetime-local input
                 # Parse it as naive datetime (no timezone info)
-                scheduled_datetime = datetime.fromisoformat(scheduled_time)
-                logging.info(f"Parsed scheduled time (local): {scheduled_datetime}")
+                local_datetime = datetime.fromisoformat(scheduled_time)
+                logging.info(f"Parsed scheduled time (local): {local_datetime}")
+                
+                # Convert local time to UTC
+                # getTimezoneOffset() returns minutes to ADD to local time to get UTC
+                # For CST (UTC-6), it returns +360 (6 hours behind UTC)
+                # So UTC = local + offset_minutes
+                from datetime import timezone, timedelta
+                offset_timedelta = timedelta(minutes=timezone_offset_minutes)
+                scheduled_datetime = local_datetime + offset_timedelta
+                logging.info(f"Converted to UTC: {scheduled_datetime} (local: {local_datetime}, offset: {timezone_offset_minutes} minutes = {timezone_offset_minutes/60} hours)")
             else:
                 # This has timezone info, parse normally
                 scheduled_datetime = datetime.fromisoformat(scheduled_time.replace('Z', '+00:00'))
@@ -1531,11 +1543,10 @@ def schedule_room():
             logging.error(f"Invalid scheduled time format: {scheduled_time}, error: {e}")
             return jsonify({'error': 'Invalid scheduled time format'}), 400
         
-        # Check if scheduled time is in the future
-        # For local datetime, compare with local time
-        now = datetime.now()
-        if scheduled_datetime <= now:
-            logging.error(f"Scheduled time is in the past: {scheduled_datetime} (current time: {now})")
+        # Check if scheduled time is in the future (using UTC)
+        now_utc = datetime.utcnow()
+        if scheduled_datetime <= now_utc:
+            logging.error(f"Scheduled time is in the past: {scheduled_datetime} UTC (current time: {now_utc} UTC)")
             return jsonify({'error': 'Scheduled time must be in the future'}), 400
         
         db = get_firestore_client()
@@ -1564,10 +1575,23 @@ def schedule_room():
             scheduled_room_data['recurrence_pattern'] = recurrence_pattern
             scheduled_room_data['recurrence_days'] = recurrence_days
             
-            # Parse end date if provided
+            # Parse end date if provided (also convert to UTC if it's a date-only input)
             if recurrence_end_date:
                 try:
-                    end_datetime = datetime.fromisoformat(recurrence_end_date)
+                    # If it's a date-only input (YYYY-MM-DD), treat as local midnight
+                    if 'T' not in recurrence_end_date:
+                        # Date only - set to midnight local time and convert to UTC
+                        end_datetime_local = datetime.fromisoformat(recurrence_end_date + 'T00:00')
+                        offset_timedelta = timedelta(minutes=timezone_offset_minutes)
+                        end_datetime = end_datetime_local + offset_timedelta
+                    elif 'T' in recurrence_end_date and '+' not in recurrence_end_date and 'Z' not in recurrence_end_date:
+                        # datetime-local input - convert to UTC
+                        end_datetime_local = datetime.fromisoformat(recurrence_end_date)
+                        offset_timedelta = timedelta(minutes=timezone_offset_minutes)
+                        end_datetime = end_datetime_local + offset_timedelta
+                    else:
+                        # Has timezone info
+                        end_datetime = datetime.fromisoformat(recurrence_end_date.replace('Z', '+00:00'))
                     scheduled_room_data['recurrence_end_date'] = end_datetime
                 except ValueError:
                     logging.warning(f"Invalid recurrence end date: {recurrence_end_date}")
@@ -2959,11 +2983,21 @@ def get_public_scheduled_sessions():
         limit = int(request.args.get('limit', 20))
         sort_by = request.args.get('sort', 'soonest')  # soonest, popular
         
+        logging.info(f"Fetching public scheduled sessions - filter: {time_filter}, sort: {sort_by}, limit: {limit}")
+        
         # Base query - only scheduled (not active/completed), only public
-        query = db.collection('scheduled_rooms')\
-            .where('status', '==', 'scheduled')\
-            .where('room_privacy', '==', 'public')\
-            .where('scheduled_time', '>=', now)
+        # Note: This requires a composite index: status, room_privacy, scheduled_time
+        try:
+            query = db.collection('scheduled_rooms')\
+                .where('status', '==', 'scheduled')\
+                .where('room_privacy', '==', 'public')\
+                .where('scheduled_time', '>=', now)
+        except Exception as query_error:
+            logging.error(f"Firestore query error (may need composite index): {str(query_error)}")
+            # Fallback: Query without scheduled_time filter, filter in Python
+            query = db.collection('scheduled_rooms')\
+                .where('status', '==', 'scheduled')\
+                .where('room_privacy', '==', 'public')
         
         # Get all matching sessions
         sessions = []
@@ -2971,9 +3005,32 @@ def get_public_scheduled_sessions():
             session_data = doc.to_dict()
             session_data['scheduled_room_id'] = doc.id
             
-            # Convert timestamp to ISO string for JSON
-            if hasattr(session_data.get('scheduled_time'), 'timestamp'):
-                session_data['scheduled_time'] = session_data['scheduled_time'].timestamp()
+            # Convert timestamp to seconds (Unix timestamp) for JSON
+            scheduled_time_obj = session_data.get('scheduled_time')
+            scheduled_timestamp = None
+            
+            if scheduled_time_obj:
+                if hasattr(scheduled_time_obj, 'timestamp'):
+                    # Firestore timestamp
+                    scheduled_timestamp = scheduled_time_obj.timestamp()
+                elif isinstance(scheduled_time_obj, datetime):
+                    # Python datetime
+                    from datetime import timezone
+                    if scheduled_time_obj.tzinfo is None:
+                        # Naive datetime - assume UTC
+                        scheduled_timestamp = (scheduled_time_obj - datetime(1970, 1, 1)).total_seconds()
+                    else:
+                        scheduled_timestamp = scheduled_time_obj.timestamp()
+                elif isinstance(scheduled_time_obj, (int, float)):
+                    # Already a number (timestamp)
+                    scheduled_timestamp = scheduled_time_obj
+                
+                # Filter out past sessions if query didn't filter by time
+                if scheduled_timestamp and scheduled_timestamp < now.timestamp():
+                    continue
+                
+                session_data['scheduled_time'] = scheduled_timestamp
+            
             if hasattr(session_data.get('created_at'), 'timestamp'):
                 session_data['created_at'] = session_data['created_at'].timestamp()
             
@@ -3229,20 +3286,29 @@ def update_scheduled_room(scheduled_room_id):
         if len(room_name) > 50:
             return jsonify({'error': 'Room name must be 50 characters or less'}), 400
         
-        # Parse scheduled time - handle local timezone
+        # Parse scheduled time - handle local timezone (same logic as schedule_room)
         try:
+            # Get timezone offset from request (in minutes)
+            timezone_offset_minutes = data.get('timezone_offset', 0)
+            
             if 'T' in scheduled_time and '+' not in scheduled_time and 'Z' not in scheduled_time:
-                # Parse it as naive datetime (no timezone info)
-                scheduled_datetime = datetime.fromisoformat(scheduled_time)
+                # Parse as local datetime and convert to UTC
+                # getTimezoneOffset() returns minutes to ADD to local time to get UTC
+                local_datetime = datetime.fromisoformat(scheduled_time)
+                from datetime import timezone, timedelta
+                offset_timedelta = timedelta(minutes=timezone_offset_minutes)
+                scheduled_datetime = local_datetime + offset_timedelta
+                logging.info(f"Updated scheduled time - converted to UTC: {scheduled_datetime} (local: {local_datetime}, offset: {timezone_offset_minutes} minutes)")
             else:
                 # This has timezone info, parse normally
                 scheduled_datetime = datetime.fromisoformat(scheduled_time.replace('Z', '+00:00'))
         except ValueError as e:
+            logging.error(f"Invalid scheduled time format: {scheduled_time}, error: {e}")
             return jsonify({'error': 'Invalid scheduled time format'}), 400
         
-        # Check if scheduled time is in the future
-        now = datetime.now()
-        if scheduled_datetime <= now:
+        # Check if scheduled time is in the future (using UTC)
+        now_utc = datetime.utcnow()
+        if scheduled_datetime <= now_utc:
             return jsonify({'error': 'Scheduled time must be in the future'}), 400
         
         db = get_firestore_client()
