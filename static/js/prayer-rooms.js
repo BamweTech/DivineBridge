@@ -241,19 +241,18 @@ class PrayerRoomsDirectory {
         try {
             console.log('Loading user rooms...');
             
-            const response = await fetch('/api/prayer-room/my-rooms', {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include'
+            const result = await this.makeAuthenticatedRequest('/api/prayer-room/my-rooms', {
+                method: 'GET'
             });
             
-            if (response.ok) {
-                const data = await response.json();
-                this.displayMyRooms(data.rooms);
+            if (result.success) {
+                this.displayMyRooms(result.data.rooms || []);
+            } else if (result.needsLogin) {
+                console.log('❌ Authentication required for loading user rooms');
+                // Don't redirect - just show empty state
+                this.displayMyRooms([]);
             } else {
-                console.error('Failed to load user rooms:', await response.text());
+                console.error('Failed to load user rooms:', result.error);
                 this.displayMyRooms([]);
             }
         } catch (error) {
@@ -266,19 +265,18 @@ class PrayerRoomsDirectory {
         try {
             console.log('Loading scheduled rooms...');
             
-            const response = await fetch('/api/prayer-room/my-scheduled-rooms', {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include'
+            const result = await this.makeAuthenticatedRequest('/api/prayer-room/my-scheduled-rooms', {
+                method: 'GET'
             });
             
-            if (response.ok) {
-                const data = await response.json();
-                this.displayScheduledRooms(data.scheduled_rooms);
+            if (result.success) {
+                this.displayScheduledRooms(result.data.scheduled_rooms || []);
+            } else if (result.needsLogin) {
+                console.log('❌ Authentication required for loading scheduled rooms');
+                // Don't redirect - just show empty state
+                this.displayScheduledRooms([]);
             } else {
-                console.error('Failed to load scheduled rooms:', await response.text());
+                console.error('Failed to load scheduled rooms:', result.error);
                 this.displayScheduledRooms([]);
             }
         } catch (error) {
@@ -466,33 +464,30 @@ class PrayerRoomsDirectory {
         try {
             console.log('Reopening room:', originalRoomId);
             
-            const response = await fetch('/api/prayer-room/reopen-room', {
+            const result = await this.makeAuthenticatedRequest('/api/prayer-room/reopen-room', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify({
                     original_room_id: originalRoomId
-                }),
-                credentials: 'include'
+                })
             });
             
-            const result = await response.json();
-            
-            if (response.ok) {
+            if (result.success) {
                 // Show room code for private rooms
-                if (result.room_code) {
-                    alert(`Room reopened successfully!\n\nRoom Code: ${result.room_code}\n\nShare this code with others to let them join your private room.`);
+                if (result.data.room_code) {
+                    alert(`Room reopened successfully!\n\nRoom Code: ${result.data.room_code}\n\nShare this code with others to let them join your private room.`);
                 } else {
                     alert('Room reopened successfully!');
                 }
                 
                 // Redirect to the reopened room with room code if it's a private room
-                let redirectUrl = `/prayer-room/join?room=${result.room_id}&name=${encodeURIComponent(result.room_name)}`;
-                if (result.room_code) {
-                    redirectUrl += `&code=${result.room_code}`;
+                let redirectUrl = `/prayer-room/join?room=${result.data.room_id}&name=${encodeURIComponent(result.data.room_name)}`;
+                if (result.data.room_code) {
+                    redirectUrl += `&code=${result.data.room_code}`;
                 }
                 window.location.href = redirectUrl;
+            } else if (result.needsLogin) {
+                alert('Please log in to reopen this room.');
+                window.location.href = '/login?redirect=' + encodeURIComponent('/prayer-room');
             } else {
                 alert('Failed to reopen room: ' + (result.error || 'Unknown error'));
             }
@@ -506,20 +501,17 @@ class PrayerRoomsDirectory {
         try {
             console.log('Canceling scheduled room:', scheduledRoomId);
             
-            const response = await fetch(`/api/prayer-room/scheduled-room/${scheduledRoomId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include'
+            const result = await this.makeAuthenticatedRequest(`/api/prayer-room/scheduled-room/${scheduledRoomId}`, {
+                method: 'DELETE'
             });
             
-            const result = await response.json();
-            
-            if (response.ok) {
+            if (result.success) {
                 alert('Scheduled room canceled successfully!');
                 // Reload the scheduled rooms
                 this.loadMyScheduledRooms();
+            } else if (result.needsLogin) {
+                alert('Please log in to cancel this scheduled room.');
+                window.location.href = '/login?redirect=' + encodeURIComponent('/prayer-room');
             } else {
                 alert('Failed to cancel scheduled room: ' + (result.error || 'Unknown error'));
             }
@@ -1075,74 +1067,38 @@ function joinRoom(roomId, roomPrivacy = 'public') {
     }
 }
 
-function reopenRoom(roomId) {
-    if (confirm('Are you sure you want to reopen this room as a live session?')) {
-        // Call the reopen room API
-        fetch('/api/prayer-room/reopen-room', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            credentials: 'include',
-            body: JSON.stringify({
-                original_room_id: roomId
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Show room code for private rooms
-                if (data.room_code) {
-                    alert(`Room reopened successfully!\n\nRoom Code: ${data.room_code}\n\nShare this code with others to let them join your private room.`);
-                } else {
-                    alert('Room reopened successfully!');
-                }
-                
-                // Redirect to the new room with room code if it's a private room
-                let redirectUrl = `/prayer-room/join?room=${data.room_id}`;
-                if (data.room_code) {
-                    redirectUrl += `&code=${data.room_code}`;
-                }
-                window.location.href = redirectUrl;
-            } else {
-                alert('Failed to reopen room: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            console.error('Error reopening room:', error);
-            alert('Failed to reopen room. Please try again.');
-        });
+async function reopenRoom(roomId) {
+    if (!confirm('Are you sure you want to reopen this room as a live session?')) {
+        return;
     }
+    
+    const prayerRoomsDirectory = window.prayerRoomsDirectory;
+    if (!prayerRoomsDirectory) {
+        alert('Prayer rooms directory not initialized');
+        return;
+    }
+    
+    // Use the class method which handles authentication properly
+    await prayerRoomsDirectory.reopenRoom(roomId);
 }
 
-function cancelScheduledRoom(scheduledRoomId, roomName = '') {
+async function cancelScheduledRoom(scheduledRoomId, roomName = '') {
     const confirmMessage = roomName ? 
         `Are you sure you want to cancel the scheduled room "${roomName}"?` :
         'Are you sure you want to cancel this scheduled room?';
         
-    if (confirm(confirmMessage)) {
-        fetch(`/api/prayer-room/scheduled-room/${scheduledRoomId}`, {
-            method: 'DELETE',
-            credentials: 'include'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Scheduled room cancelled successfully!');
-                // Reload the scheduled rooms
-                const prayerRoomsDirectory = window.prayerRoomsDirectory;
-                if (prayerRoomsDirectory) {
-                    prayerRoomsDirectory.loadMyScheduledRooms();
-                }
-            } else {
-                alert('Failed to cancel scheduled room: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            console.error('Error cancelling scheduled room:', error);
-            alert('Failed to cancel scheduled room. Please try again.');
-        });
+    if (!confirm(confirmMessage)) {
+        return;
     }
+    
+    const prayerRoomsDirectory = window.prayerRoomsDirectory;
+    if (!prayerRoomsDirectory) {
+        alert('Prayer rooms directory not initialized');
+        return;
+    }
+    
+    // Use the class method which handles authentication properly
+    await prayerRoomsDirectory.cancelScheduledRoom(scheduledRoomId);
 }
 
 function copyRoomCode(roomCode) {
