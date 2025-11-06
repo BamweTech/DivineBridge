@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/scheduled-sessions.css') }}?v={{ range(100000, 999999) | random }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-rooms-cards.css') }}?v={{ range(100000, 999999) | random }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modals-glassmorphic.css') }}?v={{ range(100000, 999999) | random }}">
     
     <style>
         * {
@@ -890,95 +891,9 @@
             }
         }
 
-        /* Modal Styles */
-        .modal {
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(5px);
-        }
-
-        .modal-content {
-            background: rgba(255, 255, 255, 0.95);
-            margin: 5% auto;
-            padding: 0;
-            border-radius: 20px;
-            width: 90%;
-            max-width: 500px;
-            max-height: 90vh; /* Limit modal height to viewport */
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            overflow: hidden; /* Prevent content from overflowing */
-        }
-
-        .modal-header {
-            padding: 20px 30px;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-shrink: 0; /* Prevent header from shrinking */
-        }
-
-        .modal-header h2 {
-            margin: 0;
-            color: #333;
-            font-size: 1.5rem;
-            font-weight: 600;
-        }
-
-        .close {
-            color: #aaa;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: color 0.3s;
-        }
-
-        .close:hover {
-            color: #000;
-        }
-
-        .modal-body {
-            padding: 30px;
-            overflow-y: auto; /* Make body scrollable */
-            flex: 1; /* Take remaining space */
-            min-height: 0; /* Allow flex item to shrink below content size */
-        }
-        
-        /* Ensure form button stays visible when scrolling */
-        .modal-body form {
-            display: flex;
-            flex-direction: column;
-            min-height: 100%; /* Ensure form takes full height */
-        }
-        
-        /* Button container at bottom - always visible */
-        .modal-body form > div:last-of-type {
-            margin-top: auto; /* Push to bottom */
-            flex-shrink: 0; /* Prevent from shrinking */
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #333;
-            font-weight: 500;
-        }
-
-        .form-group input,
-        .form-group textarea {
+        /* Modal Styles - Overridden by modals-glassmorphic.css */
+        /* Keeping minimal styles for compatibility */
+        .form-group select {
             width: 100%;
             padding: 12px 16px;
             border: 1px solid #ddd;
@@ -986,37 +901,6 @@
             font-size: 16px;
             transition: border-color 0.3s;
             box-sizing: border-box;
-        }
-
-        .form-group input:focus,
-        .form-group textarea:focus {
-            outline: none;
-            border-color: #0f56ff;
-        }
-
-        .form-group textarea {
-            resize: vertical;
-            min-height: 80px;
-        }
-
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .btn.primary {
-            background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
-            color: white;
-        }
-
-        .btn.primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(15, 86, 255, 0.3);
         }
 
         /* My Rooms Modal Styles */
@@ -1373,7 +1257,7 @@
                         </label>
                     </div>
                     
-                    <div id="recurringOptions" style="display: none; margin-left: 20px; padding: 15px; background: rgba(15, 86, 255, 0.05); border-radius: 10px; margin-bottom: 15px;">
+                    <div id="recurringOptions" style="display: none;">
                         <div class="form-group">
                             <label for="recurrencePattern">Repeat:</label>
                             <select id="recurrencePattern" name="recurrence_pattern" onchange="toggleRecurrenceDays()">
@@ -1385,36 +1269,43 @@
                         
                         <div id="recurrenceDaysSection" class="form-group">
                             <label>Repeat on:</label>
-                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 8px;">
-                                <label style="display: flex; align-items: center; gap: 4px; font-size: 0.9rem; cursor: pointer;">
-                                    <input type="checkbox" name="recurrence_days" value="0">Mon
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 4px; font-size: 0.9rem; cursor: pointer;">
-                                    <input type="checkbox" name="recurrence_days" value="1">Tue
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 4px; font-size: 0.9rem; cursor: pointer;">
-                                    <input type="checkbox" name="recurrence_days" value="2">Wed
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 4px; font-size: 0.9rem; cursor: pointer;">
-                                    <input type="checkbox" name="recurrence_days" value="3">Thu
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 4px; font-size: 0.9rem; cursor: pointer;">
-                                    <input type="checkbox" name="recurrence_days" value="4">Fri
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 4px; font-size: 0.9rem; cursor: pointer;">
-                                    <input type="checkbox" name="recurrence_days" value="5">Sat
-                                </label>
-                                <label style="display: flex; align-items: center; gap: 4px; font-size: 0.9rem; cursor: pointer;">
-                                    <input type="checkbox" name="recurrence_days" value="6">Sun
-                                </label>
+                            <div class="recurrence-days-grid">
+                                <div class="recurrence-day-item">
+                                    <input type="checkbox" name="recurrence_days" value="0" id="day-mon">
+                                    <span class="recurrence-day-label">Mon</span>
+                                </div>
+                                <div class="recurrence-day-item">
+                                    <input type="checkbox" name="recurrence_days" value="1" id="day-tue">
+                                    <span class="recurrence-day-label">Tue</span>
+                                </div>
+                                <div class="recurrence-day-item">
+                                    <input type="checkbox" name="recurrence_days" value="2" id="day-wed">
+                                    <span class="recurrence-day-label">Wed</span>
+                                </div>
+                                <div class="recurrence-day-item">
+                                    <input type="checkbox" name="recurrence_days" value="3" id="day-thu">
+                                    <span class="recurrence-day-label">Thu</span>
+                                </div>
+                                <div class="recurrence-day-item">
+                                    <input type="checkbox" name="recurrence_days" value="4" id="day-fri">
+                                    <span class="recurrence-day-label">Fri</span>
+                                </div>
+                                <div class="recurrence-day-item">
+                                    <input type="checkbox" name="recurrence_days" value="5" id="day-sat">
+                                    <span class="recurrence-day-label">Sat</span>
+                                </div>
+                                <div class="recurrence-day-item">
+                                    <input type="checkbox" name="recurrence_days" value="6" id="day-sun">
+                                    <span class="recurrence-day-label">Sun</span>
+                                </div>
                             </div>
-                            <small style="color: #666; margin-top: 6px; display: block;">Leave empty to repeat on the same day each week</small>
+                            <small>Leave empty to repeat on the same day each week</small>
                         </div>
                         
                         <div class="form-group">
                             <label for="recurrenceEndDate">End Date (Optional):</label>
                             <input type="date" id="recurrenceEndDate" name="recurrence_end_date">
-                            <small style="color: #666; margin-top: 4px; display: block;">If not specified, will default to 3 months</small>
+                            <small>If not specified, will default to 3 months</small>
                         </div>
                     </div>
                     
