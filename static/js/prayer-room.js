@@ -98,6 +98,159 @@ class PrayerRoomService {
         this.init();
     }
     
+    async getFirebaseIdToken(forceRefresh = false) {
+        /**
+         * Get Firebase ID token for authenticated requests
+         * This ensures auth persists across deployments
+         * 
+         * @param {boolean} forceRefresh - Force token refresh (useful after 401 errors)
+         */
+        try {
+            if (typeof firebase === 'undefined' || !firebase.auth) {
+                console.warn('⚠️ Firebase not initialized');
+                return null;
+            }
+            
+            // Wait for Firebase auth state to be ready (increased timeout to 5 seconds)
+            const user = await new Promise((resolve) => {
+                let resolved = false;
+                const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
+                    if (!resolved) {
+                        resolved = true;
+                        unsubscribe();
+                        resolve(user);
+                    }
+                });
+                
+                // Check if user is already available (faster path)
+                const currentUser = firebase.auth().currentUser;
+                if (currentUser && !resolved) {
+                    resolved = true;
+                    unsubscribe();
+                    resolve(currentUser);
+                }
+                
+                // Timeout after 5 seconds
+                setTimeout(() => {
+                    if (!resolved) {
+                        resolved = true;
+                        unsubscribe();
+                        console.warn('⚠️ Firebase auth state check timed out');
+                        resolve(null);
+                    }
+                }, 5000);
+            });
+            
+            if (!user) {
+                console.warn('⚠️ No Firebase user found');
+                return null;
+            }
+            
+            // Get token with retry logic for network errors
+            let token = null;
+            let retries = 0;
+            const maxRetries = 3;
+            
+            while (retries < maxRetries && !token) {
+                try {
+                    token = await Promise.race([
+                        user.getIdToken(forceRefresh),
+                        new Promise((_, reject) => 
+                            setTimeout(() => reject(new Error('Token fetch timeout')), 5000)
+                        )
+                    ]);
+                    break;
+                } catch (error) {
+                    retries++;
+                    if (retries < maxRetries) {
+                        console.warn(`⚠️ Token fetch failed (attempt ${retries}/${maxRetries}), retrying...`, error);
+                        await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+                    } else {
+                        console.error('❌ Failed to get Firebase ID token after all retries:', error);
+                        throw error;
+                    }
+                }
+            }
+            
+            return token;
+        } catch (error) {
+            console.error('❌ Error getting Firebase ID token:', error);
+            return null;
+        }
+    }
+
+    async makeAuthenticatedRequest(url, options = {}) {
+        /**
+         * Make an authenticated request with automatic token refresh on 401
+         * This prevents authentication failures after deployments
+         * 
+         * @param {string} url - The URL to request
+         * @param {object} options - Fetch options (method, body, etc.)
+         * @returns {object} - { success: boolean, data: object, error: string, needsLogin: boolean }
+         */
+        
+        // Helper to make the actual request
+        const makeRequest = async (idToken) => {
+            const headers = {
+                'Content-Type': 'application/json',
+                ...options.headers
+            };
+            
+            if (idToken) {
+                headers['Authorization'] = `Bearer ${idToken}`;
+            }
+            
+            return await fetch(url, {
+                ...options,
+                headers,
+                credentials: 'include' // Always include session cookies
+            });
+        };
+        
+        try {
+            // First attempt: Get token (cached)
+            let idToken = await this.getFirebaseIdToken(false);
+            let response = await makeRequest(idToken);
+            
+            // If 401, try refreshing the token
+            if (response.status === 401) {
+                console.log('⚠️ 401 error, attempting token refresh...');
+                
+                // Force refresh the Firebase token
+                idToken = await this.getFirebaseIdToken(true);
+                
+                if (idToken) {
+                    // Retry with fresh token
+                    console.log('🔄 Retrying request with refreshed token...');
+                    response = await makeRequest(idToken);
+                    
+                    if (response.status === 401) {
+                        // Still 401 after refresh - user needs to login
+                        console.log('❌ Still unauthorized after token refresh');
+                        return { success: false, needsLogin: true };
+                    }
+                } else {
+                    // No Firebase user - needs to login
+                    console.log('❌ No Firebase user available for token refresh');
+                    return { success: false, needsLogin: true };
+                }
+            }
+            
+            // Parse response
+            const result = await response.json();
+            
+            if (response.ok) {
+                return { success: true, data: result };
+            } else {
+                return { success: false, error: result.error || 'Unknown error' };
+            }
+            
+        } catch (error) {
+            console.error('❌ Request error:', error);
+            return { success: false, error: error.message };
+        }
+    }
+    
     async init() {
         try {
             // Initialize Firebase
@@ -344,7 +497,7 @@ class PrayerRoomService {
             // Update UI to show user info
             this.updateUserInfo();
             
-            // Join the room via API
+            // Join the room via API with authentication
             const joinData = {
                 user_id: this.userId,
                 user_name: this.userName
@@ -355,19 +508,23 @@ class PrayerRoomService {
                 joinData.room_code = window.roomCode;
             }
             
-            const response = await fetch(`/api/prayer-room/join/${this.roomId}`, {
+            const result = await this.makeAuthenticatedRequest(`/api/prayer-room/join/${this.roomId}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include',
                 body: JSON.stringify(joinData)
             });
             
-            const data = await response.json();
-            if (!data.success) {
-                throw new Error(data.error || 'Failed to join room');
+            if (!result.success) {
+                if (result.needsLogin) {
+                    this.showError('Please log in to join the prayer room. Redirecting to login...');
+                    setTimeout(() => {
+                        window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+                    }, 2000);
+                    return;
+                }
+                throw new Error(result.error || 'Failed to join room');
             }
+            
+            const data = result.data;
             
             // Update room info
             this.updateRoomInfo(data);
