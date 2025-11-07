@@ -210,6 +210,23 @@
     font-weight: 600;
 }
 
+/* Recurring Info */
+.recurring-info {
+    display: flex;
+    align-items: center;
+    padding: 8px 14px;
+    background: rgba(139, 92, 246, 0.08);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: #8b5cf6;
+    font-weight: 600;
+    border: 1px solid rgba(139, 92, 246, 0.15);
+}
+
+.recurring-info svg {
+    color: #8b5cf6;
+}
+
 /* Session Description */
 .session-description {
     font-size: 0.9375rem;
