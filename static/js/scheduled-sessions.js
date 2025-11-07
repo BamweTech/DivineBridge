@@ -278,8 +278,49 @@ class ScheduledSessionsManager {
             `;
         }
         
+        // Check if this is a recurring session
+        const isRecurring = session.is_recurring && session.recurrence_pattern;
+        let recurringBadgeHtml = '';
+        let recurringInfoHtml = '';
+        
+        if (isRecurring) {
+            // Get recurrence pattern display text
+            const patternText = session.recurrence_pattern === 'weekly' ? 'Weekly' :
+                              session.recurrence_pattern === 'biweekly' ? 'Every 2 weeks' :
+                              session.recurrence_pattern === 'monthly' ? 'Monthly' : '';
+            
+            // Get days display for weekly pattern
+            let daysText = '';
+            if (session.recurrence_pattern === 'weekly' && session.recurrence_days && session.recurrence_days.length > 0) {
+                const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                const selectedDays = session.recurrence_days.map(d => dayNames[d]).join(', ');
+                daysText = ` (${selectedDays})`;
+            }
+            
+            recurringBadgeHtml = `
+                <div class="session-badge recurring-badge">
+                    <svg style="width: 14px; height: 14px; margin-right: 4px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    ${patternText}${daysText}
+                </div>
+            `;
+            
+            // Show next occurrences
+            if (session.instance_count > 1) {
+                recurringInfoHtml = `
+                    <div class="recurring-info">
+                        <svg style="width: 16px; height: 16px; margin-right: 6px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <span>${session.instance_count} upcoming sessions</span>
+                    </div>
+                `;
+            }
+        }
+        
         return `
-            <div class="session-card" data-session-id="${session.scheduled_room_id}">
+            <div class="session-card ${isRecurring ? 'recurring-session' : ''}" data-session-id="${session.scheduled_room_id}">
                 <div class="session-header">
                     <div class="session-title-section">
                         <div class="session-title">
@@ -292,7 +333,10 @@ class ScheduledSessionsManager {
                             Hosted by ${this.escapeHtml(session.host_name)}
                         </div>
                     </div>
-                    <div class="session-badge">Public</div>
+                    <div class="session-badges">
+                        <div class="session-badge">Public</div>
+                        ${recurringBadgeHtml}
+                    </div>
                 </div>
                 
                 <div class="session-meta">
@@ -302,6 +346,7 @@ class ScheduledSessionsManager {
                         </svg>
                         <strong>${dateDisplay}</strong>
                     </div>
+                    ${recurringInfoHtml}
                 </div>
                 
                 ${session.room_description ? `

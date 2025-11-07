@@ -3035,8 +3035,30 @@ def get_public_scheduled_sessions():
         
         # Get all matching sessions
         sessions = []
+        recurring_parents = {}  # Track recurring parent sessions
+        
         for doc in query.stream():
             session_data = doc.to_dict()
+            session_data['scheduled_room_id'] = doc.id
+            
+            # Check if this is a child instance of a recurring session
+            parent_recurring_id = session_data.get('parent_recurring_id')
+            if parent_recurring_id:
+                # This is a child instance - skip it, we'll show the parent instead
+                if parent_recurring_id not in recurring_parents:
+                    # Fetch the parent recurring session
+                    parent_doc = db.collection('scheduled_rooms').document(parent_recurring_id).get()
+                    if parent_doc.exists:
+                        recurring_parents[parent_recurring_id] = {
+                            'doc': parent_doc,
+                            'instances': []
+                        }
+                
+                # Add this instance to the parent's instances list
+                if parent_recurring_id in recurring_parents:
+                    recurring_parents[parent_recurring_id]['instances'].append(session_data)
+                continue  # Skip adding this instance to sessions
+            
             session_data['scheduled_room_id'] = doc.id
             
             # Convert timestamp to seconds (Unix timestamp) for JSON
@@ -3102,6 +3124,77 @@ def get_public_scheduled_sessions():
                 session_data['user_rsvp_status'] = None
             
             sessions.append(session_data)
+        
+        # Add recurring parent sessions with their instances
+        for parent_id, parent_info in recurring_parents.items():
+            parent_doc = parent_info['doc']
+            parent_data = parent_doc.to_dict()
+            instances = parent_info['instances']
+            
+            if not instances:
+                continue  # No instances, skip
+            
+            # Sort instances by time
+            instances.sort(key=lambda x: x.get('scheduled_time', 0))
+            
+            # Get the next (soonest) instance time
+            next_instance = instances[0]
+            next_instance_time = next_instance.get('scheduled_time')
+            
+            # Convert parent session data
+            parent_session = {
+                'scheduled_room_id': parent_id,
+                'room_name': parent_data.get('room_name'),
+                'room_description': parent_data.get('room_description'),
+                'host_name': parent_data.get('host_name'),
+                'host_id': parent_data.get('host_id'),
+                'room_privacy': parent_data.get('room_privacy'),
+                'is_recurring': True,
+                'recurrence_pattern': parent_data.get('recurrence_pattern'),
+                'recurrence_days': parent_data.get('recurrence_days', []),
+                'scheduled_time': next_instance_time,  # Use next instance time for sorting
+                'instance_count': len(instances),
+                'instances': [{'scheduled_time': inst.get('scheduled_time'), 'scheduled_room_id': inst.get('scheduled_room_id')} for inst in instances]
+            }
+            
+            # Get RSVP count across all instances
+            total_rsvps = 0
+            for instance in instances:
+                instance_id = instance.get('scheduled_room_id')
+                if instance_id:
+                    rsvp_count = db.collection('scheduled_room_rsvps')\
+                        .where('scheduled_room_id', '==', instance_id)\
+                        .where('is_active', '==', True)\
+                        .stream()
+                    total_rsvps += len(list(rsvp_count))
+            
+            parent_session['total_rsvps'] = total_rsvps
+            parent_session['rsvp_count'] = {'going': 0, 'maybe': 0, 'interested': total_rsvps}
+            
+            # Check if current user has RSVPed to any instance
+            user = get_user_from_session()
+            if user:
+                user_rsvp_status = None
+                for instance in instances:
+                    instance_id = instance.get('scheduled_room_id')
+                    if instance_id:
+                        user_rsvp = db.collection('scheduled_room_rsvps')\
+                            .where('scheduled_room_id', '==', instance_id)\
+                            .where('user_id', '==', user['user_id'])\
+                            .where('is_active', '==', True)\
+                            .limit(1)\
+                            .stream()
+                        
+                        user_rsvp_list = list(user_rsvp)
+                        if user_rsvp_list:
+                            user_rsvp_status = user_rsvp_list[0].to_dict().get('rsvp_status')
+                            break
+                
+                parent_session['user_rsvp_status'] = user_rsvp_status
+            else:
+                parent_session['user_rsvp_status'] = None
+            
+            sessions.append(parent_session)
         
         # Apply time filter
         if time_filter == 'today':
