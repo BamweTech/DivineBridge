@@ -356,10 +356,12 @@ class PrayerRoomsDirectory {
         }
         
         roomsContainer.innerHTML = rooms.map(room => {
-            const createdDate = new Date(room.created_at * 1000).toLocaleDateString();
+            const roomId = room.room_id || room.id || room.document_id;
+            const createdDate = room.created_at ? new Date(room.created_at * 1000).toLocaleDateString() : 'Unknown';
             const lastActivity = room.last_activity ? new Date(room.last_activity * 1000).toLocaleDateString() : 'Never';
             const isActive = room.is_active ? 'Active' : 'Ended';
             const statusClass = room.is_active ? 'active' : 'ended';
+            const privacyLabel = room.room_privacy || 'public';
             
             return `
                 <div class="room-item">
@@ -367,7 +369,7 @@ class PrayerRoomsDirectory {
                         <h3>${room.room_name}</h3>
                         <p class="room-description">${room.room_description || 'No description'}</p>
                         <div class="room-meta">
-                            <span class="room-privacy ${room.room_privacy}">${room.room_privacy}</span>
+                            <span class="room-privacy ${privacyLabel}">${privacyLabel}</span>
                             <span class="room-status ${statusClass}">${isActive}</span>
                             <span class="room-date">Created: ${createdDate}</span>
                             <span class="room-activity">Last activity: ${lastActivity}</span>
@@ -375,11 +377,15 @@ class PrayerRoomsDirectory {
                     </div>
                     <div class="room-actions">
                         ${room.is_active ? 
-                            `<button class="btn btn-primary" onclick="joinRoom('${room.room_id}', '${room.room_privacy}')">
+                            `<button class="btn btn-primary" onclick="joinRoom('${roomId}', '${privacyLabel}')">
                                 Join Room
                             </button>` :
-                            `<button class="btn btn-secondary" onclick="reopenRoom('${room.room_id}')">
+                            `
+                            <button class="btn btn-secondary" onclick="reopenRoom('${roomId}')">
                                 Reopen Room
+                            </button>
+                            <button class="btn btn-danger" onclick="deleteRoom('${roomId}', '${this.escapeHtml(room.room_name)}')">
+                                Delete Room
                             </button>`
                         }
                         ${room.room_code ? 
@@ -446,14 +452,12 @@ class PrayerRoomsDirectory {
                             <button class="btn btn-danger" onclick="cancelScheduledRoom('${room.scheduled_room_id}')">
                                 Cancel
                             </button>` :
-                            `<div class="room-action-group">
-                                <button class="btn btn-secondary" onclick="reopenRoom('${room.room_id || room.scheduled_room_id}')">
-                                    Reopen
-                                </button>
-                                <button class="btn btn-danger" onclick="deleteRoom('${room.room_id || room.scheduled_room_id}', '${this.escapeHtml(room.room_name)}')">
-                                    Delete
-                                </button>
-                            </div>`
+                            `<button class="btn btn-secondary" onclick="reopenRoom('${room.room_id || room.original_room_id || room.scheduled_room_id}')">
+                                Reopen
+                            </button>
+                            <button class="btn btn-danger" onclick="deletePastScheduledRoom('${room.scheduled_room_id}', '${this.escapeHtml(room.room_name)}')">
+                                Delete
+                            </button>`
                         }
                     </div>
                 </div>
@@ -819,9 +823,9 @@ class PrayerRoomsDirectory {
                     // Clear the editing state
                     window.editingScheduledRoomId = null;
                     // Reset the submit button text
-                    const submitBtn = document.querySelector('#scheduleRoomModal .btn-primary');
+                    const submitBtn = document.querySelector('#scheduleModal .btn.primary');
                     if (submitBtn) {
-                        submitBtn.textContent = 'Schedule Room';
+                        submitBtn.textContent = 'Schedule Session';
                     }
                 } else {
                     alert('Room scheduled successfully!');
@@ -842,6 +846,27 @@ class PrayerRoomsDirectory {
         }
     }
 
+    async deleteRoom(roomId) {
+        try {
+            const result = await this.makeAuthenticatedRequest(`/api/prayer-room/delete-room/${roomId}`, {
+                method: 'DELETE'
+            });
+            
+            if (result.success) {
+                alert('Room deleted successfully.');
+                this.loadMyRooms();
+            } else if (result.needsLogin) {
+                alert('Please log in to delete this room.');
+                window.location.href = '/login?redirect=' + encodeURIComponent('/prayer-room');
+            } else {
+                alert('Failed to delete room: ' + (result.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error deleting room:', error);
+            alert('Failed to delete room. Please try again.');
+        }
+    }
+    
     setupRealtimeUpdates() {
         // Set up periodic refresh of rooms list
         setInterval(() => {
@@ -855,10 +880,28 @@ class PrayerRoomsDirectory {
         document.getElementById('scheduleModal').style.display = 'none';
     }
 
-    hideScheduleModal() {
+    hideScheduleModal(resetForm = true) {
         const modal = document.getElementById('scheduleModal');
         if (modal) {
             modal.style.display = 'none';
+        }
+        
+        if (resetForm) {
+            const scheduleForm = document.getElementById('scheduleForm');
+            if (scheduleForm) {
+                scheduleForm.reset();
+            }
+            window.editingScheduledRoomId = null;
+            
+            const recurringOptions = document.getElementById('recurringOptions');
+            if (recurringOptions) {
+                recurringOptions.style.display = 'none';
+            }
+            
+            const submitBtn = document.querySelector('#scheduleModal .btn.primary');
+            if (submitBtn) {
+                submitBtn.textContent = 'Schedule Session';
+            }
         }
     }
 }
@@ -875,7 +918,15 @@ function hideCreateRoomModal() {
 }
 
 function hideScheduleModal() {
-    document.getElementById('scheduleModal').style.display = 'none';
+    const prayerRoomsDirectory = window.prayerRoomsDirectory;
+    if (prayerRoomsDirectory && typeof prayerRoomsDirectory.hideScheduleModal === 'function') {
+        prayerRoomsDirectory.hideScheduleModal(true);
+    } else {
+        const modal = document.getElementById('scheduleModal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
 }
 
 function showJoinRoomModal() {
@@ -890,10 +941,6 @@ function showScheduleModal() {
     // Using global authentication system - no page load redirect
     // Modal opens for all users, auth is checked when submitting
     document.getElementById('scheduleModal').style.display = 'block';
-}
-
-function hideMyRoomsModal() {
-    document.getElementById('myRoomsModal').style.display = 'none';
 }
 
 function reopenRoom(originalRoomId) {
@@ -918,6 +965,24 @@ function cancelScheduledRoom(scheduledRoomId) {
     }
     
     const confirmed = confirm('Are you sure you want to cancel this scheduled room?');
+    if (!confirmed) return;
+    
+    const prayerRoomsDirectory = window.prayerRoomsDirectory;
+    if (!prayerRoomsDirectory) {
+        alert('Prayer rooms directory not initialized');
+        return;
+    }
+    
+    prayerRoomsDirectory.cancelScheduledRoom(scheduledRoomId);
+}
+
+function deletePastScheduledRoom(scheduledRoomId, roomName = 'this session') {
+    if (!scheduledRoomId) {
+        alert('Scheduled room ID not found');
+        return;
+    }
+    
+    const confirmed = confirm(`Are you sure you want to delete the past session "${roomName}"? This will remove it from your history.`);
     if (!confirmed) return;
     
     const prayerRoomsDirectory = window.prayerRoomsDirectory;
@@ -1122,56 +1187,23 @@ function copyRoomCode(roomCode) {
     });
 }
 
-function deleteRoom(roomId, roomName) {
-    if (confirm(`Are you sure you want to delete the room "${roomName}"? This action cannot be undone.`)) {
-        fetch(`/api/prayer-room/delete-room/${roomId}`, {
-            method: 'DELETE',
-            credentials: 'include'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Room deleted successfully!');
-                // Reload the rooms
-                const prayerRoomsDirectory = window.prayerRoomsDirectory;
-                if (prayerRoomsDirectory) {
-                    prayerRoomsDirectory.loadMyRooms();
-                }
-            } else {
-                alert('Failed to delete room: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            console.error('Error deleting room:', error);
-            alert('Failed to delete room. Please try again.');
-        });
+// Deprecated legacy delete functions retained for safety (will be removed after full migration)
+function deleteRoom(roomId, roomName = 'this room', isScheduledRoom = false) {
+    const confirmationMessage = isScheduledRoom
+        ? `Are you sure you want to delete the past session "${roomName}"? This will remove it from your history.`
+        : `Are you sure you want to delete "${roomName}"? This action cannot be undone.`;
+        
+    if (!confirm(confirmationMessage)) {
+        return;
     }
-}
-
-function deleteScheduledRoom(scheduledRoomId, roomName) {
-    if (confirm(`Are you sure you want to delete the scheduled room "${roomName}"? This action cannot be undone.`)) {
-        fetch(`/api/prayer-room/scheduled-room/${scheduledRoomId}`, {
-            method: 'DELETE',
-            credentials: 'include'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Scheduled room deleted successfully!');
-                // Reload the scheduled rooms
-                const prayerRoomsDirectory = window.prayerRoomsDirectory;
-                if (prayerRoomsDirectory) {
-                    prayerRoomsDirectory.loadMyScheduledRooms();
-                }
-            } else {
-                alert('Failed to delete scheduled room: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            console.error('Error deleting scheduled room:', error);
-            alert('Failed to delete scheduled room. Please try again.');
-        });
+    
+    const prayerRoomsDirectory = window.prayerRoomsDirectory;
+    if (!prayerRoomsDirectory || typeof prayerRoomsDirectory.deleteRoom !== 'function') {
+        alert('Prayer rooms directory not initialized.');
+        return;
     }
+    
+    prayerRoomsDirectory.deleteRoom(roomId);
 }
 
 function editScheduledRoom(scheduledRoomId, roomName, roomDescription, scheduledTime, roomPrivacy, isRecurring = false, recurrencePattern = '', recurrenceDays = '', recurrenceEndDate = '') {
@@ -1184,9 +1216,12 @@ function editScheduledRoom(scheduledRoomId, roomName, roomDescription, scheduled
     document.getElementById('scheduleRoomDescription').value = roomDescription;
     document.getElementById('scheduleDateTime').value = localDateTime;
     const privacyField = document.getElementById('schedulePrivacy');
-    if (privacyField) {
+    if (privacyField && roomPrivacy) {
         privacyField.value = roomPrivacy;
     }
+    
+    // Hide My Rooms modal so the schedule modal is fully interactable
+    hideMyRoomsModal();
     
     // Show the schedule modal
     document.getElementById('scheduleModal').style.display = 'block';
@@ -1238,6 +1273,9 @@ function editScheduledRoom(scheduledRoomId, roomName, roomDescription, scheduled
             dayCheckboxes.forEach(cb => {
                 const dayVal = parseInt(cb.value, 10);
                 cb.checked = selectedDays.includes(dayVal);
+                if (typeof updateDayItemState === 'function') {
+                    updateDayItemState(cb);
+                }
             });
         }
         
@@ -1249,8 +1287,17 @@ function editScheduledRoom(scheduledRoomId, roomName, roomDescription, scheduled
         if (recurrenceEndInput) recurrenceEndInput.value = '';
         if (recurrenceDaysSection) {
             const dayCheckboxes = recurrenceDaysSection.querySelectorAll('input[type="checkbox"]');
-            dayCheckboxes.forEach(cb => { cb.checked = false; });
+            dayCheckboxes.forEach(cb => {
+                cb.checked = false;
+                if (typeof updateDayItemState === 'function') {
+                    updateDayItemState(cb);
+                }
+            });
         }
+    }
+    
+    if (typeof setupRecurrenceDayCheckboxes === 'function') {
+        setTimeout(() => setupRecurrenceDayCheckboxes(), 100);
     }
 }
 
