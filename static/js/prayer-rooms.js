@@ -437,7 +437,7 @@ class PrayerRoomsDirectory {
                     </div>
                     <div class="room-actions">
                         ${isUpcoming ? 
-                            `<button class="btn btn-primary" onclick="editScheduledRoom('${room.scheduled_room_id}', '${this.escapeHtml(room.room_name)}', '${this.escapeHtml(room.room_description || '')}', '${room.scheduled_time}', '${room.room_privacy}')">
+                            `<button class="btn btn-primary" onclick="editScheduledRoom('${room.scheduled_room_id}', '${this.escapeHtml(room.room_name)}', '${this.escapeHtml(room.room_description || '')}', '${room.scheduled_time}', '${room.room_privacy}', ${room.is_recurring ? 'true' : 'false'}, '${room.recurrence_pattern || ''}', '${(room.recurrence_days || []).join(',')}', '${room.recurrence_end_date || ''}')">
                                 Edit
                             </button>
                             <button class="btn btn-outline" onclick="shareScheduledRoom('${room.scheduled_room_id}', '${this.escapeHtml(room.room_name)}', '${room.scheduled_time}', '${room.room_code || ''}', '${room.room_privacy}')">
@@ -446,9 +446,14 @@ class PrayerRoomsDirectory {
                             <button class="btn btn-danger" onclick="cancelScheduledRoom('${room.scheduled_room_id}')">
                                 Cancel
                             </button>` :
-                            `<button class="btn btn-secondary" onclick="reopenRoom('${room.room_id || room.scheduled_room_id}')">
-                                Reopen
-                            </button>`
+                            `<div class="room-action-group">
+                                <button class="btn btn-secondary" onclick="reopenRoom('${room.room_id || room.scheduled_room_id}')">
+                                    Reopen
+                                </button>
+                                <button class="btn btn-danger" onclick="deleteRoom('${room.room_id || room.scheduled_room_id}', '${this.escapeHtml(room.room_name)}')">
+                                    Delete
+                                </button>
+                            </div>`
                         }
                     </div>
                 </div>
@@ -1169,7 +1174,7 @@ function deleteScheduledRoom(scheduledRoomId, roomName) {
     }
 }
 
-function editScheduledRoom(scheduledRoomId, roomName, roomDescription, scheduledTime, roomPrivacy) {
+function editScheduledRoom(scheduledRoomId, roomName, roomDescription, scheduledTime, roomPrivacy, isRecurring = false, recurrencePattern = '', recurrenceDays = '', recurrenceEndDate = '') {
     // Convert timestamp to datetime-local format
     const scheduledDate = new Date(scheduledTime * 1000);
     const localDateTime = scheduledDate.toISOString().slice(0, 16);
@@ -1178,18 +1183,74 @@ function editScheduledRoom(scheduledRoomId, roomName, roomDescription, scheduled
     document.getElementById('scheduleRoomName').value = roomName;
     document.getElementById('scheduleRoomDescription').value = roomDescription;
     document.getElementById('scheduleDateTime').value = localDateTime;
-    document.getElementById('scheduleRoomPrivacy').value = roomPrivacy;
+    const privacyField = document.getElementById('schedulePrivacy');
+    if (privacyField) {
+        privacyField.value = roomPrivacy;
+    }
     
     // Show the schedule modal
-    document.getElementById('scheduleRoomModal').style.display = 'block';
+    document.getElementById('scheduleModal').style.display = 'block';
     
     // Store the scheduled room ID for updating
     window.editingScheduledRoomId = scheduledRoomId;
     
     // Change the submit button text
-    const submitBtn = document.querySelector('#scheduleRoomModal .btn-primary');
+    const submitBtn = document.querySelector('#scheduleModal .btn.primary');
     if (submitBtn) {
         submitBtn.textContent = 'Update Scheduled Room';
+    }
+    
+    // Handle recurring options
+    const recurringCheckbox = document.getElementById('scheduleIsRecurring');
+    const recurringPatternSelect = document.getElementById('recurrencePattern');
+    const recurrenceDaysSection = document.getElementById('recurrenceDaysSection');
+    const recurrenceEndInput = document.getElementById('recurrenceEndDate');
+    
+    if (recurringCheckbox) {
+        recurringCheckbox.checked = !!isRecurring;
+    }
+    
+    const recurringOptions = document.getElementById('recurringOptions');
+    if (recurringOptions) {
+        recurringOptions.style.display = isRecurring ? 'block' : 'none';
+    }
+    
+    if (isRecurring) {
+        if (recurringPatternSelect) {
+            recurringPatternSelect.value = recurrencePattern || 'weekly';
+        }
+        
+        if (recurrenceEndInput && recurrenceEndDate) {
+            // Expect recurrenceEndDate as ISO string, convert to date input format
+            try {
+                const endDate = new Date(recurrenceEndDate);
+                recurrenceEndInput.value = endDate.toISOString().slice(0, 10);
+            } catch (e) {
+                console.warn('Unable to parse recurrence end date:', recurrenceEndDate);
+            }
+        } else if (recurrenceEndInput) {
+            recurrenceEndInput.value = '';
+        }
+        
+        if (recurrenceDaysSection) {
+            const dayCheckboxes = recurrenceDaysSection.querySelectorAll('input[type="checkbox"]');
+            const selectedDays = (recurrenceDays || '').split(',').filter(Boolean).map(n => parseInt(n, 10));
+            dayCheckboxes.forEach(cb => {
+                const dayVal = parseInt(cb.value, 10);
+                cb.checked = selectedDays.includes(dayVal);
+            });
+        }
+        
+        if (typeof toggleRecurrenceDays === 'function') {
+            toggleRecurrenceDays();
+        }
+    } else {
+        if (recurringPatternSelect) recurringPatternSelect.value = 'weekly';
+        if (recurrenceEndInput) recurrenceEndInput.value = '';
+        if (recurrenceDaysSection) {
+            const dayCheckboxes = recurrenceDaysSection.querySelectorAll('input[type="checkbox"]');
+            dayCheckboxes.forEach(cb => { cb.checked = false; });
+        }
     }
 }
 
