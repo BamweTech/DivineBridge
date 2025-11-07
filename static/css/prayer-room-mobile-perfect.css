@@ -784,6 +784,30 @@
             padding-right: max(12px, env(safe-area-inset-right)) !important;
         }
     }
+
+    .speaker-slot-indicator,
+    .role-indicator-chip {
+        margin-top: 4px !important;
+        font-size: 11px !important;
+    }
+    
+    .request-status-text {
+        font-size: 11px !important;
+        margin-top: 6px !important;
+        width: 100% !important;
+    }
+    
+    .participant-controls {
+        width: 100% !important;
+        margin-top: 8px !important;
+        gap: 6px !important;
+    }
+    
+    .participant-controls .participant-action {
+        flex: 1 1 auto !important;
+        font-size: 11px !important;
+        padding: 6px 10px !important;
+    }
 }
 
 /* ========== END PERFECT MOBILE ========== */

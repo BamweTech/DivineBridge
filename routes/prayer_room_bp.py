@@ -28,6 +28,108 @@ from google.cloud import firestore
 
 prayer_room_bp = Blueprint('prayer_room', __name__)
 
+MAX_ACTIVE_SPEAKERS = 20
+VALID_PARTICIPANT_ROLES = {'speaker', 'listener'}
+
+
+def normalize_participants(participants, host_id):
+    """Ensure participants have role/request metadata and host is always a speaker."""
+    if not participants:
+        return [], 0, False
+
+    normalized = []
+    speaker_count = 0
+    changed = False
+
+    # First ensure host is marked as speaker and count existing speakers
+    for participant in participants:
+        participant_copy = dict(participant)
+        user_id = participant_copy.get('user_id')
+        role = participant_copy.get('role')
+
+        if user_id == host_id and role != 'speaker':
+            participant_copy['role'] = 'speaker'
+            role = 'speaker'
+            changed = True
+
+        if role == 'speaker':
+            speaker_count += 1
+
+        normalized.append(participant_copy)
+
+    # Second pass to add defaults and fill missing roles within the cap
+    for participant in normalized:
+        role = participant.get('role')
+
+        if role not in VALID_PARTICIPANT_ROLES:
+            if participant.get('user_id') == host_id:
+                participant['role'] = 'speaker'
+                role = 'speaker'
+            elif speaker_count < MAX_ACTIVE_SPEAKERS:
+                participant['role'] = 'speaker'
+                role = 'speaker'
+                speaker_count += 1
+            else:
+                participant['role'] = 'listener'
+                role = 'listener'
+            changed = True
+
+        if participant.get('requested_role') not in (None, 'speaker'):
+            participant['requested_role'] = None
+            changed = True
+
+        if 'requested_role' not in participant:
+            participant['requested_role'] = None
+            changed = True
+
+        if 'request_timestamp' not in participant:
+            participant['request_timestamp'] = None
+            changed = True
+
+        if 'is_muted' not in participant:
+            participant['is_muted'] = False
+            changed = True
+
+    return normalized, speaker_count, changed
+
+
+def set_participant_role(participants, user_id, new_role):
+    """Set a participant's role and clear any outstanding requests."""
+    updated = False
+    for participant in participants:
+        if participant.get('user_id') == user_id:
+            if participant.get('role') != new_role:
+                participant['role'] = new_role
+                updated = True
+            if participant.get('requested_role'):
+                participant['requested_role'] = None
+                updated = True
+            if participant.get('request_timestamp'):
+                participant['request_timestamp'] = None
+                updated = True
+            break
+    return participants, updated
+
+
+def find_participant(participants, user_id):
+    for participant in participants:
+        if participant.get('user_id') == user_id:
+            return participant
+    return None
+
+
+def count_speakers(participants):
+    return sum(1 for participant in participants if participant.get('role') == 'speaker')
+
+
+def get_max_speakers(room_data):
+    try:
+        configured = int(room_data.get('max_speakers', MAX_ACTIVE_SPEAKERS))
+    except (TypeError, ValueError):
+        configured = MAX_ACTIVE_SPEAKERS
+    configured = max(1, configured)
+    return min(configured, MAX_ACTIVE_SPEAKERS)
+
 # Rate limiting is now handled centrally in app.py
 # Blueprint-level limiter removed to prevent conflicts
 
@@ -281,7 +383,10 @@ def create_prayer_room():
                 'user_name': host_name,
                 'joined_at': datetime.utcnow(),
                 'is_muted': False,
-                'is_host': True
+                'is_host': True,
+                'role': 'speaker',
+                'requested_role': None,
+                'request_timestamp': None
             }],
             'is_active': True,
             'is_locked': False,
@@ -289,7 +394,8 @@ def create_prayer_room():
                 'allow_anonymous': room_privacy == 'public',  # Only allow anonymous for public rooms
                 'max_participants': 50,
                 'auto_mute_new_participants': False
-            }
+            },
+            'max_speakers': MAX_ACTIVE_SPEAKERS
         }
         
         db = get_firestore_client()
@@ -373,8 +479,16 @@ def join_prayer_room(room_id):
         # Check room privacy and validate room code for private rooms
         room_privacy = room_data.get('room_privacy', 'public')
         if room_privacy == 'private':
-            data = request.get_json() or {}
-            provided_code = data.get('room_code', '').strip().upper()
+            data = request.get_json(silent=True) or {}
+            raw_room_code = data.get('room_code', '')
+            
+            if isinstance(raw_room_code, (list, dict)):
+                logging.warning(f"join_prayer_room received non-string room_code payload for room {room_id}: {raw_room_code}")
+                provided_code = str(raw_room_code)
+            else:
+                provided_code = '' if raw_room_code is None else str(raw_room_code)
+            
+            provided_code = provided_code.strip().upper()
             room_code = room_data.get('room_code')
             
             if not room_code:
@@ -389,35 +503,41 @@ def join_prayer_room(room_id):
                 logging.warning(f"Invalid room code provided for room {room_id}: expected {room_code}, got {provided_code}")
                 return jsonify({'error': 'Invalid room code'}), 400
         
-        # Check if user is already in the room
+        # Normalize participant metadata and check if user is already in the room
         participants = room_data.get('participants', [])
+        host_id = room_data.get('host_id')
+        max_speakers = get_max_speakers(room_data)
+
+        participants, speaker_count, participants_changed = normalize_participants(participants, host_id)
+
         participant_updated = False
+        existing_participant = None
         for participant in participants:
-            if participant['user_id'] == user_id:
-                # Update the participant's name if it's different (fix for Anonymous issue)
+            if participant.get('user_id') == user_id:
+                existing_participant = participant
                 if participant.get('user_name') != user_name:
                     participant['user_name'] = user_name
                     participant_updated = True
                 break
-        
-        # If we updated a participant's name, save it to Firestore
-        if participant_updated:
-            room_ref.update({
+
+        if existing_participant:
+            update_payload = {
                 'participants': participants,
                 'last_activity': datetime.utcnow()
+            }
+            if participants_changed or participant_updated or room_data.get('max_speakers') != max_speakers:
+                update_payload['max_speakers'] = max_speakers
+                room_ref.update(update_payload)
+
+            return jsonify({
+                'success': True,
+                'room_id': room_id,
+                'room_name': room_data.get('room_name'),
+                'host_id': host_id,
+                'participants': participants,
+                'max_speakers': max_speakers,
+                'message': 'Already in room'
             })
-        
-        # Check again if user is in the room after potential update
-        for participant in participants:
-            if participant['user_id'] == user_id:
-                return jsonify({
-                    'success': True,
-                    'room_id': room_id,
-                    'room_name': room_data.get('room_name'),
-                    'host_id': room_data.get('host_id'),
-                    'participants': participants,  # Include participants even when already in room
-                    'message': 'Already in room'
-                })
         
         # Deactivate any existing device sessions for this user across ALL rooms
         # This ensures users can only have one active session at a time
@@ -468,21 +588,29 @@ def join_prayer_room(room_id):
             'user_name': user_name,
             'joined_at': datetime.utcnow(),
             'is_muted': False,
-            'is_host': user_id == room_data.get('host_id')
+            'is_host': user_id == host_id,
+            'role': 'speaker' if (user_id == host_id or speaker_count < max_speakers) else 'listener',
+            'requested_role': None,
+            'request_timestamp': None
         }
-        
+
+        if new_participant['role'] == 'speaker' and user_id != host_id:
+            speaker_count += 1
+
         participants.append(new_participant)
         room_ref.update({
             'participants': participants,
-            'last_activity': datetime.utcnow()
+            'last_activity': datetime.utcnow(),
+            'max_speakers': max_speakers
         })
         
         return jsonify({
             'success': True,
             'room_id': room_id,
             'room_name': room_data.get('room_name'),
-            'host_id': room_data.get('host_id'),
-            'participants': participants
+            'host_id': host_id,
+            'participants': participants,
+            'max_speakers': max_speakers
         })
         
     except Exception as e:
@@ -540,10 +668,13 @@ def leave_prayer_room(room_id):
                 'participants': []
             })
         else:
-            room_ref.update({
-                'participants': participants,
-                'last_activity': datetime.utcnow()
-            })
+            normalized_participants, _, changed = normalize_participants(participants, room_data.get('host_id'))
+            update_payload = {
+                'participants': normalized_participants,
+                'last_activity': datetime.utcnow(),
+                'max_speakers': get_max_speakers(room_data)
+            }
+            room_ref.update(update_payload)
         
         return jsonify({'success': True})
         
@@ -566,6 +697,10 @@ def get_room_participants(room_id):
         
         room_data = room_doc.to_dict()
         participants = room_data.get('participants', [])
+        host_id = room_data.get('host_id')
+        max_speakers = get_max_speakers(room_data)
+
+        participants, _, participants_changed = normalize_participants(participants, host_id)
         
         # Only update participant name if necessary and user exists
         # This should be rare, so do it asynchronously after returning response
@@ -590,12 +725,21 @@ def get_room_participants(room_id):
                     'participants': participants,
                     'last_activity': datetime.utcnow()
                 })
+
+        if participants_changed or room_data.get('max_speakers') != max_speakers:
+            room_ref = db.collection('prayer_rooms').document(room_id)
+            room_ref.update({
+                'participants': participants,
+                'last_activity': datetime.utcnow(),
+                'max_speakers': max_speakers
+            })
         
         return jsonify({
             'success': True,
             'participants': participants,
             'room_name': room_data.get('room_name'),
-            'is_active': room_data.get('is_active', False)
+            'is_active': room_data.get('is_active', False),
+            'max_speakers': max_speakers
         })
         
     except Exception as e:
@@ -644,9 +788,11 @@ def mute_participant(room_id):
         if not participant_found:
             return jsonify({'error': 'Participant not found'}), 404
         
+        normalized_participants, _, _ = normalize_participants(participants, room_data.get('host_id'))
         room_ref.update({
-            'participants': participants,
-            'last_activity': datetime.utcnow()
+            'participants': normalized_participants,
+            'last_activity': datetime.utcnow(),
+            'max_speakers': get_max_speakers(room_data)
         })
         
         return jsonify({'success': True, 'is_muted': is_muted})
@@ -654,6 +800,259 @@ def mute_participant(room_id):
     except Exception as e:
         logging.error(f"Error muting participant: {str(e)}")
         return jsonify({'error': 'Failed to mute participant'}), 500
+
+
+@prayer_room_bp.route('/room/<room_id>/request-speaker', methods=['POST'])
+def request_speaker_role(room_id):
+    """Listener requests or cancels a request to become a speaker."""
+    try:
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+
+        data = request.get_json(silent=True) or {}
+        action = data.get('action', 'request')
+
+        db = get_firestore_client()
+        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_doc = room_ref.get()
+
+        if not room_doc.exists:
+            return jsonify({'error': 'Room not found'}), 404
+
+        room_data = room_doc.to_dict()
+        participants = room_data.get('participants', [])
+        host_id = room_data.get('host_id')
+        max_speakers = get_max_speakers(room_data)
+
+        participants, _, changed = normalize_participants(participants, host_id)
+        participant = find_participant(participants, user['user_id'])
+
+        if not participant:
+            return jsonify({'error': 'Participant not found in room'}), 404
+
+        if participant.get('role') == 'speaker':
+            message = 'You are already a speaker.'
+        elif action == 'cancel':
+            if participant.get('requested_role'):
+                participant['requested_role'] = None
+                participant['request_timestamp'] = None
+                changed = True
+            message = 'Speaker request cancelled.'
+        else:
+            if participant.get('requested_role') == 'speaker':
+                message = 'Speaker request already submitted.'
+            else:
+                participant['requested_role'] = 'speaker'
+                participant['request_timestamp'] = datetime.utcnow()
+                changed = True
+                message = 'Speaker request sent.'
+
+        if changed or room_data.get('max_speakers') != max_speakers:
+            room_ref.update({
+                'participants': participants,
+                'last_activity': datetime.utcnow(),
+                'max_speakers': max_speakers
+            })
+
+        return jsonify({
+            'success': True,
+            'participants': participants,
+            'max_speakers': max_speakers,
+            'message': message
+        })
+
+    except Exception as e:
+        logging.error(f"Error handling speaker request: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to update speaker request'}), 500
+
+
+@prayer_room_bp.route('/room/<room_id>/promote-speaker', methods=['POST'])
+def promote_speaker(room_id):
+    """Host promotes a participant to speaker role (up to cap)."""
+    try:
+        host = get_user_from_session()
+        if not host:
+            return jsonify({'error': 'Authentication required'}), 401
+
+        data = request.get_json(silent=True) or {}
+        target_user_id = data.get('user_id')
+        if not target_user_id:
+            return jsonify({'error': 'Target user_id is required'}), 400
+
+        db = get_firestore_client()
+        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_doc = room_ref.get()
+
+        if not room_doc.exists:
+            return jsonify({'error': 'Room not found'}), 404
+
+        room_data = room_doc.to_dict()
+        if room_data.get('host_id') != host['user_id']:
+            return jsonify({'error': 'Only the host can promote speakers'}), 403
+
+        participants = room_data.get('participants', [])
+        host_id = room_data.get('host_id')
+        max_speakers = get_max_speakers(room_data)
+
+        participants, _, changed = normalize_participants(participants, host_id)
+        target = find_participant(participants, target_user_id)
+
+        if not target:
+            return jsonify({'error': 'Participant not found'}), 404
+
+        if target.get('role') == 'speaker':
+            return jsonify({
+                'success': True,
+                'participants': participants,
+                'max_speakers': max_speakers,
+                'message': 'Participant is already a speaker.'
+            })
+
+        current_speakers = count_speakers(participants)
+        if current_speakers >= max_speakers:
+            return jsonify({'error': f'Maximum of {max_speakers} speakers reached.'}), 400
+
+        participants, role_changed = set_participant_role(participants, target_user_id, 'speaker')
+        if role_changed:
+            changed = True
+
+        if changed or room_data.get('max_speakers') != max_speakers:
+            room_ref.update({
+                'participants': participants,
+                'last_activity': datetime.utcnow(),
+                'max_speakers': max_speakers
+            })
+
+        return jsonify({
+            'success': True,
+            'participants': participants,
+            'max_speakers': max_speakers,
+            'message': 'Participant promoted to speaker.'
+        })
+
+    except Exception as e:
+        logging.error(f"Error promoting speaker: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to promote participant'}), 500
+
+
+@prayer_room_bp.route('/room/<room_id>/demote-speaker', methods=['POST'])
+def demote_speaker(room_id):
+    """Host demotes a speaker to listener role."""
+    try:
+        host = get_user_from_session()
+        if not host:
+            return jsonify({'error': 'Authentication required'}), 401
+
+        data = request.get_json(silent=True) or {}
+        target_user_id = data.get('user_id')
+        if not target_user_id:
+            return jsonify({'error': 'Target user_id is required'}), 400
+
+        db = get_firestore_client()
+        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_doc = room_ref.get()
+
+        if not room_doc.exists:
+            return jsonify({'error': 'Room not found'}), 404
+
+        room_data = room_doc.to_dict()
+        host_id = room_data.get('host_id')
+        if host_id != host['user_id']:
+            return jsonify({'error': 'Only the host can demote speakers'}), 403
+
+        if target_user_id == host_id:
+            return jsonify({'error': 'Host cannot be demoted from speaker role'}), 400
+
+        participants = room_data.get('participants', [])
+        max_speakers = get_max_speakers(room_data)
+
+        participants, _, changed = normalize_participants(participants, host_id)
+        target = find_participant(participants, target_user_id)
+
+        if not target:
+            return jsonify({'error': 'Participant not found'}), 404
+
+        if target.get('role') != 'speaker':
+            return jsonify({
+                'success': True,
+                'participants': participants,
+                'max_speakers': max_speakers,
+                'message': 'Participant is already a listener.'
+            })
+
+        participants, role_changed = set_participant_role(participants, target_user_id, 'listener')
+        if role_changed:
+            target = find_participant(participants, target_user_id)
+            if target:
+                target['is_muted'] = True
+            changed = True
+
+        if changed or room_data.get('max_speakers') != max_speakers:
+            room_ref.update({
+                'participants': participants,
+                'last_activity': datetime.utcnow(),
+                'max_speakers': max_speakers
+            })
+
+        return jsonify({
+            'success': True,
+            'participants': participants,
+            'max_speakers': max_speakers,
+            'message': 'Participant demoted to listener.'
+        })
+
+    except Exception as e:
+        logging.error(f"Error demoting speaker: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to demote participant'}), 500
+
+
+@prayer_room_bp.route('/room/<room_id>/speaker-requests', methods=['GET'])
+def get_speaker_requests(room_id):
+    """Return pending speaker requests for host moderation UI."""
+    try:
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+
+        db = get_firestore_client()
+        room_doc = db.collection('prayer_rooms').document(room_id).get()
+
+        if not room_doc.exists:
+            return jsonify({'error': 'Room not found'}), 404
+
+        room_data = room_doc.to_dict()
+        if room_data.get('host_id') != user['user_id']:
+            return jsonify({'error': 'Only the host can view speaker requests'}), 403
+
+        participants = room_data.get('participants', [])
+        participants, _, _ = normalize_participants(participants, room_data.get('host_id'))
+
+        requests = []
+        for participant in participants:
+            if participant.get('requested_role') == 'speaker':
+                timestamp = participant.get('request_timestamp')
+                if isinstance(timestamp, datetime):
+                    ts_value = timestamp.isoformat()
+                else:
+                    ts_value = timestamp
+                requests.append({
+                    'user_id': participant.get('user_id'),
+                    'user_name': participant.get('user_name'),
+                    'request_timestamp': ts_value
+                })
+
+        requests.sort(key=lambda item: item.get('request_timestamp') or '')
+
+        return jsonify({
+            'success': True,
+            'requests': requests,
+            'max_speakers': get_max_speakers(room_data)
+        })
+
+    except Exception as e:
+        logging.error(f"Error fetching speaker requests: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to fetch speaker requests'}), 500
 
 @prayer_room_bp.route('/<room_id>/remove', methods=['POST'])
 def remove_participant(room_id):
@@ -994,15 +1393,24 @@ def update_speaking_state(room_id):
                 'is_muted': False,
                 'is_host': False,
                 'is_speaking': is_speaking,
-                'last_activity': datetime.utcnow()
+                'last_activity': datetime.utcnow(),
+                'role': 'listener',
+                'requested_role': None,
+                'request_timestamp': None
             }
             participants.append(new_participant)
         
+        participants, _, participants_changed = normalize_participants(participants, room_data.get('host_id'))
+
         # Update the room document with the modified participants
-        room_ref.update({
+        update_payload = {
             'participants': participants,
             'last_activity': datetime.utcnow()
-        })
+        }
+        if participants_changed or room_data.get('max_speakers') is None:
+            update_payload['max_speakers'] = get_max_speakers(room_data)
+
+        room_ref.update(update_payload)
         
         # Log speaking state for debugging
         user_name = user.get('name', user.get('user_name', 'Anonymous'))

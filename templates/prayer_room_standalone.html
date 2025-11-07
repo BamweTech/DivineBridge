@@ -1159,10 +1159,21 @@
                     <div class="participant-count" id="participantCount">
                         <span id="participantCountText">1 participant</span>
                     </div>
+                    <div class="speaker-slot-indicator" id="speakerSlotIndicator">
+                        <span class="label">Speakers</span>
+                        <span class="value" id="speakerSlotCount">0/20</span>
+                    </div>
+                    <div class="role-indicator-chip">
+                        <span class="label">Role</span>
+                        <span class="value" id="roleIndicator">Listener</span>
+                    </div>
                     <div class="audio-quality-indicator" id="audioQualityIndicator" style="display: none;">
                         Good
                     </div>
                     <div class="control-buttons">
+                        <button class="control-btn request-btn" id="requestSpeakerBtn" title="Request to Speak" style="display: none;">
+                            <span class="request-text">Request to Speak</span>
+                        </button>
                         <button class="control-btn join-audio-btn" id="joinAudioBtn" title="Join Audio">
                             <svg class="mic-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
@@ -1189,6 +1200,9 @@
                             <span class="subscribe-text">Subscribe</span>
                         </button>
                         <button class="control-btn leave" id="leaveBtn">Leave</button>
+                    </div>
+                    <div class="request-status-text" id="requestSpeakerStatus">
+                        Listening mode. Request if you would like to speak.
                     </div>
                 </div>
             </div>

@@ -32,6 +32,7 @@ class PrayerRoomService {
         this.audioQualityMonitor = null;
         this.connectionQuality = 'good';
         this.adaptiveBitrate = false; // Disabled by default to prevent OverconstrainedError
+        this.webRTCInitialized = false;
         
         // Multi-device session management
         this.deviceSessions = new Map();
@@ -94,6 +95,12 @@ class PrayerRoomService {
             visibleEnd: 50,
             itemHeight: 40
         };
+
+        // Role & permissions
+        this.participantRole = null;
+        this.pendingSpeakerRequest = false;
+        this.maxSpeakers = 20;
+        this.currentSpeakerCount = 0;
         
         this.init();
     }
@@ -410,9 +417,15 @@ class PrayerRoomService {
         const leaveBtn = document.getElementById('leaveBtn');
         const copyRoomCodeBtn = document.getElementById('copyRoomCodeBtn');
         const chatSendBtn = document.getElementById('sendBtn');
+        const requestSpeakerBtn = document.getElementById('requestSpeakerBtn');
+        const participantsList = document.getElementById('participantsList');
         
         if (joinAudioBtn) {
             joinAudioBtn.addEventListener('click', () => this.joinAudio());
+        }
+        
+        if (requestSpeakerBtn) {
+            requestSpeakerBtn.addEventListener('click', () => this.toggleSpeakerRequest());
         }
         
         if (muteBtn) {
@@ -451,6 +464,10 @@ class PrayerRoomService {
         
         // Initialize audio controls
         this.updateAudioControls();
+
+        if (participantsList) {
+            participantsList.addEventListener('click', (event) => this.handleParticipantAction(event));
+        }
     }
     
     updateUserInfo() {
@@ -504,8 +521,8 @@ class PrayerRoomService {
             };
             
             // Add room code for private rooms
-            if (window.roomCode) {
-                joinData.room_code = window.roomCode;
+            if (typeof window.roomCode !== 'undefined' && window.roomCode !== null) {
+                joinData.room_code = String(window.roomCode).trim();
             }
             
             const result = await this.makeAuthenticatedRequest(`/api/prayer-room/join/${this.roomId}`, {
@@ -525,12 +542,20 @@ class PrayerRoomService {
             }
             
             const data = result.data;
+            if (typeof data.max_speakers === 'number') {
+                this.maxSpeakers = data.max_speakers;
+            }
             
             // Update room info
             this.updateRoomInfo(data);
             
             // Load chat messages
             await this.loadChatMessages();
+
+            // Initialize WebRTC signaling even if user hasn't joined audio yet
+            this.initializeWebRTC().catch(err => {
+                console.warn('WebRTC initialization warning:', err);
+            });
             
         } catch (error) {
             console.error('Error joining room:', error);
@@ -539,6 +564,10 @@ class PrayerRoomService {
     }
     
     updateRoomInfo(data) {
+        if (typeof data.max_speakers === 'number') {
+            this.maxSpeakers = data.max_speakers;
+        }
+
         // Update room name
         const roomNameEl = document.querySelector('.prayer-room-title');
         if (roomNameEl) {
@@ -547,11 +576,11 @@ class PrayerRoomService {
             roomNameEl.title = data.room_name || 'Prayer Room'; // Show full name on hover
         }
         
-        // Update participants
-        this.updateParticipants(data.participants || []);
-        
         // Check if user is host
         this.isHost = data.host_id === this.userId;
+
+        // Update participants
+        this.updateParticipants(data.participants || []);
     }
     
     async loadParticipants() {
@@ -576,6 +605,10 @@ class PrayerRoomService {
                     return;
                 }
                 
+                if (typeof data.max_speakers === 'number') {
+                    this.maxSpeakers = data.max_speakers;
+                }
+
                 this.updateParticipants(data.participants || []);
             } else {
                 this.updateParticipants([]);
@@ -724,7 +757,7 @@ class PrayerRoomService {
         return name.substring(0, maxLength - 3) + '...';
     }
 
-    updateParticipants(participants) {
+    updateParticipants(participants = []) {
         const participantsContainer = document.getElementById('participantsList');
         if (!participantsContainer) {
             return;
@@ -733,7 +766,8 @@ class PrayerRoomService {
         // Remove loading indicator
         this.hideParticipantsLoading();
         
-        const currentParticipantIds = participants ? participants.map(p => p.user_id) : [];
+        const participantList = Array.isArray(participants) ? participants : [];
+        const currentParticipantIds = participantList.map(p => p.user_id);
         const existingPeerIds = Array.from(this.peers.keys());
         
         // 1. Clean up connections for participants who have left
@@ -745,8 +779,8 @@ class PrayerRoomService {
         });
         
         // 2. Create connections for new participants and update mute states for existing ones
-        if (this.localStream && participants) {
-            participants.forEach(participant => {
+        if (this.localStream && participantList.length) {
+            participantList.forEach(participant => {
                 const participantId = participant.user_id;
                 
                 // Update mute state for existing audio elements
@@ -761,7 +795,6 @@ class PrayerRoomService {
                 if (participantId !== this.userId && !this.peers.has(participantId)) {
                     // **Deterministic Initiator Logic**
                     // The user with the lexicographically smaller ID is the initiator.
-                    // This prevents both users from trying to initiate at the same time.
                     const isInitiator = this.userId < participantId;
                     console.log(`[WebRTC] Evaluating connection with ${participantId}. Am I the initiator? ${isInitiator}`);
                     
@@ -775,22 +808,84 @@ class PrayerRoomService {
             });
         }
         
-        // 3. Update the UI
+        // 3. Track roles, speaker counts, and self state
+        let speakerCount = 0;
+        let myRole = this.participantRole || 'listener';
+        let pendingRequest = this.pendingSpeakerRequest || false;
+        
+        participantList.forEach(participant => {
+            const role = participant.role || 'listener';
+            if (role === 'speaker') {
+                speakerCount += 1;
+            }
+            
+            if (participant.user_id === this.userId) {
+                myRole = role;
+                pendingRequest = participant.requested_role === 'speaker';
+            }
+        });
+        
+        this.participantRole = myRole;
+        this.pendingSpeakerRequest = pendingRequest;
+        this.currentSpeakerCount = speakerCount;
+        
+        if (this.participantRole !== 'speaker') {
+            this.enforceListenerMute();
+        }
+        
+        // 4. Render participants list
         participantsContainer.innerHTML = '';
-        if (participants && participants.length > 0) {
-            participants.forEach(participant => {
+        if (participantList.length > 0) {
+            participantList.forEach(participant => {
+                const participantRole = participant.role || 'listener';
+                const requestedSpeaker = participant.requested_role === 'speaker';
                 const participantEl = document.createElement('div');
-                participantEl.className = 'participant';
+                participantEl.className = `participant ${participantRole === 'speaker' ? 'role-speaker' : 'role-listener'}`;
                 participantEl.setAttribute('data-user-id', participant.user_id);
                 
-                if (participant.is_speaking && !participant.is_muted) {
+                if (participant.is_speaking && !participant.is_muted && participantRole === 'speaker') {
                     participantEl.classList.add('speaking');
                 }
                 if (participant.is_muted) {
                     participantEl.classList.add('muted');
                 }
+                if (requestedSpeaker) {
+                    participantEl.classList.add('requested-speaker');
+                }
                 
                 const truncatedName = this.truncateName(participant.user_name);
+                const badges = [];
+                badges.push(participantRole === 'speaker'
+                    ? '<span class="role-badge speaker">Speaker</span>'
+                    : '<span class="role-badge listener">Listener</span>');
+                
+                if (participant.is_host) {
+                    badges.push('<span class="host-badge">Host</span>');
+                }
+                if (requestedSpeaker) {
+                    badges.push('<span class="request-badge">Requested</span>');
+                }
+                if (participant.is_speaking && !participant.is_muted && participantRole === 'speaker') {
+                    badges.push('<span class="speaking-indicator">Speaking</span>');
+                }
+                if (participant.is_muted) {
+                    badges.push('<span class="mute-indicator">Muted</span>');
+                }
+                
+                const controls = [];
+                if (this.isHost && !participant.is_host) {
+                    if (participantRole === 'speaker') {
+                        controls.push(`<button class="participant-action stage-btn" data-action="demote" data-user-id="${participant.user_id}">Make Listener</button>`);
+                    } else {
+                        controls.push(`<button class="participant-action stage-btn" data-action="promote" data-user-id="${participant.user_id}">Make Speaker</button>`);
+                    }
+                    
+                    controls.push(`<button class="participant-action mute-toggle" data-action="mute-toggle" data-user-id="${participant.user_id}">${participant.is_muted ? 'Unmute' : 'Mute'}</button>`);
+                    controls.push(`<button class="participant-action remove-btn" data-action="remove" data-user-id="${participant.user_id}">Remove</button>`);
+                } else if (participant.user_id === this.userId && participantRole === 'speaker' && !participant.is_host) {
+                    controls.push(`<button class="participant-action stage-btn" data-action="demote-self" data-user-id="${participant.user_id}">Leave Stage</button>`);
+                }
+                
                 participantEl.innerHTML = `
                     <div class="participant-avatar">
                         ${truncatedName.charAt(0).toUpperCase()}
@@ -798,26 +893,12 @@ class PrayerRoomService {
                     <div class="participant-info">
                         <div class="participant-name" title="${participant.user_name}">
                             ${truncatedName}
-                            ${participant.is_host ? '<span class="host-badge">Host</span>' : ''}
                         </div>
                         <div class="participant-status">
-                            ${participant.is_speaking && !participant.is_muted ? '<span class="speaking-indicator">Speaking</span>' : ''}
-                            ${participant.is_muted ? '<span class="mute-indicator">🔇</span>' : ''}
+                            ${badges.join(' ')}
                         </div>
                     </div>
-                    ${this.isHost && !participant.is_host ? `
-                        <div class="participant-actions">
-                            <button class="action-btn mute-btn ${participant.is_muted ? 'muted' : ''}" onclick="window.prayerRoomService.muteParticipant('${participant.user_id}')" title="${participant.is_muted ? 'Unmute' : 'Mute'}">
-                                ${participant.is_muted ? 
-                                    '<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><path d="M23 9l-6 6"></path><path d="M17 9l6 6"></path></svg>' :
-                                    '<svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"></path><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>'
-                                }
-                            </button>
-                            <button class="action-btn remove-btn" onclick="window.prayerRoomService.removeParticipant('${participant.user_id}')" title="Remove">
-                                <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                            </button>
-                        </div>
-                    ` : ''}
+                    ${controls.length ? `<div class="participant-controls">${controls.join('')}</div>` : ''}
                 `;
                 participantsContainer.appendChild(participantEl);
             });
@@ -826,10 +907,15 @@ class PrayerRoomService {
         }
         
         // Update participant count
-        const participantCount = document.getElementById('participantCount');
-        if (participantCount) {
-            participantCount.textContent = participants ? participants.length : 0;
+        const participantCountText = document.getElementById('participantCountText');
+        if (participantCountText) {
+            const count = participantList.length;
+            participantCountText.textContent = count === 1 ? '1 participant' : `${count} participants`;
         }
+        
+        this.updateSpeakerSlotDisplay();
+        this.updateAudioControls();
+        this.updateRoleUI();
     }
     
     async joinAudio() {
@@ -970,54 +1056,64 @@ class PrayerRoomService {
             isAudioEnabled: this.isAudioEnabled,
             isMuted: this.isMuted,
             joinAudioBtn: !!joinAudioBtn,
-            muteBtn: !!muteBtn
+            muteBtn: !!muteBtn,
+            participantRole: this.participantRole
         });
         
-        if (joinAudioBtn && muteBtn) {
-            if (this.isAudioEnabled) {
-                // Show mute button, hide join audio button
-                joinAudioBtn.style.display = 'none';
-                muteBtn.style.display = 'flex';
-                
-                // Update mute button state
-                if (this.isMuted) {
-                    muteBtn.classList.add('muted');
-                    // Show muted icon and text
-                    const micIcon = muteBtn.querySelector('.mic-icon');
-                    const mutedIcon = muteBtn.querySelector('.muted-icon');
-                    const muteText = muteBtn.querySelector('.mute-text');
-                    const unmuteText = muteBtn.querySelector('.unmute-text');
-                    
-                    if (micIcon) micIcon.style.display = 'none';
-                    if (mutedIcon) mutedIcon.style.display = 'block';
-                    if (muteText) muteText.style.display = 'none';
-                    if (unmuteText) unmuteText.style.display = 'block';
-                } else {
-                    muteBtn.classList.remove('muted');
-                    // Show mic icon and text
-                    const micIcon = muteBtn.querySelector('.mic-icon');
-                    const mutedIcon = muteBtn.querySelector('.muted-icon');
-                    const muteText = muteBtn.querySelector('.mute-text');
-                    const unmuteText = muteBtn.querySelector('.unmute-text');
-                    
-                    if (micIcon) micIcon.style.display = 'block';
-                    if (mutedIcon) mutedIcon.style.display = 'none';
-                    if (muteText) muteText.style.display = 'block';
-                    if (unmuteText) unmuteText.style.display = 'none';
-                }
-            } else {
-                // Show join audio button, hide mute button
-                joinAudioBtn.style.display = 'flex';
-                muteBtn.style.display = 'none';
-            }
-            
-            console.log('🔧 Audio controls updated:', {
-                joinAudioDisplay: joinAudioBtn.style.display,
-                muteDisplay: muteBtn.style.display,
-                isAudioEnabled: this.isAudioEnabled,
-                isMuted: this.isMuted
-            });
+        if (!joinAudioBtn || !muteBtn) {
+            return;
         }
+
+        if (this.participantRole !== 'speaker') {
+            // Listeners always see the join button; mute control hidden
+            joinAudioBtn.style.display = 'flex';
+            muteBtn.style.display = 'none';
+            return;
+        }
+        
+        if (this.isAudioEnabled) {
+            // Show mute button, hide join audio button
+            joinAudioBtn.style.display = 'none';
+            muteBtn.style.display = 'flex';
+            
+            // Update mute button state
+            if (this.isMuted) {
+                muteBtn.classList.add('muted');
+                const micIcon = muteBtn.querySelector('.mic-icon');
+                const mutedIcon = muteBtn.querySelector('.muted-icon');
+                const muteText = muteBtn.querySelector('.mute-text');
+                const unmuteText = muteBtn.querySelector('.unmute-text');
+                
+                if (micIcon) micIcon.style.display = 'none';
+                if (mutedIcon) mutedIcon.style.display = 'block';
+                if (muteText) muteText.style.display = 'none';
+                if (unmuteText) unmuteText.style.display = 'block';
+            } else {
+                muteBtn.classList.remove('muted');
+                const micIcon = muteBtn.querySelector('.mic-icon');
+                const mutedIcon = muteBtn.querySelector('.muted-icon');
+                const muteText = muteBtn.querySelector('.mute-text');
+                const unmuteText = muteBtn.querySelector('.unmute-text');
+                
+                if (micIcon) micIcon.style.display = 'block';
+                if (mutedIcon) mutedIcon.style.display = 'none';
+                if (muteText) muteText.style.display = 'block';
+                if (unmuteText) unmuteText.style.display = 'none';
+            }
+        } else {
+            // Show join audio button, hide mute button
+            joinAudioBtn.style.display = 'flex';
+            muteBtn.style.display = 'none';
+        }
+        
+        console.log('🔧 Audio controls updated:', {
+            joinAudioDisplay: joinAudioBtn.style.display,
+            muteDisplay: muteBtn.style.display,
+            isAudioEnabled: this.isAudioEnabled,
+            isMuted: this.isMuted
+        });
+
+        this.updateRoleUI();
     }
     
     async notifyMuteStatus() {
@@ -3782,6 +3878,195 @@ Listening for unmute event...`);
             this.pollingIntervals.delete(name);
         }
     }
+
+    updateSpeakerSlotDisplay() {
+        const indicator = document.getElementById('speakerSlotCount');
+        if (!indicator) {
+            return;
+        }
+
+        const max = this.maxSpeakers || 0;
+        const count = Math.min(this.currentSpeakerCount, max);
+        indicator.textContent = `${count}/${max}`;
+    }
+
+    updateRoleUI() {
+        const requestBtn = document.getElementById('requestSpeakerBtn');
+        const requestStatus = document.getElementById('requestSpeakerStatus');
+        const roleIndicator = document.getElementById('roleIndicator');
+        const joinAudioBtn = document.getElementById('joinAudioBtn');
+        const muteBtn = document.getElementById('muteBtn');
+        const joinText = joinAudioBtn ? joinAudioBtn.querySelector('.join-text') : null;
+
+        if (roleIndicator) {
+            roleIndicator.textContent = this.participantRole === 'speaker' ? 'Speaker' : 'Listener';
+        }
+
+        if (requestBtn) {
+            if (this.participantRole === 'speaker') {
+                requestBtn.style.display = 'none';
+            } else {
+                requestBtn.style.display = 'inline-flex';
+                requestBtn.dataset.state = this.pendingSpeakerRequest ? 'pending' : 'idle';
+                requestBtn.textContent = this.pendingSpeakerRequest ? 'Cancel Request' : 'Request to Speak';
+                requestBtn.disabled = false;
+            }
+        }
+
+        if (requestStatus) {
+            if (this.participantRole === 'speaker') {
+                requestStatus.textContent = 'You are on stage as a speaker.';
+            } else if (this.pendingSpeakerRequest) {
+                requestStatus.textContent = 'Request sent. Waiting for host approval.';
+            } else if (this.currentSpeakerCount >= this.maxSpeakers) {
+                requestStatus.textContent = 'Speaker slots are full. Request to join the queue.';
+            } else {
+                requestStatus.textContent = 'Listening mode. Request if you would like to speak.';
+            }
+        }
+
+        if (muteBtn) {
+            if (this.participantRole !== 'speaker') {
+                muteBtn.style.display = 'none';
+            } else if (this.isAudioEnabled) {
+                muteBtn.style.display = 'flex';
+            }
+        }
+
+        if (joinText) {
+            if (this.participantRole === 'speaker') {
+                joinText.textContent = this.isAudioEnabled ? 'Rejoin Audio' : 'Join Audio';
+            } else {
+                joinText.textContent = this.isAudioEnabled ? 'Listening' : 'Join Audio';
+            }
+        }
+    }
+
+    enforceListenerMute() {
+        if (!this.localStream) {
+            return;
+        }
+        let changed = false;
+        this.localStream.getAudioTracks().forEach(track => {
+            if (track.enabled) {
+                track.enabled = false;
+                changed = true;
+            }
+        });
+        if (changed) {
+            this.isMuted = true;
+        }
+    }
+
+    async toggleSpeakerRequest() {
+        if (!this.roomId || this.participantRole === 'speaker') {
+            return;
+        }
+
+        const requestBtn = document.getElementById('requestSpeakerBtn');
+        if (requestBtn) {
+            requestBtn.disabled = true;
+        }
+
+        const action = this.pendingSpeakerRequest ? 'cancel' : 'request';
+        try {
+            const result = await this.makeAuthenticatedRequest(`/api/prayer-room/room/${this.roomId}/request-speaker`, {
+                method: 'POST',
+                body: JSON.stringify({ action })
+            });
+
+            if (result.success && result.data) {
+                if (typeof result.data.max_speakers === 'number') {
+                    this.maxSpeakers = result.data.max_speakers;
+                }
+                this.updateParticipants(result.data.participants || []);
+            } else if (result.error) {
+                this.showError(result.error);
+            }
+        } catch (error) {
+            console.error('Error requesting speaker role:', error);
+            this.showError('Unable to update speaker request. Please try again.');
+        } finally {
+            if (requestBtn) {
+                requestBtn.disabled = false;
+            }
+        }
+    }
+
+    handleParticipantAction(event) {
+        const button = event.target.closest('.participant-action');
+        if (!button) {
+            return;
+        }
+
+        const action = button.dataset.action;
+        const userId = button.dataset.userId;
+        if (!action || !userId) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        switch (action) {
+            case 'promote':
+                this.promoteParticipant(userId);
+                break;
+            case 'demote':
+                this.demoteParticipant(userId);
+                break;
+            case 'mute-toggle':
+                this.muteParticipant(userId);
+                break;
+            case 'remove':
+                this.removeParticipant(userId);
+                break;
+            default:
+                break;
+        }
+    }
+
+    async promoteParticipant(userId) {
+        try {
+            const result = await this.makeAuthenticatedRequest(`/api/prayer-room/room/${this.roomId}/promote-speaker`, {
+                method: 'POST',
+                body: JSON.stringify({ user_id: userId })
+            });
+
+            if (result.success && result.data) {
+                if (typeof result.data.max_speakers === 'number') {
+                    this.maxSpeakers = result.data.max_speakers;
+                }
+                this.updateParticipants(result.data.participants || []);
+            } else if (result.error) {
+                this.showError(result.error);
+            }
+        } catch (error) {
+            console.error('Error promoting participant:', error);
+            this.showError('Unable to promote participant.');
+        }
+    }
+
+    async demoteParticipant(userId) {
+        try {
+            const result = await this.makeAuthenticatedRequest(`/api/prayer-room/room/${this.roomId}/demote-speaker`, {
+                method: 'POST',
+                body: JSON.stringify({ user_id: userId })
+            });
+
+            if (result.success && result.data) {
+                if (typeof result.data.max_speakers === 'number') {
+                    this.maxSpeakers = result.data.max_speakers;
+                }
+                this.updateParticipants(result.data.participants || []);
+            } else if (result.error) {
+                this.showError(result.error);
+            }
+        } catch (error) {
+            console.error('Error demoting participant:', error);
+            this.showError('Unable to demote participant.');
+        }
+    }
 }
 
 // Initialize when DOM is loaded
@@ -3906,3 +4191,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // Setup mobile chat buttons
     setupMobileChatButtons();
 });
+
