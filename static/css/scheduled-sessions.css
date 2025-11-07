@@ -600,9 +600,13 @@
     }
     
     .recurring-badge {
-        font-size: 0.6rem;
-        padding: 5px 8px;
-        max-width: 150px;
+        font-size: 0.65rem;
+        padding: 6px 10px;
+        max-width: none;
+        width: 100%;
+        white-space: normal;
+        text-align: center;
+        line-height: 1.4;
         order: 2;
     }
     
