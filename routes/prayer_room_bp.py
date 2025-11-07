@@ -2825,11 +2825,29 @@ def generate_recurring_instances():
         
         logging.info(f"Generating recurring instances up to {check_until}")
         
-        # Find all recurring sessions
-        recurring_sessions = db.collection('scheduled_rooms')\
+        # Find all recurring sessions (both scheduled and active)
+        # We need to check both statuses because:
+        # - "scheduled" = not yet activated
+        # - "active" = currently live (but still need to generate future instances)
+        all_recurring = []
+        
+        # Get scheduled recurring sessions
+        scheduled_recurring = db.collection('scheduled_rooms')\
             .where('is_recurring', '==', True)\
             .where('status', '==', 'scheduled')\
             .stream()
+        all_recurring.extend(list(scheduled_recurring))
+        
+        # Get active recurring sessions (parent sessions that are currently live)
+        active_recurring = db.collection('scheduled_rooms')\
+            .where('is_recurring', '==', True)\
+            .where('status', '==', 'active')\
+            .stream()
+        all_recurring.extend(list(active_recurring))
+        
+        logging.info(f"Found {len(all_recurring)} recurring sessions (scheduled + active)")
+        
+        recurring_sessions = all_recurring
         
         generated_count = 0
         errors = []
