@@ -3044,6 +3044,28 @@ def get_public_scheduled_sessions():
             # Check if this is a child instance of a recurring session
             parent_recurring_id = session_data.get('parent_recurring_id')
             if parent_recurring_id:
+                # This is a child instance - convert timestamp before storing
+                scheduled_time_obj = session_data.get('scheduled_time')
+                scheduled_timestamp = None
+                
+                if scheduled_time_obj:
+                    if hasattr(scheduled_time_obj, 'timestamp'):
+                        # Firestore timestamp
+                        scheduled_timestamp = scheduled_time_obj.timestamp()
+                    elif isinstance(scheduled_time_obj, datetime):
+                        # Python datetime
+                        if scheduled_time_obj.tzinfo is None:
+                            # Naive datetime - assume UTC
+                            scheduled_timestamp = (scheduled_time_obj - datetime(1970, 1, 1)).total_seconds()
+                        else:
+                            scheduled_timestamp = scheduled_time_obj.timestamp()
+                    elif isinstance(scheduled_time_obj, (int, float)):
+                        # Already a number
+                        scheduled_timestamp = scheduled_time_obj
+                
+                session_data['scheduled_time'] = scheduled_timestamp
+                session_data['scheduled_room_id'] = doc.id
+                
                 # This is a child instance - skip it, we'll show the parent instead
                 if parent_recurring_id not in recurring_parents:
                     # Fetch the parent recurring session
