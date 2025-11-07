@@ -2862,6 +2862,10 @@ def generate_recurring_instances():
                 last_generated_time = rec_data.get('last_generated_time', rec_data.get('scheduled_time'))
                 recurrence_days = rec_data.get('recurrence_days', [])
                 
+                # Normalize datetimes (remove timezone info for comparison)
+                if hasattr(recurrence_end_date, 'replace') and recurrence_end_date.tzinfo:
+                    recurrence_end_date = recurrence_end_date.replace(tzinfo=None)
+                
                 # Stop if we've passed the end date
                 if recurrence_end_date and now > recurrence_end_date:
                     logging.info(f"Recurring session {rec_id} has ended, skipping")
@@ -2869,7 +2873,15 @@ def generate_recurring_instances():
                 
                 # Calculate next instance times
                 next_times = []
-                current_check = last_generated_time if isinstance(last_generated_time, datetime) else last_generated_time
+                
+                # Ensure current_check is a naive datetime for comparison
+                if isinstance(last_generated_time, datetime):
+                    current_check = last_generated_time.replace(tzinfo=None) if last_generated_time.tzinfo else last_generated_time
+                elif hasattr(last_generated_time, 'replace'):
+                    # Firestore timestamp
+                    current_check = last_generated_time.replace(tzinfo=None) if hasattr(last_generated_time, 'tzinfo') and last_generated_time.tzinfo else last_generated_time
+                else:
+                    current_check = last_generated_time
                 
                 if recurrence_pattern == 'weekly':
                     # Generate instances for next 7 days
@@ -2878,7 +2890,11 @@ def generate_recurring_instances():
                         
                         # Check if this day of week matches recurrence_days
                         if not recurrence_days or next_time.weekday() in recurrence_days:
-                            if next_time <= check_until and (not recurrence_end_date or next_time <= recurrence_end_date):
+                            # Ensure check_until is naive for comparison
+                            check_until_naive = check_until.replace(tzinfo=None) if check_until.tzinfo else check_until
+                            recurrence_end_naive = recurrence_end_date.replace(tzinfo=None) if recurrence_end_date and hasattr(recurrence_end_date, 'tzinfo') and recurrence_end_date.tzinfo else recurrence_end_date
+                            
+                            if next_time <= check_until_naive and (not recurrence_end_naive or next_time <= recurrence_end_naive):
                                 # Check if instance doesn't already exist
                                 existing = db.collection('scheduled_rooms')\
                                     .where('parent_recurring_id', '==', rec_id)\
