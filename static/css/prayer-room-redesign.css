@@ -111,8 +111,10 @@
     
     /* Content area optimization */
     .prayer-room-content {
-        height: calc(100vh - 160px) !important;
+        height: calc(100vh - 185px) !important;
+        height: calc(100dvh - 185px) !important;
         background: #f8f9fa !important;
+        padding-top: 8px !important;
     }
     
     /* Participants panel */
