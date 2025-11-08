@@ -1373,6 +1373,26 @@
 
         // ===== MODERN MOBILE TAB SYSTEM =====
         document.addEventListener('DOMContentLoaded', () => {
+            const updateMobileHeaderOffset = () => {
+                const header = document.querySelector('.prayer-room-header');
+                if (!header) {
+                    return;
+                }
+                const computed = window.getComputedStyle(header);
+                const marginBottom = parseFloat(computed.marginBottom || '0');
+                const offset = header.getBoundingClientRect().height + marginBottom;
+                document.documentElement.style.setProperty('--mobile-header-offset', `${Math.ceil(offset)}px`);
+            };
+
+            updateMobileHeaderOffset();
+            window.addEventListener('resize', () => requestAnimationFrame(updateMobileHeaderOffset));
+
+            const headerElement = document.querySelector('.prayer-room-header');
+            if (headerElement && 'MutationObserver' in window) {
+                const observer = new MutationObserver(() => requestAnimationFrame(updateMobileHeaderOffset));
+                observer.observe(headerElement, { childList: true, subtree: true, attributes: true });
+            }
+
             // Initialize UI Enhancements
             // Wait for Firebase auth to get user ID
             setTimeout(() => {
