@@ -483,6 +483,21 @@
     flex: 0 0 auto;
 }
 
+.audio-quality-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 80px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    background: rgba(239, 68, 68, 0.12);
+    color: #b91c1c;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
 .control-buttons {
     display: flex;
     align-items: center;
@@ -637,6 +652,12 @@
         justify-content: center !important;
         padding: 6px 8px !important;
         font-size: 11px !important;
+    }
+
+    .audio-quality-indicator {
+        flex: 1 1 100% !important;
+        width: 100% !important;
+        padding: 8px 12px !important;
     }
 
     .control-buttons {
