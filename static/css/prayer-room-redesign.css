@@ -465,6 +465,24 @@
     font-weight: 500;
 }
 
+.header-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.header-metrics {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.header-metrics > * {
+    flex: 0 0 auto;
+}
+
 .control-buttons {
     display: flex;
     align-items: center;
@@ -483,7 +501,7 @@
     font-weight: 600;
 }
 
-.request-status-text {
+.header-status-text {
     font-size: 12px;
     color: #475569;
     margin-top: 6px;
@@ -594,25 +612,58 @@
     background: rgba(250, 204, 21, 0.08);
 }
 
-.header-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 12px;
-}
+@media (max-width: 768px) {
+    .header-actions {
+        width: 100% !important;
+        align-items: stretch !important;
+        gap: 8px !important;
+    }
 
+    .header-metrics {
+        width: 100% !important;
+        justify-content: space-between !important;
+        gap: 8px !important;
+    }
+
+    .header-metrics > * {
+        flex: 1 1 calc(33% - 8px) !important;
+        justify-content: center !important;
+        text-align: center !important;
+    }
+
+    .participant-count,
     .speaker-slot-indicator,
     .role-indicator-chip {
-        font-size: 11px !important;
-        padding: 3px 8px !important;
-    }
-    
-    .request-status-text {
+        justify-content: center !important;
+        padding: 6px 8px !important;
         font-size: 11px !important;
     }
-    
+
+    .control-buttons {
+        width: 100% !important;
+        gap: 8px !important;
+    }
+
+    .control-buttons .control-btn {
+        flex: 1 1 calc(50% - 8px) !important;
+        min-width: calc(50% - 8px) !important;
+    }
+
+    .header-status-text {
+        font-size: 11px !important;
+        margin-top: 0 !important;
+    }
+
+    .participant-controls {
+        width: 100% !important;
+        margin-top: 8px !important;
+        gap: 6px !important;
+    }
+
     .participant-controls .participant-action {
-        font-size: 10px !important;
-        padding: 5px 8px !important;
+        flex: 1 1 calc(50% - 6px) !important;
+        font-size: 11px !important;
+        padding: 6px 10px !important;
     }
+}
 
