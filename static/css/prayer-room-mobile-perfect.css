@@ -329,7 +329,7 @@
         display: flex;
         flex-direction: column;
         padding: 12px !important;
-        padding-top: 16px !important; /* Extra space for sticky header */
+        padding-top: 12px !important;
         overflow: hidden;
     }
     
@@ -346,7 +346,7 @@
         overflow-y: auto !important;
         overflow-x: hidden !important;
         -webkit-overflow-scrolling: touch !important;
-        padding-top: 8px !important; /* Additional buffer from header */
+        padding-top: 0 !important;
     }
     
     .participant {
@@ -489,7 +489,7 @@
         overflow-y: auto !important;
         overflow-x: hidden !important;
         padding: 12px !important;
-        padding-top: 16px !important; /* Extra space from header */
+        padding-top: 12px !important;
         padding-bottom: 80px !important; /* Reduced: Space for fixed input */
         background: #f8f9fa !important;
         -webkit-overflow-scrolling: touch !important;

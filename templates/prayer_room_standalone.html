@@ -1378,10 +1378,10 @@
                 if (!header) {
                     return;
                 }
-                const computed = window.getComputedStyle(header);
-                const marginBottom = parseFloat(computed.marginBottom || '0');
-                const offset = header.getBoundingClientRect().height + marginBottom;
-                document.documentElement.style.setProperty('--mobile-header-offset', `${Math.ceil(offset)}px`);
+                // Get just the header height without any extra margin
+                const offset = header.offsetHeight;
+                document.documentElement.style.setProperty('--mobile-header-offset', `${offset}px`);
+                console.log('[Mobile] Header offset set to:', offset);
             };
 
             updateMobileHeaderOffset();
