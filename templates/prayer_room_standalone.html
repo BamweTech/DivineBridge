@@ -1378,10 +1378,9 @@
                 if (!header) {
                     return;
                 }
-                // Get just the header height without any extra margin
-                const offset = header.offsetHeight;
-                document.documentElement.style.setProperty('--mobile-header-offset', `${offset}px`);
-                console.log('[Mobile] Header offset set to:', offset);
+                const rawHeight = header.offsetHeight;
+                const adjustedHeight = Math.max(132, rawHeight - 24);
+                document.documentElement.style.setProperty('--mobile-header-offset', `${adjustedHeight}px`);
             };
 
             updateMobileHeaderOffset();

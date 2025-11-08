@@ -17,7 +17,7 @@
 
 @media (max-width: 768px) {
     :root {
-        --mobile-header-offset: 176px;
+        --mobile-header-offset: 150px;
     }
     /* ===== ROOT FIXES ===== */
     html, body {
