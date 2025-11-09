@@ -213,7 +213,10 @@ def create_app():
     app.config['SENDER_EMAIL'] = 'divinebridge.prayer@gmail.com'
     
     # Set host URL for email verification and password reset
-    app.config['HOST_URL'] = 'http://localhost:5001'  # Local development URL
+    is_cloud_run = os.getenv('K_SERVICE') is not None
+    default_host = 'https://divinebridge.io' if is_cloud_run else 'http://localhost:5001'
+    app.config['HOST_URL'] = os.getenv('HOST_URL', default_host)
+    logger.info(f"Configured HOST_URL: {app.config['HOST_URL']} (Cloud Run detected: {is_cloud_run})")
     
     # Configure CORS
     CORS(app, resources={
