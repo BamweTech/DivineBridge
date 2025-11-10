@@ -666,21 +666,24 @@ class PrayerRoomService {
             
             // Critical validation: Ensure IDs are valid before building RTDB paths
             if (!this.roomId || typeof this.roomId !== 'string' || !this.roomId.trim()) {
-                console.warn('RTDB disabled: Invalid or missing roomId.');
+                console.warn('⚠️ RTDB disabled: Invalid or missing roomId.');
                 this.useRTDB = false;
                 return;
             }
             if (!this.userId || typeof this.userId !== 'string' || !this.userId.trim()) {
-                console.warn('RTDB disabled: Invalid or missing userId.');
+                console.warn('⚠️ RTDB disabled: Invalid or missing userId.');
                 this.useRTDB = false;
                 return;
             }
 
             if (!firebase.database || typeof firebase.database !== 'function') {
-                console.warn('Firebase RTDB not available, staying on HTTP polling');
+                console.warn('⚠️ Firebase RTDB not available, using REST polling (slower connections)');
+                console.warn('⚠️ To enable faster connections, configure Firebase Realtime Database');
                 this.rtdb = null;
                 return;
             }
+            
+            console.log('🔥 Initializing Firebase Realtime Database for fast signaling...');
             this.rtdb = firebase.database();
             console.log('[RTDB] Database object initialized.');
             if (!this.roomId) return;
@@ -1752,6 +1755,9 @@ class PrayerRoomService {
     setupSignalPolling() {
         // Only set up polling if WebSocket is not connected or in fallback mode
         if (!this.wsConnected || this.wsFallbackMode) {
+            console.log('⚠️ Using REST polling for WebRTC signals (200ms interval)');
+            console.log('⚠️ For faster connections, enable Firebase Realtime Database');
+            
             // Poll for WebRTC signals every 200ms for near real-time connection
             const intervalId = setInterval(() => {
                 if (this.isPageVisible) {
@@ -1766,10 +1772,15 @@ class PrayerRoomService {
         try {
             if (!this.roomId) return;
             
-            // Check for WebRTC offers
-            const offersResponse = await fetch(`/api/prayer-room/room/${this.roomId}/webrtc-offers`, {
-                credentials: 'include'
-            });
+            // OPTIMIZATION: Fetch all signal types in parallel instead of sequentially
+            // This reduces total latency from (3 * network_time) to (1 * network_time)
+            const [offersResponse, answersResponse, candidatesResponse] = await Promise.all([
+                fetch(`/api/prayer-room/room/${this.roomId}/webrtc-offers`, { credentials: 'include' }),
+                fetch(`/api/prayer-room/room/${this.roomId}/webrtc-answers`, { credentials: 'include' }),
+                fetch(`/api/prayer-room/room/${this.roomId}/webrtc-candidates`, { credentials: 'include' })
+            ]);
+            
+            // Process offers
             if (offersResponse.ok) {
                 const offers = await offersResponse.json();
                 for (const offer of offers) {
@@ -1779,10 +1790,7 @@ class PrayerRoomService {
                 }
             }
             
-            // Check for WebRTC answers
-            const answersResponse = await fetch(`/api/prayer-room/room/${this.roomId}/webrtc-answers`, {
-                credentials: 'include'
-            });
+            // Process answers
             if (answersResponse.ok) {
                 const answers = await answersResponse.json();
                 for (const answer of answers) {
@@ -1792,10 +1800,7 @@ class PrayerRoomService {
                 }
             }
             
-            // Check for WebRTC candidates
-            const candidatesResponse = await fetch(`/api/prayer-room/room/${this.roomId}/webrtc-candidates`, {
-                credentials: 'include'
-            });
+            // Process candidates
             if (candidatesResponse.ok) {
                 const candidates = await candidatesResponse.json();
                 for (const candidate of candidates) {
@@ -1812,6 +1817,7 @@ class PrayerRoomService {
 
     async createPeerConnection(participantId, isInitiator) {
         try {
+            const startTime = performance.now();
             console.log(`[WebRTC] Creating peer connection for ${participantId}. Initiator: ${isInitiator}`);
             console.log(`[WebRTC] Local stream available: ${!!this.localStream}, Active: ${this.localStream?.active}`);
             
@@ -1857,9 +1863,17 @@ class PrayerRoomService {
             });
             
             this.peers.set(participantId, peer);
+            
+            // Store connection start time for timing measurement
+            if (!this.connectionTimings) {
+                this.connectionTimings = new Map();
+            }
+            this.connectionTimings.set(participantId, startTime);
+            
             this.setupPeerEventHandlers(peer, participantId);
             
-            console.log(`✅ [WebRTC] Peer connection created for ${participantId} with local audio stream`);
+            const creationTime = performance.now() - startTime;
+            console.log(`✅ [WebRTC] Peer connection created for ${participantId} in ${creationTime.toFixed(1)}ms`);
             
         } catch (error) {
             console.error(`[WebRTC] Error creating peer connection for ${participantId}:`, error);
@@ -2008,7 +2022,14 @@ Listening for unmute event...`);
 
         // Handle successful connection
         peer.on('connect', () => {
-            console.log(`✅ [WebRTC] Connected to ${participantId}`);
+            // Log total connection time
+            if (this.connectionTimings && this.connectionTimings.has(participantId)) {
+                const totalTime = performance.now() - this.connectionTimings.get(participantId);
+                console.log(`✅ [WebRTC] Connected to ${participantId} in ${totalTime.toFixed(0)}ms`);
+                this.connectionTimings.delete(participantId);
+            } else {
+                console.log(`✅ [WebRTC] Connected to ${participantId}`);
+            }
             
             // Clear retry count on successful connection
             if (this.connectionRetries.has(participantId)) {
