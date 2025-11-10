@@ -273,12 +273,21 @@ def signup():
 def forgot_password():
     """Handle forgot password request"""
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
+        if not data:
+            logger.warning("Forgot password request with invalid or missing JSON body")
+            return jsonify({'error': 'Invalid request format'}), 400
+        
         email = data.get('email')
         
         if not email:
             logger.warning("Forgot password request missing email")
             return jsonify({'error': 'Email is required', 'field': 'email'}), 400
+        
+        # Validate email format
+        if not validate_email(email):
+            logger.warning(f"Forgot password request with invalid email format: {email}")
+            return jsonify({'error': 'Invalid email format', 'field': 'email'}), 400
             
         # Check if user exists
         try:
