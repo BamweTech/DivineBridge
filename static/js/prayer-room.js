@@ -1450,20 +1450,30 @@ class PrayerRoomService {
                 if (message.message_type === 'system_notification') {
                     messageEl.className = 'message system-notification';
                     messageEl.innerHTML = `
-                        <div class="message-content system-message">
-                            <div class="system-icon">⚠️</div>
-                            <div class="system-text">${message.message}</div>
+                        <div class="message-bubble">
+                            <div class="system-message">
+                                <div class="system-icon">⚠️</div>
+                                <div class="system-text">${message.message}</div>
+                            </div>
                         </div>
                     `;
                 } else {
-                    messageEl.className = 'message';
+                    // Check if this is the current user's message
+                    const isOwnMessage = message.user_id === this.userId;
+                    messageEl.className = `message ${isOwnMessage ? 'message-own' : 'message-other'}`;
+                    
+                    // Format timestamp (show time only)
+                    const timeString = new Date(message.timestamp).toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                    });
+                    
                     messageEl.innerHTML = `
-                        <div class="message-header">
-                            <span class="message-sender">${message.user_name}</span>
-                            <span class="message-time">${new Date(message.timestamp).toLocaleTimeString()}</span>
-                        </div>
-                        <div class="message-content">
-                            ${message.message}
+                        <div class="message-bubble">
+                            ${!isOwnMessage ? `<div class="message-sender">${message.user_name}</div>` : ''}
+                            <div class="message-content">${message.message}</div>
+                            <div class="message-time">${timeString}</div>
                         </div>
                     `;
                 }
