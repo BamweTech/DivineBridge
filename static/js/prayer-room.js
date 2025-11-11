@@ -447,16 +447,49 @@ class PrayerRoomService {
         }
         
         if (chatSendBtn) {
-            chatSendBtn.addEventListener('click', () => this.sendChatMessage());
+            chatSendBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Send button clicked');
+                this.sendChatMessage();
+            });
+        } else {
+            console.warn('Send button not found in DOM');
         }
         
         // Chat input enter key
         const chatInput = document.getElementById('chatInput');
         if (chatInput) {
             chatInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
                     this.sendChatMessage();
                 }
+            });
+            
+            // Handle focus/blur for mobile keyboard
+            chatInput.addEventListener('focus', () => {
+                document.body.classList.add('chat-input-focused');
+            });
+            
+            chatInput.addEventListener('blur', () => {
+                setTimeout(() => {
+                    document.body.classList.remove('chat-input-focused');
+                }, 100);
+            });
+        }
+        
+        // Set up event delegation for participant action buttons (dynamically created)
+        if (participantsList) {
+            participantsList.addEventListener('click', (e) => {
+                this.handleParticipantAction(e);
+            });
+        }
+        
+        // Set up request speaker button
+        if (requestSpeakerBtn) {
+            requestSpeakerBtn.addEventListener('click', () => {
+                this.toggleSpeakerRequest();
             });
         }
         
@@ -464,10 +497,6 @@ class PrayerRoomService {
         
         // Initialize audio controls
         this.updateAudioControls();
-
-        if (participantsList) {
-            participantsList.addEventListener('click', (event) => this.handleParticipantAction(event));
-        }
     }
     
     updateUserInfo() {

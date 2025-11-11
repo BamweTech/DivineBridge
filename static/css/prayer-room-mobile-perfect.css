@@ -544,9 +544,9 @@
         width: 100% !important;
         overflow-y: auto !important;
         overflow-x: hidden !important;
-        padding: 12px !important;
-        padding-top: 16px !important;
-        padding-bottom: 90px !important; /* Space for fixed input + tabs */
+        padding: 16px !important;
+        padding-top: 20px !important;
+        padding-bottom: 100px !important; /* Space for fixed input + tabs */
         background: #f8f9fa !important;
         -webkit-overflow-scrolling: touch !important;
         scroll-behavior: smooth !important;
@@ -554,16 +554,42 @@
     
     /* When chat input is focused, reduce padding since tabs are hidden */
     body.chat-input-focused .chat-messages {
-        padding-bottom: 70px !important; /* Just enough for input section */
+        padding-bottom: 80px !important; /* Just enough for input section */
     }
     
     .message,
     .chat-message {
         background: #ffffff !important;
-        border-radius: 10px !important;
-        padding: 10px 12px !important;
-        margin-bottom: 8px !important;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+        border-radius: 12px !important;
+        padding: 12px 16px !important;
+        margin-bottom: 12px !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06) !important;
+        max-width: 85% !important;
+    }
+    
+    .message-header {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        margin-bottom: 6px !important;
+    }
+    
+    .message-sender {
+        font-weight: 600 !important;
+        color: #0f56ff !important;
+        font-size: 13px !important;
+    }
+    
+    .message-time {
+        font-size: 11px !important;
+        color: #94a3b8 !important;
+    }
+    
+    .message-content {
+        font-size: 14px !important;
+        line-height: 1.5 !important;
+        color: #1e293b !important;
+        word-wrap: break-word !important;
     }
     
     /* ===== CHAT INPUT - FIXED AT BOTTOM ===== */
@@ -572,19 +598,22 @@
         bottom: 56px !important; /* Above bottom tabs */
         left: 0 !important;
         right: 0 !important;
-        padding: 10px 12px !important;
+        padding: 12px !important;
         background: #ffffff !important;
         border-top: 1px solid #e5e7eb !important;
-        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08) !important;
+        box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.1) !important;
         z-index: 150 !important; /* Above bottom tabs */
         transition: bottom 0.15s ease !important;
+        pointer-events: auto !important;
     }
     
     .chat-input-container {
         display: flex !important;
-        gap: 8px !important;
+        gap: 10px !important;
         align-items: center !important;
         width: 100% !important;
+        position: relative !important;
+        z-index: 1 !important;
     }
     
     /* When keyboard is active - move to bottom and above everything */
@@ -623,23 +652,35 @@
     
     .chat-send-btn,
     .send-btn {
-        padding: 10px 16px !important;
+        padding: 12px 20px !important;
         background: #3b82f6 !important;
         color: #ffffff !important;
         border: none !important;
-        border-radius: 20px !important;
+        border-radius: 24px !important;
         font-size: 14px !important;
         font-weight: 600 !important;
         cursor: pointer !important;
         flex-shrink: 0 !important;
-        min-width: 60px !important; /* Ensure button stays visible */
+        min-width: 70px !important;
         white-space: nowrap !important;
+        pointer-events: auto !important;
+        -webkit-tap-highlight-color: transparent !important;
+        touch-action: manipulation !important;
+        user-select: none !important;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25) !important;
     }
     
     .chat-send-btn:active,
     .send-btn:active {
-        transform: scale(0.96) !important;
+        transform: scale(0.94) !important;
         background: #2563eb !important;
+        box-shadow: 0 1px 4px rgba(59, 130, 246, 0.3) !important;
+    }
+    
+    .chat-send-btn:hover,
+    .send-btn:hover {
+        background: #2563eb !important;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35) !important;
     }
     
     /* ===== CONTROLS - VISIBLE & COMPACT ===== */
