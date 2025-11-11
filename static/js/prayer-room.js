@@ -705,16 +705,30 @@ class PrayerRoomService {
                 return;
             }
 
+            console.log('[RTDB] Checking Firebase RTDB availability...');
+            console.log('[RTDB] firebase object:', typeof firebase);
+            console.log('[RTDB] firebase.database:', typeof firebase.database);
+            console.log('[RTDB] firebase.app():', firebase.app ? firebase.app() : 'not available');
+            
+            if (firebase.app && firebase.app()) {
+                const app = firebase.app();
+                console.log('[RTDB] Firebase app options:', app.options);
+                console.log('[RTDB] databaseURL in config:', app.options.databaseURL);
+            }
+            
             if (!firebase.database || typeof firebase.database !== 'function') {
-                console.warn('⚠️ Firebase RTDB not available, using REST polling (slower connections)');
-                console.warn('⚠️ To enable faster connections, configure Firebase Realtime Database');
+                console.error('❌ Firebase RTDB not available!');
+                console.error('❌ firebase.database type:', typeof firebase.database);
+                console.error('❌ Using REST polling (slower connections)');
+                console.error('❌ Check that firebase-database-compat.js is loaded');
                 this.rtdb = null;
                 return;
             }
             
             console.log('🔥 Initializing Firebase Realtime Database for fast signaling...');
             this.rtdb = firebase.database();
-            console.log('[RTDB] Database object initialized.');
+            console.log('[RTDB] Database object created:', this.rtdb);
+            console.log('[RTDB] Database ref method available:', typeof this.rtdb.ref);
             if (!this.roomId) return;
             
             // Prepare references
