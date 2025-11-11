@@ -901,8 +901,13 @@ def demote_speaker(room_id):
 
         room_data = room_doc.to_dict()
         host_id = room_data.get('host_id')
-        if host_id != host['user_id']:
-            return jsonify({'error': 'Only the host can demote speakers'}), 403
+        
+        # Allow self-demotion or host demotion
+        is_self_demotion = target_user_id == host['user_id']
+        is_host = host_id == host['user_id']
+        
+        if not is_self_demotion and not is_host:
+            return jsonify({'error': 'Only the host can demote other speakers'}), 403
 
         if target_user_id == host_id:
             return jsonify({'error': 'Host cannot be demoted from speaker role'}), 400

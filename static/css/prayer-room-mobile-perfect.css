@@ -458,23 +458,37 @@
         transform: scale(0.97) !important;
     }
     
-    .promote-btn,
-    .demote-btn {
+    .participant-action.stage-btn {
         background: linear-gradient(135deg, #0f56ff, #60a5fa) !important;
         color: #ffffff !important;
         border-color: transparent !important;
+        box-shadow: 0 2px 8px rgba(15, 86, 255, 0.25) !important;
     }
     
-    .mute-btn.participant-action {
-        background: #ef4444 !important;
+    .participant-action.stage-btn:active {
+        background: linear-gradient(135deg, #0d47d6, #3b82f6) !important;
+    }
+    
+    .participant-action.mute-toggle {
+        background: linear-gradient(135deg, #ef4444, #f87171) !important;
         color: #ffffff !important;
         border-color: transparent !important;
+        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25) !important;
     }
     
-    .remove-btn {
+    .participant-action.mute-toggle:active {
+        background: linear-gradient(135deg, #dc2626, #ef4444) !important;
+    }
+    
+    .participant-action.remove-btn {
         background: #f3f4f6 !important;
         color: #6b7280 !important;
         border-color: #e5e7eb !important;
+    }
+    
+    .participant-action.remove-btn:active {
+        background: #fee2e2 !important;
+        color: #dc2626 !important;
     }
     
     /* ===== CHAT PANEL ===== */
@@ -598,7 +612,7 @@
     }
     
     .message-bubble {
-        max-width: 75% !important;
+        max-width: 65% !important;
         padding: 10px 14px !important;
         position: relative !important;
     }
