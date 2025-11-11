@@ -1550,6 +1550,11 @@ class PrayerRoomService {
             clearInterval(this.participantPollInterval);
         }
         
+        // Skip if RTDB is active (participant updates handled via Firestore snapshot listeners)
+        if (this.useRTDB && this.rtdb) {
+            return;
+        }
+        
         // Only set up polling if WebSocket is not connected or in fallback mode
         if (!this.wsConnected || this.wsFallbackMode) {
             this.removePollingInterval('participants');
@@ -1806,10 +1811,15 @@ class PrayerRoomService {
     }
 
     setupSignalPolling() {
-        // Only set up polling if WebSocket is not connected or in fallback mode
+        // Only set up polling if RTDB is not active AND WebSocket is not connected
+        if (this.useRTDB && this.rtdb) {
+            console.log('✅ Using Firebase RTDB for real-time signaling (fast)');
+            return; // RTDB is active, no need for polling
+        }
+        
         if (!this.wsConnected || this.wsFallbackMode) {
             console.log('⚠️ Using REST polling for WebRTC signals (200ms interval)');
-            console.log('⚠️ For faster connections, enable Firebase Realtime Database');
+            console.log('⚠️ RTDB not active, using fallback');
             
             // Poll for WebRTC signals every 200ms for near real-time connection
             const intervalId = setInterval(() => {
@@ -3933,7 +3943,12 @@ Listening for unmute event...`);
     
     resumePolling() {
         console.log('📊 Resuming polling');
-        // Only resume if WebSocket is not connected
+        // Only resume if RTDB is not active AND WebSocket is not connected
+        if (this.useRTDB && this.rtdb) {
+            console.log('📊 RTDB is active, skipping REST polling resume');
+            return;
+        }
+        
         if (!this.wsConnected || this.wsFallbackMode) {
             this.setupSignalPolling();
             this.setupParticipantPolling();
