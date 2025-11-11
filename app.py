@@ -279,8 +279,9 @@ def create_app():
         from routes.testimony_bp import testimony_bp
         from routes.prayer_room_bp import prayer_room_bp
         from routes.admin_bp import admin_bp
+        from routes.livekit_bp import livekit_bp
         
-        # Exempt auth, prayer, email, testimony, prayer room, nonprofit, and admin blueprints from CSRF protection
+        # Exempt auth, prayer, email, testimony, prayer room, nonprofit, admin, and livekit blueprints from CSRF protection
         # Auth uses Firebase token auth, Prayer/Email use Cloud Scheduler verification, Admin uses passcode
         csrf.exempt(auth_bp)
         csrf.exempt(prayer_bp)
@@ -289,6 +290,7 @@ def create_app():
         csrf.exempt(prayer_room_bp)
         csrf.exempt(nonprofit_bp)
         csrf.exempt(admin_bp)
+        csrf.exempt(livekit_bp)
         
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
         app.register_blueprint(prayer_bp, url_prefix='/api/prayer')
@@ -299,6 +301,7 @@ def create_app():
         app.register_blueprint(prayer_room_bp, url_prefix='/api/prayer-room')
         app.register_blueprint(admin_bp)  # Admin routes at root level
         app.register_blueprint(seo_bp)  # SEO routes at root level
+        app.register_blueprint(livekit_bp, url_prefix='/api/livekit')  # LiveKit SFU integration
         
         # Exempt prayer room polling endpoints from rate limiting
         # These endpoints need high frequency access for WebRTC signaling and chat
