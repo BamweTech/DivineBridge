@@ -3,7 +3,7 @@ from firebase_auth import get_firestore_client
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from input_validation import validate_data, sanitize_string
-from auth_decorators import verify_cloud_scheduler, login_required
+from auth_decorators import verify_cloud_scheduler
 import logging
 from datetime import datetime, timedelta
 import uuid
@@ -1634,7 +1634,6 @@ def get_webrtc_candidates(room_id):
 
 # Multi-Device Session Management Endpoints
 @prayer_room_bp.route('/<room_id>/check-session', methods=['POST'])
-@login_required
 def check_user_session(room_id):
     try:
         user = get_user_from_session()
@@ -1664,7 +1663,6 @@ def check_user_session(room_id):
         return jsonify({'error': 'Failed to check user session'}), 500
 
 @prayer_room_bp.route('/<room_id>/register-session', methods=['POST'])
-@login_required
 def register_user_session(room_id):
     """Register a new device session"""
     try:
