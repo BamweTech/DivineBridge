@@ -1430,9 +1430,9 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
     
     <!-- Firebase Configuration and Initialization -->
+    {% if firebase_config %}
     <script>
         // Firebase configuration
-        {% if firebase_config %}
         const firebaseConfig = {
             apiKey: "{{ firebase_config.apiKey }}",
             authDomain: "{{ firebase_config.authDomain }}",
@@ -1446,8 +1446,23 @@
         // Initialize Firebase when it's loaded
         if (typeof firebase !== 'undefined' && firebase.initializeApp) {
             try {
+                // Log config before initialization
+                console.log('Initializing Firebase with config:', {
+                    authDomain: firebaseConfig.authDomain,
+                    projectId: firebaseConfig.projectId,
+                    databaseURL: firebaseConfig.databaseURL,
+                    hasDatabaseURL: !!firebaseConfig.databaseURL
+                });
+                
                 firebase.initializeApp(firebaseConfig);
                 console.log('✅ Firebase initialized successfully on prayer rooms page');
+                
+                // Verify database is available
+                if (firebase.database) {
+                    console.log('✅ firebase.database is available');
+                } else {
+                    console.error('❌ firebase.database is NOT available after init');
+                }
                 
                 // Initialize Auth
                 firebase.auth();
@@ -1458,10 +1473,12 @@
         } else {
             console.error('❌ Firebase not loaded');
         }
-        {% else %}
-        console.warn('⚠️ Firebase config not provided - authentication may not work correctly');
-        {% endif %}
     </script>
+    {% else %}
+    <script>
+        console.warn('⚠️ Firebase config not provided - authentication may not work correctly');
+    </script>
+    {% endif %}
     
     <script src="{{ url_for('static', filename='js/prayer-rooms.js') }}?v={{ range(100000, 999999) | random }}"></script>
     <script src="{{ url_for('static', filename='js/scheduled-sessions.js') }}?v={{ range(100000, 999999) | random }}"></script>

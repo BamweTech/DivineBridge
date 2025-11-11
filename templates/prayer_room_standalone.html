@@ -1318,16 +1318,31 @@
                     clearInterval(checkFirebase);
                     
                     try {
+                        // Log config before initialization
+                        console.log('Initializing Firebase with config:', {
+                            authDomain: firebaseConfig.authDomain,
+                            projectId: firebaseConfig.projectId,
+                            databaseURL: firebaseConfig.databaseURL,
+                            hasDatabaseURL: !!firebaseConfig.databaseURL
+                        });
+                        
                         // Initialize Firebase
                         firebase.initializeApp(firebaseConfig);
-                        console.log('Firebase initialized successfully');
+                        console.log('✅ Firebase initialized successfully');
+                        
+                        // Verify database is available
+                        if (firebase.database) {
+                            console.log('✅ firebase.database is available');
+                        } else {
+                            console.error('❌ firebase.database is NOT available after init');
+                        }
                         
                         // Initialize Auth
                         firebase.auth();
-                        console.log('Firebase Auth initialized');
+                        console.log('✅ Firebase Auth initialized');
                         
                     } catch (error) {
-                        console.error('Error initializing Firebase:', error);
+                        console.error('❌ Error initializing Firebase:', error);
                     }
                 } else {
                     attempts++;
