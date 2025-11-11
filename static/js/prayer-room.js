@@ -537,6 +537,19 @@ class PrayerRoomService {
             this.userId = user.uid;
             this.userName = user.displayName || 'Anonymous';
             
+            // Check for an existing session BEFORE joining
+            const sessionExists = await this.checkExistingSession();
+            if (sessionExists) {
+                const switchDevice = confirm(
+                    'It looks like you already have an active session in this room on another device. Do you want to switch to this device?'
+                );
+                if (!switchDevice) {
+                    this.showError('Session already active on another device. Please close the other session to join from here.');
+                    // Optionally, redirect or disable UI
+                    return;
+                }
+            }
+
             // --> ADDED: Initialize RTDB now that we have a confirmed userId
             await this.initializeRealtimeDB();
 
@@ -4073,6 +4086,9 @@ Listening for unmute event...`);
                 this.promoteParticipant(userId);
                 break;
             case 'demote':
+                this.demoteParticipant(userId);
+                break;
+            case 'demote-self':
                 this.demoteParticipant(userId);
                 break;
             case 'mute-toggle':

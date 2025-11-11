@@ -3,7 +3,7 @@ from firebase_auth import get_firestore_client
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from input_validation import validate_data, sanitize_string
-from auth_decorators import verify_cloud_scheduler
+from auth_decorators import verify_cloud_scheduler, login_required
 import logging
 from datetime import datetime, timedelta
 import uuid
@@ -512,75 +512,18 @@ def join_prayer_room(room_id):
 
         participant_updated = False
         existing_participant = None
-        for participant in participants:
-            if participant.get('user_id') == user_id:
-                existing_participant = participant
-                if participant.get('user_name') != user_name:
-                    participant['user_name'] = user_name
-                    participant_updated = True
+        for p in participants:
+            if p.get('user_id') == user_id:
+                # Archive the old session
+                p['is_active'] = False
+                p['archived_at'] = datetime.utcnow()
+                p['reason_archived'] = 'joined_from_new_device'
+                participant_updated = True
                 break
 
-        if existing_participant:
-            update_payload = {
-                'participants': participants,
-                'last_activity': datetime.utcnow()
-            }
-            if participants_changed or participant_updated or room_data.get('max_speakers') != max_speakers:
-                update_payload['max_speakers'] = max_speakers
-                room_ref.update(update_payload)
-
-            return jsonify({
-                'success': True,
-                'room_id': room_id,
-                'room_name': room_data.get('room_name'),
-                'host_id': host_id,
-                'participants': participants,
-                'max_speakers': max_speakers,
-                'message': 'Already in room'
-            })
-        
-        # Deactivate any existing device sessions for this user across ALL rooms
-        # This ensures users can only have one active session at a time
-        # OPTIMIZED: Use collection group query for better performance
-        try:
-            # Use collection group query to find all active sessions for this user across all rooms
-            # This is much faster than iterating through all rooms
-            sessions_query = db.collection_group('device_sessions')\
-                .where('user_id', '==', user_id)\
-                .where('is_active', '==', True)\
-                .limit(10)  # Limit to prevent excessive reads (should be max 1-2 anyway)
-            
-            # Batch update all sessions
-            batch = db.batch()
-            session_count = 0
-            for session_doc in sessions_query.stream():
-                batch.update(session_doc.reference, {
-                    'is_active': False,
-                    'ended_at': datetime.utcnow()
-                })
-                session_count += 1
-            
-            if session_count > 0:
-                batch.commit()
-                logging.info(f"Deactivated {session_count} existing session(s) for user {user_id}")
-        except Exception as e:
-            # If collection group queries fail, fall back to a simpler approach
-            # Only check the current room's sessions as a fallback
-            logging.warning(f"Collection group query failed, using fallback: {e}")
-            try:
-                current_room_sessions = db.collection('prayer_rooms').document(room_id)\
-                    .collection('device_sessions')\
-                    .where('user_id', '==', user_id)\
-                    .where('is_active', '==', True)\
-                    .stream()
-                
-                for session_doc in current_room_sessions:
-                    session_doc.reference.update({
-                        'is_active': False,
-                        'ended_at': datetime.utcnow()
-                    })
-            except Exception as fallback_error:
-                logging.error(f"Fallback session deactivation also failed: {fallback_error}")
+        # Remove the old participant entry if it was found and marked as inactive
+        if participant_updated:
+            participants = [p for p in participants if p.get('user_id') != user_id or p.get('is_active')]
         
         # Add participant to room
         new_participant = {
@@ -1691,47 +1634,38 @@ def get_webrtc_candidates(room_id):
 
 # Multi-Device Session Management Endpoints
 @prayer_room_bp.route('/<room_id>/check-session', methods=['POST'])
-def check_session(room_id):
-    """Check if user already has an active session on another device"""
+@login_required
+def check_user_session(room_id):
     try:
-        # Get authenticated user from session
         user = get_user_from_session()
-        if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
-        data = request.get_json()
-        device_id = data.get('device_id')
-        device_info = data.get('device_info', {})
-        
-        # Use authenticated user ID
-        user_id = user['user_id']
-        
+        user_id = user.get('user_id') if user else None
+
+        if not user_id:
+            return jsonify({'error': 'User not authenticated'}), 401
+
         db = get_firestore_client()
-        
-        # Check for existing active sessions for this user
-        sessions_ref = db.collection('prayer_rooms').document(room_id)\
-            .collection('device_sessions')\
-            .where('user_id', '==', user_id)\
-            .where('is_active', '==', True)\
-            .limit(1)
-        
-        existing_sessions = list(sessions_ref.stream())
-        
-        if existing_sessions:
-            existing_session = existing_sessions[0].to_dict()
-            return jsonify({
-                'has_existing_session': True,
-                'existing_device_info': existing_session.get('device_info', {})
-            })
-        
-        return jsonify({'has_existing_session': False})
-        
+        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_doc = room_ref.get()
+
+        if not room_doc.exists:
+            return jsonify({'error': 'Room not found'}), 404
+
+        room_data = room_doc.to_dict()
+        participants = room_data.get('participants', [])
+
+        session_exists = any(
+            p.get('user_id') == user_id and p.get('session_id') and p.get('is_active', True)
+            for p in participants
+        )
+
+        return jsonify({'session_exists': session_exists})
     except Exception as e:
-        logging.error(f"Error checking session: {str(e)}")
-        return jsonify({'error': 'Failed to check session'}), 500
+        logging.error(f"Error checking user session in room {room_id}: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to check user session'}), 500
 
 @prayer_room_bp.route('/<room_id>/register-session', methods=['POST'])
-def register_session(room_id):
+@login_required
+def register_user_session(room_id):
     """Register a new device session"""
     try:
         # Get authenticated user from session

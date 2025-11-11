@@ -722,3 +722,49 @@
         display: none !important;
     }
 }
+.participant-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+    align-items: flex-start;
+}
+
+.participant-action {
+    padding: 6px 12px;
+    font-size: 13px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 100%;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.participant-action.stage-btn {
+    background-color: #e0e7ff;
+    color: #4338ca;
+    border-color: #c7d2fe;
+}
+.participant-action.stage-btn:hover {
+    background-color: #c7d2fe;
+}
+
+.participant-action.mute-toggle {
+    background-color: #fef3c7;
+    color: #b45309;
+    border-color: #fde68a;
+}
+.participant-action.mute-toggle:hover {
+    background-color: #fde68a;
+}
+
+.participant-action.remove-btn {
+    background-color: #fee2e2;
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+.participant-action.remove-btn:hover {
+    background-color: #fecaca;
+}
