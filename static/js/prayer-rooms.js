@@ -379,19 +379,21 @@ class PrayerRoomsDirectory {
                         ${room.is_active ? 
                             `<button class="btn btn-primary" onclick="joinRoom('${roomId}', '${privacyLabel}')">
                                 Join Room
+                            </button>
+                            ${room.room_code ? 
+                                `<button class="btn btn-outline" onclick="copyRoomCode('${room.room_code}')">
+                                    Copy Code
+                                </button>` : ''
+                            }
+                            <button class="btn btn-danger" onclick="deleteRoom('${roomId}', '${this.escapeHtml(room.room_name)}')">
+                                Delete
                             </button>` :
-                            `
-                            <button class="btn btn-secondary" onclick="reopenRoom('${roomId}')">
+                            `<button class="btn btn-secondary" onclick="reopenRoom('${roomId}')">
                                 Reopen Room
                             </button>
                             <button class="btn btn-danger" onclick="deleteRoom('${roomId}', '${this.escapeHtml(room.room_name)}')">
                                 Delete Room
                             </button>`
-                        }
-                        ${room.room_code ? 
-                            `<button class="btn btn-outline" onclick="copyRoomCode('${room.room_code}')">
-                                Copy Code
-                            </button>` : ''
                         }
                     </div>
                 </div>
