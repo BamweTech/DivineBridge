@@ -1915,15 +1915,29 @@ class PrayerRoomService {
                 }))
             });
             
+            // Optimize ICE configuration for better TURN utilization
+            // Prioritize TURN servers and increase candidate pool for better connectivity
+            const turnCount = this.iceServers.filter(s => 
+                s.urls && (typeof s.urls === 'string' ? s.urls.includes('turn:') : 
+                (Array.isArray(s.urls) && s.urls.some(u => u.includes('turn:'))))
+            ).length;
+            console.log(`[WebRTC] ICE Config: ${this.iceServers.length} servers (${turnCount} TURN, ${this.iceServers.length - turnCount} STUN)`);
+            
+            const optimizedConfig = {
+                iceServers: this.iceServers,
+                iceCandidatePoolSize: 20, // Increased from 10 for better TURN discovery
+                iceTransportPolicy: 'all' // Try both relay (TURN) and direct connections
+            };
+            
             const peer = new SimplePeer({
                 initiator: isInitiator,
                 stream: this.localStream,
                 trickle: true,
-                config: {
-                    iceServers: this.iceServers,
-                    iceCandidatePoolSize: 10
-                }
+                config: optimizedConfig
             });
+            
+            // Add connection quality monitoring
+            this.setupConnectionMonitoring(peer, participantId);
             
             this.peers.set(participantId, peer);
             
@@ -2125,6 +2139,75 @@ Listening for unmute event...`);
                 console.warn(`⚠️ [WebRTC] Unhandled error with ${participantId}, cleaning up`);
                 this.cleanupPeerConnection(participantId);
             }
+        });
+    }
+
+    setupConnectionMonitoring(peer, participantId) {
+        /**
+         * Monitor WebRTC connection quality and ICE candidate usage
+         * Tracks when TURN relay is being used vs direct connections
+         */
+        if (!peer._pc) {
+            // Wait for peer connection to be created
+            setTimeout(() => this.setupConnectionMonitoring(peer, participantId), 100);
+            return;
+        }
+        
+        const pc = peer._pc;
+        
+        // Monitor ICE connection state changes
+        pc.addEventListener('iceconnectionstatechange', () => {
+            const state = pc.iceConnectionState;
+            console.log(`🔌 [WebRTC] ICE connection state for ${participantId}: ${state}`);
+            
+            if (state === 'connected' || state === 'completed') {
+                // Check which candidates are being used
+                pc.getStats().then(stats => {
+                    let relayCandidates = 0;
+                    let hostCandidates = 0;
+                    let srflxCandidates = 0;
+                    
+                    stats.forEach(report => {
+                        if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+                            const localCandidate = stats.get(report.localCandidateId);
+                            
+                            if (localCandidate) {
+                                if (localCandidate.candidateType === 'relay') relayCandidates++;
+                                else if (localCandidate.candidateType === 'host') hostCandidates++;
+                                else if (localCandidate.candidateType === 'srflx') srflxCandidates++;
+                            }
+                        }
+                    });
+                    
+                    if (relayCandidates > 0) {
+                        console.log(`✅ [WebRTC] Using TURN relay for ${participantId} (${relayCandidates} relay candidate(s))`);
+                        this.connectionQuality = 'good'; // TURN ensures connectivity
+                    } else if (hostCandidates > 0) {
+                        console.log(`✅ [WebRTC] Direct connection for ${participantId} (${hostCandidates} host candidate(s))`);
+                        this.connectionQuality = 'excellent'; // Direct is best
+                    } else if (srflxCandidates > 0) {
+                        console.log(`✅ [WebRTC] NAT traversal via STUN for ${participantId} (${srflxCandidates} srflx candidate(s))`);
+                        this.connectionQuality = 'good';
+                    }
+                }).catch(err => {
+                    console.warn(`[WebRTC] Could not get connection stats for ${participantId}:`, err);
+                });
+            } else if (state === 'failed' || state === 'disconnected') {
+                console.warn(`⚠️ [WebRTC] ICE connection ${state} for ${participantId}`);
+                this.connectionQuality = 'poor';
+            }
+        });
+        
+        // Monitor ICE gathering state
+        pc.addEventListener('icegatheringstatechange', () => {
+            const state = pc.iceGatheringState;
+            console.log(`🔍 [WebRTC] ICE gathering state for ${participantId}: ${state}`);
+        });
+        
+        // Monitor connection state
+        pc.addEventListener('connectionstatechange', () => {
+            const state = pc.connectionState;
+            console.log(`📡 [WebRTC] Connection state for ${participantId}: ${state}`);
         });
     }
 

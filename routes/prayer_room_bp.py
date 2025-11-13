@@ -284,45 +284,79 @@ def get_user_from_session():
 
 @prayer_room_bp.route('/ice-config', methods=['GET'])
 def get_ice_config():
-    """Return ICE/TURN server configuration for WebRTC.
+    """Return optimized ICE/TURN server configuration for WebRTC.
+    Provides multiple STUN servers and TURN servers (UDP/TCP) for maximum reliability.
     Reads TURN settings from environment variables if present; otherwise returns STUN-only.
     Env vars supported:
       TURN_URLS (comma-separated), TURN_USERNAME, TURN_PASSWORD
       STUN_URLS (optional, comma-separated)
     """
     try:
-        # Defaults: public Google STUN
-        stun_urls = os.getenv('STUN_URLS', 'stun:stun.l.google.com:19302').split(',')
+        # Defaults: multiple public Google STUN servers for redundancy
+        stun_urls = os.getenv('STUN_URLS', 'stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302,stun:stun2.l.google.com:19302').split(',')
         turn_urls_env = os.getenv('TURN_URLS', '')
         turn_username = os.getenv('TURN_USERNAME')
         turn_password = os.getenv('TURN_PASSWORD')
 
-        ice_servers = [{'urls': url.strip()} for url in stun_urls if url.strip()]
+        ice_servers = []
+        
+        # Add STUN servers first (for NAT discovery)
+        for url in stun_urls:
+            url = url.strip()
+            if url:
+                ice_servers.append({'urls': url})
 
-        # Handle complex, comma-separated TURN URLs
-        if turn_urls_env:
-            for url in turn_urls_env.split(','):
-                url = url.strip()
-                if not url:
-                    continue
-                
-                # If username/password are provided as env vars, use them
-                if turn_username and turn_password:
+        # Handle TURN URLs - enhance with multiple transport options
+        if turn_urls_env and turn_username and turn_password:
+            # Parse base TURN URL (e.g., "turn:35.192.126.89:3478")
+            base_urls = [url.strip() for url in turn_urls_env.split(',') if url.strip()]
+            
+            for base_url in base_urls:
+                # Extract host and port from TURN URL
+                # Format: turn:host:port or turn:host:port?transport=udp
+                if base_url.startswith('turn:'):
+                    # Remove 'turn:' prefix
+                    url_part = base_url[5:]
+                    
+                    # Remove any existing transport parameter
+                    if '?' in url_part:
+                        url_part = url_part.split('?')[0]
+                    
+                    # Add TURN server with UDP transport (preferred for low latency)
                     ice_servers.append({
-                        'urls': url,
+                        'urls': f'turn:{url_part}?transport=udp',
                         'username': turn_username,
                         'credential': turn_password
                     })
-                else:
-                    # Otherwise, assume credentials might be in the URL (e.g., Twilio)
-                    # or it's a TURN server without authentication.
+                    
+                    # Add TURN server with TCP transport (fallback for restrictive firewalls)
+                    ice_servers.append({
+                        'urls': f'turn:{url_part}?transport=tcp',
+                        'username': turn_username,
+                        'credential': turn_password
+                    })
+                    
+                    # Also add without transport specifier (browser will choose)
+                    ice_servers.append({
+                        'urls': f'turn:{url_part}',
+                        'username': turn_username,
+                        'credential': turn_password
+                    })
+        elif turn_urls_env:
+            # TURN URLs without credentials (e.g., Twilio format or unauthenticated)
+            for url in turn_urls_env.split(','):
+                url = url.strip()
+                if url:
                     ice_servers.append({'urls': url})
 
         # If no servers were configured at all, provide a fallback
         if not ice_servers:
-             ice_servers.append({'urls': 'stun:stun.l.google.com:19302'})
+            ice_servers = [
+                {'urls': 'stun:stun.l.google.com:19302'},
+                {'urls': 'stun:stun1.l.google.com:19302'}
+            ]
 
-        logging.info(f"Generated ICE Servers. Count: {len(ice_servers)}")
+        logging.info(f"Generated ICE Servers. Count: {len(ice_servers)} (STUN: {len([s for s in ice_servers if 'stun:' in s.get('urls', '')])}, TURN: {len([s for s in ice_servers if 'turn:' in s.get('urls', '')])})")
         return jsonify({'iceServers': ice_servers})
         
     except Exception as e:
