@@ -42,6 +42,11 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-mobile-enhanced.css') }}?v={{ range(100000, 999999) | random }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-mobile-enhanced-part2.css') }}?v={{ range(100000, 999999) | random }}">
     
+    <!-- Force cache refresh with timestamp -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
     <!-- Cache-busting meta tags -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
