@@ -979,8 +979,24 @@ class PrayerRoomService {
                     controls.push(`<button class="participant-action stage-btn" data-action="demote-self" data-user-id="${participant.user_id}">Leave Stage</button>`);
                 }
                 
-                participantEl.innerHTML = `
-                    <div class="participant-avatar">
+                // Desktop: Wrap avatar and info in a row, controls below
+                // Mobile: Keep original structure
+                const isDesktop = window.innerWidth >= 769;
+                const infoRow = isDesktop 
+                    ? `<div class="participant-info-row">
+                        <div class="participant-avatar">
+                            ${truncatedName.charAt(0).toUpperCase()}
+                        </div>
+                        <div class="participant-info">
+                            <div class="participant-name" title="${participant.user_name}">
+                                ${truncatedName}
+                            </div>
+                            <div class="participant-status">
+                                ${badges.join(' ')}
+                            </div>
+                        </div>
+                    </div>`
+                    : `<div class="participant-avatar">
                         ${truncatedName.charAt(0).toUpperCase()}
                     </div>
                     <div class="participant-info">
@@ -990,7 +1006,10 @@ class PrayerRoomService {
                         <div class="participant-status">
                             ${badges.join(' ')}
                         </div>
-                    </div>
+                    </div>`;
+                
+                participantEl.innerHTML = `
+                    ${infoRow}
                     ${controls.length ? `<div class="participant-controls">${controls.join('')}</div>` : ''}
                 `;
                 participantsContainer.appendChild(participantEl);
