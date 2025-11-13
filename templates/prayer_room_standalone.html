@@ -1584,6 +1584,7 @@
                 setupChatInputFocus() {
                     const chatInput = document.getElementById('chatInput');
                     const bottomTabs = document.getElementById('mobileBottomTabs');
+                    const chatMessages = document.getElementById('chatMessages');
                     
                     if (!chatInput || !bottomTabs) return;
                     
@@ -1593,15 +1594,44 @@
                         bottomTabs.style.transform = 'translateY(100%)';
                         bottomTabs.style.opacity = '0';
                         bottomTabs.style.pointerEvents = 'none';
+                        
+                        // Scroll chat to bottom when keyboard appears
+                        setTimeout(() => {
+                            if (chatMessages) {
+                                chatMessages.scrollTop = chatMessages.scrollHeight;
+                            }
+                            scrollChatToBottom();
+                        }, 300);
                     });
                     
                     // Show bottom tabs when chat input loses focus
                     chatInput.addEventListener('blur', () => {
-                        document.body.classList.remove('chat-input-focused');
-                        bottomTabs.style.transform = 'translateY(0)';
-                        bottomTabs.style.opacity = '1';
-                        bottomTabs.style.pointerEvents = 'auto';
+                        // Delay to allow send button click
+                        setTimeout(() => {
+                            // Check if send button was clicked
+                            const sendBtn = document.getElementById('sendBtn');
+                            const wasSendClicked = sendBtn && document.activeElement === sendBtn;
+                            
+                            if (!wasSendClicked) {
+                                document.body.classList.remove('chat-input-focused');
+                                bottomTabs.style.transform = 'translateY(0)';
+                                bottomTabs.style.opacity = '1';
+                                bottomTabs.style.pointerEvents = 'auto';
+                            }
+                        }, 150);
                     });
+                    
+                    // Handle visual viewport changes (keyboard show/hide)
+                    if (window.visualViewport) {
+                        window.visualViewport.addEventListener('resize', () => {
+                            if (document.activeElement === chatInput) {
+                                // Keyboard is visible, ensure input is in view
+                                setTimeout(() => {
+                                    scrollChatToBottom();
+                                }, 100);
+                            }
+                        });
+                    }
                 },
                 
                 setupTabs() {

@@ -460,23 +460,70 @@ class PrayerRoomService {
         // Chat input enter key
         const chatInput = document.getElementById('chatInput');
         if (chatInput) {
-            chatInput.addEventListener('keypress', (e) => {
+            // Enhanced keyboard handling for mobile
+            chatInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
+                    e.stopPropagation();
                     this.sendChatMessage();
+                    // Keep focus on input for quick typing
+                    setTimeout(() => {
+                        if (chatInput) chatInput.focus();
+                    }, 50);
                 }
             });
             
-            // Handle focus/blur for mobile keyboard
-            chatInput.addEventListener('focus', () => {
-                document.body.classList.add('chat-input-focused');
+            chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
             });
             
-            chatInput.addEventListener('blur', () => {
+            // Enhanced focus handling for mobile
+            chatInput.addEventListener('focus', () => {
+                // Scroll chat to bottom when input is focused
                 setTimeout(() => {
-                    document.body.classList.remove('chat-input-focused');
+                    scrollChatToBottom();
+                    // Ensure input is visible above keyboard
+                    if (window.innerWidth <= 768) {
+                        setTimeout(() => {
+                            chatInput.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                        }, 300);
+                    }
                 }, 100);
             });
+            
+            // Handle input changes to auto-scroll
+            chatInput.addEventListener('input', () => {
+                // Auto-scroll when typing (with debounce)
+                clearTimeout(this.chatScrollTimeout);
+                this.chatScrollTimeout = setTimeout(() => {
+                    scrollChatToBottom();
+                }, 100);
+            });
+            
+            // Improved blur handling
+            chatInput.addEventListener('blur', () => {
+                // Small delay to allow button clicks
+                setTimeout(() => {
+                    // Only remove focus class if not clicking send button
+                    const sendBtn = document.getElementById('sendBtn');
+                    if (!sendBtn || !sendBtn.matches(':active')) {
+                        // Input lost focus naturally
+                    }
+                }, 100);
+            });
+            
+            // Prevent zoom on iOS when focusing (already handled in CSS, but ensure)
+            if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+                chatInput.addEventListener('touchstart', () => {
+                    // Ensure font-size is 16px to prevent zoom
+                    if (parseInt(window.getComputedStyle(chatInput).fontSize) < 16) {
+                        chatInput.style.fontSize = '16px';
+                    }
+                });
+            }
         }
         
         // Set up event delegation for participant action buttons (dynamically created)

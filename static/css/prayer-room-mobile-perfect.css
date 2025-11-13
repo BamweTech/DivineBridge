@@ -560,15 +560,19 @@
         overflow-x: hidden !important;
         padding: 16px !important;
         padding-top: 20px !important;
-        padding-bottom: 100px !important; /* Space for fixed input + tabs */
+        padding-bottom: 120px !important; /* Space for fixed input + tabs + safe area */
         background: #f8f9fa !important;
         -webkit-overflow-scrolling: touch !important;
         scroll-behavior: smooth !important;
+        /* Improve scrolling performance */
+        -webkit-transform: translateZ(0) !important;
+        transform: translateZ(0) !important;
+        will-change: scroll-position !important;
     }
     
-    /* When chat input is focused, reduce padding since tabs are hidden */
+    /* When chat input is focused, add more padding for keyboard */
     body.chat-input-focused .chat-messages {
-        padding-bottom: 80px !important; /* Just enough for input section */
+        padding-bottom: 140px !important; /* Extra space when keyboard is visible */
     }
     
     .message {
@@ -612,9 +616,25 @@
     }
     
     .message-bubble {
-        max-width: 65% !important;
-        padding: 10px 14px !important;
+        max-width: 75% !important; /* Slightly wider for better readability */
+        padding: 12px 16px !important; /* More padding for better touch targets */
         position: relative !important;
+        word-wrap: break-word !important;
+        word-break: break-word !important;
+        overflow-wrap: break-word !important;
+        /* Smooth animations */
+        animation: messageSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+    
+    @keyframes messageSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
     
     .message-sender {
@@ -670,21 +690,25 @@
         left: 0 !important;
         right: 0 !important;
         padding: 12px !important;
+        padding-bottom: max(12px, env(safe-area-inset-bottom)) !important; /* Safe area for notched devices */
         background: #ffffff !important;
         border-top: 1px solid #e5e7eb !important;
         box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.1) !important;
         z-index: 150 !important; /* Above bottom tabs */
-        transition: bottom 0.15s ease !important;
+        transition: bottom 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
         pointer-events: auto !important;
+        -webkit-transform: translateZ(0) !important; /* Hardware acceleration */
+        transform: translateZ(0) !important;
     }
     
     .chat-input-container {
         display: flex !important;
         gap: 10px !important;
-        align-items: center !important;
+        align-items: flex-end !important; /* Align to bottom for better visual */
         width: 100% !important;
         position: relative !important;
         z-index: 1 !important;
+        max-width: 100% !important;
     }
     
     /* When keyboard is active - move to bottom and above everything */
@@ -693,6 +717,7 @@
         bottom: 0 !important; /* Stick to bottom (above keyboard) */
         z-index: 200 !important; /* Above everything including tabs */
         position: fixed !important;
+        padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
     }
     
     /* Hide bottom tabs when chat input is focused (WhatsApp style) */
@@ -700,58 +725,96 @@
         transform: translateY(100%) !important;
         opacity: 0 !important;
         pointer-events: none !important;
-        transition: transform 0.2s ease, opacity 0.2s ease !important;
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease !important;
+    }
+    
+    /* Ensure chat messages scroll when input is focused */
+    body.chat-input-focused .chat-messages {
+        padding-bottom: 120px !important; /* Extra space for input when keyboard is up */
     }
     
     .chat-input {
         flex: 1 !important;
-        padding: 10px 14px !important;
+        padding: 12px 16px !important;
         border: 1.5px solid #e5e7eb !important;
-        border-radius: 20px !important;
-        font-size: 15px !important;
+        border-radius: 24px !important;
+        font-size: 16px !important; /* Prevent zoom on iOS */
         background: #f8f9fa !important;
         color: #1e293b !important;
         outline: none !important;
         min-width: 0 !important; /* Allow shrinking */
+        max-width: 100% !important;
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        resize: none !important;
+        line-height: 1.4 !important;
+        /* Prevent text selection issues */
+        -webkit-user-select: text !important;
+        user-select: text !important;
+        /* Smooth scrolling */
+        -webkit-overflow-scrolling: touch !important;
     }
     
     .chat-input:focus {
         border-color: #3b82f6 !important;
         background: #ffffff !important;
         box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+        /* Ensure input stays visible */
+        position: relative !important;
+        z-index: 10 !important;
+    }
+    
+    /* Fix for iOS Safari input zoom */
+    @supports (-webkit-touch-callout: none) {
+        .chat-input {
+            font-size: 16px !important; /* Prevents zoom on iOS */
+        }
     }
     
     .chat-send-btn,
     .send-btn {
-        padding: 12px 20px !important;
-        background: #3b82f6 !important;
+        padding: 12px 24px !important;
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
         color: #ffffff !important;
         border: none !important;
         border-radius: 24px !important;
-        font-size: 14px !important;
+        font-size: 15px !important;
         font-weight: 600 !important;
         cursor: pointer !important;
         flex-shrink: 0 !important;
-        min-width: 70px !important;
+        min-width: 80px !important;
         white-space: nowrap !important;
         pointer-events: auto !important;
         -webkit-tap-highlight-color: transparent !important;
         touch-action: manipulation !important;
         user-select: none !important;
-        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25) !important;
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3) !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        position: relative !important;
+        overflow: hidden !important;
+        align-self: flex-end !important; /* Align with input bottom */
     }
     
     .chat-send-btn:active,
     .send-btn:active {
-        transform: scale(0.94) !important;
-        background: #2563eb !important;
-        box-shadow: 0 1px 4px rgba(59, 130, 246, 0.3) !important;
+        transform: scale(0.96) !important;
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+        box-shadow: 0 1px 4px rgba(59, 130, 246, 0.4) !important;
     }
     
     .chat-send-btn:hover,
     .send-btn:hover {
-        background: #2563eb !important;
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35) !important;
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4) !important;
+        transform: translateY(-1px) !important;
+    }
+    
+    /* Disabled state */
+    .chat-send-btn:disabled,
+    .send-btn:disabled {
+        opacity: 0.5 !important;
+        cursor: not-allowed !important;
+        transform: none !important;
     }
     
     /* ===== CONTROLS - VISIBLE & COMPACT ===== */
