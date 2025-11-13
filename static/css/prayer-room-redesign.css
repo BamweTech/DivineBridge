@@ -4,6 +4,7 @@
    ======================================== */
 
 /* ===== DESKTOP IMPROVEMENTS ===== */
+/* IMPORTANT: These styles MUST load after mobile styles to override them */
 @media (min-width: 769px) {
     .prayer-room-main {
         display: grid;
@@ -709,6 +710,7 @@
     width: 100%;
 }
 
+/* Base participant styles - will be overridden by desktop media query */
 .participant {
     display: flex;
     align-items: center;
@@ -725,6 +727,26 @@
     background: rgba(255, 255, 255, 0.8);
     box-shadow: 0 2px 8px rgba(15, 86, 255, 0.08);
     transform: translateX(2px);
+}
+
+/* Desktop participant styles - MUST override mobile styles */
+@media (min-width: 769px) {
+    .participant {
+        padding: 16px 20px !important;
+        margin-bottom: 12px !important;
+        border-radius: 12px !important;
+        background: rgba(255, 255, 255, 0.95) !important;
+        border: 2px solid rgba(59, 130, 246, 0.2) !important;
+        border-bottom: 2px solid rgba(59, 130, 246, 0.2) !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+    }
+    
+    .participant:hover {
+        background: rgba(255, 255, 255, 1) !important;
+        border-color: rgba(59, 130, 246, 0.5) !important;
+        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.15) !important;
+        transform: translateY(-2px) !important;
+    }
 }
 
 .participant-avatar {

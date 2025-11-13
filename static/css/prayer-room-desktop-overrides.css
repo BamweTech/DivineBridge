@@ -1,0 +1,135 @@
+/* ========================================
+   DESKTOP OVERRIDES - Loads LAST
+   Ensures desktop styles override mobile styles
+   ======================================== */
+
+/* Desktop participant cards - Enhanced styling */
+@media (min-width: 769px) {
+    .participant {
+        padding: 16px 20px !important;
+        margin-bottom: 12px !important;
+        border-radius: 12px !important;
+        background: rgba(255, 255, 255, 0.95) !important;
+        border: 2px solid rgba(59, 130, 246, 0.2) !important;
+        border-bottom: 2px solid rgba(59, 130, 246, 0.2) !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    .participant:hover {
+        background: rgba(255, 255, 255, 1) !important;
+        border-color: rgba(59, 130, 246, 0.5) !important;
+        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.15) !important;
+        transform: translateY(-2px) !important;
+    }
+    
+    /* Desktop participant controls - Modern layout */
+    .participant-controls {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+        margin-left: auto !important;
+        align-items: center !important;
+        padding-left: 12px !important;
+        width: auto !important;
+        grid-row: auto !important;
+        grid-column: auto !important;
+        grid-template-columns: none !important;
+    }
+    
+    .participant-controls .participant-action {
+        padding: 10px 18px !important;
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        min-width: 120px !important;
+        border-radius: 8px !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        position: relative !important;
+        overflow: hidden !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08) !important;
+        width: auto !important;
+    }
+    
+    .participant-controls .participant-action::before {
+        content: '' !important;
+        position: absolute !important;
+        top: 50% !important;
+        left: 50% !important;
+        width: 0 !important;
+        height: 0 !important;
+        border-radius: 50% !important;
+        background: rgba(255, 255, 255, 0.3) !important;
+        transform: translate(-50%, -50%) !important;
+        transition: width 0.6s, height 0.6s !important;
+    }
+    
+    .participant-controls .participant-action:active::before {
+        width: 300px !important;
+        height: 300px !important;
+    }
+    
+    .participant-controls .participant-action:hover {
+        transform: translateY(-1px) !important;
+        box-shadow: 0 4px 8px rgba(15, 86, 255, 0.15) !important;
+    }
+    
+    /* Stage button - Blue gradient */
+    .participant-controls .stage-btn {
+        background: linear-gradient(135deg, #0f56ff 0%, #3b82f6 50%, #60a5fa 100%) !important;
+        color: #ffffff !important;
+        border-color: transparent !important;
+        box-shadow: 0 2px 8px rgba(15, 86, 255, 0.2) !important;
+    }
+    
+    .participant-controls .stage-btn:hover {
+        background: linear-gradient(135deg, #0d47d6 0%, #2563eb 50%, #3b82f6 100%) !important;
+        box-shadow: 0 4px 16px rgba(15, 86, 255, 0.35) !important;
+        transform: translateY(-2px) !important;
+    }
+    
+    .participant-controls .stage-btn:active {
+        transform: translateY(0) !important;
+        box-shadow: 0 2px 6px rgba(15, 86, 255, 0.3) !important;
+    }
+    
+    /* Mute button - Red gradient */
+    .participant-controls .mute-toggle {
+        background: linear-gradient(135deg, #ef4444 0%, #f87171 50%, #fca5a5 100%) !important;
+        color: #ffffff !important;
+        border-color: transparent !important;
+        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2) !important;
+    }
+    
+    .participant-controls .mute-toggle:hover {
+        background: linear-gradient(135deg, #dc2626 0%, #ef4444 50%, #f87171 100%) !important;
+        box-shadow: 0 4px 16px rgba(239, 68, 68, 0.35) !important;
+        transform: translateY(-2px) !important;
+    }
+    
+    .participant-controls .mute-toggle:active {
+        transform: translateY(0) !important;
+        box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3) !important;
+    }
+    
+    /* Remove button - Subtle gray */
+    .participant-controls .remove-btn {
+        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%) !important;
+        color: #64748b !important;
+        border: 1.5px solid #e2e8f0 !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+    }
+    
+    .participant-controls .remove-btn:hover {
+        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%) !important;
+        color: #dc2626 !important;
+        border-color: #fca5a5 !important;
+        box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2) !important;
+        transform: translateY(-2px) !important;
+    }
+    
+    .participant-controls .remove-btn:active {
+        transform: translateY(0) !important;
+        box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25) !important;
+    }
+}
+
