@@ -41,6 +41,13 @@
         overflow: hidden !important; /* Prevent text overflow */
     }
     
+    .participant-name-wrapper {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        width: 100% !important;
+    }
+    
     .participant-name {
         font-size: 15px !important;
         font-weight: 600 !important;
@@ -49,6 +56,37 @@
         white-space: nowrap !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
+        flex: 1 !important;
+        min-width: 0 !important;
+    }
+    
+    /* Expand button for host controls */
+    .participant-expand-btn {
+        background: transparent !important;
+        border: none !important;
+        padding: 4px !important;
+        cursor: pointer !important;
+        color: #64748b !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 4px !important;
+        transition: all 0.2s ease !important;
+        flex-shrink: 0 !important;
+        margin-bottom: 4px !important;
+    }
+    
+    .participant-expand-btn:hover {
+        background: rgba(148, 163, 184, 0.1) !important;
+        color: #475569 !important;
+    }
+    
+    .participant-expand-btn.expanded {
+        transform: rotate(180deg) !important;
+    }
+    
+    .participant-expand-btn svg {
+        display: block !important;
     }
     
     .participant-status {
@@ -58,7 +96,7 @@
         align-items: center !important;
     }
     
-    /* Desktop participant controls - Below participant info */
+    /* Desktop participant controls - Below participant info (collapsible) */
     .participant-controls {
         display: flex !important;
         flex-wrap: wrap !important;
@@ -68,11 +106,36 @@
         margin-top: 8px !important;
         padding-left: 0 !important;
         padding-top: 8px !important;
+        padding-bottom: 8px !important;
         border-top: 1px solid rgba(148, 163, 184, 0.15) !important;
         align-items: center !important;
         grid-row: auto !important;
         grid-column: auto !important;
         grid-template-columns: none !important;
+        overflow: hidden !important;
+        max-height: 200px !important; /* Set a reasonable max height */
+        transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                    margin-top 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                    padding-top 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                    padding-bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                    border-top-color 0.3s ease,
+                    opacity 0.3s ease 0.1s !important; /* Delay opacity slightly */
+    }
+    
+    /* Collapsed state - hide controls smoothly */
+    .participant-controls.collapsed {
+        max-height: 0 !important;
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        border-top-color: transparent !important;
+        opacity: 0 !important;
+        transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                    margin-top 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                    padding-top 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                    padding-bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                    border-top-color 0.3s ease,
+                    opacity 0.2s ease !important; /* Faster opacity fade on collapse */
     }
     
     .participant-controls .participant-action {
@@ -87,6 +150,62 @@
         overflow: hidden !important;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08) !important;
         width: auto !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 6px !important;
+    }
+    
+    /* Icon-only mute button */
+    .participant-controls .mute-toggle {
+        min-width: 44px !important;
+        padding: 10px !important;
+        position: relative !important;
+    }
+    
+    .participant-controls .mute-toggle svg {
+        position: absolute !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        width: 16px !important;
+        height: 16px !important;
+        flex-shrink: 0 !important;
+    }
+    
+    /* Default: show mic icon, hide muted icon */
+    .participant-controls .mute-toggle .mic-icon {
+        display: block !important;
+    }
+    
+    .participant-controls .mute-toggle .mute-icon {
+        display: none !important;
+    }
+    
+    /* When participant is muted, show strike-through icon */
+    .participant.muted .mute-toggle .mic-icon,
+    .participant-controls .mute-toggle[data-muted="true"] .mic-icon {
+        display: none !important;
+    }
+    
+    .participant.muted .mute-toggle .mute-icon,
+    .participant-controls .mute-toggle[data-muted="true"] .mute-icon {
+        display: block !important;
+    }
+    
+    /* Ensure only one icon is visible at a time - explicit rules */
+    .participant-controls .mute-toggle[data-muted="false"] .mute-icon {
+        display: none !important;
+    }
+    
+    .participant-controls .mute-toggle[data-muted="false"] .mic-icon {
+        display: block !important;
+    }
+    
+    /* Additional specificity to prevent overlap */
+    .participant-controls .mute-toggle .mic-icon,
+    .participant-controls .mute-toggle .mute-icon {
+        pointer-events: none !important;
     }
     
     .participant-controls .participant-action::before {

@@ -102,6 +102,9 @@ class PrayerRoomService {
         this.maxSpeakers = 20;
         this.currentSpeakerCount = 0;
         
+        // Track expanded participant controls (desktop only)
+        this.expandedParticipantControls = new Set(); // Set of participant user_ids with expanded controls
+        
         this.init();
     }
     
@@ -926,7 +929,21 @@ class PrayerRoomService {
             this.enforceListenerMute();
         }
         
-        // 4. Render participants list
+        // 4. Save expanded state before clearing (preserve UI state across refreshes)
+        const expandedStates = new Set();
+        if (participantsContainer) {
+            const existingParticipants = participantsContainer.querySelectorAll('.participant');
+            existingParticipants.forEach(participantEl => {
+                const userId = participantEl.getAttribute('data-user-id');
+                const controlsEl = participantEl.querySelector('.participant-controls');
+                const expandBtn = participantEl.querySelector('.participant-expand-btn');
+                if (userId && controlsEl && expandBtn && !controlsEl.classList.contains('collapsed')) {
+                    expandedStates.add(userId);
+                }
+            });
+        }
+        
+        // 5. Render participants list
         participantsContainer.innerHTML = '';
         if (participantList.length > 0) {
             participantList.forEach(participant => {
@@ -973,23 +990,49 @@ class PrayerRoomService {
                         controls.push(`<button class="participant-action stage-btn" data-action="promote" data-user-id="${participant.user_id}">Make Speaker</button>`);
                     }
                     
-                    controls.push(`<button class="participant-action mute-toggle" data-action="mute-toggle" data-user-id="${participant.user_id}">${participant.is_muted ? 'Unmute' : 'Mute'}</button>`);
+                    // Mute button with icon (microphone with strike-through when muted)
+                    // Include both icons, CSS will show/hide based on mute state
+                    const muteButtonIcons = `
+                        <svg class="mic-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                        </svg>
+                        <svg class="mute-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 14c1.656 0 2.99-1.344 2.99-3L15 5c0-1.657-1.344-3-3-3S9 3.343 9 5v6c0 1.656 1.343 3 3 3z"/>
+                            <path d="M5 11a7 7 0 0 0 12.585 4.046l1.369 1.368L20.99 15.38l-15-15-1.414 1.415 2.202 2.203C6.875 4.416 6 4.5 6 4.5v6.5z"/>
+                            <path d="M11 5L6 9H2v6h4l5 4z"/>
+                            <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    `;
+                    controls.push(`<button class="participant-action mute-toggle" data-action="mute-toggle" data-user-id="${participant.user_id}" data-muted="${participant.is_muted ? 'true' : 'false'}" title="${participant.is_muted ? 'Unmute' : 'Mute'}">${muteButtonIcons}</button>`);
                     controls.push(`<button class="participant-action remove-btn" data-action="remove" data-user-id="${participant.user_id}">Remove</button>`);
                 } else if (participant.user_id === this.userId && participantRole === 'speaker' && !participant.is_host) {
                     controls.push(`<button class="participant-action stage-btn" data-action="demote-self" data-user-id="${participant.user_id}">Leave Stage</button>`);
                 }
                 
-                // Desktop: Wrap avatar and info in a row, controls below
+                // Desktop: Wrap avatar and info in a row, controls below (collapsible)
                 // Mobile: Keep original structure
                 const isDesktop = window.innerWidth >= 769;
+                const hasHostControls = controls.length > 0 && isDesktop;
+                const expandIcon = hasHostControls 
+                    ? `<button class="participant-expand-btn" data-participant-id="${participant.user_id}" aria-label="Toggle controls">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>`
+                    : '';
+                
                 const infoRow = isDesktop 
                     ? `<div class="participant-info-row">
                         <div class="participant-avatar">
                             ${truncatedName.charAt(0).toUpperCase()}
                         </div>
                         <div class="participant-info">
-                            <div class="participant-name" title="${participant.user_name}">
-                                ${truncatedName}
+                            <div class="participant-name-wrapper">
+                                <span class="participant-name" title="${participant.user_name}">
+                                    ${truncatedName}
+                                </span>
+                                ${expandIcon}
                             </div>
                             <div class="participant-status">
                                 ${badges.join(' ')}
@@ -1008,10 +1051,40 @@ class PrayerRoomService {
                         </div>
                     </div>`;
                 
+                // Check if this participant's controls should be expanded (preserve state)
+                const shouldBeExpanded = expandedStates.has(participant.user_id) || this.expandedParticipantControls.has(participant.user_id);
+                const collapsedClass = (hasHostControls && !shouldBeExpanded) ? 'collapsed' : '';
+                
                 participantEl.innerHTML = `
                     ${infoRow}
-                    ${controls.length ? `<div class="participant-controls">${controls.join('')}</div>` : ''}
+                    ${controls.length ? `<div class="participant-controls ${collapsedClass}">${controls.join('')}</div>` : ''}
                 `;
+                
+                // Add click handler for expand button (desktop only)
+                if (hasHostControls) {
+                    const expandBtn = participantEl.querySelector('.participant-expand-btn');
+                    const controlsEl = participantEl.querySelector('.participant-controls');
+                    
+                    if (expandBtn && controlsEl) {
+                        // Set initial expanded state
+                        if (shouldBeExpanded) {
+                            expandBtn.classList.add('expanded');
+                        }
+                        
+                        expandBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            controlsEl.classList.toggle('collapsed');
+                            expandBtn.classList.toggle('expanded');
+                            
+                            // Track expanded state
+                            if (controlsEl.classList.contains('collapsed')) {
+                                this.expandedParticipantControls.delete(participant.user_id);
+                            } else {
+                                this.expandedParticipantControls.add(participant.user_id);
+                            }
+                        });
+                    }
+                }
                 participantsContainer.appendChild(participantEl);
             });
         } else {
@@ -1449,6 +1522,10 @@ class PrayerRoomService {
                 });
                 chatInput.value = '';
                 console.log('Chat message sent via RTDB');
+                // Scroll to bottom after sending (message will appear via RTDB listener)
+                setTimeout(() => {
+                    scrollChatToBottom();
+                }, 200);
                 return;
             }
             
@@ -1468,6 +1545,10 @@ class PrayerRoomService {
             if (data.success) {
                 chatInput.value = '';
                 // Message will be added via real-time listener
+                // Scroll to bottom after sending
+                setTimeout(() => {
+                    scrollChatToBottom();
+                }, 200);
             }
             
         } catch (error) {
@@ -4379,8 +4460,14 @@ document.addEventListener('keydown', (event) => {
 function scrollChatToBottom() {
     const chatMessages = document.getElementById('chatMessages');
     if (chatMessages) {
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-        console.log('Chat scrolled to bottom, position:', chatMessages.scrollTop);
+        // Use requestAnimationFrame for smooth scrolling
+        requestAnimationFrame(() => {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            // Double-check after a short delay for mobile keyboards
+            setTimeout(() => {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }, 100);
+        });
     }
 }
 
