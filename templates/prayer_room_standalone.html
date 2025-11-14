@@ -37,8 +37,10 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room.css') }}?v={{ range(100000, 999999) | random }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-mobile.css') }}?v={{ range(100000, 999999) | random }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-redesign.css') }}?v={{ range(100000, 999999) | random }}">
-    <!-- MODERN MOBILE TEAMS-LIKE UX - Must load last to override everything -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-mobile-teams-modern.css') }}?v={{ range(100000, 999999) | random }}">
+    <!-- MOBILE PERFECT - Must load last to override everything -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-mobile-perfect.css') }}?v={{ range(100000, 999999) | random }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-mobile-enhanced.css') }}?v={{ range(100000, 999999) | random }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-mobile-enhanced-part2.css') }}?v={{ range(100000, 999999) | random }}">
     <!-- DESKTOP OVERRIDES - Loads LAST to ensure desktop styles override mobile -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-desktop-overrides.css') }}?v={{ range(100000, 999999) | random }}">
     
@@ -1399,13 +1401,10 @@
                 if (!header) {
                     return;
                 }
-                // Get the exact height and bottom position of the header
+                // Get the exact bottom position of the header including border
                 const rect = header.getBoundingClientRect();
-                const headerHeight = rect.height;
                 const headerBottom = rect.bottom;
-                
-                // Set both --header-height and --mobile-header-offset for layout calculations
-                document.documentElement.style.setProperty('--header-height', `${headerHeight}px`);
+                // Use exact bottom position to ensure chat connects seamlessly
                 document.documentElement.style.setProperty('--mobile-header-offset', `${headerBottom}px`);
             };
 
