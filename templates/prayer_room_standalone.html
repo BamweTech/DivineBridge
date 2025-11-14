@@ -1410,6 +1410,8 @@
 
             updateMobileHeaderOffset();
             window.addEventListener('resize', () => requestAnimationFrame(updateMobileHeaderOffset));
+            window.addEventListener('load', () => requestAnimationFrame(updateMobileHeaderOffset));
+            window.addEventListener('orientationchange', () => setTimeout(updateMobileHeaderOffset, 120));
 
             const headerElement = document.querySelector('.prayer-room-header');
             if (headerElement && 'MutationObserver' in window) {
