@@ -601,7 +601,7 @@
         width: 100% !important;
         overflow-y: auto !important;
         overflow-x: hidden !important;
-        padding: 0 12px 140px 12px !important;
+        padding: 0 8px 140px 8px !important;
         padding-top: 0 !important;
         background: #ffffff !important;
         -webkit-overflow-scrolling: touch !important;
@@ -695,17 +695,17 @@
     }
     
     .message-bubble {
-        max-width: 80% !important;
+        max-width: 90% !important;
         min-width: auto !important;
         padding: 10px 14px !important;
         position: relative !important;
         border-radius: 18px !important;
         border: none !important;
         word-wrap: break-word !important;
-        word-break: break-word !important;
+        word-break: normal !important;
         overflow-wrap: break-word !important;
         white-space: normal !important;
-        hyphens: auto !important;
+        hyphens: none !important;
         box-shadow: none !important;
         backdrop-filter: none !important;
         transition: transform 0.15s ease !important;
@@ -743,12 +743,15 @@
         line-height: 1.4 !important;
         color: inherit !important;
         word-wrap: break-word !important;
-        word-break: break-word !important;
+        word-break: normal !important;
         overflow-wrap: break-word !important;
         white-space: normal !important;
         margin: 0 !important;
         display: block !important;
         text-align: left !important;
+        /* Ensure text wraps properly without truncating words */
+        overflow: visible !important;
+        text-overflow: clip !important;
     }
     
     .message-own .message-content {
