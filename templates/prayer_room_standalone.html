@@ -1252,7 +1252,12 @@
                     <div class="chat-input-section">
                         <div class="chat-input-container">
                             <input type="text" class="chat-input" id="chatInput" placeholder="Type a message...">
-                            <button class="send-btn" id="sendBtn">Send</button>
+                            <button class="send-btn" id="sendBtn" aria-label="Send message">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                </svg>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1396,9 +1401,11 @@
                 if (!header) {
                     return;
                 }
-                const rawHeight = header.offsetHeight;
-                const adjustedHeight = Math.max(132, rawHeight - 24);
-                document.documentElement.style.setProperty('--mobile-header-offset', `${adjustedHeight}px`);
+                // Get the exact bottom position of the header including border
+                const rect = header.getBoundingClientRect();
+                const headerBottom = rect.bottom;
+                // Use exact bottom position to ensure chat connects seamlessly
+                document.documentElement.style.setProperty('--mobile-header-offset', `${headerBottom}px`);
             };
 
             updateMobileHeaderOffset();
@@ -1723,10 +1730,21 @@
                 monitorChat() {
                     // Monitor for new chat messages
                     setInterval(() => {
-                        const chatMessages = document.querySelectorAll('.message');
-                        const currentCount = chatMessages.length;
+                        // Only count actual messages, exclude empty state and system notifications
+                        const chatMessages = document.querySelectorAll('.message:not(.system-notification)');
+                        // Filter out empty state messages
+                        let actualMessageCount = 0;
+                        chatMessages.forEach(msg => {
+                            const content = msg.querySelector('.message-content');
+                            if (content && !content.textContent.includes('No messages yet') && !content.textContent.includes('Start the conversation')) {
+                                actualMessageCount++;
+                            }
+                        });
                         
-                        if (currentCount > this.lastMessageCount) {
+                        const currentCount = actualMessageCount;
+                        
+                        // Only increment if we're not on the chat tab and there are new messages
+                        if (currentCount > this.lastMessageCount && this.currentTab !== 'chat') {
                             this.incrementUnread();
                         }
                         
