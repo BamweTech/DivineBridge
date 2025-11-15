@@ -70,7 +70,7 @@
 @media (min-width: 1400px) {
     .prayer-room-main {
         display: grid !important;
-        grid-template-columns: 380px 1fr 420px !important;
+        grid-template-columns: 320px 1fr 500px !important;
         gap: var(--space-lg) !important;
         max-width: 1600px !important;
         margin: 0 auto !important;
@@ -101,9 +101,10 @@
         padding: var(--space-xl) !important;
     }
     
-    /* Show chat panel on standard desktop */
+    /* Make chat panel wider on standard desktop */
     .chat-panel {
         display: flex !important;
+        min-width: 450px !important;
     }
 }
 
