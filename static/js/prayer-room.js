@@ -738,6 +738,10 @@ class PrayerRoomService {
         
         // Check if user is host
         this.isHost = data.host_id === this.userId;
+        
+        // Update UI immediately after setting isHost to hide/show correct buttons
+        this.updateRoleUI();
+        this.updateAudioControls();
 
         // Update participants
         this.updateParticipants(data.participants || []);
