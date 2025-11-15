@@ -1584,8 +1584,8 @@
                     const subscribeBtn = document.getElementById('subscribeBtn');
                     if (!subscribeBtn) return;
                     
-                    // Show the button (it's hidden by default)
-                    subscribeBtn.style.display = '';
+                    // Subscribe button is now removed - do nothing
+                    return;
                     
                     subscribeBtn.addEventListener('click', async () => {
                         if (this.isSubscribed) {

@@ -1394,7 +1394,7 @@ class PrayerRoomService {
 
         if (this.participantRole !== 'speaker') {
             // Listeners always see the join button; mute control hidden
-            joinAudioBtn.style.display = 'flex';
+            joinAudioBtn.style.display = 'inline-flex';
             muteBtn.style.display = 'none';
             return;
         }

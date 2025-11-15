@@ -972,6 +972,17 @@
     height: 16px !important;
 }
 
+/* Hide request and join audio buttons by default - will be shown by JS when needed */
+.control-btn.request-btn,
+.control-btn.join-audio-btn {
+    display: none !important;
+}
+
+/* Subscribe button should always be hidden */
+.control-btn.subscribe-btn {
+    display: none !important;
+}
+
 .control-btn.primary,
 .control-btn.subscribe {
     background: var(--gradient-primary) !important;
