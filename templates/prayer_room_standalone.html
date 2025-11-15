@@ -1409,6 +1409,7 @@
             const updateMobileHeaderOffset = () => {
                 const header = document.querySelector('.prayer-room-header');
                 if (!header) {
+                    console.warn('[Header Offset] Header element not found');
                     return;
                 }
                 
@@ -1425,6 +1426,21 @@
                     // Status text is visible, use its bottom position
                     const statusRect = statusText.getBoundingClientRect();
                     actualBottom = Math.max(headerBottom, statusRect.bottom);
+                    console.log('[Header Offset] Status text found:', {
+                        headerBottom: headerBottom,
+                        statusBottom: statusRect.bottom,
+                        actualBottom: actualBottom,
+                        statusVisible: statusText.offsetParent !== null,
+                        statusText: statusText.textContent
+                    });
+                } else {
+                    console.log('[Header Offset] No status text or hidden:', {
+                        headerBottom: headerBottom,
+                        headerHeight: headerHeight,
+                        actualBottom: actualBottom,
+                        statusExists: !!statusText,
+                        statusVisible: statusText ? statusText.offsetParent !== null : false
+                    });
                 }
                 
                 // Use Visual Viewport API for accurate height calculations (Teams approach)
@@ -1434,6 +1450,56 @@
                 document.documentElement.style.setProperty('--mobile-header-offset', `${actualBottom}px`);
                 document.documentElement.style.setProperty('--header-height', `${actualBottom}px`);
                 document.documentElement.style.setProperty('--viewport-height', `${viewportHeight}px`);
+                
+                // Log the computed CSS variable values
+                const computedOffset = getComputedStyle(document.documentElement).getPropertyValue('--mobile-header-offset');
+                const computedHeight = getComputedStyle(document.documentElement).getPropertyValue('--header-height');
+                console.log('[Header Offset] CSS Variables set:', {
+                    '--mobile-header-offset': computedOffset,
+                    '--header-height': computedHeight,
+                    '--viewport-height': `${viewportHeight}px`,
+                    'Calculated actualBottom': `${actualBottom}px`
+                });
+                
+                // Also log the chat panel position
+                const chatPanel = document.querySelector('.chat-panel');
+                if (chatPanel) {
+                    const chatRect = chatPanel.getBoundingClientRect();
+                    const computedTop = getComputedStyle(chatPanel).top;
+                    console.log('[Header Offset] Chat Panel position:', {
+                        top: chatRect.top,
+                        expectedTop: actualBottom,
+                        gap: chatRect.top - actualBottom,
+                        height: chatRect.height,
+                        computedTop: computedTop,
+                        cssVarUsed: computedTop.includes('var(--mobile-header-offset)') || computedTop === `${actualBottom}px`
+                    });
+                }
+                
+                // Also log the participants panel position
+                const participantsPanel = document.querySelector('.participants-panel');
+                if (participantsPanel) {
+                    const participantsRect = participantsPanel.getBoundingClientRect();
+                    const computedTopParticipants = getComputedStyle(participantsPanel).top;
+                    console.log('[Header Offset] Participants Panel position:', {
+                        top: participantsRect.top,
+                        expectedTop: actualBottom,
+                        gap: participantsRect.top - actualBottom,
+                        height: participantsRect.height,
+                        computedTop: computedTopParticipants,
+                        cssVarUsed: computedTopParticipants.includes('var(--mobile-header-offset)') || computedTopParticipants === `${actualBottom}px`
+                    });
+                }
+                
+                // Log all CSS files loaded
+                const stylesheets = Array.from(document.styleSheets).map(sheet => {
+                    try {
+                        return sheet.href || sheet.ownerNode?.href || 'inline';
+                    } catch (e) {
+                        return 'cross-origin';
+                    }
+                }).filter(Boolean);
+                console.log('[Header Offset] Loaded stylesheets:', stylesheets.filter(s => s.includes('prayer-room')));
             };
             
             // Update viewport height on resize (for keyboard handling)
