@@ -961,8 +961,9 @@
     }
     
     /* Teams-like: Messages remain visible and scrollable when keyboard is open */
+    /* When input is focused, bottom tabs are hidden, so only need space for input */
     body.chat-input-focused .chat-messages {
-        padding-bottom: calc(60px + env(safe-area-inset-bottom)) !important;
+        padding-bottom: 140px !important; /* Space for input section (bottom tabs are hidden) */
         scroll-behavior: smooth !important;
         /* Use visual viewport height for accurate calculations */
         max-height: calc(var(--viewport-height, 100vh) - var(--header-height, 56px) - 60px) !important;
