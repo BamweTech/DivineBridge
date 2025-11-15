@@ -1122,6 +1122,11 @@ class PrayerRoomService {
                 `;
                 participantsContainer.appendChild(participantEl);
             });
+            
+            // Scroll to bottom to show latest participants (with justify-content: flex-end, this shows newest at bottom)
+            requestAnimationFrame(() => {
+                participantsContainer.scrollTop = participantsContainer.scrollHeight;
+            });
         } else {
             participantsContainer.innerHTML = '<div class="no-participants">No participants yet</div>';
         }
