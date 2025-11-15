@@ -170,5 +170,55 @@
         transform: translateY(0) !important;
         box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25) !important;
     }
+    
+    /* ===== DESKTOP CHAT SECTION - Fixed Input, Scrollable Messages ===== */
+    .chat-panel {
+        display: flex !important;
+        flex-direction: column !important;
+        height: 100% !important;
+        overflow: hidden !important;
+    }
+    
+    .chat-section {
+        display: flex !important;
+        flex-direction: column !important;
+        height: 100% !important;
+        overflow: hidden !important;
+    }
+    
+    .chat-header {
+        flex-shrink: 0 !important;
+        padding: 16px 20px !important;
+        border-bottom: 1px solid #e5e7eb !important;
+        background: #ffffff !important;
+    }
+    
+    .chat-messages {
+        flex: 1 !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        padding: 16px 20px !important;
+        padding-bottom: 80px !important; /* Space for fixed input */
+        min-height: 0 !important; /* Important for flex child scrolling */
+        scroll-behavior: smooth !important;
+    }
+    
+    /* Fixed chat input at bottom for desktop */
+    .chat-input-section {
+        position: sticky !important;
+        bottom: 0 !important;
+        flex-shrink: 0 !important;
+        padding: 12px 20px !important;
+        background: #ffffff !important;
+        border-top: 1px solid #e5e7eb !important;
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06) !important;
+        z-index: 10 !important;
+        margin: 0 !important;
+    }
+    
+    .chat-input-container {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
 }
 
