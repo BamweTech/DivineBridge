@@ -261,6 +261,12 @@
     gap: var(--space-xs) !important;
     flex: 1 !important;
     min-width: 0 !important;
+    max-width: 100% !important;
+}
+
+.room-code {
+    display: inline-block !important;
+    width: fit-content !important;
 }
 
 .room-title {
