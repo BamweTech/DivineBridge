@@ -1406,7 +1406,7 @@ class PrayerRoomService {
         if (this.isAudioEnabled) {
             // Show mute button, hide join audio button
             joinAudioBtn.style.display = 'none';
-            muteBtn.style.display = 'flex';
+            muteBtn.style.display = 'inline-flex';
             
             // Update mute button state
             if (this.isMuted) {
