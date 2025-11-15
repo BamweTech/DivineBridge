@@ -1900,12 +1900,17 @@
                         const unreadBadge = document.getElementById('unreadBadge');
                         const chatTab = document.getElementById('chatTab');
                         
+                        // Only show badge if there are unread messages (more than 0)
                         if (unreadBadge) {
-                            unreadBadge.textContent = this.unreadCount > 99 ? '99+' : this.unreadCount;
-                            unreadBadge.style.display = 'flex';
+                            if (this.unreadCount > 0) {
+                                unreadBadge.textContent = this.unreadCount > 99 ? '99+' : this.unreadCount;
+                                unreadBadge.style.display = 'flex';
+                                chatTab?.classList.add('has-unread');
+                            } else {
+                                unreadBadge.style.display = 'none';
+                                chatTab?.classList.remove('has-unread');
+                            }
                         }
-                        
-                        chatTab?.classList.add('has-unread');
                     }
                 },
                 
