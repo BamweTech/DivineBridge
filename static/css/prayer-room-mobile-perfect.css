@@ -941,11 +941,13 @@
     /* ===== CHAT INPUT - FIXED AT BOTTOM ===== */
     .chat-input-section {
         position: fixed !important;
-        bottom: 56px !important;
+        bottom: 56px !important; /* Directly above bottom tabs - no gap */
         left: 0 !important;
         right: 0 !important;
-        padding: 8px 12px !important;
-        padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+        padding: 8px 12px 0 12px !important; /* Remove bottom padding to eliminate gap */
+        padding-bottom: 0 !important; /* No bottom padding - flush with tabs */
+        margin: 0 !important; /* Remove any margin */
+        margin-bottom: 0 !important; /* Ensure no bottom margin */
         background: #ffffff !important;
         border-top: 1px solid #e5e7eb !important;
         box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06) !important;
