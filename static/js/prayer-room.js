@@ -1791,7 +1791,12 @@ class PrayerRoomService {
             return;
         }
         
-        console.log('Updating chat display with messages:', this.chatMessages ? this.chatMessages.length : 0);
+        // Ensure chatMessages array exists
+        if (!this.chatMessages) {
+            this.chatMessages = [];
+        }
+        
+        console.log('Updating chat display with messages:', this.chatMessages.length);
         
         // Clear loading skeletons
         const skeletons = chatMessages.querySelectorAll('.message-skeleton');
@@ -1801,6 +1806,10 @@ class PrayerRoomService {
         if (typeof window.chatUpdateInProgress === 'function') {
             window.chatUpdateInProgress();
         }
+        
+        // Save current scroll position before clearing
+        const wasNearBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight < 100;
+        const savedScrollTop = chatMessages.scrollTop;
         
         chatMessages.innerHTML = '';
         
@@ -1944,19 +1953,24 @@ class PrayerRoomService {
                 chatMessages.appendChild(messageGroup);
             });
             
-            console.log('Chat messages rendered successfully');
+            console.log('Chat messages rendered successfully, total:', this.chatMessages.length);
             
-            // Scroll to bottom after rendering (only if user is near bottom or it's a new message)
+            // Scroll to bottom after rendering (only if user is near bottom or it's mobile)
             requestAnimationFrame(() => {
                 setTimeout(() => {
                     const chatMessagesEl = document.getElementById('chatMessages');
                     if (chatMessagesEl) {
-                        // Check if user is near bottom (within 100px) before auto-scrolling
-                        const isNearBottom = chatMessagesEl.scrollHeight - chatMessagesEl.scrollTop - chatMessagesEl.clientHeight < 100;
-                        
-                        // Always scroll to bottom for new messages or if user is already near bottom
-                        if (isNearBottom || window.innerWidth <= 768) {
+                        // On mobile, always scroll to bottom
+                        if (window.innerWidth <= 768) {
                             scrollChatToBottom();
+                        } else {
+                            // On desktop, only scroll if user was near bottom before update
+                            if (wasNearBottom) {
+                                scrollChatToBottom();
+                            } else {
+                                // Restore scroll position if user was reading older messages
+                                chatMessagesEl.scrollTop = savedScrollTop;
+                            }
                         }
                     }
                 }, 50);
