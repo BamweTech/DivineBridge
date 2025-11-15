@@ -964,6 +964,19 @@ class PrayerRoomService {
             return;
         }
         
+        // Setup click-outside handler once (only for host)
+        if (this.isHost && !this.participantClickOutsideHandler) {
+            this.participantClickOutsideHandler = (e) => {
+                const expandedParticipants = participantsContainer.querySelectorAll('.participant.expanded');
+                expandedParticipants.forEach(p => {
+                    if (!p.contains(e.target)) {
+                        p.classList.remove('expanded');
+                    }
+                });
+            };
+            document.addEventListener('click', this.participantClickOutsideHandler);
+        }
+        
         // Remove loading indicator
         this.hideParticipantsLoading();
         
