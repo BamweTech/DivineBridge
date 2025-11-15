@@ -136,6 +136,7 @@
 
 .message-other {
     justify-content: flex-start;
+    background: transparent; /* No background on container, only bubble */
 }
 
 .message-other .message-bubble {
@@ -146,6 +147,7 @@
 
 .message-own {
     justify-content: flex-end;
+    background: transparent; /* No background on container, only bubble */
 }
 
 .message-own .message-bubble {

@@ -707,6 +707,7 @@
     .message-other {
         justify-content: flex-start !important;
         padding-left: 0 !important;
+        background: transparent !important; /* No background on container, only bubble */
     }
     
     .message-other .message-bubble {
@@ -720,6 +721,7 @@
     .message-own {
         justify-content: flex-end !important;
         padding-right: 0 !important;
+        background: transparent !important; /* No background on container, only bubble */
     }
     
     .message-own .message-bubble {

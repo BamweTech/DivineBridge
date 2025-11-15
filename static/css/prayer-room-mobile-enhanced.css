@@ -364,14 +364,12 @@ body,
 .message.message-own,
 .chat-message.message-own {
     align-self: flex-end !important;
-    background: var(--gradient-primary) !important;
-    color: #ffffff !important;
-    border-radius: 18px 18px 4px 18px !important;
+    background: transparent !important; /* No background on container, only bubble */
+    color: inherit !important;
+    border-radius: 0 !important; /* No border-radius on container */
     margin-left: auto !important;
     margin-right: 0 !important;
-    box-shadow: 
-        0 2px 8px rgba(102, 126, 234, 0.3),
-        inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+    box-shadow: none !important; /* No shadow on container */
 }
 
 /* Chat bubble tail for own messages */
@@ -392,13 +390,13 @@ body,
 .message.message-other,
 .chat-message.message-other {
     align-self: flex-start !important;
-    background: #f3f4f6 !important;
-    color: #1e293b !important; /* Dark text for light background */
-    border-radius: 18px 18px 18px 4px !important;
+    background: transparent !important; /* No background on container, only bubble */
+    color: inherit !important;
+    border-radius: 0 !important; /* No border-radius on container */
     margin-right: auto !important;
     margin-left: 0 !important;
-    box-shadow: var(--shadow-sm) !important;
-    border: 1px solid #e5e7eb !important;
+    box-shadow: none !important; /* No shadow on container */
+    border: none !important; /* No border on container */
 }
 
 /* Ensure message content is visible */
