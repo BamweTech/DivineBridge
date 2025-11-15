@@ -5,6 +5,31 @@
 
 /* Desktop participant cards - Enhanced styling */
 @media (min-width: 769px) {
+    /* Prevent page scrolling - everything fits in viewport */
+    html, body {
+        height: 100vh !important;
+        max-height: 100vh !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    .prayer-room-container {
+        height: 100vh !important;
+        max-height: 100vh !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+        padding: 0 !important;
+    }
+    
+    .prayer-room-interface {
+        height: 100% !important;
+        max-height: 100% !important;
+        overflow: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
     .participant {
         padding: 16px 20px !important;
         margin-bottom: 12px !important;
