@@ -76,6 +76,18 @@
         margin: 0 auto !important;
         padding: var(--space-xl) !important;
     }
+    
+    /* Show stage area for hosts on large screens */
+    .stage-area {
+        display: block !important;
+    }
+}
+
+/* Hide stage area on smaller screens and for participants */
+@media (max-width: 1399px) {
+    .stage-area {
+        display: none !important;
+    }
 }
 
 /* ===== DESKTOP LAYOUT - STANDARD (2-COLUMN) ===== */
@@ -307,6 +319,7 @@
 .control-btn.mute-btn .muted-icon {
     width: 18px !important;
     height: 18px !important;
+    position: relative !important;
 }
 
 .control-btn.mute-btn.muted .mic-icon {
@@ -315,6 +328,19 @@
 
 .control-btn.mute-btn:not(.muted) .muted-icon {
     display: none !important;
+}
+
+/* Add strike-through line for muted icon */
+.control-btn.mute-btn.muted .muted-icon::after {
+    content: '' !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 2px !important;
+    background: currentColor !important;
+    transform: translateY(-50%) !important;
+    z-index: 1 !important;
 }
 
 .control-btn.subscribe-btn {
@@ -467,6 +493,89 @@
     background: rgba(59, 130, 246, 0.1) !important;
     color: var(--color-primary-dark) !important;
     border: 1px solid var(--border-primary) !important;
+}
+
+/* ===== STAGE AREA - GLASSMORPHISM ===== */
+.stage-area {
+    background: var(--glass-subtle) !important;
+    backdrop-filter: var(--blur-sm) !important;
+    -webkit-backdrop-filter: var(--blur-sm) !important;
+    border-radius: var(--radius-xl) !important;
+    border: 1px solid var(--border-white) !important;
+    box-shadow: var(--shadow-md) !important;
+    padding: var(--space-2xl) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow-y: auto !important;
+}
+
+.stage-content {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+}
+
+.stage-label {
+    font-size: 14px !important;
+    color: var(--text-primary) !important;
+    opacity: 0.7 !important;
+    margin-bottom: var(--space-sm) !important;
+}
+
+.stage-title {
+    font-size: 32px !important;
+    font-weight: 700 !important;
+    background: var(--gradient-primary) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+    margin-bottom: var(--space-xl) !important;
+}
+
+.speakers-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+    gap: var(--space-md) !important;
+    width: 100% !important;
+}
+
+.speaker-tile {
+    border-radius: var(--radius-lg) !important;
+    border: 2px solid var(--border-primary) !important;
+    background: var(--glass-primary) !important;
+    padding: var(--space-lg) !important;
+    transition: all 0.3s ease !important;
+    text-align: center !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+}
+
+.speaker-tile:hover {
+    transform: scale(1.05) !important;
+    background: var(--glass-hover) !important;
+    box-shadow: var(--shadow-lg) !important;
+}
+
+.speaker-tile.active {
+    border-color: #10b981 !important;
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.4) !important;
+}
+
+.speaker-tile .participant-avatar {
+    width: 80px !important;
+    height: 80px !important;
+    font-size: 32px !important;
+    margin-bottom: var(--space-sm) !important;
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3) !important;
+}
+
+.speaker-tile .participant-name {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+    margin-top: var(--space-xs) !important;
 }
 
 /* ===== PARTICIPANTS SECTION - ENHANCED ===== */

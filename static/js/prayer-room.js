@@ -1191,6 +1191,46 @@ class PrayerRoomService {
         this.updateSpeakerSlotDisplay();
         this.updateAudioControls();
         this.updateRoleUI();
+        this.updateStageArea(participantList);
+    }
+    
+    updateStageArea(participants = []) {
+        const speakersGrid = document.getElementById('speakersGrid');
+        if (!speakersGrid) {
+            return;
+        }
+        
+        // Filter only speakers
+        const speakers = participants.filter(p => (p.role || 'listener') === 'speaker');
+        
+        speakersGrid.innerHTML = '';
+        
+        if (speakers.length === 0) {
+            speakersGrid.innerHTML = '<div class="no-speakers">No speakers on stage</div>';
+            return;
+        }
+        
+        speakers.forEach(speaker => {
+            const speakerTile = document.createElement('div');
+            speakerTile.className = 'speaker-tile';
+            if (speaker.is_speaking && !speaker.is_muted) {
+                speakerTile.classList.add('active');
+            }
+            speakerTile.setAttribute('data-user-id', speaker.user_id);
+            
+            const truncatedName = this.truncateName(speaker.user_name, 20);
+            const initials = truncatedName.charAt(0).toUpperCase();
+            
+            speakerTile.innerHTML = `
+                <div class="participant-avatar" style="background: ${speaker.is_host ? 'linear-gradient(135deg, #3b82f6, #8b5cf6)' : 'linear-gradient(135deg, #3b82f6, #8b5cf6)'}">
+                    ${initials}
+                </div>
+                <div class="participant-name">${this.escapeHtml(truncatedName)}</div>
+                ${speaker.is_host ? '<div class="host-badge" style="margin-top: 8px;">Host</div>' : ''}
+            `;
+            
+            speakersGrid.appendChild(speakerTile);
+        });
     }
     
     async joinAudio() {
@@ -1895,10 +1935,6 @@ class PrayerRoomService {
                         hour12: true
                     });
                     
-                    // Get message status
-                    const status = message.status || (message.tempId ? 'sending' : 'sent');
-                    const statusIcon = this.getMessageStatusIcon(status, isOwnMessage);
-                    
                     // Check if should show sender name (first message in group)
                     const showSender = msgIndex === 0;
                     
@@ -1920,7 +1956,6 @@ class PrayerRoomService {
                             ${reactionsHtml}
                             <div class="message-time">
                                 ${timeString}
-                                ${isOwnMessage ? `<span class="message-status ${status}">${statusIcon}</span>` : ''}
                             </div>
                         </div>
                     `;
