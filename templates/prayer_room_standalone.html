@@ -1139,7 +1139,34 @@
     </style>
 </head>
 <body>
-    <div class="prayer-room-container">
+    <!-- Minimized Prayer Room Window -->
+    <div class="prayer-room-minimized" id="prayerRoomMinimized" style="display: none;">
+        <div class="minimized-content">
+            <div class="minimized-info">
+                <div class="minimized-icon">🎙️</div>
+                <div class="minimized-text">
+                    <div class="minimized-title">Prayer Room Active</div>
+                    <div class="minimized-status" id="minimizedStatus">Connected</div>
+                </div>
+            </div>
+            <div class="minimized-actions">
+                <button class="minimized-btn restore-btn" id="restoreBtn" title="Restore prayer room">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                    </svg>
+                </button>
+                <button class="minimized-btn leave-btn" id="minimizedLeaveBtn" title="Leave room">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="prayer-room-container" id="prayerRoomContainer">
         <!-- Header -->
         <div class="prayer-room-header">
             <div class="header-content">
@@ -1169,6 +1196,11 @@
                                 <path d="M5 11a7 7 0 0 0 12.585 4.046l1.369 1.368L20.99 15.38l-15-15-1.414 1.415 2.202 2.203C6.875 4.416 6 4.5 6 4.5v6.5z"/>
                                 <path d="M11 5L6 9H2v6h4l5 4z"/>
                                 <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </button>
+                        <button class="control-btn minimize-btn" id="minimizeBtn" title="Minimize prayer room">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
                             </svg>
                         </button>
                         <button class="control-btn" id="shareBtn" title="Share room">Share</button>
