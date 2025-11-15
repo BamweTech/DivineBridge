@@ -578,6 +578,14 @@
     margin-top: var(--space-xs) !important;
 }
 
+.no-speakers {
+    text-align: center !important;
+    color: var(--text-muted) !important;
+    font-size: 14px !important;
+    padding: var(--space-xl) !important;
+    font-style: italic !important;
+}
+
 /* ===== PARTICIPANTS SECTION - ENHANCED ===== */
 .participants-section {
     padding: var(--space-xl) !important;
