@@ -1128,15 +1128,6 @@ class PrayerRoomService {
                     });
                 }
                 
-                // Close expanded participant when clicking outside
-                if (this.isHost && controls.length > 0) {
-                    document.addEventListener('click', (e) => {
-                        if (!participantEl.contains(e.target) && participantEl.classList.contains('expanded')) {
-                            participantEl.classList.remove('expanded');
-                        }
-                    });
-                }
-                
                 participantsContainer.appendChild(participantEl);
             });
             
