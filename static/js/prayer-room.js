@@ -887,6 +887,12 @@ class PrayerRoomService {
 
     subscribeRTDBChat() {
         if (!this.rtdb || !this.rtdbRefs.chat) return;
+        
+        // Ensure chatMessages array exists
+        if (!this.chatMessages) {
+            this.chatMessages = [];
+        }
+        
         // Load recent and stream new messages
         this.rtdbRefs.chat.limitToLast(200).on('child_added', (snap) => {
             const val = snap.val();
@@ -908,7 +914,7 @@ class PrayerRoomService {
             // Check if we already have this message (optimistic update or duplicate)
             const existingIndex = this.chatMessages.findIndex(m => 
                 (m.id === msgId) || 
-                (m.tempId && m.user_id === msg.user_id && Math.abs((m.timestamp instanceof Date ? m.timestamp.getTime() : m.timestamp) - msgTimestamp) < 2000 && m.message === msg.message)
+                (m.tempId && m.user_id === msg.user_id && Math.abs((m.timestamp instanceof Date ? m.timestamp.getTime() : (typeof m.timestamp === 'number' ? m.timestamp : new Date(m.timestamp).getTime())) - msgTimestamp) < 2000 && m.message === msg.message)
             );
             
             if (existingIndex !== -1) {
@@ -923,6 +929,8 @@ class PrayerRoomService {
                 this.chatMessages.push(msg);
             }
             
+            // Ensure array is not cleared
+            console.log('RTDB chat message received, total messages:', this.chatMessages.length);
             this.updateChatDisplay();
         });
     }
@@ -1937,17 +1945,26 @@ class PrayerRoomService {
             });
             
             console.log('Chat messages rendered successfully');
+            
+            // Scroll to bottom after rendering (only if user is near bottom or it's a new message)
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    const chatMessagesEl = document.getElementById('chatMessages');
+                    if (chatMessagesEl) {
+                        // Check if user is near bottom (within 100px) before auto-scrolling
+                        const isNearBottom = chatMessagesEl.scrollHeight - chatMessagesEl.scrollTop - chatMessagesEl.clientHeight < 100;
+                        
+                        // Always scroll to bottom for new messages or if user is already near bottom
+                        if (isNearBottom || window.innerWidth <= 768) {
+                            scrollChatToBottom();
+                        }
+                    }
+                }, 50);
+            });
         } else {
             console.log('No chat messages - chat container is empty');
             // Don't show empty state - just leave it empty
         }
-        
-        // Scroll to bottom after rendering
-        requestAnimationFrame(() => {
-            setTimeout(() => {
-                scrollChatToBottom();
-            }, 50);
-        });
     }
     
     groupMessagesByDateAndSender(messages) {

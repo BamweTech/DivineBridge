@@ -201,6 +201,8 @@
         padding-bottom: 80px !important; /* Space for fixed input */
         min-height: 0 !important; /* Important for flex child scrolling */
         scroll-behavior: smooth !important;
+        justify-content: flex-start !important; /* Normal flow for desktop, not flex-end */
+        align-items: stretch !important;
     }
     
     /* Fixed chat input at bottom for desktop */
