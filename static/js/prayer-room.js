@@ -1185,7 +1185,7 @@ class PrayerRoomService {
         const participantCountText = document.getElementById('participantCountText');
         if (participantCountText) {
             const count = participantList.length;
-            participantCountText.textContent = count === 1 ? '1 participant' : `${count} participants`;
+            participantCountText.textContent = count.toString();
         }
         
         this.updateSpeakerSlotDisplay();
