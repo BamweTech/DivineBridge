@@ -1177,14 +1177,6 @@ class PrayerRoomService {
             participantsContainer.innerHTML = '<div class="no-participants">No participants yet</div>';
         }
         
-        // Update participant count
-        const participantCountText = document.getElementById('participantCountText');
-        if (participantCountText) {
-            const count = participantList.length;
-            participantCountText.textContent = count.toString();
-        }
-        
-        this.updateSpeakerSlotDisplay();
         this.updateAudioControls();
         this.updateRoleUI();
         this.updateStageArea(participantList);
@@ -5224,14 +5216,9 @@ Listening for unmute event...`);
     updateRoleUI() {
         const requestBtn = document.getElementById('requestSpeakerBtn');
         const requestStatus = document.getElementById('requestSpeakerStatus');
-        const roleIndicator = document.getElementById('roleIndicator');
         const joinAudioBtn = document.getElementById('joinAudioBtn');
         const muteBtn = document.getElementById('muteBtn');
         const joinText = joinAudioBtn ? joinAudioBtn.querySelector('.join-text') : null;
-
-        if (roleIndicator) {
-            roleIndicator.textContent = this.participantRole === 'speaker' ? 'Speaker' : 'Listener';
-        }
 
         // Hosts should never see request/join audio buttons - they're always speakers
         if (this.isHost) {
