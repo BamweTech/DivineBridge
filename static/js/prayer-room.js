@@ -1747,6 +1747,11 @@ class PrayerRoomService {
         const skeletons = chatMessages.querySelectorAll('.message-skeleton');
         skeletons.forEach(s => s.remove());
         
+        // Signal that we're updating to prevent MutationObserver interference
+        if (typeof window.chatUpdateInProgress === 'function') {
+            window.chatUpdateInProgress();
+        }
+        
         chatMessages.innerHTML = '';
         
         if (this.chatMessages && this.chatMessages.length > 0) {
@@ -1993,48 +1998,6 @@ class PrayerRoomService {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
-    }
-    
-    showEmptyChatState() {
-        const chatMessages = document.getElementById('chatMessages');
-        if (!chatMessages) return;
-        
-        const emptyState = document.createElement('div');
-        emptyState.className = 'empty-chat-state';
-        emptyState.innerHTML = `
-            <div class="empty-chat-icon">💬</div>
-            <h3>Start the Conversation</h3>
-            <p>Share prayers, encouragement, and support with others in this prayer room.</p>
-            <div class="quick-messages">
-                <button class="quick-message-btn" onclick="this.insertQuickMessage('🙏 Please pray for...')">
-                    🙏 Send a prayer
-                </button>
-                <button class="quick-message-btn" onclick="this.insertQuickMessage('✨ I want to share...')">
-                    ✨ Share testimony
-                </button>
-                <button class="quick-message-btn" onclick="this.insertQuickMessage('💚 God bless you!')">
-                    💚 Encourage others
-                </button>
-            </div>
-        `;
-        
-        // Add click handlers for quick messages
-        emptyState.querySelectorAll('.quick-message-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const btnText = e.target.textContent || e.target.innerText;
-                // Extract text after emoji (format: "🙏 Send a prayer" -> "Send a prayer")
-                const text = btnText.replace(/^[^\s]+\s+/, '');
-                const chatInput = document.getElementById('chatInput');
-                if (chatInput) {
-                    chatInput.value = text;
-                    chatInput.focus();
-                    // Trigger input event to update counter and height
-                    chatInput.dispatchEvent(new Event('input'));
-                }
-            });
-        });
-        
-        chatMessages.appendChild(emptyState);
     }
     
     showLoadingSkeletons(count = 3) {

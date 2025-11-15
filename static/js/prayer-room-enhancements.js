@@ -625,47 +625,6 @@
     // ========================================
     
     const EmptyState = {
-        /**
-         * Show empty chat state
-         */
-        showEmptyChat() {
-            const chatMessages = document.getElementById('chatMessages');
-            if (!chatMessages) return;
-
-            // Check if already showing
-            if (chatMessages.querySelector('.empty-chat-state')) return;
-
-            const emptyState = document.createElement('div');
-            emptyState.className = 'empty-chat-state';
-            emptyState.innerHTML = `
-                <div class="empty-icon">🙏</div>
-                <h3>Start the Conversation</h3>
-                <p>Share prayers, encouragement, and support with others</p>
-                <div class="quick-messages">
-                    <button onclick="document.getElementById('chatInput').value='🙏 Please pray for...'; document.getElementById('chatInput').focus();">
-                        🙏 Send a prayer
-                    </button>
-                    <button onclick="document.getElementById('chatInput').value='✨ I want to share...'; document.getElementById('chatInput').focus();">
-                        ✨ Share testimony
-                    </button>
-                    <button onclick="document.getElementById('chatInput').value='💚 God bless you!'; document.getElementById('chatInput').focus();">
-                        💚 Encourage others
-                    </button>
-                </div>
-            `;
-
-            chatMessages.appendChild(emptyState);
-        },
-
-        /**
-         * Hide empty chat state
-         */
-        hideEmptyChat() {
-            const emptyState = document.querySelector('.empty-chat-state');
-            if (emptyState) {
-                emptyState.remove();
-            }
-        },
 
         /**
          * Show no participants state
@@ -744,7 +703,14 @@
             const chatMessages = document.getElementById('chatMessages');
             if (!chatMessages) return;
 
+            // Flag to prevent empty state from showing during updates
+            let isUpdating = false;
+            let updateTimeout = null;
+
             const observer = new MutationObserver((mutations) => {
+                // Skip empty state logic if we're in the middle of an update
+                if (isUpdating) return;
+
                 mutations.forEach((mutation) => {
                     mutation.addedNodes.forEach((node) => {
                         if (node.nodeType === 1 && (node.classList.contains('message') || node.classList.contains('chat-message'))) {
@@ -755,16 +721,24 @@
                     });
                 });
 
-                // Update empty state
-                const hasMessages = chatMessages.querySelectorAll('.message, .chat-message').length > 0;
-                if (hasMessages) {
-                    EmptyState.hideEmptyChat();
-                } else {
-                    EmptyState.showEmptyChat();
+                // Debounce empty state check to avoid race conditions during updates
+                if (updateTimeout) {
+                    clearTimeout(updateTimeout);
                 }
+                
+                // Empty state removed - no longer showing empty chat state
+                // Just process message transformations
             });
 
             observer.observe(chatMessages, { childList: true, subtree: true });
+            
+            // Expose update flag for PrayerRoomService to use
+            window.chatUpdateInProgress = () => {
+                isUpdating = true;
+                setTimeout(() => {
+                    isUpdating = false;
+                }, 500);
+            };
         },
 
         /**
@@ -879,13 +853,7 @@
                 }
             });
 
-            // Show empty states if needed
-            const chatMessages = document.getElementById('chatMessages');
-            const hasMessages = chatMessages?.querySelectorAll('.message, .chat-message').length > 0;
-            if (!hasMessages) {
-                EmptyState.showEmptyChat();
-            }
-
+            // Show empty states if needed (chat empty state removed)
             const participantsList = document.getElementById('participantsList');
             const hasParticipants = participantsList?.querySelectorAll('.participant').length > 0;
             if (!hasParticipants) {
