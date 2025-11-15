@@ -94,7 +94,7 @@
 @media (min-width: 769px) and (max-width: 1399px) {
     .prayer-room-main {
         display: grid !important;
-        grid-template-columns: minmax(280px, 320px) 1fr !important;
+        grid-template-columns: minmax(280px, 320px) minmax(450px, 1fr) !important;
         gap: var(--space-lg) !important;
         max-width: 1400px !important;
         margin: 0 auto !important;
