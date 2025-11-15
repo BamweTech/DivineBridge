@@ -1147,17 +1147,6 @@
                     <div class="logo-section">
                         <img src="{{ url_for('static', filename='images/LogowithName.svg') }}" alt="Divine Bridge" class="header-logo header-logo-img">
                     </div>
-                    <div class="room-details">
-                        <div class="room-name-container">
-                            <h1 class="room-title" id="roomTitle">
-                                <span class="room-title-text">{{ room_name or 'Prayer Room' }}</span>
-                            </h1>
-                        </div>
-                        <div class="room-code" id="roomCode">{{ room_id }}</div>
-                        {% if room_code %}
-                        <div class="room-code-display" id="roomCodeDisplay">Code: {{ room_code }}</div>
-                        {% endif %}
-                    </div>
                 </div>
                 <div class="header-actions">
                     <div class="header-metrics">
