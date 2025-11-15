@@ -1411,17 +1411,28 @@
                 if (!header) {
                     return;
                 }
-                // Get the exact bottom position of the header including border
+                
+                // Get the exact bottom position of the header including ALL content (status text, etc.)
                 const rect = header.getBoundingClientRect();
                 const headerBottom = rect.bottom;
                 const headerHeight = rect.height;
                 
+                // Also check if status text exists and get its bottom position
+                const statusText = document.getElementById('requestSpeakerStatus');
+                let actualBottom = headerBottom;
+                
+                if (statusText && statusText.offsetParent !== null) {
+                    // Status text is visible, use its bottom position
+                    const statusRect = statusText.getBoundingClientRect();
+                    actualBottom = Math.max(headerBottom, statusRect.bottom);
+                }
+                
                 // Use Visual Viewport API for accurate height calculations (Teams approach)
                 const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
                 
-                // Set CSS variables for layout calculations
-                document.documentElement.style.setProperty('--mobile-header-offset', `${headerBottom}px`);
-                document.documentElement.style.setProperty('--header-height', `${headerHeight}px`);
+                // Set CSS variables for layout calculations - use actualBottom to include status text
+                document.documentElement.style.setProperty('--mobile-header-offset', `${actualBottom}px`);
+                document.documentElement.style.setProperty('--header-height', `${actualBottom}px`);
                 document.documentElement.style.setProperty('--viewport-height', `${viewportHeight}px`);
             };
             
@@ -1439,9 +1450,22 @@
             window.addEventListener('orientationchange', () => setTimeout(updateMobileHeaderOffset, 120));
 
             const headerElement = document.querySelector('.prayer-room-header');
+            const statusTextElement = document.getElementById('requestSpeakerStatus');
+            
             if (headerElement && 'MutationObserver' in window) {
                 const observer = new MutationObserver(() => requestAnimationFrame(updateMobileHeaderOffset));
                 observer.observe(headerElement, { childList: true, subtree: true, attributes: true });
+                
+                // Also watch status text for visibility changes
+                if (statusTextElement) {
+                    observer.observe(statusTextElement, { attributes: true, attributeFilter: ['style', 'class'] });
+                }
+            }
+            
+            // Also update when status text content changes (speaker status updates)
+            if (statusTextElement && 'MutationObserver' in window) {
+                const statusObserver = new MutationObserver(() => requestAnimationFrame(updateMobileHeaderOffset));
+                statusObserver.observe(statusTextElement, { childList: true, subtree: true, characterData: true });
             }
 
             // Initialize UI Enhancements

@@ -602,7 +602,7 @@
         overflow-y: auto !important;
         overflow-x: hidden !important;
         padding: 8px 12px 140px 12px !important;
-        padding-top: 8px !important;
+        padding-top: 0 !important;
         background: #ffffff !important;
         -webkit-overflow-scrolling: touch !important;
         scroll-behavior: smooth !important;
@@ -612,6 +612,7 @@
         min-height: 0 !important;
         max-height: 100% !important;
         margin: 0 !important;
+        margin-top: 0 !important;
         align-self: stretch !important;
         display: flex !important;
         flex-direction: column !important;
@@ -668,7 +669,15 @@
     }
     
     .chat-messages > .message:first-child,
-    .chat-messages > .date-divider:first-child {
+    .chat-messages > .date-divider:first-child,
+    .chat-messages > .message-group:first-child {
+        margin-top: 0 !important;
+        padding-top: 8px !important;
+    }
+    
+    /* Ensure first message/group has top padding but container doesn't */
+    .chat-messages > .message:first-child .message-bubble,
+    .chat-messages > .message-group:first-child .message:first-child .message-bubble {
         margin-top: 0 !important;
     }
     
