@@ -1404,9 +1404,24 @@
                 // Get the exact bottom position of the header including border
                 const rect = header.getBoundingClientRect();
                 const headerBottom = rect.bottom;
-                // Use exact bottom position to ensure chat connects seamlessly
+                const headerHeight = rect.height;
+                
+                // Use Visual Viewport API for accurate height calculations (Teams approach)
+                const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+                
+                // Set CSS variables for layout calculations
                 document.documentElement.style.setProperty('--mobile-header-offset', `${headerBottom}px`);
+                document.documentElement.style.setProperty('--header-height', `${headerHeight}px`);
+                document.documentElement.style.setProperty('--viewport-height', `${viewportHeight}px`);
             };
+            
+            // Update viewport height on resize (for keyboard handling)
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', () => {
+                    const viewportHeight = window.visualViewport.height;
+                    document.documentElement.style.setProperty('--viewport-height', `${viewportHeight}px`);
+                });
+            }
 
             updateMobileHeaderOffset();
             window.addEventListener('resize', () => requestAnimationFrame(updateMobileHeaderOffset));
@@ -1596,51 +1611,104 @@
                     const chatInput = document.getElementById('chatInput');
                     const bottomTabs = document.getElementById('mobileBottomTabs');
                     const chatMessages = document.getElementById('chatMessages');
+                    const chatPanel = document.getElementById('chatPanel');
                     
                     if (!chatInput || !bottomTabs) return;
                     
-                    // Hide bottom tabs when chat input is focused (WhatsApp style)
-                    chatInput.addEventListener('focus', () => {
+                    // Teams-like: Improved keyboard handling with Visual Viewport API
+                    const handleKeyboardShow = () => {
                         document.body.classList.add('chat-input-focused');
                         bottomTabs.style.transform = 'translateY(100%)';
                         bottomTabs.style.opacity = '0';
                         bottomTabs.style.pointerEvents = 'none';
                         
-                        // Scroll chat to bottom when keyboard appears
-                        setTimeout(() => {
+                        // Use Visual Viewport API for accurate keyboard height
+                        if (window.visualViewport) {
+                            const viewportHeight = window.visualViewport.height;
+                            const windowHeight = window.innerHeight;
+                            const keyboardHeight = windowHeight - viewportHeight;
+                            
+                            // Set CSS variable for keyboard height
+                            document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`);
+                            
+                            // Adjust chat messages container height
                             if (chatMessages) {
-                                chatMessages.scrollTop = chatMessages.scrollHeight;
+                                const headerHeight = document.querySelector('.prayer-room-header')?.offsetHeight || 56;
+                                const inputHeight = document.querySelector('.chat-input-section')?.offsetHeight || 60;
+                                const availableHeight = viewportHeight - headerHeight - inputHeight;
+                                
+                                chatMessages.style.maxHeight = `${availableHeight}px`;
                             }
-                            scrollChatToBottom();
-                        }, 300);
-                    });
+                        }
+                        
+                        // Scroll to show latest messages (Teams behavior)
+                        requestAnimationFrame(() => {
+                            setTimeout(() => {
+                                if (chatMessages) {
+                                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                                }
+                                scrollChatToBottom();
+                            }, 100);
+                        });
+                    };
                     
-                    // Show bottom tabs when chat input loses focus
-                    chatInput.addEventListener('blur', () => {
+                    const handleKeyboardHide = () => {
                         // Delay to allow send button click
                         setTimeout(() => {
-                            // Check if send button was clicked
                             const sendBtn = document.getElementById('sendBtn');
                             const wasSendClicked = sendBtn && document.activeElement === sendBtn;
                             
-                            if (!wasSendClicked) {
+                            if (!wasSendClicked && document.activeElement !== chatInput) {
                                 document.body.classList.remove('chat-input-focused');
                                 bottomTabs.style.transform = 'translateY(0)';
                                 bottomTabs.style.opacity = '1';
                                 bottomTabs.style.pointerEvents = 'auto';
+                                
+                                // Reset chat messages height
+                                if (chatMessages) {
+                                    chatMessages.style.maxHeight = '';
+                                }
+                                
+                                document.documentElement.style.setProperty('--keyboard-height', '0px');
                             }
                         }, 150);
-                    });
+                    };
                     
-                    // Handle visual viewport changes (keyboard show/hide)
+                    // Focus event - keyboard is showing
+                    chatInput.addEventListener('focus', handleKeyboardShow);
+                    
+                    // Blur event - keyboard might be hiding
+                    chatInput.addEventListener('blur', handleKeyboardHide);
+                    
+                    // Visual Viewport API for better keyboard detection (Teams approach)
                     if (window.visualViewport) {
+                        let lastViewportHeight = window.visualViewport.height;
+                        
                         window.visualViewport.addEventListener('resize', () => {
-                            if (document.activeElement === chatInput) {
-                                // Keyboard is visible, ensure input is in view
-                                setTimeout(() => {
-                                    scrollChatToBottom();
-                                }, 100);
+                            const currentHeight = window.visualViewport.height;
+                            const isKeyboardVisible = currentHeight < lastViewportHeight * 0.75;
+                            
+                            if (isKeyboardVisible && document.activeElement === chatInput) {
+                                handleKeyboardShow();
+                            } else if (!isKeyboardVisible && document.activeElement !== chatInput) {
+                                handleKeyboardHide();
                             }
+                            
+                            // Update chat messages height dynamically
+                            if (document.activeElement === chatInput && chatMessages) {
+                                const headerHeight = document.querySelector('.prayer-room-header')?.offsetHeight || 56;
+                                const inputHeight = document.querySelector('.chat-input-section')?.offsetHeight || 60;
+                                const availableHeight = currentHeight - headerHeight - inputHeight;
+                                
+                                chatMessages.style.maxHeight = `${availableHeight}px`;
+                                
+                                // Keep scrolling to bottom as keyboard adjusts
+                                requestAnimationFrame(() => {
+                                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                                });
+                            }
+                            
+                            lastViewportHeight = currentHeight;
                         });
                     }
                 },

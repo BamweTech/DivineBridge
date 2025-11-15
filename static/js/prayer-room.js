@@ -4379,8 +4379,14 @@ document.addEventListener('keydown', (event) => {
 function scrollChatToBottom() {
     const chatMessages = document.getElementById('chatMessages');
     if (chatMessages) {
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-        console.log('Chat scrolled to bottom, position:', chatMessages.scrollTop);
+        // Teams-like: Smooth scroll with proper timing
+        requestAnimationFrame(() => {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            // Double-check after a brief delay to ensure we're at bottom
+            setTimeout(() => {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }, 50);
+        });
     }
 }
 

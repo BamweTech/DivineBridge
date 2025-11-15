@@ -616,14 +616,11 @@
         display: flex !important;
         flex-direction: column !important;
         gap: 2px !important;
+        /* Teams-like: Ensure messages container fills available space */
+        flex-grow: 1 !important;
+        flex-shrink: 1 !important;
     }
     
-    /* When chat input is focused, add more padding for keyboard */
-    body.chat-input-focused .chat-messages {
-        padding-bottom: 180px !important; /* Extra space when keyboard is visible */
-        /* Force scroll to bottom when keyboard appears */
-        scroll-behavior: smooth !important;
-    }
     
     .message {
         display: flex !important;
@@ -829,16 +826,18 @@
         margin: 0 !important;
     }
     
-    /* When keyboard is active - move to bottom and above everything */
+    /* When keyboard is active - Teams-like positioning */
     body.chat-input-focused .chat-input-section,
     .chat-panel:not(.mobile-hidden) .chat-input-section:focus-within {
-        bottom: 0 !important; /* Stick to bottom (above keyboard) */
-        z-index: 200 !important; /* Above everything including tabs */
         position: fixed !important;
-        padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+        bottom: 0 !important;
+        z-index: 200 !important;
+        padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+        /* Smooth transition */
+        transition: bottom 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
     }
     
-    /* Hide bottom tabs when chat input is focused (WhatsApp style) */
+    /* Hide bottom tabs when chat input is focused */
     body.chat-input-focused .mobile-bottom-tabs {
         transform: translateY(100%) !important;
         opacity: 0 !important;
@@ -846,11 +845,37 @@
         transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease !important;
     }
     
-    /* Ensure chat messages scroll when input is focused */
+    /* Teams-like: Messages remain visible and scrollable when keyboard is open */
     body.chat-input-focused .chat-messages {
-        padding-bottom: 180px !important; /* Extra space for input when keyboard is up */
-        /* Smooth scroll to bottom */
+        padding-bottom: calc(60px + env(safe-area-inset-bottom)) !important;
         scroll-behavior: smooth !important;
+        /* Use visual viewport height for accurate calculations */
+        max-height: calc(var(--viewport-height, 100vh) - var(--header-height, 56px) - 60px) !important;
+        /* Ensure smooth scrolling */
+        -webkit-overflow-scrolling: touch !important;
+    }
+    
+    /* Adjust chat panel height when keyboard is open - Teams approach */
+    body.chat-input-focused .chat-panel {
+        height: calc(var(--viewport-height, 100vh) - var(--header-height, 56px)) !important;
+        max-height: calc(var(--viewport-height, 100vh) - var(--header-height, 56px)) !important;
+        /* Ensure it stays in view */
+        position: absolute !important;
+        top: var(--header-height, 56px) !important;
+    }
+    
+    body.chat-input-focused .chat-section {
+        height: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+    }
+    
+    /* Ensure input section stays above keyboard */
+    body.chat-input-focused .chat-input-section {
+        position: fixed !important;
+        bottom: 0 !important;
+        /* Account for keyboard */
+        transform: translateY(0) !important;
     }
     
     /* Note: chat-input-section z-index is set above in the main rule */
