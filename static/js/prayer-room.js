@@ -1761,24 +1761,25 @@ class PrayerRoomService {
                 // Merge: start with existing messages, add server messages that don't exist
                 const mergedMessages = [...existingMessages];
                 serverMessages.forEach(serverMsg => {
-                    const exists = mergedMessages.some(m => 
+                    const existingIndex = mergedMessages.findIndex(m => 
                         (m.id === serverMsg.id) || 
                         (m.tempId && m.user_id === serverMsg.user_id && Math.abs((m.timestamp instanceof Date ? m.timestamp.getTime() : (typeof m.timestamp === 'number' ? m.timestamp : new Date(m.timestamp).getTime())) - serverMsg.timestamp) < 2000 && m.message === serverMsg.message)
                     );
-                    if (!exists) {
+                    
+                    if (existingIndex === -1) {
+                        // New message, add it
                         mergedMessages.push(serverMsg);
-                    } else if (m.tempId) {
-                        // Update optimistic message with real data
-                        const index = mergedMessages.findIndex(m => 
-                            (m.tempId && m.user_id === serverMsg.user_id && Math.abs((m.timestamp instanceof Date ? m.timestamp.getTime() : (typeof m.timestamp === 'number' ? m.timestamp : new Date(m.timestamp).getTime())) - serverMsg.timestamp) < 2000 && m.message === serverMsg.message)
-                        );
-                        if (index !== -1) {
-                            mergedMessages[index] = {
-                                ...mergedMessages[index],
+                    } else {
+                        // Existing message, update optimistic message with real data if needed
+                        const existingMsg = mergedMessages[existingIndex];
+                        if (existingMsg.tempId) {
+                            mergedMessages[existingIndex] = {
+                                ...existingMsg,
                                 ...serverMsg,
                                 tempId: undefined
                             };
                         }
+                        // If message already has real ID, keep it as is
                     }
                 });
                 
