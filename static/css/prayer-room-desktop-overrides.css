@@ -207,6 +207,8 @@
     .chat-input-section {
         position: sticky !important;
         bottom: 0 !important;
+        left: auto !important; /* Override mobile fixed positioning */
+        right: auto !important; /* Override mobile fixed positioning */
         flex-shrink: 0 !important;
         padding: 12px 20px !important;
         background: #ffffff !important;
