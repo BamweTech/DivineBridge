@@ -891,14 +891,38 @@ class PrayerRoomService {
         this.rtdbRefs.chat.limitToLast(200).on('child_added', (snap) => {
             const val = snap.val();
             if (!val) return;
+            
+            const msgId = snap.key;
+            const msgTimestamp = val.timestamp ? (typeof val.timestamp === 'number' ? val.timestamp : new Date(val.timestamp).getTime()) : Date.now();
+            
             // Normalize to existing message structure
             const msg = {
+                id: msgId,
                 user_id: val.user_id,
                 user_name: val.user_name,
                 message: val.message,
-                timestamp: val.timestamp ? new Date(val.timestamp) : new Date()
+                timestamp: msgTimestamp,
+                status: 'sent'
             };
-            this.chatMessages.push(msg);
+            
+            // Check if we already have this message (optimistic update or duplicate)
+            const existingIndex = this.chatMessages.findIndex(m => 
+                (m.id === msgId) || 
+                (m.tempId && m.user_id === msg.user_id && Math.abs((m.timestamp instanceof Date ? m.timestamp.getTime() : m.timestamp) - msgTimestamp) < 2000 && m.message === msg.message)
+            );
+            
+            if (existingIndex !== -1) {
+                // Update existing optimistic message with real data
+                this.chatMessages[existingIndex] = {
+                    ...this.chatMessages[existingIndex],
+                    ...msg,
+                    tempId: undefined
+                };
+            } else {
+                // New message from another user
+                this.chatMessages.push(msg);
+            }
+            
             this.updateChatDisplay();
         });
     }
@@ -1646,6 +1670,9 @@ class PrayerRoomService {
             this.showLoadingSkeletons(3);
         }
         
+        // Preserve optimistic messages
+        const optimisticMessages = (this.chatMessages || []).filter(m => m.tempId);
+        
         try {
             const response = await fetch(`/api/prayer-room/${this.roomId}/chat`, {
                 credentials: 'include'
@@ -1659,17 +1686,39 @@ class PrayerRoomService {
             console.log('Chat messages loaded:', data);
             
             if (data && data.success && Array.isArray(data.messages)) {
-                // Avoid clearing visible chat on occasional empty payloads
-                if (data.messages.length === 0 && this.chatMessages && this.chatMessages.length > 0) {
-                    console.warn('Empty chat payload received; keeping existing messages to prevent flicker');
-                    return;
-                }
-                this.chatMessages = data.messages;
+                // Merge server messages with optimistic messages, avoiding duplicates
+                const serverMessages = data.messages.map(msg => ({
+                    id: msg.id || msg.message_id,
+                    user_id: msg.user_id,
+                    user_name: msg.user_name,
+                    message: msg.message,
+                    timestamp: msg.timestamp ? (typeof msg.timestamp === 'number' ? msg.timestamp : new Date(msg.timestamp).getTime()) : Date.now(),
+                    message_type: msg.message_type,
+                    status: 'sent'
+                }));
+                
+                // Merge: keep optimistic messages, add server messages that don't exist
+                const mergedMessages = [...optimisticMessages];
+                serverMessages.forEach(serverMsg => {
+                    const exists = mergedMessages.some(m => 
+                        (m.id === serverMsg.id) || 
+                        (m.tempId && m.user_id === serverMsg.user_id && Math.abs((m.timestamp instanceof Date ? m.timestamp.getTime() : (typeof m.timestamp === 'number' ? m.timestamp : new Date(m.timestamp).getTime())) - serverMsg.timestamp) < 2000 && m.message === serverMsg.message)
+                    );
+                    if (!exists) {
+                        mergedMessages.push(serverMsg);
+                    }
+                });
+                
+                this.chatMessages = mergedMessages;
                 console.log('Chat messages array:', this.chatMessages);
                 this.updateChatDisplay();
             } else {
                 console.warn('Chat payload invalid or unsuccessful, preserving current messages');
-                // Do not clear UI on bad payloads
+                // Do not clear UI on bad payloads - keep optimistic messages
+                if (optimisticMessages.length > 0) {
+                    this.chatMessages = optimisticMessages;
+                    this.updateChatDisplay();
+                }
             }
             
         } catch (error) {
@@ -1698,8 +1747,15 @@ class PrayerRoomService {
         if (this.chatMessages && this.chatMessages.length > 0) {
             console.log('Rendering chat messages...');
             
+            // Sort messages by timestamp to ensure correct order
+            const sortedMessages = [...this.chatMessages].sort((a, b) => {
+                const timeA = a.timestamp instanceof Date ? a.timestamp.getTime() : (typeof a.timestamp === 'number' ? a.timestamp : new Date(a.timestamp).getTime());
+                const timeB = b.timestamp instanceof Date ? b.timestamp.getTime() : (typeof b.timestamp === 'number' ? b.timestamp : new Date(b.timestamp).getTime());
+                return timeA - timeB;
+            });
+            
             // Group messages by date and sender
-            const groupedMessages = this.groupMessagesByDateAndSender(this.chatMessages);
+            const groupedMessages = this.groupMessagesByDateAndSender(sortedMessages);
             
             groupedMessages.forEach((group, groupIndex) => {
                 // Add date divider if needed
@@ -1756,7 +1812,7 @@ class PrayerRoomService {
                     const showSender = msgIndex === 0;
                     
                     // Get message ID for reactions
-                    const messageId = message.id || message.tempId || `msg_${index}_${Date.now()}`;
+                    const messageId = message.id || message.tempId || `msg_${groupIndex}_${msgIndex}_${Date.now()}`;
                     messageEl.dataset.messageId = messageId;
                     
                     // Get reactions for this message
@@ -1830,12 +1886,16 @@ class PrayerRoomService {
             
             console.log('Chat messages rendered successfully');
         } else {
-            console.log('No chat messages, showing empty state');
-            this.showEmptyChatState();
+            console.log('No chat messages - showing empty chat');
+            // Don't show empty state - just leave it empty
         }
         
-        // Scroll to bottom
-        scrollChatToBottom();
+        // Scroll to bottom after rendering
+        requestAnimationFrame(() => {
+            setTimeout(() => {
+                scrollChatToBottom();
+            }, 50);
+        });
     }
     
     groupMessagesByDateAndSender(messages) {
@@ -5307,10 +5367,15 @@ function scrollChatToBottom() {
     if (chatMessages) {
         // Teams-like: Smooth scroll with proper timing
         requestAnimationFrame(() => {
+            // Force scroll to bottom
             chatMessages.scrollTop = chatMessages.scrollHeight;
-            // Double-check after a brief delay to ensure we're at bottom
+            
+            // Double-check after delays to ensure we're at bottom (handles dynamic content)
             setTimeout(() => {
                 chatMessages.scrollTop = chatMessages.scrollHeight;
+                setTimeout(() => {
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }, 100);
             }, 50);
         });
     }
