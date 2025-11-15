@@ -5202,17 +5202,6 @@ Listening for unmute event...`);
         }
     }
 
-    updateSpeakerSlotDisplay() {
-        const indicator = document.getElementById('speakerSlotCount');
-        if (!indicator) {
-            return;
-        }
-
-        const max = this.maxSpeakers || 0;
-        const count = Math.min(this.currentSpeakerCount, max);
-        indicator.textContent = `${count}/${max}`;
-    }
-
     updateRoleUI() {
         const requestBtn = document.getElementById('requestSpeakerBtn');
         const requestStatus = document.getElementById('requestSpeakerStatus');
