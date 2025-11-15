@@ -227,6 +227,110 @@
     flex-shrink: 0 !important;
 }
 
+/* Room Info Structure */
+.room-info {
+    display: flex !important;
+    align-items: center !important;
+    gap: var(--space-md) !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+}
+
+.room-details {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: var(--space-xs) !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+}
+
+.room-title {
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    color: var(--text-primary) !important;
+    margin: 0 !important;
+}
+
+.room-code-display {
+    font-size: 12px !important;
+    color: var(--text-muted) !important;
+}
+
+.header-status-text {
+    font-size: 13px !important;
+    color: var(--text-muted) !important;
+    font-style: italic !important;
+    margin-top: var(--space-xs) !important;
+}
+
+.audio-quality-wrapper {
+    display: flex !important;
+    align-items: center !important;
+}
+
+.audio-quality-indicator {
+    padding: 4px 8px !important;
+    border-radius: var(--radius-sm) !important;
+    background: rgba(16, 185, 129, 0.1) !important;
+    color: #059669 !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+}
+
+/* Control Buttons Specific Styles */
+.control-btn.request-btn,
+.control-btn.join-audio-btn {
+    background: var(--gradient-primary) !important;
+    color: white !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: var(--space-xs) !important;
+}
+
+.control-btn.mute-btn {
+    background: var(--glass-secondary) !important;
+    color: var(--text-secondary) !important;
+    border: 1px solid var(--border-primary) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: relative !important;
+}
+
+.control-btn.mute-btn.muted {
+    background: var(--gradient-danger) !important;
+    color: white !important;
+    border-color: transparent !important;
+}
+
+.control-btn.mute-btn .mic-icon,
+.control-btn.mute-btn .muted-icon {
+    width: 18px !important;
+    height: 18px !important;
+}
+
+.control-btn.mute-btn.muted .mic-icon {
+    display: none !important;
+}
+
+.control-btn.mute-btn:not(.muted) .muted-icon {
+    display: none !important;
+}
+
+.control-btn.subscribe-btn {
+    background: var(--glass-secondary) !important;
+    color: var(--text-secondary) !important;
+    border: 1px solid var(--border-primary) !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: var(--space-xs) !important;
+}
+
+.control-btn.subscribe-btn:hover {
+    background: var(--glass-hover) !important;
+    border-color: var(--color-primary) !important;
+}
+
 /* ===== PARTICIPANTS PANEL - GLASSMORPHISM ===== */
 .participants-panel {
     background: var(--glass-primary) !important;
