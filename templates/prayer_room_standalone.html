@@ -1996,6 +1996,40 @@
             if (window.innerWidth <= 768) {
                 window.mobileTabSystem.init();
             }
+            
+            // Prevent scroll propagation from chat messages to page (desktop only)
+            const setupChatScrollIsolation = () => {
+                const chatMessages = document.getElementById('chatMessages');
+                if (chatMessages && window.innerWidth > 768) {
+                    // Prevent scroll events from bubbling to page
+                    chatMessages.addEventListener('wheel', (e) => {
+                        // Check if we're at the top or bottom of the scrollable area
+                        const isAtTop = chatMessages.scrollTop === 0;
+                        const isAtBottom = Math.abs(chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight) < 1;
+                        
+                        // If scrolling up at top or down at bottom, prevent default to stop page scroll
+                        if ((e.deltaY < 0 && isAtTop) || (e.deltaY > 0 && isAtBottom)) {
+                            e.stopPropagation();
+                        }
+                    }, { passive: false });
+                    
+                    // Prevent touch scroll from propagating (for trackpad gestures)
+                    chatMessages.addEventListener('touchmove', (e) => {
+                        e.stopPropagation();
+                    }, { passive: false });
+                    
+                    // Prevent scroll event from bubbling
+                    chatMessages.addEventListener('scroll', (e) => {
+                        e.stopPropagation();
+                    });
+                }
+            };
+            
+            // Setup scroll isolation when chat messages container is available
+            setupChatScrollIsolation();
+            
+            // Also setup after a delay to ensure DOM is ready
+            setTimeout(setupChatScrollIsolation, 500);
         });
     </script>
 </body>
