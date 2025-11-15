@@ -728,14 +728,6 @@ class PrayerRoomService {
             this.maxSpeakers = data.max_speakers;
         }
 
-        // Update room name
-        const roomNameEl = document.querySelector('.prayer-room-title');
-        if (roomNameEl) {
-            const truncatedRoomName = this.truncateName(data.room_name || 'Prayer Room', 50);
-            roomNameEl.textContent = truncatedRoomName;
-            roomNameEl.title = data.room_name || 'Prayer Room'; // Show full name on hover
-        }
-        
         // Check if user is host
         this.isHost = data.host_id === this.userId;
         
