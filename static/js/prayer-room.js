@@ -102,6 +102,16 @@ class PrayerRoomService {
         this.maxSpeakers = 20;
         this.currentSpeakerCount = 0;
         
+        // Message reactions storage
+        this.messageReactions = new Map();
+        
+        // @ Mentions state
+        this.mentionState = {
+            start: -1,
+            query: '',
+            selectedIndex: -1
+        };
+        
         this.init();
     }
     
@@ -457,15 +467,49 @@ class PrayerRoomService {
             console.warn('Send button not found in DOM');
         }
         
-        // Chat input enter key
+        // Enhanced chat input setup with all features
         const chatInput = document.getElementById('chatInput');
+        const chatInputCounter = document.getElementById('chatInputCounter');
+        const emojiPickerBtn = document.getElementById('emojiPickerBtn');
+        
+        // Store functions for reuse
+        const adjustHeight = () => {
+            if (chatInput) {
+                chatInput.style.height = 'auto';
+                const newHeight = Math.min(chatInput.scrollHeight, 120);
+                chatInput.style.height = newHeight + 'px';
+            }
+        };
+        
+        const updateCounter = () => {
+            if (chatInputCounter && chatInput) {
+                const length = chatInput.value.length;
+                const maxLength = chatInput.maxLength || 1000;
+                chatInputCounter.textContent = `${length}/${maxLength}`;
+                
+                chatInputCounter.className = 'chat-input-counter';
+                if (length > maxLength * 0.9) {
+                    chatInputCounter.classList.add('warning');
+                }
+                if (length >= maxLength) {
+                    chatInputCounter.classList.add('error');
+                }
+            }
+        };
+        
         if (chatInput) {
+            // Initial setup
+            adjustHeight();
+            updateCounter();
+            
             // Enhanced keyboard handling for mobile
             chatInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     e.stopPropagation();
                     this.sendChatMessage();
+                    adjustHeight();
+                    updateCounter();
                     // Keep focus on input for quick typing
                     setTimeout(() => {
                         if (chatInput) chatInput.focus();
@@ -478,6 +522,18 @@ class PrayerRoomService {
                     e.preventDefault();
                     e.stopPropagation();
                 }
+            });
+            
+            // Auto-resize on input
+            chatInput.addEventListener('input', () => {
+                adjustHeight();
+                updateCounter();
+                
+                // Auto-scroll when typing (with debounce)
+                clearTimeout(this.chatScrollTimeout);
+                this.chatScrollTimeout = setTimeout(() => {
+                    scrollChatToBottom();
+                }, 100);
             });
             
             // Enhanced focus handling for mobile
@@ -494,15 +550,6 @@ class PrayerRoomService {
                 }, 100);
             });
             
-            // Handle input changes to auto-scroll
-            chatInput.addEventListener('input', () => {
-                // Auto-scroll when typing (with debounce)
-                clearTimeout(this.chatScrollTimeout);
-                this.chatScrollTimeout = setTimeout(() => {
-                    scrollChatToBottom();
-                }, 100);
-            });
-            
             // Improved blur handling
             chatInput.addEventListener('blur', () => {
                 // Small delay to allow button clicks
@@ -515,7 +562,7 @@ class PrayerRoomService {
                 }, 100);
             });
             
-            // Prevent zoom on iOS when focusing (already handled in CSS, but ensure)
+            // Prevent zoom on iOS when focusing
             if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
                 chatInput.addEventListener('touchstart', () => {
                     // Ensure font-size is 16px to prevent zoom
@@ -524,7 +571,44 @@ class PrayerRoomService {
                     }
                 });
             }
+            
+            // Long-press for message actions (will be added to message bubbles)
+            this.setupLongPressActions();
         }
+        
+        // Emoji picker button
+        if (emojiPickerBtn && chatInput) {
+            emojiPickerBtn.addEventListener('click', () => {
+                // Simple emoji picker - insert common emojis
+                const emojis = ['🙏', '❤️', '✨', '💚', '🙌', '😊', '🎉', '🌟', '💫', '🔥'];
+                const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+                const cursorPos = chatInput.selectionStart;
+                const textBefore = chatInput.value.substring(0, cursorPos);
+                const textAfter = chatInput.value.substring(cursorPos);
+                chatInput.value = textBefore + emoji + textAfter;
+                chatInput.focus();
+                chatInput.setSelectionRange(cursorPos + emoji.length, cursorPos + emoji.length);
+                adjustHeight();
+                updateCounter();
+                
+                // Haptic feedback
+                if (navigator.vibrate) {
+                    navigator.vibrate(5);
+                }
+            });
+        }
+        
+        // Pull-to-refresh setup
+        this.setupPullToRefresh();
+        
+        // Typing indicator setup
+        this.setupTypingIndicator();
+        
+        // @ Mentions setup
+        this.setupMentions();
+        
+        // Initialize reactions
+        this.initReactions();
         
         // Set up event delegation for participant action buttons (dynamically created)
         if (participantsList) {
@@ -1437,17 +1521,56 @@ class PrayerRoomService {
         
         if (!message) return;
         
+        // Haptic feedback
+        if (navigator.vibrate) {
+            navigator.vibrate(10);
+        }
+        
+        // Clear input immediately
+        chatInput.value = '';
+        this.adjustInputHeight(chatInput);
+        
+        // Create optimistic message
+        const tempId = 'temp_' + Date.now();
+        const user = firebase.auth().currentUser;
+        const optimisticMessage = {
+            tempId: tempId,
+            user_id: user ? user.uid : this.userId,
+            user_name: this.userName || (user && user.displayName) || 'Anonymous',
+            message: message,
+            timestamp: Date.now(),
+            status: 'sending'
+        };
+        
+        // Add optimistic message immediately
+        if (!this.chatMessages) {
+            this.chatMessages = [];
+        }
+        this.chatMessages.push(optimisticMessage);
+        this.updateChatDisplay();
+        
         try {
             // Prefer RTDB if available
             if (this.useRTDB && this.rtdb && this.rtdbRefs.chat) {
-                const user = firebase.auth().currentUser;
-                await this.rtdbRefs.chat.push({
+                const messageRef = this.rtdbRefs.chat.push({
                     user_id: user ? user.uid : this.userId,
                     user_name: this.userName || (user && user.displayName) || 'Anonymous',
                     message,
                     timestamp: firebase.database.ServerValue.TIMESTAMP
                 });
-                chatInput.value = '';
+                
+                // Update optimistic message with real ID and status
+                const optimisticIndex = this.chatMessages.findIndex(m => m.tempId === tempId);
+                if (optimisticIndex !== -1) {
+                    this.chatMessages[optimisticIndex] = {
+                        ...this.chatMessages[optimisticIndex],
+                        id: messageRef.key,
+                        status: 'sent',
+                        tempId: undefined
+                    };
+                    this.updateChatDisplay();
+                }
+                
                 console.log('Chat message sent via RTDB');
                 return;
             }
@@ -1458,7 +1581,7 @@ class PrayerRoomService {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                credentials: 'include', // Include session cookie
+                credentials: 'include',
                 body: JSON.stringify({
                     message: message
                 })
@@ -1466,16 +1589,63 @@ class PrayerRoomService {
             
             const data = await response.json();
             if (data.success) {
-                chatInput.value = '';
-                // Message will be added via real-time listener
+                // Update optimistic message status
+                const optimisticIndex = this.chatMessages.findIndex(m => m.tempId === tempId);
+                if (optimisticIndex !== -1) {
+                    this.chatMessages[optimisticIndex] = {
+                        ...this.chatMessages[optimisticIndex],
+                        id: data.message_id || tempId,
+                        status: 'sent',
+                        tempId: undefined
+                    };
+                    this.updateChatDisplay();
+                }
+                // Message will be updated via real-time listener
+            } else {
+                // Remove failed message
+                this.chatMessages = this.chatMessages.filter(m => m.tempId !== tempId);
+                this.updateChatDisplay();
+                this.showErrorMessage('Failed to send message. Please try again.');
             }
             
         } catch (error) {
             console.error('Error sending chat message:', error);
+            // Remove failed optimistic message
+            this.chatMessages = this.chatMessages.filter(m => m.tempId !== tempId);
+            this.updateChatDisplay();
+            this.showErrorMessage('Failed to send message. Please check your connection.');
         }
     }
     
+    adjustInputHeight(input) {
+        if (!input) {
+            input = document.getElementById('chatInput');
+        }
+        if (!input) return;
+        input.style.height = 'auto';
+        input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+    }
+    
+    showErrorMessage(message) {
+        // Simple toast notification
+        const toast = document.createElement('div');
+        toast.style.cssText = 'position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #ef4444; color: white; padding: 12px 20px; border-radius: 8px; z-index: 10000; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+    
     async loadChatMessages() {
+        // Show loading skeletons on first load
+        if (!this.chatMessages || this.chatMessages.length === 0) {
+            this.showLoadingSkeletons(3);
+        }
+        
         try {
             const response = await fetch(`/api/prayer-room/${this.roomId}/chat`, {
                 credentials: 'include'
@@ -1519,63 +1689,819 @@ class PrayerRoomService {
         
         console.log('Updating chat display with messages:', this.chatMessages ? this.chatMessages.length : 0);
         
+        // Clear loading skeletons
+        const skeletons = chatMessages.querySelectorAll('.message-skeleton');
+        skeletons.forEach(s => s.remove());
+        
         chatMessages.innerHTML = '';
         
         if (this.chatMessages && this.chatMessages.length > 0) {
             console.log('Rendering chat messages...');
-            this.chatMessages.forEach(message => {
-                const messageEl = document.createElement('div');
-                
-                // Check if it's a system notification
-                if (message.message_type === 'system_notification') {
-                    messageEl.className = 'message system-notification';
-                    messageEl.innerHTML = `
-                        <div class="message-bubble">
-                            <div class="system-message">
-                                <div class="system-icon">⚠️</div>
-                                <div class="system-text">${message.message}</div>
-                            </div>
-                        </div>
+            
+            // Group messages by date and sender
+            const groupedMessages = this.groupMessagesByDateAndSender(this.chatMessages);
+            
+            groupedMessages.forEach((group, groupIndex) => {
+                // Add date divider if needed
+                if (group.dateDivider) {
+                    const dateDivider = document.createElement('div');
+                    dateDivider.className = 'date-divider';
+                    dateDivider.innerHTML = `
+                        <div class="date-divider-line"></div>
+                        <div class="date-divider-text">${group.dateDivider}</div>
+                        <div class="date-divider-line"></div>
                     `;
-                } else {
+                    chatMessages.appendChild(dateDivider);
+                }
+                
+                // Create message group container
+                const messageGroup = document.createElement('div');
+                messageGroup.className = 'message-group';
+                
+                group.messages.forEach((message, msgIndex) => {
+                    const messageEl = document.createElement('div');
+                    
+                    // Check if it's a system notification
+                    if (message.message_type === 'system_notification') {
+                        messageEl.className = 'message system-notification';
+                        messageEl.innerHTML = `
+                            <div class="message-bubble">
+                                <div class="system-message">
+                                    <div class="system-icon">⚠️</div>
+                                    <div class="system-text">${this.escapeHtml(message.message)}</div>
+                                </div>
+                            </div>
+                        `;
+                        chatMessages.appendChild(messageEl);
+                        return;
+                    }
+                    
                     // Check if this is the current user's message
                     const isOwnMessage = message.user_id === this.userId;
                     messageEl.className = `message ${isOwnMessage ? 'message-own' : 'message-other'}`;
                     
-                    // Format timestamp (show time only)
-                    const timeString = new Date(message.timestamp).toLocaleTimeString('en-US', {
+                    // Format timestamp
+                    const messageDate = new Date(message.timestamp);
+                    const timeString = messageDate.toLocaleTimeString('en-US', {
                         hour: 'numeric',
                         minute: '2-digit',
                         hour12: true
                     });
                     
+                    // Get message status
+                    const status = message.status || (message.tempId ? 'sending' : 'sent');
+                    const statusIcon = this.getMessageStatusIcon(status, isOwnMessage);
+                    
+                    // Check if should show sender name (first message in group)
+                    const showSender = msgIndex === 0;
+                    
+                    // Get message ID for reactions
+                    const messageId = message.id || message.tempId || `msg_${index}_${Date.now()}`;
+                    messageEl.dataset.messageId = messageId;
+                    
+                    // Get reactions for this message
+                    const reactions = this.getMessageReactions(messageId);
+                    const reactionsHtml = this.renderReactions(messageId, reactions, isOwnMessage);
+                    
+                    // Process message content for mentions
+                    const processedContent = this.processMentions(message.message);
+                    
                     messageEl.innerHTML = `
                         <div class="message-bubble">
-                            ${!isOwnMessage ? `<div class="message-sender">${message.user_name}</div>` : ''}
-                            <div class="message-content">${message.message}</div>
-                            <div class="message-time">${timeString}</div>
+                            ${!isOwnMessage && showSender ? `<div class="message-sender">${this.escapeHtml(message.user_name)}</div>` : ''}
+                            <div class="message-content">${processedContent}</div>
+                            ${reactionsHtml}
+                            <div class="message-time">
+                                ${timeString}
+                                ${isOwnMessage ? `<span class="message-status ${status}">${statusIcon}</span>` : ''}
+                            </div>
                         </div>
                     `;
-                }
+                    
+                    // Add reaction click handlers
+                    messageEl.querySelectorAll('.message-reaction').forEach(reactionEl => {
+                        reactionEl.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const emoji = reactionEl.dataset.emoji;
+                            this.toggleReaction(messageId, emoji);
+                        });
+                    });
+                    
+                    // Add long-press/touch for reaction picker
+                    const messageBubble = messageEl.querySelector('.message-bubble');
+                    
+                    // Desktop: right-click
+                    messageBubble.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+                        this.showReactionPicker(messageEl, e);
+                    });
+                    
+                    // Mobile: long-press
+                    let longPressTimer = null;
+                    messageBubble.addEventListener('touchstart', (e) => {
+                        longPressTimer = setTimeout(() => {
+                            e.preventDefault();
+                            this.showReactionPicker(messageEl, e);
+                            if (navigator.vibrate) {
+                                navigator.vibrate(50);
+                            }
+                        }, 500);
+                    });
+                    
+                    messageBubble.addEventListener('touchend', () => {
+                        if (longPressTimer) {
+                            clearTimeout(longPressTimer);
+                            longPressTimer = null;
+                        }
+                    });
+                    
+                    messageBubble.addEventListener('touchmove', () => {
+                        if (longPressTimer) {
+                            clearTimeout(longPressTimer);
+                            longPressTimer = null;
+                        }
+                    });
+                    
+                    messageGroup.appendChild(messageEl);
+                });
                 
-                chatMessages.appendChild(messageEl);
+                chatMessages.appendChild(messageGroup);
             });
+            
             console.log('Chat messages rendered successfully');
         } else {
             console.log('No chat messages, showing empty state');
-            // Show empty state
-            const emptyEl = document.createElement('div');
-            emptyEl.className = 'message';
-            emptyEl.innerHTML = `
-                <div class="message-content" style="text-align: center; color: #64748b; font-style: italic;">
-                    No messages yet. Start the conversation!
-                </div>
-            `;
-            chatMessages.appendChild(emptyEl);
+            this.showEmptyChatState();
         }
         
         // Scroll to bottom
         scrollChatToBottom();
+    }
+    
+    groupMessagesByDateAndSender(messages) {
+        if (!messages || messages.length === 0) return [];
+        
+        const groups = [];
+        let currentGroup = null;
+        let lastDate = null;
+        let lastSenderId = null;
+        
+        messages.forEach((message, index) => {
+            const messageDate = new Date(message.timestamp);
+            const dateKey = messageDate.toDateString();
+            const isNewDate = lastDate !== dateKey;
+            const isNewSender = lastSenderId !== message.user_id;
+            
+            // Add date divider if new date
+            if (isNewDate) {
+                const dateLabel = this.formatDateLabel(messageDate);
+                // Push previous group if exists
+                if (currentGroup && currentGroup.messages.length > 0) {
+                    groups.push(currentGroup);
+                }
+                // Start new group with date divider
+                currentGroup = {
+                    dateDivider: dateLabel,
+                    messages: []
+                };
+                lastDate = dateKey;
+                lastSenderId = null; // Reset sender when new date
+            } else if (!currentGroup) {
+                // First message, no date divider needed
+                currentGroup = { messages: [] };
+            }
+            
+            // Start new message group if new sender (within same date)
+            if (isNewSender && !isNewDate) {
+                if (currentGroup && currentGroup.messages.length > 0) {
+                    groups.push(currentGroup);
+                }
+                currentGroup = {
+                    messages: []
+                };
+            }
+            
+            currentGroup.messages.push(message);
+            lastSenderId = message.user_id;
+        });
+        
+        // Push final group
+        if (currentGroup && currentGroup.messages.length > 0) {
+            groups.push(currentGroup);
+        }
+        
+        return groups;
+    }
+    
+    formatDateLabel(date) {
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        if (date.toDateString() === today.toDateString()) {
+            return 'Today';
+        } else if (date.toDateString() === yesterday.toDateString()) {
+            return 'Yesterday';
+        } else {
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined });
+        }
+    }
+    
+    getMessageStatusIcon(status, isOwnMessage) {
+        if (!isOwnMessage) return '';
+        
+        switch (status) {
+            case 'sending':
+                return '<svg class="message-status-icon" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="1.5"/></svg>';
+            case 'sent':
+                return '<svg class="message-status-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg>';
+            case 'delivered':
+                return '<svg class="message-status-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg>';
+            case 'read':
+                return '<svg class="message-status-icon" viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg>';
+            default:
+                return '';
+        }
+    }
+    
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    showEmptyChatState() {
+        const chatMessages = document.getElementById('chatMessages');
+        if (!chatMessages) return;
+        
+        const emptyState = document.createElement('div');
+        emptyState.className = 'empty-chat-state';
+        emptyState.innerHTML = `
+            <div class="empty-chat-icon">💬</div>
+            <h3>Start the Conversation</h3>
+            <p>Share prayers, encouragement, and support with others in this prayer room.</p>
+            <div class="quick-messages">
+                <button class="quick-message-btn" onclick="this.insertQuickMessage('🙏 Please pray for...')">
+                    🙏 Send a prayer
+                </button>
+                <button class="quick-message-btn" onclick="this.insertQuickMessage('✨ I want to share...')">
+                    ✨ Share testimony
+                </button>
+                <button class="quick-message-btn" onclick="this.insertQuickMessage('💚 God bless you!')">
+                    💚 Encourage others
+                </button>
+            </div>
+        `;
+        
+        // Add click handlers for quick messages
+        emptyState.querySelectorAll('.quick-message-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const btnText = e.target.textContent || e.target.innerText;
+                // Extract text after emoji (format: "🙏 Send a prayer" -> "Send a prayer")
+                const text = btnText.replace(/^[^\s]+\s+/, '');
+                const chatInput = document.getElementById('chatInput');
+                if (chatInput) {
+                    chatInput.value = text;
+                    chatInput.focus();
+                    // Trigger input event to update counter and height
+                    chatInput.dispatchEvent(new Event('input'));
+                }
+            });
+        });
+        
+        chatMessages.appendChild(emptyState);
+    }
+    
+    showLoadingSkeletons(count = 3) {
+        const chatMessages = document.getElementById('chatMessages');
+        if (!chatMessages) return;
+        
+        // Clear existing content
+        chatMessages.innerHTML = '';
+        
+        for (let i = 0; i < count; i++) {
+            const skeleton = document.createElement('div');
+            skeleton.className = 'message-skeleton';
+            skeleton.innerHTML = `
+                <div class="message-skeleton-avatar"></div>
+                <div class="message-skeleton-content">
+                    <div class="message-skeleton-line"></div>
+                    <div class="message-skeleton-line"></div>
+                    <div class="message-skeleton-line"></div>
+                </div>
+            `;
+            chatMessages.appendChild(skeleton);
+        }
+    }
+    
+    setupLongPressActions() {
+        const chatMessages = document.getElementById('chatMessages');
+        if (!chatMessages) return;
+        
+        let longPressTimer = null;
+        let longPressTarget = null;
+        
+        const handleLongPress = (e) => {
+            const messageBubble = e.target.closest('.message-bubble');
+            if (!messageBubble) return;
+            
+            const messageEl = e.target.closest('.message');
+            if (!messageEl) return;
+            
+            longPressTarget = messageEl;
+            longPressTimer = setTimeout(() => {
+                this.showMessageContextMenu(messageEl, e);
+                if (navigator.vibrate) {
+                    navigator.vibrate(50);
+                }
+            }, 500);
+        };
+        
+        const cancelLongPress = () => {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+            longPressTarget = null;
+        };
+        
+        chatMessages.addEventListener('touchstart', handleLongPress);
+        chatMessages.addEventListener('touchend', cancelLongPress);
+        chatMessages.addEventListener('touchmove', cancelLongPress);
+        chatMessages.addEventListener('mousedown', handleLongPress);
+        chatMessages.addEventListener('mouseup', cancelLongPress);
+        chatMessages.addEventListener('mouseleave', cancelLongPress);
+    }
+    
+    showMessageContextMenu(messageEl, event) {
+        // Remove existing menu
+        const existingMenu = document.querySelector('.message-context-menu');
+        if (existingMenu) {
+            existingMenu.remove();
+        }
+        
+        const isOwnMessage = messageEl.classList.contains('message-own');
+        const menu = document.createElement('div');
+        menu.className = 'message-context-menu';
+        
+        menu.innerHTML = `
+            <div class="message-context-menu-item" data-action="copy">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                Copy
+            </div>
+            ${isOwnMessage ? `
+            <div class="message-context-menu-item danger" data-action="delete">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                Delete
+            </div>
+            ` : ''}
+        `;
+        
+        // Position menu
+        const rect = messageEl.getBoundingClientRect();
+        menu.style.left = `${rect.left}px`;
+        menu.style.top = `${rect.top - 10}px`;
+        
+        document.body.appendChild(menu);
+        
+        // Handle menu actions
+        menu.querySelectorAll('.message-context-menu-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const action = item.dataset.action;
+                
+                if (action === 'copy') {
+                    const messageContent = messageEl.querySelector('.message-content')?.textContent || '';
+                    navigator.clipboard.writeText(messageContent).then(() => {
+                        this.showSuccessMessage('Message copied!');
+                    });
+                } else if (action === 'delete') {
+                    // TODO: Implement delete message
+                    this.showSuccessMessage('Delete feature coming soon!');
+                }
+                
+                menu.remove();
+            });
+        });
+        
+        // Close menu on outside click
+        setTimeout(() => {
+            document.addEventListener('click', function closeMenu() {
+                menu.remove();
+                document.removeEventListener('click', closeMenu);
+            }, { once: true });
+        }, 100);
+    }
+    
+    setupPullToRefresh() {
+        const chatMessages = document.getElementById('chatMessages');
+        if (!chatMessages) return;
+        
+        let startY = 0;
+        let isPulling = false;
+        let pullDistance = 0;
+        
+        const pullToRefresh = document.createElement('div');
+        pullToRefresh.className = 'pull-to-refresh';
+        pullToRefresh.innerHTML = `
+            <svg class="pull-to-refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            <div class="pull-to-refresh-text">Pull to refresh</div>
+        `;
+        chatMessages.insertBefore(pullToRefresh, chatMessages.firstChild);
+        
+        chatMessages.addEventListener('touchstart', (e) => {
+            if (chatMessages.scrollTop === 0) {
+                startY = e.touches[0].clientY;
+                isPulling = true;
+            }
+        });
+        
+        chatMessages.addEventListener('touchmove', (e) => {
+            if (!isPulling) return;
+            
+            const currentY = e.touches[0].clientY;
+            pullDistance = currentY - startY;
+            
+            if (pullDistance > 0 && chatMessages.scrollTop === 0) {
+                e.preventDefault();
+                if (pullDistance > 60) {
+                    pullToRefresh.classList.add('active');
+                } else {
+                    pullToRefresh.classList.remove('active');
+                }
+            }
+        });
+        
+        chatMessages.addEventListener('touchend', () => {
+            if (isPulling && pullDistance > 60) {
+                pullToRefresh.classList.add('active');
+                this.loadChatMessages();
+                setTimeout(() => {
+                    pullToRefresh.classList.remove('active');
+                }, 1000);
+            }
+            isPulling = false;
+            pullDistance = 0;
+        });
+    }
+    
+    setupTypingIndicator() {
+        // Typing indicator will be shown when RTDB detects typing events
+        // For now, we'll add a simple implementation
+        const chatMessages = document.getElementById('chatMessages');
+        if (!chatMessages) return;
+        
+        // This will be enhanced when RTDB typing events are implemented
+        this.typingUsers = new Set();
+    }
+    
+    showTypingIndicator(userName) {
+        const chatMessages = document.getElementById('chatMessages');
+        if (!chatMessages) return;
+        
+        // Remove existing typing indicator
+        const existing = chatMessages.querySelector('.typing-indicator');
+        if (existing) {
+            existing.remove();
+        }
+        
+        const typingEl = document.createElement('div');
+        typingEl.className = 'typing-indicator';
+        typingEl.innerHTML = `
+            <div class="typing-indicator-bubble">
+                <span class="typing-indicator-text">${this.escapeHtml(userName)} is typing</span>
+                <div class="typing-dots">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            </div>
+        `;
+        
+        chatMessages.appendChild(typingEl);
+        scrollChatToBottom();
+    }
+    
+    hideTypingIndicator() {
+        const chatMessages = document.getElementById('chatMessages');
+        if (!chatMessages) return;
+        
+        const typingEl = chatMessages.querySelector('.typing-indicator');
+        if (typingEl) {
+            typingEl.remove();
+        }
+    }
+    
+    showSuccessMessage(message) {
+        const toast = document.createElement('div');
+        toast.style.cssText = 'position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 12px 20px; border-radius: 8px; z-index: 10000; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => toast.remove(), 300);
+        }, 2000);
+    }
+    
+    // ===== MESSAGE REACTIONS =====
+    initReactions() {
+        // Initialize reactions storage (in-memory, can be enhanced with backend)
+        if (!this.messageReactions) {
+            this.messageReactions = new Map();
+        }
+    }
+    
+    getMessageReactions(messageId) {
+        if (!this.messageReactions) {
+            this.initReactions();
+        }
+        return this.messageReactions.get(messageId) || {};
+    }
+    
+    toggleReaction(messageId, emoji) {
+        if (!this.messageReactions) {
+            this.initReactions();
+        }
+        
+        const reactions = this.getMessageReactions(messageId);
+        if (!reactions[emoji]) {
+            reactions[emoji] = [];
+        }
+        
+        const userId = this.userId;
+        const userIndex = reactions[emoji].indexOf(userId);
+        
+        if (userIndex > -1) {
+            // Remove reaction
+            reactions[emoji].splice(userIndex, 1);
+            if (reactions[emoji].length === 0) {
+                delete reactions[emoji];
+            }
+        } else {
+            // Add reaction
+            reactions[emoji].push(userId);
+        }
+        
+        this.messageReactions.set(messageId, reactions);
+        this.updateChatDisplay();
+        
+        // Haptic feedback
+        if (navigator.vibrate) {
+            navigator.vibrate(10);
+        }
+    }
+    
+    renderReactions(messageId, reactions, isOwnMessage) {
+        const reactionEmojis = Object.keys(reactions);
+        if (reactionEmojis.length === 0) {
+            return '';
+        }
+        
+        const reactionsHtml = reactionEmojis.map(emoji => {
+            const userIds = reactions[emoji];
+            const count = userIds.length;
+            const hasUserReaction = userIds.includes(this.userId);
+            
+            return `
+                <div class="message-reaction ${hasUserReaction ? 'own-reaction' : ''}" data-emoji="${emoji}">
+                    <span class="message-reaction-emoji">${emoji}</span>
+                    <span class="message-reaction-count">${count}</span>
+                </div>
+            `;
+        }).join('');
+        
+        return `<div class="message-reactions">${reactionsHtml}</div>`;
+    }
+    
+    showReactionPicker(messageEl, event) {
+        // Remove existing picker
+        const existingPicker = document.querySelector('.message-reaction-picker');
+        if (existingPicker) {
+            existingPicker.remove();
+        }
+        
+        const messageBubble = messageEl.querySelector('.message-bubble');
+        const picker = document.createElement('div');
+        picker.className = 'message-reaction-picker';
+        
+        const reactions = ['👍', '❤️', '😂', '😮', '😢', '🙏', '🔥', '✨'];
+        picker.innerHTML = reactions.map(emoji => 
+            `<button class="reaction-picker-btn" data-emoji="${emoji}">${emoji}</button>`
+        ).join('');
+        
+        // Position picker
+        const rect = messageBubble.getBoundingClientRect();
+        picker.style.left = `${rect.left}px`;
+        picker.style.bottom = `${window.innerHeight - rect.top + 8}px`;
+        
+        document.body.appendChild(picker);
+        
+        // Handle reaction selection
+        picker.querySelectorAll('.reaction-picker-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const emoji = btn.dataset.emoji;
+                const messageId = messageEl.dataset.messageId;
+                this.toggleReaction(messageId, emoji);
+                picker.remove();
+                
+                // Haptic feedback
+                if (navigator.vibrate) {
+                    navigator.vibrate(10);
+                }
+            });
+        });
+        
+        // Close picker on outside click
+        setTimeout(() => {
+            document.addEventListener('click', function closePicker() {
+                picker.remove();
+                document.removeEventListener('click', closePicker);
+            }, { once: true });
+        }, 100);
+    }
+    
+    // ===== @ MENTIONS =====
+    setupMentions() {
+        const chatInput = document.getElementById('chatInput');
+        const mentionAutocomplete = document.getElementById('mentionAutocomplete');
+        
+        if (!chatInput || !mentionAutocomplete) return;
+        
+        chatInput.addEventListener('input', (e) => {
+            const value = chatInput.value;
+            const cursorPos = chatInput.selectionStart;
+            
+            // Find @ symbol before cursor
+            const textBeforeCursor = value.substring(0, cursorPos);
+            const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+            
+            if (lastAtIndex !== -1) {
+                // Check if there's a space after @ (meaning mention is complete)
+                const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+                if (!textAfterAt.includes(' ') && !textAfterAt.includes('\n')) {
+                    this.mentionState.start = lastAtIndex;
+                    this.mentionState.query = textAfterAt.toLowerCase();
+                    
+                    // Show autocomplete
+                    this.showMentionAutocomplete(this.mentionState.query, this.mentionState.start);
+                    this.mentionState.selectedIndex = -1;
+                    return;
+                }
+            }
+            
+            // Hide autocomplete
+            mentionAutocomplete.classList.remove('active');
+            this.mentionState.start = -1;
+            this.mentionState.query = '';
+        });
+        
+        chatInput.addEventListener('keydown', (e) => {
+            if (!mentionAutocomplete.classList.contains('active')) return;
+            
+            const items = mentionAutocomplete.querySelectorAll('.mention-autocomplete-item');
+            if (items.length === 0) return;
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                this.mentionState.selectedIndex = Math.min(this.mentionState.selectedIndex + 1, items.length - 1);
+                this.updateMentionSelection(items, this.mentionState.selectedIndex);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                this.mentionState.selectedIndex = Math.max(this.mentionState.selectedIndex - 1, -1);
+                this.updateMentionSelection(items, this.mentionState.selectedIndex);
+            } else if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                if (this.mentionState.selectedIndex >= 0 && items[this.mentionState.selectedIndex]) {
+                    items[this.mentionState.selectedIndex].click();
+                }
+            } else if (e.key === 'Escape') {
+                mentionAutocomplete.classList.remove('active');
+            }
+        });
+        
+        // Close autocomplete on blur (with delay to allow clicks)
+        chatInput.addEventListener('blur', () => {
+            setTimeout(() => {
+                if (document.activeElement !== mentionAutocomplete) {
+                    mentionAutocomplete.classList.remove('active');
+                }
+            }, 200);
+        });
+    }
+    
+    showMentionAutocomplete(query, startPos) {
+        const mentionAutocomplete = document.getElementById('mentionAutocomplete');
+        if (!mentionAutocomplete) return;
+        
+        // Get participants
+        const participants = this.getParticipantsForMentions();
+        
+        // Filter by query
+        const filtered = participants.filter(p => 
+            p.name.toLowerCase().includes(query) || 
+            p.userName.toLowerCase().includes(query)
+        );
+        
+        if (filtered.length === 0) {
+            mentionAutocomplete.classList.remove('active');
+            return;
+        }
+        
+        mentionAutocomplete.innerHTML = filtered.map((participant, index) => {
+            const initials = participant.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+            return `
+                <div class="mention-autocomplete-item" data-user-id="${participant.userId}" data-user-name="${this.escapeHtml(participant.name)}" data-index="${index}">
+                    <div class="mention-autocomplete-item-avatar">${initials}</div>
+                    <div class="mention-autocomplete-item-name">${this.escapeHtml(participant.name)}</div>
+                    <div class="mention-autocomplete-item-username">@${this.escapeHtml(participant.userName)}</div>
+                </div>
+            `;
+        }).join('');
+        
+        // Add click handlers
+        mentionAutocomplete.querySelectorAll('.mention-autocomplete-item').forEach(item => {
+            item.addEventListener('click', () => {
+                this.insertMention(item.dataset.userName, startPos, query.length);
+                mentionAutocomplete.classList.remove('active');
+            });
+        });
+        
+        mentionAutocomplete.classList.add('active');
+        this.mentionState.selectedIndex = -1;
+    }
+    
+    updateMentionSelection(items, index) {
+        items.forEach((item, i) => {
+            item.classList.toggle('selected', i === index);
+        });
+    }
+    
+    insertMention(userName, startPos, queryLength) {
+        const chatInput = document.getElementById('chatInput');
+        if (!chatInput) return;
+        
+        const value = chatInput.value;
+        const beforeMention = value.substring(0, startPos);
+        const afterMention = value.substring(startPos + 1 + queryLength); // +1 for @
+        
+        chatInput.value = beforeMention + `@${userName} ` + afterMention;
+        
+        // Set cursor position after mention
+        const newPos = startPos + userName.length + 2; // +2 for @ and space
+        chatInput.setSelectionRange(newPos, newPos);
+        chatInput.focus();
+        
+        // Trigger input event to update counter
+        chatInput.dispatchEvent(new Event('input'));
+        
+        // Haptic feedback
+        if (navigator.vibrate) {
+            navigator.vibrate(5);
+        }
+    }
+    
+    getParticipantsForMentions() {
+        // Get participants from current participants list
+        const participants = [];
+        
+        if (this.participants && Array.isArray(this.participants)) {
+            this.participants.forEach(p => {
+                if (p.user_id !== this.userId) { // Don't include self
+                    participants.push({
+                        userId: p.user_id,
+                        name: p.user_name || 'Anonymous',
+                        userName: p.user_name ? p.user_name.toLowerCase().replace(/\s+/g, '') : 'anonymous'
+                    });
+                }
+            });
+        }
+        
+        return participants;
+    }
+    
+    processMentions(text) {
+        if (!text) return '';
+        
+        // Find @mentions in text and wrap them
+        const mentionRegex = /@(\w+(?:\s+\w+)*)/g;
+        const processed = this.escapeHtml(text).replace(mentionRegex, (match, name) => {
+            return `<span class="mention">${match}</span>`;
+        });
+        
+        return processed;
     }
     
     setupRealtimeListeners() {

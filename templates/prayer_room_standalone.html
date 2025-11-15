@@ -1251,8 +1251,18 @@
                     </div>
                     <div class="chat-input-section">
                         <div class="chat-input-container">
-                            <input type="text" class="chat-input" id="chatInput" placeholder="Type a message...">
-                            <button class="send-btn" id="sendBtn" aria-label="Send message">
+                            <button class="emoji-picker-btn" id="emojiPickerBtn" aria-label="Emoji picker" title="Add emoji">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                                    <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                                    <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                                </svg>
+                            </button>
+                            <textarea class="chat-input" id="chatInput" placeholder="Type a message... (use @ to mention)" rows="1" maxlength="1000"></textarea>
+                            <div class="chat-input-counter" id="chatInputCounter"></div>
+                            <div class="mention-autocomplete" id="mentionAutocomplete"></div>
+                            <button class="send-btn" id="sendBtn" aria-label="Send message" title="Send">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                     <line x1="22" y1="2" x2="11" y2="13"></line>
                                     <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
