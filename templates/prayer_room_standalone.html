@@ -1949,6 +1949,20 @@
                             this.incrementUnread();
                         }
                         
+                        // Update badge visibility based on unread count (ensure it's hidden when 0)
+                        const unreadBadge = document.getElementById('unreadBadge');
+                        const chatTab = document.getElementById('chatTab');
+                        if (unreadBadge) {
+                            if (this.unreadCount > 0) {
+                                unreadBadge.textContent = this.unreadCount > 99 ? '99+' : this.unreadCount;
+                                unreadBadge.style.display = 'flex';
+                                chatTab?.classList.add('has-unread');
+                            } else {
+                                unreadBadge.style.display = 'none';
+                                chatTab?.classList.remove('has-unread');
+                            }
+                        }
+                        
                         this.lastMessageCount = currentCount;
                     }, 500);
                 },
