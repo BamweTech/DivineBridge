@@ -1087,39 +1087,37 @@ class PrayerRoomService {
                     controls.push(`<button class="participant-action stage-btn" data-action="demote-self" data-user-id="${participant.user_id}">Leave Stage</button>`);
                 }
                 
-                // Desktop: Wrap avatar and info in a row, controls below
-                // Mobile: Keep original structure
-                const isDesktop = window.innerWidth >= 769;
-                const infoRow = isDesktop 
-                    ? `<div class="participant-info-row">
-                        <div class="participant-avatar">
-                            ${truncatedName.charAt(0).toUpperCase()}
-                        </div>
-                        <div class="participant-info">
-                            <div class="participant-name" title="${participant.user_name}">
-                                ${truncatedName}
-                            </div>
-                            <div class="participant-status">
-                                ${badges.join(' ')}
-                            </div>
-                        </div>
-                    </div>`
-                    : `<div class="participant-avatar">
+                // Pill layout: avatar + name + roles in one row
+                const infoRow = `<div class="participant-info-row">
+                    <div class="participant-avatar">
                         ${truncatedName.charAt(0).toUpperCase()}
                     </div>
-                    <div class="participant-info">
+                    <div class="participant-details">
                         <div class="participant-name" title="${participant.user_name}">
                             ${truncatedName}
                         </div>
                         <div class="participant-status">
                             ${badges.join(' ')}
                         </div>
-                    </div>`;
+                    </div>
+                </div>`;
                 
                 participantEl.innerHTML = `
                     ${infoRow}
                     ${controls.length ? `<div class="participant-controls">${controls.join('')}</div>` : ''}
                 `;
+                
+                // Add click handler for expand/collapse (only for host)
+                if (this.isHost && controls.length > 0) {
+                    participantEl.addEventListener('click', (e) => {
+                        // Don't toggle if clicking on controls
+                        if (e.target.closest('.participant-controls') || e.target.closest('.participant-action')) {
+                            return;
+                        }
+                        participantEl.classList.toggle('expanded');
+                    });
+                }
+                
                 participantsContainer.appendChild(participantEl);
             });
             
