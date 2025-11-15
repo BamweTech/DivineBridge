@@ -968,8 +968,7 @@
         position: relative !important;
         z-index: 1 !important;
         max-width: 100% !important;
-        /* Ensure proper spacing */
-        padding: 0 !important;
+        padding: 0 0 8px 0 !important; /* Add bottom padding to container instead of section */
         margin: 0 !important;
     }
     
@@ -979,9 +978,15 @@
         position: fixed !important;
         bottom: 0 !important;
         z-index: 200 !important;
-        padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+        padding-bottom: 0 !important; /* No bottom padding when keyboard is open */
+        margin-bottom: 0 !important; /* No bottom margin */
         /* Smooth transition */
         transition: bottom 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+    
+    /* Ensure container has padding when keyboard is open */
+    body.chat-input-focused .chat-input-container {
+        padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
     }
     
     /* Hide bottom tabs when chat input is focused */
