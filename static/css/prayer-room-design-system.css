@@ -66,7 +66,7 @@
     --blur-lg: blur(25px);
 }
 
-/* ===== DESKTOP LAYOUT - HOST VIEW (3-COLUMN) ===== */
+/* ===== DESKTOP LAYOUT - HOST VIEW (3-COLUMN WHEN CHAT EXISTS) ===== */
 @media (min-width: 1400px) {
     .prayer-room-main {
         display: grid !important;
@@ -89,9 +89,9 @@
         padding: var(--space-xl) !important;
     }
     
-    /* Hide chat panel on smaller desktop, show as separate section */
+    /* Show chat panel on standard desktop */
     .chat-panel {
-        display: none !important;
+        display: flex !important;
     }
 }
 
@@ -320,70 +320,37 @@
     border: 1px solid var(--border-primary) !important;
 }
 
-/* ===== STAGE AREA - GLASSMORPHISM ===== */
-.stage-area,
-.prayer-room-main > div:not(.participants-panel):not(.chat-panel) {
-    padding: var(--space-2xl) !important;
-    border-radius: var(--radius-xl) !important;
-    background: var(--glass-subtle) !important;
-    border: 1px solid var(--border-white) !important;
-    backdrop-filter: var(--blur-sm) !important;
-    -webkit-backdrop-filter: var(--blur-sm) !important;
-    box-shadow: var(--shadow-md) !important;
+/* ===== PARTICIPANTS SECTION - ENHANCED ===== */
+.participants-section {
+    padding: var(--space-xl) !important;
+    position: relative !important;
+    z-index: 1 !important;
 }
 
-.stage-title {
-    font-size: 32px !important;
-    font-weight: 700 !important;
-    background: var(--gradient-primary) !important;
-    -webkit-background-clip: text !important;
-    -webkit-text-fill-color: transparent !important;
-    background-clip: text !important;
-    text-align: center !important;
-    margin-bottom: var(--space-xl) !important;
+.participants-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: var(--space-sm) !important;
+    max-height: calc(100vh - 300px) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding-right: var(--space-xs) !important;
 }
 
-.stage-label {
-    font-size: 14px !important;
-    color: var(--text-primary) !important;
-    opacity: 0.7 !important;
-    text-align: center !important;
-    margin-bottom: var(--space-sm) !important;
-}
-
-/* Speaker Grid */
-.speakers-grid {
-    display: grid !important;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+/* Participant Info Row - Pill Layout */
+.participant-info-row {
+    display: flex !important;
+    align-items: center !important;
     gap: var(--space-md) !important;
+    width: 100% !important;
 }
 
-.speaker-tile {
-    border-radius: var(--radius-lg) !important;
-    border: 2px solid var(--border-primary) !important;
-    background: var(--glass-primary) !important;
-    padding: var(--space-lg) !important;
-    transition: all 0.3s ease !important;
-    text-align: center !important;
-}
-
-.speaker-tile:hover {
-    transform: scale(1.05) !important;
-    background: var(--glass-hover) !important;
-    box-shadow: var(--shadow-lg) !important;
-}
-
-.speaker-tile.active {
-    border-color: #10b981 !important;
-    box-shadow: 0 0 20px rgba(16, 185, 129, 0.4) !important;
-}
-
-.speaker-tile .participant-avatar {
-    width: 80px !important;
-    height: 80px !important;
-    font-size: 32px !important;
-    margin: 0 auto var(--space-sm) !important;
-    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3) !important;
+.participant-details {
+    flex: 1 !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
 }
 
 /* ===== CHAT PANEL - GLASSMORPHISM ===== */
@@ -456,24 +423,56 @@
     border-top: 1px solid var(--border-light) !important;
     padding: var(--space-md) !important;
     border-radius: 0 0 var(--radius-xl) var(--radius-xl) !important;
+    flex-shrink: 0 !important;
+}
+
+.chat-input-container {
+    display: flex !important;
+    align-items: flex-end !important;
+    gap: var(--space-sm) !important;
 }
 
 .chat-input {
-    width: 100% !important;
-    height: 48px !important;
+    flex: 1 !important;
+    min-height: 44px !important;
+    max-height: 120px !important;
     padding: 12px 16px !important;
     border-radius: var(--radius-md) !important;
     background: var(--glass-input) !important;
     border: 1px solid var(--border-primary) !important;
     font-size: 14px !important;
+    font-family: inherit !important;
     color: var(--text-tertiary) !important;
     transition: all 0.3s ease !important;
+    resize: none !important;
+    overflow-y: auto !important;
 }
 
 .chat-input:focus {
     outline: none !important;
     border-color: var(--color-primary) !important;
+    background: var(--glass-hover) !important;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+.emoji-picker-btn {
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: var(--radius-md) !important;
+    background: var(--glass-secondary) !important;
+    border: 1px solid var(--border-primary) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    color: var(--text-secondary) !important;
+    flex-shrink: 0 !important;
+}
+
+.emoji-picker-btn:hover {
+    background: var(--glass-hover) !important;
+    border-color: var(--color-primary) !important;
 }
 
 .chat-send-btn,
