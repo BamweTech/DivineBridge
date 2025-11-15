@@ -521,16 +521,18 @@
     }
     
     /* ===== CHAT PANEL ===== */
+    /* NOTE: chat-panel is inside .prayer-room-main which already handles the offset */
+    /* So we use top: 0 relative to parent, not the viewport offset */
     .prayer-room-chat,
     .chat-panel {
         position: absolute !important;
-        top: var(--mobile-header-offset, 176px) !important;
+        top: 0 !important; /* Relative to .prayer-room-main, not viewport */
         left: 0 !important;
         right: 0 !important;
         bottom: 0 !important;
         width: 100% !important;
-        height: calc(100% - var(--mobile-header-offset, 176px)) !important;
-        max-height: calc(100% - var(--mobile-header-offset, 176px)) !important;
+        height: 100% !important; /* Fill parent container */
+        max-height: 100% !important;
         display: flex !important;
         flex-direction: column !important;
         background: #ffffff !important;
@@ -559,9 +561,9 @@
     /* When keyboard is open, ensure chat panel stays properly positioned */
     body.chat-input-focused .chat-panel:not(.mobile-hidden) {
         position: fixed !important;
-        top: 0 !important;
-        height: 100vh !important;
-        height: 100dvh !important;
+        top: var(--mobile-header-offset, 176px) !important; /* Use viewport offset when fixed */
+        height: calc(100vh - var(--mobile-header-offset, 176px)) !important;
+        height: calc(100dvh - var(--mobile-header-offset, 176px)) !important;
     }
     
     .chat-section {
@@ -955,9 +957,9 @@
     body.chat-input-focused .chat-panel {
         height: calc(var(--viewport-height, 100vh) - var(--header-height, 56px)) !important;
         max-height: calc(var(--viewport-height, 100vh) - var(--header-height, 56px)) !important;
-        /* Ensure it stays in view */
-        position: absolute !important;
-        top: var(--header-height, 56px) !important;
+        /* When fixed, use viewport offset; when absolute, use 0 (relative to parent) */
+        position: fixed !important;
+        top: var(--mobile-header-offset, 176px) !important;
     }
     
     body.chat-input-focused .chat-section {
