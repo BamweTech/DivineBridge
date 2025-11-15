@@ -3845,6 +3845,12 @@ Listening for unmute event...`);
             if (peer) {
                 peer.signal(offer.offer);
                 console.log(`[WebRTC] Applied offer from ${fromUser}.`);
+                
+                // Process any queued candidates now that the connection is ready
+                // Wait a bit for the remote description to be set
+                setTimeout(() => {
+                    this.processQueuedCandidates(fromUser);
+                }, 100);
             } else {
                  console.error(`[WebRTC] Failed to create peer for offer from ${fromUser}.`);
             }
@@ -3880,6 +3886,12 @@ Listening for unmute event...`);
 
             peer.signal(answer.answer);
             console.log(`[WebRTC] Applied answer from ${fromUser}.`);
+            
+            // Process any queued candidates now that the connection is ready
+            // Wait a bit for the remote description to be set
+            setTimeout(() => {
+                this.processQueuedCandidates(fromUser);
+            }, 100);
 
         } catch (error) {
             console.error('[WebRTC] Error handling WebRTC answer:', error);
@@ -3911,13 +3923,22 @@ Listening for unmute event...`);
             if (peer) {
                 // Add candidate if peer connection is ready
                 if (peer._pc && peer._pc.remoteDescription) {
-                    peer.signal(candidate.candidate);
+                    try {
+                        peer.signal(candidate.candidate);
+                        console.log(`✅ Added candidate to peer connection for ${candidate.from_user}`);
+                    } catch (error) {
+                        console.warn(`⚠️ Failed to add candidate to peer connection for ${candidate.from_user}:`, error);
+                        // Queue for retry if signaling fails
+                        this.queueCandidateForLater(candidate);
+                    }
                 } else {
+                    // Peer connection exists but not ready yet - queue the candidate
+                    console.log(`📡 Peer connection for ${candidate.from_user} not ready yet, queuing candidate`);
                     this.queueCandidateForLater(candidate);
                 }
             } else {
-                console.warn('No peer connection found for candidate from:', candidate.from_user);
-                // Queue the candidate for when the peer connection is created
+                // No peer connection yet - this is normal, candidates can arrive before connection is created
+                console.log(`📡 No peer connection yet for ${candidate.from_user}, queuing candidate (this is normal)`);
                 this.queueCandidateForLater(candidate);
             }
             
