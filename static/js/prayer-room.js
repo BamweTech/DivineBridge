@@ -62,6 +62,12 @@ class PrayerRoomService {
         this.maxRetries = 3;
         this.retryDelay = 2000; // Start with 2 seconds
         
+        // Audio connection retry tracking
+        this.audioConnectionRetries = 0;
+        this.maxAudioRetries = 3;
+        this.audioRetryDelay = 2000; // Start with 2 seconds
+        this.isRetryingAudio = false;
+        
         // WebSocket for real-time communication
         this.socket = null;
         this.wsConnected = false;
@@ -1221,17 +1227,27 @@ class PrayerRoomService {
         });
     }
     
-    async joinAudio() {
+    async joinAudio(retryAttempt = 0) {
         try {
-            console.log('🎤 Joining audio...');
+            // Prevent multiple simultaneous join attempts
+            if (this.isRetryingAudio) {
+                console.log('🎤 Audio join already in progress, skipping...');
+                return;
+            }
+            
+            console.log(`🎤 Joining audio${retryAttempt > 0 ? ` (retry ${retryAttempt}/${this.maxAudioRetries})` : ''}...`);
             
             if (!this.roomId) {
                 throw new Error('Room ID not available. Please refresh the page and try again.');
             }
             
-            // Update UI immediately for instant feedback
-            this.isAudioEnabled = true;
-            this.updateAudioControls();
+            // Update UI immediately for instant feedback (only on first attempt)
+            if (retryAttempt === 0) {
+                this.isAudioEnabled = true;
+                this.updateAudioControls();
+            }
+            
+            this.isRetryingAudio = true;
             
             // Request microphone permission with enhanced noise suppression
             console.log('🎤 Requesting microphone permission...');
@@ -1328,12 +1344,159 @@ class PrayerRoomService {
             
             console.log('🎤 Audio join process initiated successfully');
             
+            // Reset retry counter on success
+            this.audioConnectionRetries = 0;
+            this.isRetryingAudio = false;
+            
         } catch (error) {
             console.error('🎤 Error joining audio:', error);
-            this.isAudioEnabled = false;
-            this.updateAudioControls();
-            this.showError('Failed to access microphone. Please check permissions and try again.');
+            this.isRetryingAudio = false;
+            
+            // Check if we should retry
+            if (retryAttempt < this.maxAudioRetries) {
+                const delay = this.audioRetryDelay * Math.pow(2, retryAttempt);
+                console.log(`🔄 Retrying audio connection in ${delay}ms (attempt ${retryAttempt + 1}/${this.maxAudioRetries})`);
+                
+                // Show retry notification
+                this.showAudioRetryNotification(retryAttempt + 1, this.maxAudioRetries, delay);
+                
+                // Wait before retrying
+                await new Promise(resolve => setTimeout(resolve, delay));
+                
+                // Retry the connection
+                return this.joinAudio(retryAttempt + 1);
+            } else {
+                // Max retries reached - reset audio state and show error
+                console.error(`❌ Max audio retries (${this.maxAudioRetries}) reached. Resetting audio state.`);
+                this.handleAudioConnectionFailure(error);
+            }
         }
+    }
+    
+    handleAudioConnectionFailure(error) {
+        // Reset audio state
+        this.isAudioEnabled = false;
+        this.isMuted = false;
+        this.audioConnectionRetries = 0;
+        
+        // Clean up any existing stream
+        if (this.localStream) {
+            this.localStream.getTracks().forEach(track => track.stop());
+            this.localStream = null;
+        }
+        
+        // Update UI to show "Join Audio" button
+        this.updateAudioControls();
+        
+        // Get user-friendly error message
+        const errorMessage = this.getAudioErrorMessage(error);
+        
+        // Show persistent error notification with retry button
+        this.showAudioErrorNotification(errorMessage);
+    }
+    
+    getAudioErrorMessage(error) {
+        const errorName = error.name || error.toString();
+        
+        if (errorName.includes('NotAllowedError') || errorName.includes('PermissionDeniedError')) {
+            return 'Microphone permission denied. Please allow microphone access in your browser settings and try again.';
+        } else if (errorName.includes('NotFoundError') || errorName.includes('DevicesNotFoundError')) {
+            return 'No microphone found. Please connect a microphone and try again.';
+        } else if (errorName.includes('NotReadableError') || errorName.includes('TrackStartError')) {
+            return 'Microphone is being used by another app. Please close other apps using the microphone and try again.';
+        } else if (errorName.includes('OverconstrainedError') || errorName.includes('ConstraintNotSatisfiedError')) {
+            return 'Microphone settings not supported. Please try a different microphone or browser.';
+        } else if (errorName.includes('AbortError')) {
+            return 'Microphone access was interrupted. Please try again.';
+        } else if (errorName.includes('Network')) {
+            return 'Network error. Please check your internet connection and try again.';
+        } else {
+            return 'Failed to connect to audio. Please check your microphone permissions and try again.';
+        }
+    }
+    
+    showAudioRetryNotification(attempt, maxAttempts, delayMs) {
+        const delaySeconds = Math.ceil(delayMs / 1000);
+        const message = `Retrying audio connection... (${attempt}/${maxAttempts}) - ${delaySeconds}s`;
+        this.showToast(message, 'info', 2000);
+    }
+    
+    showAudioErrorNotification(message) {
+        // Create a persistent error notification with retry button
+        const existingNotification = document.getElementById('audio-error-notification');
+        if (existingNotification) {
+            existingNotification.remove();
+        }
+        
+        const notification = document.createElement('div');
+        notification.id = 'audio-error-notification';
+        notification.className = 'audio-error-notification';
+        notification.innerHTML = `
+            <div class="audio-error-content">
+                <div class="audio-error-icon">⚠️</div>
+                <div class="audio-error-text">
+                    <div class="audio-error-title">Audio Connection Failed</div>
+                    <div class="audio-error-message">${this.escapeHtml(message)}</div>
+                </div>
+                <button class="audio-error-retry-btn" id="audioErrorRetryBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                    Rejoin Audio
+                </button>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Add retry button handler
+        const retryBtn = document.getElementById('audioErrorRetryBtn');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', () => {
+                notification.remove();
+                this.joinAudio(0); // Start fresh retry
+            });
+        }
+        
+        // Auto-dismiss after 10 seconds (user can still click retry)
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.style.opacity = '0';
+                notification.style.transition = 'opacity 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }
+        }, 10000);
+    }
+    
+    showToast(message, type = 'info', duration = 3000) {
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.textContent = message;
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10000;
+            animation: slideInRight 0.3s ease;
+            max-width: 400px;
+            font-weight: 500;
+            font-size: 14px;
+        `;
+        
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.3s ease';
+            setTimeout(() => toast.remove(), 300);
+        }, duration);
     }
     
     toggleMute() {
