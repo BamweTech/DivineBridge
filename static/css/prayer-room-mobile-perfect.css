@@ -470,13 +470,16 @@
     .participant-status span,
     .role-badge,
     .speaking-indicator,
-    .mute-indicator {
-        font-size: 11px !important;
+    .mute-indicator,
+    .host-badge,
+    .request-badge {
+        font-size: 10px !important;
         font-weight: 600 !important;
-        padding: 4px 10px !important;
+        padding: 3px 8px !important;
         border-radius: 999px !important;
         background: rgba(148, 163, 184, 0.18) !important;
         color: #334155 !important;
+        white-space: nowrap !important;
     }
     
     .role-badge.speaker {
