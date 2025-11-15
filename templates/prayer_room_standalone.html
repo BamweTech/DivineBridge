@@ -41,6 +41,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-mobile-perfect.css') }}?v={{ range(100000, 999999) | random }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-mobile-enhanced.css') }}?v={{ range(100000, 999999) | random }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-mobile-enhanced-part2.css') }}?v={{ range(100000, 999999) | random }}">
+    <!-- DESIGN SYSTEM - Based on profiles, loads before desktop overrides -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-design-system.css') }}?v={{ range(100000, 999999) | random }}">
     <!-- DESKTOP OVERRIDES - Loads LAST to ensure desktop styles override mobile -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-desktop-overrides.css') }}?v={{ range(100000, 999999) | random }}">
     

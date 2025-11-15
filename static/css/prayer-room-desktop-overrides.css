@@ -1,6 +1,7 @@
 /* ========================================
    DESKTOP OVERRIDES - Loads LAST
    Ensures desktop styles override mobile styles
+   Works with Design System CSS
    ======================================== */
 
 /* Desktop participant cards - Enhanced styling */
@@ -20,7 +21,7 @@
         overflow: hidden !important;
         display: flex !important;
         flex-direction: column !important;
-        padding: 0 !important;
+        padding: var(--space-lg, 20px) !important;
     }
     
     .prayer-room-interface {
@@ -43,6 +44,7 @@
         flex: 1 !important;
         min-height: 0 !important;
         overflow: hidden !important;
+        /* Grid layout handled by design-system.css */
     }
     
     .participant {

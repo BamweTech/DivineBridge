@@ -1,0 +1,626 @@
+/* ========================================
+   PRAYER ROOM - DESIGN SYSTEM IMPLEMENTATION
+   Based on Host & Participant Design Profiles
+   Using Existing Color Palette
+   ======================================== */
+
+/* ===== CSS VARIABLES - EXISTING COLOR PALETTE ===== */
+:root {
+    /* Primary Colors - Keep existing */
+    --color-primary: #3b82f6;
+    --color-primary-dark: #2563eb;
+    --color-primary-light: #60a5fa;
+    --color-purple: #764ba2;
+    --color-purple-light: #667eea;
+    
+    /* Gradients - Keep existing */
+    --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --gradient-primary-alt: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    --gradient-danger: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    --gradient-warning: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    --gradient-secondary: linear-gradient(135deg, #06b6d4 0%, #0ea5e9 100%);
+    
+    /* Glass Effects - Enhanced from profiles */
+    --glass-primary: rgba(255, 255, 255, 0.7);
+    --glass-secondary: rgba(255, 255, 255, 0.6);
+    --glass-subtle: rgba(255, 255, 255, 0.5);
+    --glass-card: rgba(255, 255, 255, 0.6);
+    --glass-input: rgba(255, 255, 255, 0.8);
+    --glass-hover: rgba(255, 255, 255, 0.9);
+    
+    /* Borders */
+    --border-primary: rgba(59, 130, 246, 0.2);
+    --border-light: rgba(59, 130, 246, 0.15);
+    --border-white: rgba(255, 255, 255, 0.8);
+    
+    /* Text Colors */
+    --text-primary: #1e3a8a;
+    --text-secondary: #1e40af;
+    --text-tertiary: #374151;
+    --text-muted: #6b7280;
+    
+    /* Spacing System */
+    --space-xs: 8px;
+    --space-sm: 12px;
+    --space-md: 16px;
+    --space-lg: 20px;
+    --space-xl: 24px;
+    --space-2xl: 32px;
+    
+    /* Border Radius */
+    --radius-sm: 6px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+    
+    /* Shadows */
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 32px rgba(59, 130, 246, 0.1);
+    --shadow-xl: 0 12px 48px rgba(59, 130, 246, 0.15);
+    
+    /* Blur */
+    --blur-sm: blur(10px);
+    --blur-md: blur(20px);
+    --blur-lg: blur(25px);
+}
+
+/* ===== DESKTOP LAYOUT - HOST VIEW (3-COLUMN) ===== */
+@media (min-width: 1400px) {
+    .prayer-room-main {
+        display: grid !important;
+        grid-template-columns: 380px 1fr 420px !important;
+        gap: var(--space-lg) !important;
+        max-width: 1600px !important;
+        margin: 0 auto !important;
+        padding: var(--space-xl) !important;
+    }
+}
+
+/* ===== DESKTOP LAYOUT - STANDARD (2-COLUMN) ===== */
+@media (min-width: 769px) and (max-width: 1399px) {
+    .prayer-room-main {
+        display: grid !important;
+        grid-template-columns: minmax(280px, 320px) 1fr !important;
+        gap: var(--space-lg) !important;
+        max-width: 1400px !important;
+        margin: 0 auto !important;
+        padding: var(--space-xl) !important;
+    }
+    
+    /* Hide chat panel on smaller desktop, show as separate section */
+    .chat-panel {
+        display: none !important;
+    }
+}
+
+/* ===== PARTICIPANT VIEW - 2-COLUMN LAYOUT ===== */
+@media (min-width: 1200px) {
+    body.participant-view .prayer-room-main {
+        display: grid !important;
+        grid-template-columns: 1fr 420px !important;
+        gap: var(--space-lg) !important;
+    }
+    
+    body.participant-view .participants-panel {
+        max-height: 300px !important;
+        overflow-y: auto !important;
+    }
+}
+
+/* ===== CONTAINER & BACKGROUND ===== */
+.prayer-room-container {
+    background: linear-gradient(135deg, rgba(224, 242, 254, 0.3) 0%, rgba(221, 214, 254, 0.2) 30%, rgba(250, 232, 255, 0.2) 60%, rgba(240, 249, 255, 0.3) 100%) !important;
+    min-height: 100vh !important;
+    padding: var(--space-lg) !important;
+}
+
+.prayer-room-interface {
+    background: var(--glass-primary) !important;
+    backdrop-filter: var(--blur-md) !important;
+    -webkit-backdrop-filter: var(--blur-md) !important;
+    border-radius: var(--radius-xl) !important;
+    border: 1px solid var(--border-white) !important;
+    box-shadow: var(--shadow-lg) !important;
+    overflow: hidden !important;
+    max-width: 1600px !important;
+    margin: 0 auto !important;
+}
+
+/* ===== HEADER - ENHANCED GLASSMORPHISM ===== */
+.prayer-room-header {
+    background: var(--glass-primary) !important;
+    backdrop-filter: var(--blur-md) !important;
+    -webkit-backdrop-filter: var(--blur-md) !important;
+    padding: var(--space-lg) var(--space-2xl) !important;
+    border-bottom: 1px solid var(--border-white) !important;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0 !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    box-shadow: var(--shadow-md) !important;
+}
+
+.header-logo-img,
+.header-logo {
+    height: 48px !important;
+    width: auto !important;
+}
+
+.prayer-room-title {
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    color: var(--text-primary) !important;
+    margin: 0 !important;
+}
+
+.room-code {
+    background: rgba(59, 130, 246, 0.1) !important;
+    padding: 8px 16px !important;
+    border-radius: var(--radius-md) !important;
+    color: var(--text-secondary) !important;
+    font-family: 'Courier New', monospace !important;
+    font-size: 18px !important;
+    font-weight: bold !important;
+    letter-spacing: 2px !important;
+    border: 1px solid var(--border-primary) !important;
+}
+
+.copy-room-code-btn {
+    background: var(--glass-secondary) !important;
+    border: 1px solid var(--border-primary) !important;
+    color: var(--text-secondary) !important;
+    padding: 8px 16px !important;
+    border-radius: var(--radius-md) !important;
+    transition: all 0.3s ease !important;
+}
+
+.copy-room-code-btn:hover {
+    background: var(--glass-hover) !important;
+    border-color: var(--color-primary) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* ===== PARTICIPANTS PANEL - GLASSMORPHISM ===== */
+.participants-panel {
+    background: var(--glass-primary) !important;
+    backdrop-filter: var(--blur-md) !important;
+    -webkit-backdrop-filter: var(--blur-md) !important;
+    border-radius: var(--radius-xl) !important;
+    border: 1px solid var(--border-white) !important;
+    box-shadow: var(--shadow-md) !important;
+    padding: var(--space-xl) !important;
+    transition: all 0.3s ease !important;
+    overflow: hidden !important;
+}
+
+.participants-panel:hover {
+    box-shadow: var(--shadow-xl) !important;
+    transform: translateY(-2px) !important;
+}
+
+.participants-title {
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    color: var(--text-primary) !important;
+    margin-bottom: var(--space-md) !important;
+}
+
+/* Search Box */
+.participants-panel input[type="search"],
+.participants-panel input[type="text"] {
+    width: 100% !important;
+    height: 44px !important;
+    padding: 12px 16px 12px 40px !important;
+    border-radius: var(--radius-md) !important;
+    background: var(--glass-input) !important;
+    border: 1px solid var(--border-primary) !important;
+    font-size: 14px !important;
+    color: var(--text-tertiary) !important;
+    transition: all 0.3s ease !important;
+}
+
+.participants-panel input:focus {
+    outline: none !important;
+    border-color: var(--color-primary) !important;
+    background: var(--glass-hover) !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Tabs */
+.participants-tabs {
+    display: flex !important;
+    gap: var(--space-sm) !important;
+    margin-bottom: var(--space-md) !important;
+}
+
+.participants-tab {
+    flex: 1 !important;
+    padding: 10px 16px !important;
+    border-radius: var(--radius-md) !important;
+    background: var(--glass-subtle) !important;
+    border: 1px solid var(--border-primary) !important;
+    color: var(--text-secondary) !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    transition: all 0.3s ease !important;
+    cursor: pointer !important;
+}
+
+.participants-tab.active {
+    background: var(--gradient-primary) !important;
+    border-color: transparent !important;
+    color: white !important;
+}
+
+/* Participant Card */
+.participant {
+    padding: var(--space-md) !important;
+    margin-bottom: var(--space-sm) !important;
+    border-radius: var(--radius-lg) !important;
+    background: var(--glass-card) !important;
+    border: 1px solid var(--border-light) !important;
+    transition: all 0.3s ease !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+.participant:hover {
+    background: var(--glass-hover) !important;
+    border-color: var(--border-primary) !important;
+    box-shadow: var(--shadow-md) !important;
+    transform: translateX(4px) !important;
+}
+
+.participant-avatar {
+    width: 48px !important;
+    height: 48px !important;
+    border-radius: 50% !important;
+    background: var(--gradient-primary-alt) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 18px !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+}
+
+.participant-name {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+    margin-bottom: 4px !important;
+}
+
+.participant-status {
+    font-size: 12px !important;
+    color: var(--text-muted) !important;
+}
+
+/* Badges */
+.role-badge,
+.host-badge,
+.speaker-badge {
+    padding: 3px 10px !important;
+    border-radius: var(--radius-sm) !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+}
+
+.speaker-badge {
+    background: rgba(16, 185, 129, 0.1) !important;
+    color: #059669 !important;
+    border: 1px solid rgba(16, 185, 129, 0.2) !important;
+}
+
+.host-badge {
+    background: rgba(59, 130, 246, 0.1) !important;
+    color: var(--color-primary-dark) !important;
+    border: 1px solid var(--border-primary) !important;
+}
+
+/* ===== STAGE AREA - GLASSMORPHISM ===== */
+.stage-area,
+.prayer-room-main > div:not(.participants-panel):not(.chat-panel) {
+    padding: var(--space-2xl) !important;
+    border-radius: var(--radius-xl) !important;
+    background: var(--glass-subtle) !important;
+    border: 1px solid var(--border-white) !important;
+    backdrop-filter: var(--blur-sm) !important;
+    -webkit-backdrop-filter: var(--blur-sm) !important;
+    box-shadow: var(--shadow-md) !important;
+}
+
+.stage-title {
+    font-size: 32px !important;
+    font-weight: 700 !important;
+    background: var(--gradient-primary) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+    text-align: center !important;
+    margin-bottom: var(--space-xl) !important;
+}
+
+.stage-label {
+    font-size: 14px !important;
+    color: var(--text-primary) !important;
+    opacity: 0.7 !important;
+    text-align: center !important;
+    margin-bottom: var(--space-sm) !important;
+}
+
+/* Speaker Grid */
+.speakers-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+    gap: var(--space-md) !important;
+}
+
+.speaker-tile {
+    border-radius: var(--radius-lg) !important;
+    border: 2px solid var(--border-primary) !important;
+    background: var(--glass-primary) !important;
+    padding: var(--space-lg) !important;
+    transition: all 0.3s ease !important;
+    text-align: center !important;
+}
+
+.speaker-tile:hover {
+    transform: scale(1.05) !important;
+    background: var(--glass-hover) !important;
+    box-shadow: var(--shadow-lg) !important;
+}
+
+.speaker-tile.active {
+    border-color: #10b981 !important;
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.4) !important;
+}
+
+.speaker-tile .participant-avatar {
+    width: 80px !important;
+    height: 80px !important;
+    font-size: 32px !important;
+    margin: 0 auto var(--space-sm) !important;
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* ===== CHAT PANEL - GLASSMORPHISM ===== */
+.chat-panel {
+    background: var(--glass-primary) !important;
+    backdrop-filter: var(--blur-md) !important;
+    -webkit-backdrop-filter: var(--blur-md) !important;
+    border-radius: var(--radius-xl) !important;
+    border: 1px solid var(--border-white) !important;
+    box-shadow: var(--shadow-md) !important;
+    padding: var(--space-xl) !important;
+    transition: all 0.3s ease !important;
+    overflow: hidden !important;
+}
+
+.chat-panel:hover {
+    box-shadow: var(--shadow-xl) !important;
+    transform: translateY(-2px) !important;
+}
+
+.chat-header {
+    padding: var(--space-md) 0 !important;
+    border-bottom: 1px solid var(--border-light) !important;
+    margin-bottom: var(--space-md) !important;
+}
+
+.chat-title {
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    color: var(--text-primary) !important;
+}
+
+/* Chat Messages */
+.chat-messages {
+    background: transparent !important;
+}
+
+.message {
+    padding: var(--space-sm) var(--space-md) !important;
+    border-radius: var(--radius-md) !important;
+    background: var(--glass-card) !important;
+    border: 1px solid var(--border-light) !important;
+    margin-bottom: var(--space-md) !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+.message-avatar {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 50% !important;
+    background: var(--gradient-secondary) !important;
+}
+
+.message-sender {
+    font-weight: 600 !important;
+    color: var(--text-secondary) !important;
+    font-size: 13px !important;
+    margin-bottom: 4px !important;
+}
+
+.message-content {
+    color: var(--text-tertiary) !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+}
+
+/* Chat Input */
+.chat-input-section {
+    background: var(--glass-input) !important;
+    border-top: 1px solid var(--border-light) !important;
+    padding: var(--space-md) !important;
+    border-radius: 0 0 var(--radius-xl) var(--radius-xl) !important;
+}
+
+.chat-input {
+    width: 100% !important;
+    height: 48px !important;
+    padding: 12px 16px !important;
+    border-radius: var(--radius-md) !important;
+    background: var(--glass-input) !important;
+    border: 1px solid var(--border-primary) !important;
+    font-size: 14px !important;
+    color: var(--text-tertiary) !important;
+    transition: all 0.3s ease !important;
+}
+
+.chat-input:focus {
+    outline: none !important;
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+.chat-send-btn,
+.send-btn {
+    width: 48px !important;
+    height: 48px !important;
+    border-radius: 50% !important;
+    background: var(--gradient-primary) !important;
+    border: none !important;
+    color: white !important;
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3) !important;
+    transition: all 0.3s ease !important;
+    cursor: pointer !important;
+}
+
+.chat-send-btn:hover,
+.send-btn:hover {
+    transform: translateY(-2px) scale(1.1) !important;
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4) !important;
+}
+
+/* ===== BUTTONS - GRADIENT STYLING ===== */
+.control-btn,
+.participant-action {
+    padding: 10px 24px !important;
+    border-radius: var(--radius-md) !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    transition: all 0.3s ease !important;
+    border: none !important;
+    cursor: pointer !important;
+}
+
+.control-btn.primary,
+.participant-action.stage-btn {
+    background: var(--gradient-primary) !important;
+    color: white !important;
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3) !important;
+}
+
+.control-btn.primary:hover,
+.participant-action.stage-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4) !important;
+}
+
+.participant-action.mute-toggle {
+    background: var(--gradient-danger) !important;
+    color: white !important;
+}
+
+.participant-action.remove-btn {
+    background: var(--glass-secondary) !important;
+    color: var(--text-secondary) !important;
+    border: 1px solid var(--border-primary) !important;
+}
+
+.participant-action.remove-btn:hover {
+    background: rgba(239, 68, 68, 0.1) !important;
+    color: #dc2626 !important;
+    border-color: rgba(239, 68, 68, 0.2) !important;
+}
+
+/* ===== STATUS INDICATORS ===== */
+.status-indicator {
+    width: 12px !important;
+    height: 12px !important;
+    border-radius: 50% !important;
+    border: 2px solid white !important;
+    position: absolute !important;
+    bottom: 2px !important;
+    right: 2px !important;
+}
+
+.status-indicator.speaking {
+    background: #10b981 !important;
+    animation: pulse 1.5s infinite !important;
+}
+
+.status-indicator.muted {
+    background: #ef4444 !important;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.7;
+        transform: scale(1.1);
+    }
+}
+
+/* ===== SCROLLBAR STYLING ===== */
+.participants-list::-webkit-scrollbar,
+.chat-messages::-webkit-scrollbar {
+    width: 8px !important;
+}
+
+.participants-list::-webkit-scrollbar-track,
+.chat-messages::-webkit-scrollbar-track {
+    background: rgba(59, 130, 246, 0.05) !important;
+    border-radius: 4px !important;
+}
+
+.participants-list::-webkit-scrollbar-thumb,
+.chat-messages::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.2) !important;
+    border-radius: 4px !important;
+}
+
+.participants-list::-webkit-scrollbar-thumb:hover,
+.chat-messages::-webkit-scrollbar-thumb:hover {
+    background: rgba(59, 130, 246, 0.3) !important;
+}
+
+/* ===== MOBILE RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .prayer-room-container {
+        padding: 0 !important;
+    }
+    
+    .prayer-room-interface {
+        border-radius: 0 !important;
+    }
+    
+    .prayer-room-header {
+        border-radius: 0 !important;
+        padding: 12px 16px !important;
+    }
+    
+    .participants-panel,
+    .chat-panel {
+        border-radius: 0 !important;
+        padding: var(--space-md) !important;
+    }
+    
+    .speakers-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)) !important;
+        gap: var(--space-sm) !important;
+    }
+    
+    .speaker-tile .participant-avatar {
+        width: 60px !important;
+        height: 60px !important;
+        font-size: 24px !important;
+    }
+}
+
