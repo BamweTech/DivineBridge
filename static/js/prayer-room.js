@@ -1345,6 +1345,16 @@ class PrayerRoomService {
             });
         }
         
+        // Update mute button visual state immediately
+        const muteBtn = document.getElementById('muteBtn');
+        if (muteBtn) {
+            if (this.isMuted) {
+                muteBtn.classList.add('muted');
+            } else {
+                muteBtn.classList.remove('muted');
+            }
+        }
+        
         this.updateAudioControls();
         
         // Notify other participants
@@ -1392,33 +1402,15 @@ class PrayerRoomService {
             joinAudioBtn.style.display = 'none';
             muteBtn.style.display = 'inline-flex';
             
-            // Update mute button state
+            // Update mute button state using CSS classes
             if (this.isMuted) {
                 muteBtn.classList.add('muted');
-                const micIcon = muteBtn.querySelector('.mic-icon');
-                const mutedIcon = muteBtn.querySelector('.muted-icon');
-                const muteText = muteBtn.querySelector('.mute-text');
-                const unmuteText = muteBtn.querySelector('.unmute-text');
-                
-                if (micIcon) micIcon.style.display = 'none';
-                if (mutedIcon) mutedIcon.style.display = 'block';
-                if (muteText) muteText.style.display = 'none';
-                if (unmuteText) unmuteText.style.display = 'block';
             } else {
                 muteBtn.classList.remove('muted');
-                const micIcon = muteBtn.querySelector('.mic-icon');
-                const mutedIcon = muteBtn.querySelector('.muted-icon');
-                const muteText = muteBtn.querySelector('.mute-text');
-                const unmuteText = muteBtn.querySelector('.unmute-text');
-                
-                if (micIcon) micIcon.style.display = 'block';
-                if (mutedIcon) mutedIcon.style.display = 'none';
-                if (muteText) muteText.style.display = 'block';
-                if (unmuteText) unmuteText.style.display = 'none';
             }
         } else {
             // Show join audio button, hide mute button
-            joinAudioBtn.style.display = 'flex';
+            joinAudioBtn.style.display = 'inline-flex';
             muteBtn.style.display = 'none';
         }
         

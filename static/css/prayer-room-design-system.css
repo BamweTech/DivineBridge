@@ -334,10 +334,20 @@
     width: 18px !important;
     height: 18px !important;
     position: relative !important;
+    display: block !important;
 }
 
+/* Show/hide icons based on muted state */
 .control-btn.mute-btn.muted .mic-icon {
     display: none !important;
+}
+
+.control-btn.mute-btn.muted .muted-icon {
+    display: block !important;
+}
+
+.control-btn.mute-btn:not(.muted) .mic-icon {
+    display: block !important;
 }
 
 .control-btn.mute-btn:not(.muted) .muted-icon {
