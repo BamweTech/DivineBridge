@@ -1720,13 +1720,19 @@ class PrayerRoomService {
     }
     
     async loadChatMessages() {
-        // Show loading skeletons on first load
-        if (!this.chatMessages || this.chatMessages.length === 0) {
+        // Ensure chatMessages array exists
+        if (!this.chatMessages) {
+            this.chatMessages = [];
+        }
+        
+        // Show loading skeletons on first load only
+        if (this.chatMessages.length === 0) {
             this.showLoadingSkeletons(3);
         }
         
-        // Preserve optimistic messages
-        const optimisticMessages = (this.chatMessages || []).filter(m => m.tempId);
+        // Preserve ALL existing messages (not just optimistic ones)
+        const existingMessages = [...(this.chatMessages || [])];
+        const optimisticMessages = existingMessages.filter(m => m.tempId);
         
         try {
             const response = await fetch(`/api/prayer-room/${this.roomId}/chat`, {
@@ -1738,10 +1744,10 @@ class PrayerRoomService {
             }
             const data = await response.json();
             
-            console.log('Chat messages loaded:', data);
+            console.log('Chat messages loaded from server:', data.messages ? data.messages.length : 0, 'existing:', existingMessages.length);
             
             if (data && data.success && Array.isArray(data.messages)) {
-                // Merge server messages with optimistic messages, avoiding duplicates
+                // Merge server messages with existing messages, avoiding duplicates
                 const serverMessages = data.messages.map(msg => ({
                     id: msg.id || msg.message_id,
                     user_id: msg.user_id,
@@ -1752,8 +1758,8 @@ class PrayerRoomService {
                     status: 'sent'
                 }));
                 
-                // Merge: keep optimistic messages, add server messages that don't exist
-                const mergedMessages = [...optimisticMessages];
+                // Merge: start with existing messages, add server messages that don't exist
+                const mergedMessages = [...existingMessages];
                 serverMessages.forEach(serverMsg => {
                     const exists = mergedMessages.some(m => 
                         (m.id === serverMsg.id) || 
@@ -1761,24 +1767,39 @@ class PrayerRoomService {
                     );
                     if (!exists) {
                         mergedMessages.push(serverMsg);
+                    } else if (m.tempId) {
+                        // Update optimistic message with real data
+                        const index = mergedMessages.findIndex(m => 
+                            (m.tempId && m.user_id === serverMsg.user_id && Math.abs((m.timestamp instanceof Date ? m.timestamp.getTime() : (typeof m.timestamp === 'number' ? m.timestamp : new Date(m.timestamp).getTime())) - serverMsg.timestamp) < 2000 && m.message === serverMsg.message)
+                        );
+                        if (index !== -1) {
+                            mergedMessages[index] = {
+                                ...mergedMessages[index],
+                                ...serverMsg,
+                                tempId: undefined
+                            };
+                        }
                     }
                 });
                 
                 this.chatMessages = mergedMessages;
-                console.log('Chat messages array:', this.chatMessages);
+                console.log('Chat messages array after merge:', this.chatMessages.length);
                 this.updateChatDisplay();
             } else {
                 console.warn('Chat payload invalid or unsuccessful, preserving current messages');
-                // Do not clear UI on bad payloads - keep optimistic messages
-                if (optimisticMessages.length > 0) {
-                    this.chatMessages = optimisticMessages;
+                // Do not clear UI on bad payloads - keep existing messages
+                if (existingMessages.length > 0) {
+                    this.chatMessages = existingMessages;
                     this.updateChatDisplay();
                 }
             }
             
         } catch (error) {
             console.warn('Chat load error, preserving current messages:', error);
-            // Do not clear UI on errors
+            // Do not clear UI on errors - preserve existing messages
+            if (existingMessages.length > 0) {
+                this.chatMessages = existingMessages;
+            }
         }
         
         // Polling is managed centrally by setupChatPolling via addPollingInterval('chat', ...)
