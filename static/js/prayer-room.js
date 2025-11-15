@@ -1114,7 +1114,26 @@ class PrayerRoomService {
                         if (e.target.closest('.participant-controls') || e.target.closest('.participant-action')) {
                             return;
                         }
+                        
+                        // Close other expanded participants
+                        const allParticipants = participantsContainer.querySelectorAll('.participant.expanded');
+                        allParticipants.forEach(p => {
+                            if (p !== participantEl) {
+                                p.classList.remove('expanded');
+                            }
+                        });
+                        
+                        // Toggle this participant
                         participantEl.classList.toggle('expanded');
+                    });
+                }
+                
+                // Close expanded participant when clicking outside
+                if (this.isHost && controls.length > 0) {
+                    document.addEventListener('click', (e) => {
+                        if (!participantEl.contains(e.target) && participantEl.classList.contains('expanded')) {
+                            participantEl.classList.remove('expanded');
+                        }
                     });
                 }
                 
