@@ -389,6 +389,7 @@
         overflow-x: hidden !important;
         -webkit-overflow-scrolling: touch !important;
         padding-top: 0 !important;
+        padding-bottom: 72px !important; /* Space for bottom tabs (56px) + extra padding (16px) */
         display: flex !important;
         flex-direction: column !important;
         justify-content: flex-end !important; /* Start from bottom, expand upward */
@@ -621,7 +622,7 @@
         width: 100% !important;
         overflow-y: auto !important;
         overflow-x: hidden !important;
-        padding: 8px 12px 140px 12px !important;
+        padding: 8px 12px 196px 12px !important; /* 140px (input) + 56px (bottom tabs) = 196px */
         padding-top: 0 !important;
         background: #ffffff !important;
         -webkit-overflow-scrolling: touch !important;
