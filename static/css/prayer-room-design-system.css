@@ -590,6 +590,63 @@
     background: rgba(59, 130, 246, 0.3) !important;
 }
 
+/* ===== HEADER ELEMENTS ===== */
+.header-metrics {
+    display: flex !important;
+    gap: var(--space-md) !important;
+    align-items: center !important;
+}
+
+.participant-count,
+.speaker-slot-indicator,
+.role-indicator-chip {
+    padding: 6px 12px !important;
+    border-radius: var(--radius-md) !important;
+    background: var(--glass-secondary) !important;
+    border: 1px solid var(--border-primary) !important;
+    font-size: 13px !important;
+    color: var(--text-secondary) !important;
+}
+
+.control-buttons {
+    display: flex !important;
+    gap: var(--space-sm) !important;
+    align-items: center !important;
+}
+
+.control-btn {
+    padding: 10px 20px !important;
+    border-radius: var(--radius-md) !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    transition: all 0.3s ease !important;
+    border: none !important;
+    cursor: pointer !important;
+}
+
+.control-btn.primary,
+.control-btn.subscribe {
+    background: var(--gradient-primary) !important;
+    color: white !important;
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3) !important;
+}
+
+.control-btn.primary:hover,
+.control-btn.subscribe:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4) !important;
+}
+
+.control-btn.leave {
+    background: rgba(239, 68, 68, 0.1) !important;
+    color: #dc2626 !important;
+    border: 1px solid rgba(239, 68, 68, 0.2) !important;
+}
+
+.control-btn.leave:hover {
+    background: rgba(239, 68, 68, 0.2) !important;
+}
+
 /* ===== MOBILE RESPONSIVE ===== */
 @media (max-width: 768px) {
     .prayer-room-container {
@@ -611,15 +668,14 @@
         padding: var(--space-md) !important;
     }
     
-    .speakers-grid {
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)) !important;
-        gap: var(--space-sm) !important;
+    .participant {
+        padding: var(--space-sm) var(--space-md) !important;
     }
     
-    .speaker-tile .participant-avatar {
-        width: 60px !important;
-        height: 60px !important;
-        font-size: 24px !important;
+    .participant-avatar {
+        width: 36px !important;
+        height: 36px !important;
+        font-size: 14px !important;
     }
 }
 
