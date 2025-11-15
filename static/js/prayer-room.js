@@ -1372,10 +1372,23 @@ class PrayerRoomService {
             isMuted: this.isMuted,
             joinAudioBtn: !!joinAudioBtn,
             muteBtn: !!muteBtn,
-            participantRole: this.participantRole
+            participantRole: this.participantRole,
+            isHost: this.isHost
         });
         
         if (!joinAudioBtn || !muteBtn) {
+            return;
+        }
+
+        // Hosts should never see join audio button - they're always speakers
+        if (this.isHost) {
+            joinAudioBtn.style.display = 'none';
+            // Hosts can mute/unmute, so show mute button if audio is enabled
+            if (this.isAudioEnabled) {
+                muteBtn.style.display = 'flex';
+            } else {
+                muteBtn.style.display = 'none';
+            }
             return;
         }
 
@@ -5222,6 +5235,20 @@ Listening for unmute event...`);
 
         if (roleIndicator) {
             roleIndicator.textContent = this.participantRole === 'speaker' ? 'Speaker' : 'Listener';
+        }
+
+        // Hosts should never see request/join audio buttons - they're always speakers
+        if (this.isHost) {
+            if (requestBtn) {
+                requestBtn.style.display = 'none';
+            }
+            if (joinAudioBtn) {
+                joinAudioBtn.style.display = 'none';
+            }
+            if (requestStatus) {
+                requestStatus.textContent = 'You are the host. You can speak at any time.';
+            }
+            return; // Early return for hosts
         }
 
         if (requestBtn) {
