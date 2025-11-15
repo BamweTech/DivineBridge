@@ -1617,10 +1617,21 @@
                     
                     // Teams-like: Improved keyboard handling with Visual Viewport API
                     const handleKeyboardShow = () => {
+                        // CRITICAL: Ensure chat tab is active when input is focused
+                        const tabSystem = window.mobileTabSystem || this;
+                        if (tabSystem.currentTab !== 'chat') {
+                            tabSystem.switchTab('chat');
+                        }
+                        
                         document.body.classList.add('chat-input-focused');
                         bottomTabs.style.transform = 'translateY(100%)';
                         bottomTabs.style.opacity = '0';
                         bottomTabs.style.pointerEvents = 'none';
+                        
+                        // Ensure chat panel is visible
+                        if (chatPanel) {
+                            chatPanel.classList.remove('mobile-hidden');
+                        }
                         
                         // Use Visual Viewport API for accurate keyboard height
                         if (window.visualViewport) {
@@ -1675,7 +1686,22 @@
                     };
                     
                     // Focus event - keyboard is showing
-                    chatInput.addEventListener('focus', handleKeyboardShow);
+                    chatInput.addEventListener('focus', () => {
+                        // Ensure we're on chat tab before handling keyboard
+                        const tabSystem = window.mobileTabSystem || this;
+                        if (tabSystem.currentTab !== 'chat') {
+                            tabSystem.switchTab('chat');
+                        }
+                        handleKeyboardShow();
+                    });
+                    
+                    // Also handle click on chat input to ensure tab switch
+                    chatInput.addEventListener('click', () => {
+                        const tabSystem = window.mobileTabSystem || this;
+                        if (tabSystem.currentTab !== 'chat') {
+                            tabSystem.switchTab('chat');
+                        }
+                    });
                     
                     // Blur event - keyboard might be hiding
                     chatInput.addEventListener('blur', handleKeyboardHide);
