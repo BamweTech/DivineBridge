@@ -140,12 +140,12 @@
     margin: 0 auto !important;
 }
 
-/* ===== HEADER - ENHANCED GLASSMORPHISM ===== */
+/* ===== HEADER - COMPACT & EFFICIENT ===== */
 .prayer-room-header {
     background: var(--glass-primary) !important;
     backdrop-filter: var(--blur-md) !important;
     -webkit-backdrop-filter: var(--blur-md) !important;
-    padding: var(--space-lg) var(--space-2xl) !important;
+    padding: var(--space-sm) var(--space-lg) !important;
     border-bottom: 1px solid var(--border-white) !important;
     border-radius: var(--radius-xl) var(--radius-xl) 0 0 !important;
     box-shadow: var(--shadow-md) !important;
@@ -155,9 +155,9 @@
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    gap: var(--space-xl) !important;
+    gap: var(--space-md) !important;
     max-width: 100% !important;
-    flex-wrap: wrap !important;
+    flex-wrap: nowrap !important;
 }
 
 .header-left,
@@ -178,7 +178,7 @@
 
 .header-logo-img,
 .header-logo {
-    height: 48px !important;
+    height: 32px !important;
     width: auto !important;
 }
 
@@ -189,8 +189,8 @@
 
 .prayer-room-title,
 .room-title-text {
-    font-size: 20px !important;
-    font-weight: 700 !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
     color: var(--text-primary) !important;
     margin: 0 !important;
     white-space: nowrap !important;
@@ -207,13 +207,13 @@
 
 .room-code {
     background: rgba(59, 130, 246, 0.1) !important;
-    padding: 8px 16px !important;
-    border-radius: var(--radius-md) !important;
+    padding: 4px 10px !important;
+    border-radius: var(--radius-sm) !important;
     color: var(--text-secondary) !important;
     font-family: 'Courier New', monospace !important;
-    font-size: 18px !important;
-    font-weight: bold !important;
-    letter-spacing: 2px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    letter-spacing: 1px !important;
     border: 1px solid var(--border-primary) !important;
     display: inline-block !important;
     width: fit-content !important;
@@ -241,10 +241,10 @@
 .header-actions {
     display: flex !important;
     align-items: center !important;
-    gap: var(--space-md) !important;
+    gap: var(--space-sm) !important;
     flex: 0 1 auto !important;
     flex-shrink: 0 !important;
-    flex-wrap: wrap !important;
+    flex-wrap: nowrap !important;
     justify-content: flex-end !important;
 }
 
@@ -259,8 +259,9 @@
 
 .room-details {
     display: flex !important;
-    flex-direction: column !important;
-    gap: var(--space-xs) !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: var(--space-sm) !important;
     flex: 1 !important;
     min-width: 0 !important;
     max-width: 100% !important;
@@ -280,10 +281,11 @@
 }
 
 .header-status-text {
-    font-size: 13px !important;
+    font-size: 11px !important;
     color: var(--text-muted) !important;
     font-style: italic !important;
-    margin-top: var(--space-xs) !important;
+    margin-top: 0 !important;
+    display: none !important; /* Hide status text to save space */
 }
 
 .audio-quality-wrapper {
@@ -911,40 +913,63 @@
 /* ===== HEADER ELEMENTS ===== */
 .header-metrics {
     display: flex !important;
-    gap: var(--space-sm) !important;
+    gap: var(--space-xs) !important;
     align-items: center !important;
-    flex-wrap: wrap !important;
+    flex-wrap: nowrap !important;
     flex-shrink: 0 !important;
 }
 
 .participant-count,
 .speaker-slot-indicator,
 .role-indicator-chip {
-    padding: 6px 12px !important;
-    border-radius: var(--radius-md) !important;
+    padding: 4px 8px !important;
+    border-radius: var(--radius-sm) !important;
     background: var(--glass-secondary) !important;
     border: 1px solid var(--border-primary) !important;
-    font-size: 13px !important;
+    font-size: 11px !important;
     color: var(--text-secondary) !important;
+    white-space: nowrap !important;
+}
+
+.participant-count .label,
+.speaker-slot-indicator .label,
+.role-indicator-chip .label {
+    display: none !important;
+}
+
+.participant-count .value,
+.speaker-slot-indicator .value,
+.role-indicator-chip .value {
+    font-weight: 600 !important;
 }
 
 .control-buttons {
     display: flex !important;
-    gap: var(--space-sm) !important;
+    gap: var(--space-xs) !important;
     align-items: center !important;
-    flex-wrap: wrap !important;
+    flex-wrap: nowrap !important;
     flex-shrink: 0 !important;
     justify-content: flex-end !important;
 }
 
 .control-btn {
-    padding: 10px 20px !important;
-    border-radius: var(--radius-md) !important;
+    padding: 6px 12px !important;
+    border-radius: var(--radius-sm) !important;
     font-weight: 600 !important;
-    font-size: 14px !important;
+    font-size: 12px !important;
     transition: all 0.3s ease !important;
     border: none !important;
     cursor: pointer !important;
+    white-space: nowrap !important;
+    min-height: 32px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+}
+
+.control-btn svg {
+    width: 16px !important;
+    height: 16px !important;
 }
 
 .control-btn.primary,
