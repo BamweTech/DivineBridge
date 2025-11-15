@@ -967,11 +967,14 @@ class PrayerRoomService {
         // Setup click-outside handler once (only for host)
         if (this.isHost && !this.participantClickOutsideHandler) {
             this.participantClickOutsideHandler = (e) => {
+                // Don't close if clicking on participant card or controls
+                if (e.target.closest('.participant') || e.target.closest('.participant-controls')) {
+                    return;
+                }
+                
                 const expandedParticipants = participantsContainer.querySelectorAll('.participant.expanded');
                 expandedParticipants.forEach(p => {
-                    if (!p.contains(e.target)) {
-                        p.classList.remove('expanded');
-                    }
+                    p.classList.remove('expanded');
                 });
             };
             document.addEventListener('click', this.participantClickOutsideHandler);
@@ -1123,10 +1126,13 @@ class PrayerRoomService {
                 // Add click handler for expand/collapse (only for host)
                 if (this.isHost && controls.length > 0) {
                     participantEl.addEventListener('click', (e) => {
-                        // Don't toggle if clicking on controls
+                        // Don't toggle if clicking on controls or action buttons
                         if (e.target.closest('.participant-controls') || e.target.closest('.participant-action')) {
                             return;
                         }
+                        
+                        // Stop event propagation to prevent click-outside handler from firing
+                        e.stopPropagation();
                         
                         // Close other expanded participants
                         const allParticipants = participantsContainer.querySelectorAll('.participant.expanded');
