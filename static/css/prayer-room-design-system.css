@@ -386,22 +386,44 @@
 /* Chat Messages */
 .chat-messages {
     background: transparent !important;
+    flex: 1 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: var(--space-md) !important;
 }
 
 .message {
+    margin-bottom: var(--space-md) !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.message-bubble {
     padding: var(--space-sm) var(--space-md) !important;
     border-radius: var(--radius-md) !important;
     background: var(--glass-card) !important;
     border: 1px solid var(--border-light) !important;
-    margin-bottom: var(--space-md) !important;
     box-shadow: var(--shadow-sm) !important;
+    max-width: 75% !important;
+    display: inline-block !important;
 }
 
-.message-avatar {
-    width: 32px !important;
-    height: 32px !important;
-    border-radius: 50% !important;
-    background: var(--gradient-secondary) !important;
+.message-own {
+    align-items: flex-end !important;
+}
+
+.message-own .message-bubble {
+    background: var(--gradient-primary) !important;
+    color: white !important;
+    border-color: transparent !important;
+}
+
+.message-other {
+    align-items: flex-start !important;
+}
+
+.message-other .message-bubble {
+    background: var(--glass-card) !important;
 }
 
 .message-sender {
@@ -411,10 +433,29 @@
     margin-bottom: 4px !important;
 }
 
+.message-own .message-sender {
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
 .message-content {
     color: var(--text-tertiary) !important;
     font-size: 14px !important;
     line-height: 1.5 !important;
+    word-wrap: break-word !important;
+}
+
+.message-own .message-content {
+    color: white !important;
+}
+
+.message-time {
+    font-size: 11px !important;
+    color: var(--text-muted) !important;
+    margin-top: 4px !important;
+}
+
+.message-own .message-time {
+    color: rgba(255, 255, 255, 0.8) !important;
 }
 
 /* Chat Input */
