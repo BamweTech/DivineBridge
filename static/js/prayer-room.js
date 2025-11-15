@@ -1896,7 +1896,7 @@ class PrayerRoomService {
             
             console.log('Chat messages rendered successfully');
         } else {
-            console.log('No chat messages - showing empty chat');
+            console.log('No chat messages - chat container is empty');
             // Don't show empty state - just leave it empty
         }
         
