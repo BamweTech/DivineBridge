@@ -968,16 +968,21 @@ class PrayerRoomService {
         if (this.isHost && !this.participantClickOutsideHandler) {
             this.participantClickOutsideHandler = (e) => {
                 // Don't close if clicking on participant card or controls
-                if (e.target.closest('.participant') || e.target.closest('.participant-controls')) {
+                const clickedParticipant = e.target.closest('.participant');
+                const clickedControls = e.target.closest('.participant-controls');
+                
+                if (clickedParticipant || clickedControls) {
                     return;
                 }
                 
+                // Close all expanded participants
                 const expandedParticipants = participantsContainer.querySelectorAll('.participant.expanded');
                 expandedParticipants.forEach(p => {
                     p.classList.remove('expanded');
                 });
             };
-            document.addEventListener('click', this.participantClickOutsideHandler);
+            // Use capture phase to ensure it fires before other handlers
+            document.addEventListener('click', this.participantClickOutsideHandler, true);
         }
         
         // Remove loading indicator
@@ -1125,25 +1130,42 @@ class PrayerRoomService {
                 
                 // Add click handler for expand/collapse (only for host)
                 if (this.isHost && controls.length > 0) {
+                    // Use a flag to prevent double-firing
+                    let isToggling = false;
+                    
                     participantEl.addEventListener('click', (e) => {
                         // Don't toggle if clicking on controls or action buttons
                         if (e.target.closest('.participant-controls') || e.target.closest('.participant-action')) {
                             return;
                         }
                         
-                        // Stop event propagation to prevent click-outside handler from firing
+                        // Prevent double-firing
+                        if (isToggling) return;
+                        isToggling = true;
+                        
+                        // Stop event propagation to prevent click-outside handler from firing immediately
                         e.stopPropagation();
                         
-                        // Close other expanded participants
-                        const allParticipants = participantsContainer.querySelectorAll('.participant.expanded');
-                        allParticipants.forEach(p => {
-                            if (p !== participantEl) {
-                                p.classList.remove('expanded');
+                        // Use setTimeout to allow the toggle to complete before click-outside handler can interfere
+                        setTimeout(() => {
+                            // Close other expanded participants
+                            const allParticipants = participantsContainer.querySelectorAll('.participant.expanded');
+                            allParticipants.forEach(p => {
+                                if (p !== participantEl) {
+                                    p.classList.remove('expanded');
+                                }
+                            });
+                            
+                            // Toggle this participant
+                            const isCurrentlyExpanded = participantEl.classList.contains('expanded');
+                            if (isCurrentlyExpanded) {
+                                participantEl.classList.remove('expanded');
+                            } else {
+                                participantEl.classList.add('expanded');
                             }
-                        });
-                        
-                        // Toggle this participant
-                        participantEl.classList.toggle('expanded');
+                            
+                            isToggling = false;
+                        }, 0);
                     });
                 }
                 
