@@ -140,6 +140,24 @@
     justify-content: space-between !important;
     align-items: center !important;
     box-shadow: var(--shadow-md) !important;
+    flex-wrap: wrap !important;
+    gap: var(--space-md) !important;
+}
+
+.header-left,
+.header-content {
+    display: flex !important;
+    align-items: center !important;
+    gap: var(--space-md) !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+}
+
+.logo-section,
+.prayer-room-logo {
+    display: flex !important;
+    align-items: center !important;
+    flex-shrink: 0 !important;
 }
 
 .header-logo-img,
@@ -148,11 +166,27 @@
     width: auto !important;
 }
 
-.prayer-room-title {
+.room-name-container {
+    flex: 1 !important;
+    min-width: 0 !important;
+}
+
+.prayer-room-title,
+.room-title-text {
     font-size: 20px !important;
     font-weight: 700 !important;
     color: var(--text-primary) !important;
     margin: 0 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+.room-code-section {
+    display: flex !important;
+    align-items: center !important;
+    gap: var(--space-sm) !important;
+    flex-shrink: 0 !important;
 }
 
 .room-code {
@@ -174,12 +208,23 @@
     padding: 8px 16px !important;
     border-radius: var(--radius-md) !important;
     transition: all 0.3s ease !important;
+    cursor: pointer !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
 }
 
 .copy-room-code-btn:hover {
     background: var(--glass-hover) !important;
     border-color: var(--color-primary) !important;
     transform: translateY(-2px) !important;
+}
+
+.header-right,
+.header-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: var(--space-md) !important;
+    flex-shrink: 0 !important;
 }
 
 /* ===== PARTICIPANTS PANEL - GLASSMORPHISM ===== */
