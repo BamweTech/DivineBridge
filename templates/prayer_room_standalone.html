@@ -1562,6 +1562,121 @@
                 }
             }, 500);
 
+            // Initialize minimize/restore functionality
+            window.prayerRoomMinimize = {
+                isMinimized: false,
+                
+                init() {
+                    // Check if we should restore from minimized state
+                    const wasMinimized = sessionStorage.getItem('prayerRoomMinimized') === 'true';
+                    if (wasMinimized && window.location.pathname !== '/prayer-room/' + window.prayerRoomService?.roomId) {
+                        // User navigated away, show minimized window
+                        this.showMinimized();
+                    }
+                    
+                    // Setup event listeners
+                    const minimizeBtn = document.getElementById('minimizeBtn');
+                    const restoreBtn = document.getElementById('restoreBtn');
+                    const minimizedLeaveBtn = document.getElementById('minimizedLeaveBtn');
+                    const leaveBtn = document.getElementById('leaveBtn');
+                    
+                    if (minimizeBtn) {
+                        minimizeBtn.addEventListener('click', () => this.minimize());
+                    }
+                    
+                    if (restoreBtn) {
+                        restoreBtn.addEventListener('click', () => this.restore());
+                    }
+                    
+                    if (minimizedLeaveBtn) {
+                        minimizedLeaveBtn.addEventListener('click', () => {
+                            if (leaveBtn) leaveBtn.click();
+                        });
+                    }
+                    
+                    // Update status periodically
+                    setInterval(() => this.updateStatus(), 5000);
+                },
+                
+                minimize() {
+                    this.isMinimized = true;
+                    sessionStorage.setItem('prayerRoomMinimized', 'true');
+                    sessionStorage.setItem('prayerRoomUrl', window.location.href);
+                    
+                    const container = document.getElementById('prayerRoomContainer');
+                    const minimized = document.getElementById('prayerRoomMinimized');
+                    
+                    if (container) {
+                        container.style.display = 'none';
+                    }
+                    
+                    if (minimized) {
+                        minimized.style.display = 'block';
+                    }
+                    
+                    // Allow navigation
+                    this.updateStatus();
+                },
+                
+                restore() {
+                    this.isMinimized = false;
+                    sessionStorage.removeItem('prayerRoomMinimized');
+                    
+                    const container = document.getElementById('prayerRoomContainer');
+                    const minimized = document.getElementById('prayerRoomMinimized');
+                    
+                    if (container) {
+                        container.style.display = 'block';
+                    }
+                    
+                    if (minimized) {
+                        minimized.style.display = 'none';
+                    }
+                    
+                    // Navigate back to prayer room if we're on a different page
+                    const savedUrl = sessionStorage.getItem('prayerRoomUrl');
+                    if (savedUrl && window.location.href !== savedUrl) {
+                        window.location.href = savedUrl;
+                    }
+                },
+                
+                showMinimized() {
+                    const minimized = document.getElementById('prayerRoomMinimized');
+                    if (minimized) {
+                        minimized.style.display = 'block';
+                    }
+                    this.isMinimized = true;
+                },
+                
+                updateStatus() {
+                    const statusEl = document.getElementById('minimizedStatus');
+                    if (!statusEl) return;
+                    
+                    if (window.prayerRoomService) {
+                        if (window.prayerRoomService.isAudioEnabled) {
+                            if (window.prayerRoomService.isMuted) {
+                                statusEl.textContent = 'Muted';
+                            } else {
+                                statusEl.textContent = 'Speaking';
+                            }
+                        } else {
+                            statusEl.textContent = 'Listening';
+                        }
+                    } else {
+                        statusEl.textContent = 'Connected';
+                    }
+                }
+            };
+            
+            // Initialize minimize system when DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => {
+                    setTimeout(() => window.prayerRoomMinimize?.init(), 1000);
+                });
+            } else {
+                setTimeout(() => window.prayerRoomMinimize?.init(), 1000);
+            }
+            
             // Initialize room subscription system
             window.roomSubscription = {
                 isSubscribed: false,
