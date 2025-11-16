@@ -1381,6 +1381,7 @@ class PrayerRoomService {
         this.isAudioEnabled = false;
         this.isMuted = false;
         this.audioConnectionRetries = 0;
+        this.isRetryingAudio = false; // Reset retry flag to allow new attempts
         
         // Clean up any existing stream
         if (this.localStream) {
