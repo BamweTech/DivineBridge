@@ -1229,8 +1229,8 @@ class PrayerRoomService {
     
     async joinAudio(retryAttempt = 0) {
         try {
-            // Prevent multiple simultaneous join attempts
-            if (this.isRetryingAudio) {
+            // Prevent multiple simultaneous join attempts (but allow retries)
+            if (this.isRetryingAudio && retryAttempt === 0) {
                 console.log('🎤 Audio join already in progress, skipping...');
                 return;
             }
@@ -1247,7 +1247,10 @@ class PrayerRoomService {
                 this.updateAudioControls();
             }
             
-            this.isRetryingAudio = true;
+            // Set retry flag only on first attempt
+            if (retryAttempt === 0) {
+                this.isRetryingAudio = true;
+            }
             
             // Request microphone permission with enhanced noise suppression
             console.log('🎤 Requesting microphone permission...');
