@@ -1288,6 +1288,9 @@ class PrayerRoomService {
                 throw new Error('Invalid audio stream from microphone');
             }
             
+            // Ensure audio is enabled now that we have the stream
+            this.isAudioEnabled = true;
+            
             // Monitor local audio track for mute/unmute events
             const localTrack = this.localStream.getAudioTracks()[0];
             if (localTrack) {
@@ -1313,6 +1316,10 @@ class PrayerRoomService {
                     this.showError('Microphone not working. Close other apps using the mic and refresh.');
                 }
             }
+            
+            // Update UI to show mute button now that stream is active
+            this.updateAudioControls();
+            console.log('🎤 Audio controls updated after stream obtained');
             
             // Start lightweight initialization immediately
             console.log('🎤 Starting fast initialization...');
@@ -1354,6 +1361,12 @@ class PrayerRoomService {
         } catch (error) {
             console.error('🎤 Error joining audio:', error);
             this.isRetryingAudio = false;
+            
+            // Reset audio state if this was the first attempt (not a retry)
+            if (retryAttempt === 0) {
+                this.isAudioEnabled = false;
+                this.updateAudioControls();
+            }
             
             // Check if we should retry
             if (retryAttempt < this.maxAudioRetries) {
@@ -1557,13 +1570,8 @@ class PrayerRoomService {
             return;
         }
 
-        if (this.participantRole !== 'speaker') {
-            // Listeners always see the join button; mute control hidden
-            joinAudioBtn.style.display = 'inline-flex';
-            muteBtn.style.display = 'none';
-            return;
-        }
-        
+        // If audio is enabled (microphone is active), show mute button regardless of role
+        // This allows users to control their microphone after joining audio
         if (this.isAudioEnabled) {
             // Show mute button, hide join audio button
             joinAudioBtn.style.display = 'none';
@@ -1576,9 +1584,16 @@ class PrayerRoomService {
                 muteBtn.classList.remove('muted');
             }
         } else {
-            // Show join audio button, hide mute button
-            joinAudioBtn.style.display = 'inline-flex';
-            muteBtn.style.display = 'none';
+            // Audio not enabled - show join button for listeners, hide mute button
+            if (this.participantRole !== 'speaker') {
+                // Listeners see the join button
+                joinAudioBtn.style.display = 'inline-flex';
+                muteBtn.style.display = 'none';
+            } else {
+                // Speakers who haven't joined audio yet (shouldn't happen, but handle it)
+                joinAudioBtn.style.display = 'inline-flex';
+                muteBtn.style.display = 'none';
+            }
         }
         
         console.log('🔧 Audio controls updated:', {
