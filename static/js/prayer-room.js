@@ -68,6 +68,13 @@ class PrayerRoomService {
         this.audioRetryDelay = 2000; // Start with 2 seconds
         this.isRetryingAudio = false;
         
+        // Participants filtering
+        this.participantsFilter = {
+            searchQuery: '',
+            activeTab: 'all' // 'all' or 'speakers'
+        };
+        this.allParticipants = []; // Store all participants for filtering
+        
         // WebSocket for real-time communication
         this.socket = null;
         this.wsConnected = false;
@@ -435,6 +442,29 @@ class PrayerRoomService {
         const chatSendBtn = document.getElementById('sendBtn');
         const requestSpeakerBtn = document.getElementById('requestSpeakerBtn');
         const participantsList = document.getElementById('participantsList');
+        const participantsSearch = document.getElementById('participantsSearch');
+        const participantsTabAll = document.getElementById('participantsTabAll');
+        const participantsTabSpeakers = document.getElementById('participantsTabSpeakers');
+        
+        // Search functionality
+        if (participantsSearch) {
+            participantsSearch.addEventListener('input', (e) => {
+                this.filterParticipants(e.target.value);
+            });
+        }
+        
+        // Tab functionality
+        if (participantsTabAll) {
+            participantsTabAll.addEventListener('click', () => {
+                this.setParticipantsTab('all');
+            });
+        }
+        
+        if (participantsTabSpeakers) {
+            participantsTabSpeakers.addEventListener('click', () => {
+                this.setParticipantsTab('speakers');
+            });
+        }
         
         if (joinAudioBtn) {
             joinAudioBtn.addEventListener('click', () => this.joinAudio());
@@ -974,6 +1004,9 @@ class PrayerRoomService {
             return;
         }
         
+        // Store all participants for filtering
+        this.allParticipants = Array.isArray(participants) ? participants : [];
+        
         // Setup click-outside handler once (only for host)
         if (this.isHost && !this.participantClickOutsideHandler) {
             this.participantClickOutsideHandler = (e) => {
@@ -1069,10 +1102,13 @@ class PrayerRoomService {
             this.enforceListenerMute();
         }
         
-        // 4. Render participants list
+        // 4. Filter participants based on search and tab
+        const filteredParticipants = this.getFilteredParticipants(participantList);
+        
+        // 5. Render participants list
         participantsContainer.innerHTML = '';
-        if (participantList.length > 0) {
-            participantList.forEach(participant => {
+        if (filteredParticipants.length > 0) {
+            filteredParticipants.forEach(participant => {
                 const participantRole = participant.role || 'listener';
                 const requestedSpeaker = participant.requested_role === 'speaker';
                 const participantEl = document.createElement('div');
@@ -1188,6 +1224,57 @@ class PrayerRoomService {
         this.updateStageArea(participantList);
     }
     
+    getFilteredParticipants(participants = []) {
+        let filtered = [...participants];
+        
+        // Filter by tab (all or speakers)
+        if (this.participantsFilter.activeTab === 'speakers') {
+            filtered = filtered.filter(p => (p.role || 'listener') === 'speaker');
+        }
+        
+        // Filter by search query
+        if (this.participantsFilter.searchQuery.trim()) {
+            const query = this.participantsFilter.searchQuery.toLowerCase().trim();
+            filtered = filtered.filter(p => {
+                const name = (p.user_name || '').toLowerCase();
+                return name.includes(query);
+            });
+        }
+        
+        return filtered;
+    }
+    
+    filterParticipants(searchQuery) {
+        this.participantsFilter.searchQuery = searchQuery;
+        // Re-render with filtered participants
+        this.updateParticipants(this.allParticipants);
+    }
+    
+    setParticipantsTab(tab) {
+        if (tab !== 'all' && tab !== 'speakers') {
+            return;
+        }
+        
+        this.participantsFilter.activeTab = tab;
+        
+        // Update tab buttons
+        const tabAll = document.getElementById('participantsTabAll');
+        const tabSpeakers = document.getElementById('participantsTabSpeakers');
+        
+        if (tabAll && tabSpeakers) {
+            if (tab === 'all') {
+                tabAll.classList.add('active');
+                tabSpeakers.classList.remove('active');
+            } else {
+                tabAll.classList.remove('active');
+                tabSpeakers.classList.add('active');
+            }
+        }
+        
+        // Re-render with filtered participants
+        this.updateParticipants(this.allParticipants);
+    }
+    
     updateStageArea(participants = []) {
         const speakersGrid = document.getElementById('speakersGrid');
         if (!speakersGrid) {
@@ -1252,23 +1339,44 @@ class PrayerRoomService {
                 this.isRetryingAudio = true;
             }
             
+            // Check if getUserMedia is available
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                // Check for legacy getUserMedia
+                const getUserMedia = navigator.mediaDevices?.getUserMedia || 
+                                   navigator.getUserMedia || 
+                                   navigator.webkitGetUserMedia || 
+                                   navigator.mozGetUserMedia || 
+                                   navigator.msGetUserMedia;
+                
+                if (!getUserMedia) {
+                    throw new Error('getUserMedia is not supported in this browser. Please use a modern browser like Chrome, Firefox, or Safari.');
+                }
+                
+                // Check if we're on HTTPS or localhost
+                if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+                    throw new Error('Microphone access requires HTTPS. Please use a secure connection (https://) or localhost.');
+                }
+            }
+            
             // Request microphone permission with enhanced noise suppression
             console.log('🎤 Requesting microphone permission...');
-            this.localStream = await navigator.mediaDevices.getUserMedia({
+            
+            // Try with full constraints first, then fallback to simpler constraints if needed
+            let constraints = {
                 audio: {
                     // Core audio processing - these are critical for quality
                     echoCancellation: true,        // Required: Remove echo
                     noiseSuppression: true,        // Required: Remove background noise
                     autoGainControl: true,         // Required: Normalize volume levels
                     
-                    // Audio quality settings
+                    // Audio quality settings (use ideal to allow fallback)
                     sampleRate: { ideal: 48000 },  // Higher sample rate for better quality
-                    channelCount: 1,               // Mono is sufficient for voice
+                    channelCount: { ideal: 1 },    // Mono is sufficient for voice
                     
-                    // Latency optimization
+                    // Latency optimization (use ideal to allow fallback)
                     latency: { ideal: 0.01 },      // 10ms latency target
                     
-                    // Google-specific enhanced audio processing (Chrome/Edge)
+                    // Google-specific enhanced audio processing (Chrome/Edge) - optional
                     googEchoCancellation: true,
                     googAutoGainControl: true,
                     googNoiseSuppression: true,
@@ -1279,7 +1387,28 @@ class PrayerRoomService {
                     googNoiseReduction: true        // Additional noise reduction
                 },
                 video: false
-            });
+            };
+            
+            try {
+                this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (constraintError) {
+                // If constraints fail, try with minimal constraints
+                if (constraintError.name === 'OverconstrainedError' || constraintError.name === 'ConstraintNotSatisfiedError') {
+                    console.warn('⚠️ Advanced constraints not supported, falling back to basic constraints:', constraintError);
+                    constraints = {
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true
+                        },
+                        video: false
+                    };
+                    this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+                } else {
+                    // Re-throw if it's not a constraint error
+                    throw constraintError;
+                }
+            }
             
             console.log('🎤 Microphone permission granted, stream obtained:', this.localStream);
             
@@ -1414,6 +1543,16 @@ class PrayerRoomService {
     
     getAudioErrorMessage(error) {
         const errorName = error.name || error.toString();
+        const errorMessage = error.message || error.toString();
+        
+        // Check for specific error messages first
+        if (errorMessage.includes('not supported')) {
+            return errorMessage;
+        }
+        
+        if (errorMessage.includes('HTTPS') || errorMessage.includes('secure connection')) {
+            return errorMessage;
+        }
         
         if (errorName.includes('NotAllowedError') || errorName.includes('PermissionDeniedError')) {
             return 'Microphone permission denied. Please allow microphone access in your browser settings and try again.';
@@ -1422,13 +1561,13 @@ class PrayerRoomService {
         } else if (errorName.includes('NotReadableError') || errorName.includes('TrackStartError')) {
             return 'Microphone is being used by another app. Please close other apps using the microphone and try again.';
         } else if (errorName.includes('OverconstrainedError') || errorName.includes('ConstraintNotSatisfiedError')) {
-            return 'Microphone settings not supported. Please try a different microphone or browser.';
+            return 'Microphone settings not supported. Using basic audio settings instead.';
         } else if (errorName.includes('AbortError')) {
             return 'Microphone access was interrupted. Please try again.';
         } else if (errorName.includes('Network')) {
             return 'Network error. Please check your internet connection and try again.';
         } else {
-            return 'Failed to connect to audio. Please check your microphone permissions and try again.';
+            return errorMessage || 'Failed to connect to audio. Please check your microphone permissions and try again.';
         }
     }
     

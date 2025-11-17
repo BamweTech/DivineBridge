@@ -70,7 +70,7 @@
 @media (min-width: 1400px) {
     .prayer-room-main {
         display: grid !important;
-        grid-template-columns: 320px 1fr 500px !important;
+        grid-template-columns: 380px 1fr 420px !important;
         gap: var(--space-lg) !important;
         max-width: 1600px !important;
         margin: 0 auto !important;
@@ -83,10 +83,16 @@
     }
 }
 
-/* Hide stage area on smaller screens and for participants */
+/* Hide stage area on smaller screens, but show for participants in 2-column layout */
 @media (max-width: 1399px) {
-    .stage-area {
+    /* Hide stage area for hosts on smaller screens */
+    body:not(.participant-view) .stage-area {
         display: none !important;
+    }
+    
+    /* Show stage area for participants (view-only) in 2-column layout */
+    body.participant-view .stage-area {
+        display: block !important;
     }
 }
 
@@ -94,7 +100,7 @@
 @media (min-width: 769px) and (max-width: 1399px) {
     .prayer-room-main {
         display: grid !important;
-        grid-template-columns: minmax(280px, 320px) minmax(450px, 1fr) !important;
+        grid-template-columns: minmax(300px, 380px) minmax(450px, 1fr) !important;
         gap: var(--space-lg) !important;
         max-width: 1400px !important;
         margin: 0 auto !important;
@@ -146,7 +152,7 @@
     background: var(--glass-primary) !important;
     backdrop-filter: var(--blur-md) !important;
     -webkit-backdrop-filter: var(--blur-md) !important;
-    padding: var(--space-sm) var(--space-lg) !important;
+    padding: 20px 32px !important;
     border-bottom: 1px solid var(--border-white) !important;
     border-radius: var(--radius-xl) var(--radius-xl) 0 0 !important;
     box-shadow: var(--shadow-md) !important;
@@ -179,7 +185,7 @@
 
 .header-logo-img,
 .header-logo {
-    height: 32px !important;
+    height: 48px !important;
     width: auto !important;
 }
 
@@ -406,9 +412,26 @@
     margin-bottom: var(--space-md) !important;
 }
 
+/* Search Box Wrapper */
+.participants-search-wrapper {
+    position: relative !important;
+    width: 100% !important;
+    margin-bottom: var(--space-md) !important;
+}
+
+.participants-search-wrapper .search-icon {
+    position: absolute !important;
+    left: 12px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    color: var(--text-muted) !important;
+    pointer-events: none !important;
+    z-index: 1 !important;
+}
+
 /* Search Box */
 .participants-panel input[type="search"],
-.participants-panel input[type="text"] {
+.participants-panel .participants-search {
     width: 100% !important;
     height: 44px !important;
     padding: 12px 16px 12px 40px !important;
@@ -418,13 +441,20 @@
     font-size: 14px !important;
     color: var(--text-tertiary) !important;
     transition: all 0.3s ease !important;
+    font-family: inherit !important;
 }
 
-.participants-panel input:focus {
+.participants-panel input[type="search"]:focus,
+.participants-panel .participants-search:focus {
     outline: none !important;
     border-color: var(--color-primary) !important;
     background: var(--glass-hover) !important;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+.participants-panel input[type="search"]::placeholder,
+.participants-panel .participants-search::placeholder {
+    color: var(--text-muted) !important;
 }
 
 /* Tabs */
@@ -445,12 +475,19 @@
     font-size: 14px !important;
     transition: all 0.3s ease !important;
     cursor: pointer !important;
+    font-family: inherit !important;
+}
+
+.participants-tab:hover {
+    background: var(--glass-secondary) !important;
+    border-color: var(--color-primary) !important;
 }
 
 .participants-tab.active {
     background: var(--gradient-primary) !important;
     border-color: transparent !important;
     color: white !important;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2) !important;
 }
 
 /* Participant Card */
@@ -483,6 +520,16 @@
     font-weight: 600 !important;
     font-size: 18px !important;
     box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
+    position: relative !important;
+}
+
+/* Avatar gradients based on role */
+.participant.role-speaker .participant-avatar {
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6) !important;
+}
+
+.participant.role-listener .participant-avatar {
+    background: linear-gradient(135deg, #06b6d4, #0ea5e9) !important;
 }
 
 .participant-name {
@@ -542,9 +589,10 @@
 
 .stage-label {
     font-size: 14px !important;
-    color: var(--text-primary) !important;
+    color: #1e3a8a !important;
     opacity: 0.7 !important;
     margin-bottom: var(--space-sm) !important;
+    font-weight: 500 !important;
 }
 
 .stage-title {
@@ -765,7 +813,8 @@
 
 .chat-input {
     flex: 1 !important;
-    min-height: 44px !important;
+    min-height: 48px !important;
+    height: 48px !important;
     max-height: 120px !important;
     padding: 12px 16px !important;
     border-radius: var(--radius-md) !important;
