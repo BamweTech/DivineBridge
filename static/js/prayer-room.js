@@ -1340,15 +1340,19 @@ class PrayerRoomService {
             }
             
             // Check if getUserMedia is available
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            let getUserMediaFn = null;
+            
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                // Modern API
+                getUserMediaFn = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+            } else {
                 // Check for legacy getUserMedia
-                const getUserMedia = navigator.mediaDevices?.getUserMedia || 
-                                   navigator.getUserMedia || 
-                                   navigator.webkitGetUserMedia || 
-                                   navigator.mozGetUserMedia || 
-                                   navigator.msGetUserMedia;
+                const legacyGetUserMedia = navigator.getUserMedia || 
+                                          navigator.webkitGetUserMedia || 
+                                          navigator.mozGetUserMedia || 
+                                          navigator.msGetUserMedia;
                 
-                if (!getUserMedia) {
+                if (!legacyGetUserMedia) {
                     throw new Error('getUserMedia is not supported in this browser. Please use a modern browser like Chrome, Firefox, or Safari.');
                 }
                 
@@ -1356,6 +1360,13 @@ class PrayerRoomService {
                 if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
                     throw new Error('Microphone access requires HTTPS. Please use a secure connection (https://) or localhost.');
                 }
+                
+                // Wrap legacy API to return a Promise
+                getUserMediaFn = (constraints) => {
+                    return new Promise((resolve, reject) => {
+                        legacyGetUserMedia.call(navigator, constraints, resolve, reject);
+                    });
+                };
             }
             
             // Request microphone permission with enhanced noise suppression
@@ -1390,7 +1401,7 @@ class PrayerRoomService {
             };
             
             try {
-                this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+                this.localStream = await getUserMediaFn(constraints);
             } catch (constraintError) {
                 // If constraints fail, try with minimal constraints
                 if (constraintError.name === 'OverconstrainedError' || constraintError.name === 'ConstraintNotSatisfiedError') {
@@ -1403,7 +1414,7 @@ class PrayerRoomService {
                         },
                         video: false
                     };
-                    this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    this.localStream = await getUserMediaFn(constraints);
                 } else {
                     // Re-throw if it's not a constraint error
                     throw constraintError;
@@ -1412,16 +1423,34 @@ class PrayerRoomService {
             
             console.log('🎤 Microphone permission granted, stream obtained:', this.localStream);
             
-            // Quick validation
-            if (!this.localStream || !this.localStream.active) {
-                throw new Error('Invalid audio stream from microphone');
+            // Validate stream exists
+            if (!this.localStream) {
+                throw new Error('No audio stream received from microphone');
+            }
+            
+            // Check for audio tracks
+            const audioTracks = this.localStream.getAudioTracks();
+            if (!audioTracks || audioTracks.length === 0) {
+                throw new Error('No audio tracks found in microphone stream');
+            }
+            
+            // Wait a moment for stream to become active (some browsers need time)
+            let attempts = 0;
+            while (!this.localStream.active && attempts < 10) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+            
+            // Final validation
+            if (!this.localStream.active) {
+                console.warn('⚠️ Stream not active after waiting, but continuing anyway');
             }
             
             // Ensure audio is enabled now that we have the stream
             this.isAudioEnabled = true;
             
             // Monitor local audio track for mute/unmute events
-            const localTrack = this.localStream.getAudioTracks()[0];
+            const localTrack = audioTracks[0];
             if (localTrack) {
                 console.log('🎤 Local audio track:', {
                     id: localTrack.id,
@@ -1444,6 +1473,14 @@ class PrayerRoomService {
                     console.error('❌ Your microphone track is muted! It won\'t send audio.');
                     this.showError('Microphone not working. Close other apps using the mic and refresh.');
                 }
+                
+                // Ensure track is enabled
+                if (!localTrack.enabled) {
+                    console.log('🔧 Enabling audio track...');
+                    localTrack.enabled = true;
+                }
+            } else {
+                throw new Error('No audio track found in microphone stream');
             }
             
             // Update UI to show mute button now that stream is active
@@ -1459,8 +1496,14 @@ class PrayerRoomService {
             });
             
             // Initialize WebRTC first (most critical for voice)
-            await this.loadIceConfig();
-            this.initializeWebRTC().then(() => {
+            try {
+                await this.loadIceConfig();
+            } catch (iceError) {
+                console.warn('⚠️ ICE config loading failed, continuing with defaults:', iceError);
+            }
+            
+            try {
+                await this.initializeWebRTC();
                 console.log('🎤 WebRTC initialized successfully');
                 
                 // Add stream to any existing peer connections that were created before audio was joined
@@ -1477,9 +1520,11 @@ class PrayerRoomService {
                 this.initializeAdvancedAudioProcessing().catch(error => {
                     console.warn('⚠️ Advanced audio processing failed:', error);
                 });
-            }).catch(error => {
-                console.warn('⚠️ WebRTC initialization failed:', error);
-            });
+            } catch (webrtcError) {
+                console.error('❌ WebRTC initialization failed:', webrtcError);
+                // Don't throw - allow audio to work even if WebRTC setup has issues
+                // The stream is still valid and can be used
+            }
             
             console.log('🎤 Audio join process initiated successfully');
             
