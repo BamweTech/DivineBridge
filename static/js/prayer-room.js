@@ -1744,12 +1744,12 @@ class PrayerRoomService {
 
         // Hosts should never see join audio button - they're always speakers
         if (this.isHost) {
-            joinAudioBtn.style.display = 'none';
+            joinAudioBtn.style.setProperty('display', 'none', 'important');
             // Hosts can mute/unmute, so show mute button if audio is enabled
             if (this.isAudioEnabled) {
-                muteBtn.style.display = 'flex';
+                muteBtn.style.setProperty('display', 'flex', 'important');
             } else {
-                muteBtn.style.display = 'none';
+                muteBtn.style.setProperty('display', 'none', 'important');
             }
             return;
         }
@@ -1758,8 +1758,8 @@ class PrayerRoomService {
         // This allows users to control their microphone after joining audio
         if (this.isAudioEnabled) {
             // Show mute button, hide join audio button
-            joinAudioBtn.style.display = 'none';
-            muteBtn.style.display = 'inline-flex';
+            joinAudioBtn.style.setProperty('display', 'none', 'important');
+            muteBtn.style.setProperty('display', 'inline-flex', 'important');
             
             // Update mute button state using CSS classes
             if (this.isMuted) {
@@ -1768,16 +1768,10 @@ class PrayerRoomService {
                 muteBtn.classList.remove('muted');
             }
         } else {
-            // Audio not enabled - show join button for listeners, hide mute button
-            if (this.participantRole !== 'speaker') {
-                // Listeners see the join button
-                joinAudioBtn.style.display = 'inline-flex';
-                muteBtn.style.display = 'none';
-            } else {
-                // Speakers who haven't joined audio yet (shouldn't happen, but handle it)
-                joinAudioBtn.style.display = 'inline-flex';
-                muteBtn.style.display = 'none';
-            }
+            // Audio not enabled - show join button, hide mute button
+            // Show join button for all non-hosts (listeners and speakers who haven't joined yet)
+            joinAudioBtn.style.setProperty('display', 'inline-flex', 'important');
+            muteBtn.style.setProperty('display', 'none', 'important');
         }
         
         console.log('🔧 Audio controls updated:', {
