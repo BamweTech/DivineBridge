@@ -235,11 +235,25 @@ Rules:
         }
         
         # Sort by severity (highest first), then by casualties
+        # Ensure casualties is always an integer for proper sorting
+        def get_casualties_int(disaster):
+            casualties = disaster.get('casualties', 0) or 0
+            # Convert to int if it's a string or other type
+            if isinstance(casualties, str):
+                try:
+                    return int(casualties)
+                except (ValueError, TypeError):
+                    return 0
+            try:
+                return int(casualties)
+            except (ValueError, TypeError):
+                return 0
+        
         sorted_disasters = sorted(
             disasters,
             key=lambda d: (
                 severity_rank.get(d.get('severity', 'minor'), 0),
-                d.get('casualties', 0) or 0
+                get_casualties_int(d)
             ),
             reverse=True
         )
