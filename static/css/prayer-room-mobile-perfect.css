@@ -492,10 +492,10 @@
     /* Host controls for participants - hidden by default */
     .participant-controls {
         display: none !important; /* Hidden by default */
-        position: relative !important; /* Normal flow positioning */
-        top: auto !important;
-        left: auto !important;
-        right: auto !important;
+        position: absolute !important;
+        top: calc(100% + 8px) !important;
+        left: 0 !important;
+        right: 0 !important;
         flex-wrap: wrap !important;
         gap: 8px !important;
         background: #ffffff !important;
@@ -507,14 +507,11 @@
         opacity: 0 !important;
         visibility: hidden !important;
         pointer-events: none !important;
-        margin-top: 8px !important; /* Space above controls */
-        width: 100% !important; /* Full width */
     }
     
-    /* Show controls when participant is expanded - appears below name */
+    /* Show controls when participant is expanded */
     .participant.expanded .participant-controls {
-        display: grid !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        display: flex !important;
         opacity: 1 !important;
         visibility: visible !important;
         pointer-events: auto !important;
@@ -1259,8 +1256,10 @@
         min-width: unset !important;
     }
 
-    /* Override for expanded state - show controls in grid layout below name */
+    /* Override for expanded state - show controls in grid layout */
     .participant.expanded .participant-controls {
+        grid-row: 3 !important;
+        grid-column: 1 / span 2 !important;
         display: grid !important;
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         gap: 8px !important;
@@ -1268,11 +1267,10 @@
         opacity: 1 !important;
         visibility: visible !important;
         pointer-events: auto !important;
-        position: relative !important; /* Normal flow - appears below name */
+        position: relative !important; /* Override absolute positioning for grid layout */
         top: auto !important;
         left: auto !important;
         right: auto !important;
-        margin-top: 8px !important; /* Space between name and controls */
     }
     
     /* Keep hidden by default - this will override the grid display */
