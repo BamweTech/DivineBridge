@@ -667,7 +667,7 @@
         width: 100% !important;
         overflow-y: auto !important;
         overflow-x: hidden !important;
-        padding: 16px 12px 200px 12px !important; /* Top padding + bottom padding for input (140px) + tabs (56px) */
+        padding: 16px 12px 180px 12px !important; /* Top padding + bottom padding for input (~120px) + tabs (56px) + extra */
         background: #ffffff !important;
         -webkit-overflow-scrolling: touch !important;
         scroll-behavior: smooth !important;
