@@ -1652,11 +1652,25 @@
                         sessionStorage.setItem('prayerRoomUrl', window.location.href);
                     }
                     
-                    // Update speakers before navigating
-                    this.updateSpeakers();
+                    // Hide the prayer room container but keep audio active
+                    const container = document.getElementById('prayerRoomContainer');
+                    if (container) {
+                        container.style.display = 'none';
+                    }
                     
-                    // Navigate to home page
-                    window.location.href = '/';
+                    // Show minimized pill
+                    const minimized = document.getElementById('prayerRoomMinimized');
+                    if (minimized) {
+                        minimized.style.display = 'flex';
+                    }
+                    
+                    // Update speakers and status
+                    this.updateSpeakers();
+                    this.updateStatus();
+                    
+                    // Allow navigation - audio will stay active
+                    // User can navigate to home page manually if desired
+                    // The pill will appear on other pages if they navigate away
                 },
                 
                 restore() {
@@ -1680,11 +1694,18 @@
                 
                 showMinimized() {
                     const minimized = document.getElementById('prayerRoomMinimized');
+                    const container = document.getElementById('prayerRoomContainer');
+                    
                     if (minimized) {
                         minimized.style.display = 'flex';
                         this.isMinimized = true;
                         this.updateSpeakers();
                         this.updateStatus();
+                    }
+                    
+                    // Hide container if we're on a different page
+                    if (container && !window.location.pathname.includes('/prayer-room/')) {
+                        container.style.display = 'none';
                     }
                 },
                 

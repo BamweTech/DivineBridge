@@ -504,11 +504,22 @@
         padding: 12px !important;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
         z-index: 10 !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
     }
     
     /* Show controls when participant is expanded */
     .participant.expanded .participant-controls {
         display: flex !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+    }
+    
+    /* Ensure participant has relative positioning for absolute controls */
+    .participant {
+        position: relative !important;
     }
     
     .participant-action {
@@ -652,13 +663,15 @@
         width: 100% !important;
         overflow-y: auto !important;
         overflow-x: hidden !important;
-        padding: 8px 12px 196px 12px !important; /* 140px (input) + 56px (bottom tabs) = 196px */
-        padding-top: 0 !important;
+        padding: 16px 12px 220px 12px !important; /* Extra padding: 16px top + 220px bottom (input ~140px + bottom tabs 56px + extra 24px) */
+        padding-top: 16px !important;
         background: #ffffff !important;
         -webkit-overflow-scrolling: touch !important;
         scroll-behavior: smooth !important;
         -webkit-transform: translateZ(0) !important;
         transform: translateZ(0) !important;
+        min-height: 0 !important;
+        box-sizing: border-box !important;
         will-change: scroll-position !important;
         min-height: 0 !important;
         max-height: 100% !important;
@@ -1212,13 +1225,29 @@
         min-width: unset !important;
     }
 
-    .participant-controls {
+    /* Override for expanded state - show controls in grid layout */
+    .participant.expanded .participant-controls {
         grid-row: 3 !important;
         grid-column: 1 / span 2 !important;
         display: grid !important;
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         gap: 8px !important;
         width: 100% !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        position: relative !important; /* Override absolute positioning for grid layout */
+        top: auto !important;
+        left: auto !important;
+        right: auto !important;
+    }
+    
+    /* Keep hidden by default - this will override the grid display */
+    .participant-controls {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
     }
 
     .participant-controls .participant-action {
