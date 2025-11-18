@@ -582,28 +582,65 @@ class PrayerRoomService {
                     scrollChatToBottom();
                 }, 100);
                 
-                // Use visual viewport API if available for better keyboard handling
+                // Use visual viewport API for Teams-like keyboard handling
                 if (window.visualViewport) {
                     const handleViewportResize = () => {
                         const viewport = window.visualViewport;
-                        // Adjust chat messages padding based on keyboard height
                         const chatMessages = document.getElementById('chatMessages');
-                        if (chatMessages) {
+                        const chatInputSection = document.querySelector('.chat-input-section');
+                        
+                        if (chatMessages && chatInputSection) {
+                            // Calculate keyboard height
                             const keyboardHeight = window.innerHeight - viewport.height;
+                            
                             if (keyboardHeight > 0) {
-                                chatMessages.style.paddingBottom = `${160 + keyboardHeight}px`;
+                                // Input stays fixed at bottom (above keyboard)
+                                // Messages area adjusts to fill space above input
+                                const inputHeight = chatInputSection.offsetHeight || 140;
+                                const availableHeight = viewport.height - inputHeight;
+                                
+                                // Set messages container height to fill available space
+                                chatMessages.style.height = `${availableHeight}px`;
+                                chatMessages.style.maxHeight = `${availableHeight}px`;
+                                chatMessages.style.paddingBottom = `${inputHeight + 20}px`;
+                                
+                                // Ensure input stays fixed
+                                chatInputSection.style.bottom = '0px';
+                                
+                                // Scroll to bottom to show latest messages
+                                setTimeout(() => {
+                                    scrollChatToBottom();
+                                }, 100);
+                            } else {
+                                // Keyboard closed - reset to normal
+                                chatMessages.style.height = '';
+                                chatMessages.style.maxHeight = '';
+                                chatMessages.style.paddingBottom = '';
                             }
                         }
                     };
+                    
+                    // Initial adjustment
+                    handleViewportResize();
                     
                     window.visualViewport.addEventListener('resize', handleViewportResize);
                     window.visualViewport.addEventListener('scroll', handleViewportResize);
                     
                     // Clean up on blur
-                    chatInput.addEventListener('blur', () => {
+                    const cleanup = () => {
                         window.visualViewport.removeEventListener('resize', handleViewportResize);
                         window.visualViewport.removeEventListener('scroll', handleViewportResize);
-                    }, { once: true });
+                        
+                        // Reset styles
+                        const chatMessages = document.getElementById('chatMessages');
+                        if (chatMessages) {
+                            chatMessages.style.height = '';
+                            chatMessages.style.maxHeight = '';
+                            chatMessages.style.paddingBottom = '';
+                        }
+                    };
+                    
+                    chatInput.addEventListener('blur', cleanup, { once: true });
                 }
             });
             
