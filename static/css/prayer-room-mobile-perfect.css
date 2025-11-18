@@ -761,70 +761,76 @@
     }
     
     .message-other .message-bubble {
-        background: #f1f3f5 !important; /* Softer gray background */
-        border-radius: 20px 20px 20px 4px !important; /* More rounded, Teams-like */
+        background: transparent !important; /* No background - plain text */
+        border-radius: 0 !important; /* No rounded corners */
         border: none !important;
-        box-shadow: none !important; /* No shadow for cleaner look */
+        box-shadow: none !important;
+        padding: 4px 0 !important; /* Minimal padding */
     }
     
     /* Own messages - right aligned */
     .message-own {
         justify-content: flex-end !important;
         padding-right: 0 !important;
-        background: transparent !important; /* No background on container, only bubble */
+        background: transparent !important;
     }
     
     .message-own .message-bubble {
-        background: #0078d4 !important; /* Teams blue color */
-        border-radius: 20px 20px 4px 20px !important; /* More rounded, Teams-like */
-        color: #ffffff !important;
+        background: transparent !important; /* No background - plain text */
+        border-radius: 0 !important; /* No rounded corners */
+        color: #1e293b !important; /* Dark text color */
         border: none !important;
-        box-shadow: none !important; /* No shadow for cleaner look */
+        box-shadow: none !important;
+        padding: 4px 0 !important; /* Minimal padding */
     }
     
     .message-own .message-sender {
-        color: rgba(255, 255, 255, 0.95) !important;
+        color: #1e293b !important; /* Dark text for readability */
     }
     
     .message-own .message-content {
-        color: #ffffff !important;
+        color: #1e293b !important; /* Dark text for readability */
     }
     
     .message-own .message-time {
-        color: rgba(255, 255, 255, 0.75) !important;
+        color: #64748b !important; /* Gray for time */
     }
     
     .message-other .message-content,
     .message-other .message-sender,
     .message-other .message-time {
-        color: #202124 !important;
+        color: #1e293b !important; /* Dark text */
     }
     
     .message-own .message-content,
-    .message-own .message-sender,
+    .message-own .message-sender {
+        color: #1e293b !important; /* Dark text for readability */
+    }
+    
     .message-own .message-time {
-        color: #ffffff !important;
+        color: #64748b !important; /* Gray for time */
     }
     
     .message-bubble {
         width: fit-content !important;
-        max-width: calc(100% - 32px) !important; /* More space from edges */
+        max-width: calc(100% - 24px) !important; /* Space from edges */
         min-width: auto !important;
-        padding: 8px 12px !important; /* Slightly tighter padding */
+        padding: 4px 0 !important; /* Minimal padding - no rectangle */
         position: relative !important;
-        border-radius: 20px !important; /* More rounded */
+        border-radius: 0 !important; /* No rounded corners */
         border: none !important;
         word-wrap: normal !important;
         word-break: normal !important;
         overflow-wrap: normal !important;
         white-space: normal !important;
         hyphens: none !important;
-        box-shadow: none !important; /* Remove shadow for cleaner Teams-like look */
+        box-shadow: none !important; /* No shadow */
         backdrop-filter: none !important;
         transition: transform 0.2s ease !important;
         animation: messageSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
         display: flex !important;
         flex-direction: column !important;
+        background: transparent !important; /* No background - plain text */
         /* Force override any conflicting word-break rules */
         word-break: normal !important;
         overflow-wrap: normal !important;
@@ -963,11 +969,12 @@
     /* ===== CHAT INPUT - FIXED ABOVE KEYBOARD (Teams-like) ===== */
     .chat-input-section {
         position: fixed !important;
-        bottom: 56px !important; /* Above bottom tabs when keyboard closed */
+        bottom: 56px !important; /* Attached directly to bottom tabs - no gap */
         left: 0 !important;
         right: 0 !important;
-        padding: 8px 12px 8px 12px !important;
+        padding: 6px 12px 6px 12px !important; /* Reduced padding to minimize gap */
         margin: 0 !important;
+        margin-bottom: 0 !important; /* No bottom margin */
         background: #ffffff !important;
         border-top: 1px solid #e5e7eb !important;
         box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06) !important;
@@ -992,14 +999,17 @@
         max-width: 100% !important;
         padding: 0 !important;
         margin: 0 !important;
+        margin-bottom: 0 !important; /* No bottom margin to eliminate gap */
     }
     
     /* When keyboard is active - Input stays fixed above keyboard (Teams-like) */
     body.chat-input-focused .chat-input-section {
         position: fixed !important;
-        bottom: 0 !important; /* Fixed at bottom, above keyboard */
+        bottom: 0 !important; /* Fixed at bottom, directly above keyboard - no gap */
         z-index: 200 !important;
-        padding-bottom: max(8px, env(safe-area-inset-bottom)) !important; /* Safe area padding */
+        padding: 6px 12px max(6px, env(safe-area-inset-bottom)) 12px !important; /* Minimal padding, no gap */
+        margin: 0 !important;
+        margin-bottom: 0 !important; /* No bottom margin */
         transition: bottom 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
         /* Ensure it doesn't scroll */
         transform: translateZ(0) !important;
