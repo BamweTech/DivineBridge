@@ -1310,9 +1310,13 @@
     background: var(--gradient-primary-alt) !important;
 }
 
-.minimized-btn.leave-btn:hover {
+.minimized-btn.leave-btn {
     background: rgba(239, 68, 68, 0.1) !important;
-    border-color: rgba(239, 68, 68, 0.3) !important;
+    color: #dc2626 !important;
+}
+
+.minimized-btn.leave-btn:hover {
+    background: rgba(239, 68, 68, 0.2) !important;
     color: #dc2626 !important;
 }
 
