@@ -13,6 +13,9 @@ class PrayerRoomService {
         this.firestore = null;
         this.chatMessages = [];
         
+        // Track expanded participants to preserve state across updates
+        this.expandedParticipantIds = new Set();
+        
         // WebRTC components for high-quality voice
         this.peerConnections = new Map();
         this.audioContext = null;
@@ -1086,6 +1089,10 @@ class PrayerRoomService {
                 // Close all expanded participants
                 const expandedParticipants = participantsContainer.querySelectorAll('.participant.expanded');
                 expandedParticipants.forEach(p => {
+                    const userId = p.getAttribute('data-user-id');
+                    if (userId) {
+                        this.expandedParticipantIds.delete(userId);
+                    }
                     p.classList.remove('expanded');
                 });
             };
@@ -1170,7 +1177,16 @@ class PrayerRoomService {
         // 4. Filter participants based on search and tab
         const filteredParticipants = this.getFilteredParticipants(participantList);
         
-        // 5. Render participants list
+        // 5. Save expanded state before clearing (preserve expanded participants)
+        const currentlyExpanded = participantsContainer.querySelectorAll('.participant.expanded');
+        currentlyExpanded.forEach(el => {
+            const userId = el.getAttribute('data-user-id');
+            if (userId) {
+                this.expandedParticipantIds.add(userId);
+            }
+        });
+        
+        // 6. Render participants list
         participantsContainer.innerHTML = '';
         if (filteredParticipants.length > 0) {
             filteredParticipants.forEach(participant => {
@@ -1243,6 +1259,11 @@ class PrayerRoomService {
                     ${controls.length ? `<div class="participant-controls">${controls.join('')}</div>` : ''}
                 `;
                 
+                // Restore expanded state if this participant was expanded before
+                if (this.expandedParticipantIds.has(participant.user_id)) {
+                    participantEl.classList.add('expanded');
+                }
+                
                 // Add click handler for expand/collapse (only for host)
                 if (this.isHost && controls.length > 0) {
                     participantEl.addEventListener('click', (e) => {
@@ -1259,6 +1280,10 @@ class PrayerRoomService {
                         const allParticipants = participantsContainer.querySelectorAll('.participant.expanded');
                         allParticipants.forEach(p => {
                             if (p !== participantEl) {
+                                const otherUserId = p.getAttribute('data-user-id');
+                                if (otherUserId) {
+                                    this.expandedParticipantIds.delete(otherUserId);
+                                }
                                 p.classList.remove('expanded');
                             }
                         });
@@ -1267,8 +1292,10 @@ class PrayerRoomService {
                         const isCurrentlyExpanded = participantEl.classList.contains('expanded');
                         if (isCurrentlyExpanded) {
                             participantEl.classList.remove('expanded');
+                            this.expandedParticipantIds.delete(participant.user_id);
                         } else {
                             participantEl.classList.add('expanded');
+                            this.expandedParticipantIds.add(participant.user_id);
                         }
                     });
                 }
