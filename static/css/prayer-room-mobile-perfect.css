@@ -775,8 +775,13 @@
         background: transparent !important;
     }
     
-    .message-own .message-bubble {
+    /* Override ALL other CSS files - ensure no background on own messages */
+    .message-own .message-bubble,
+    .message.message-own .message-bubble,
+    .chat-message.message-own .message-bubble {
         background: transparent !important; /* No background - plain text */
+        background-color: transparent !important; /* Force override gradient */
+        background-image: none !important; /* Remove any gradient images */
         border-radius: 0 !important; /* No rounded corners */
         color: #1e293b !important; /* Dark text color */
         border: none !important;
@@ -811,7 +816,10 @@
         color: #64748b !important; /* Gray for time */
     }
     
-    .message-bubble {
+    /* Override ALL CSS files - ensure no backgrounds on any message bubbles */
+    .message-bubble,
+    .message .message-bubble,
+    .chat-message .message-bubble {
         width: fit-content !important;
         max-width: calc(100% - 24px) !important; /* Space from edges */
         min-width: auto !important;
@@ -831,6 +839,8 @@
         display: flex !important;
         flex-direction: column !important;
         background: transparent !important; /* No background - plain text */
+        background-color: transparent !important; /* Force override */
+        background-image: none !important; /* Remove gradients */
         /* Force override any conflicting word-break rules */
         word-break: normal !important;
         overflow-wrap: normal !important;
@@ -972,7 +982,7 @@
         bottom: 56px !important; /* Attached directly to bottom tabs - no gap */
         left: 0 !important;
         right: 0 !important;
-        padding: 6px 12px 6px 12px !important; /* Reduced padding to minimize gap */
+        padding: 4px 12px 4px 12px !important; /* Minimal padding */
         margin: 0 !important;
         margin-bottom: 0 !important; /* No bottom margin */
         background: #ffffff !important;
@@ -1007,7 +1017,7 @@
         position: fixed !important;
         bottom: 0 !important; /* Fixed at bottom, directly above keyboard - no gap */
         z-index: 200 !important;
-        padding: 6px 12px max(6px, env(safe-area-inset-bottom)) 12px !important; /* Minimal padding, no gap */
+        padding: 4px 12px max(4px, env(safe-area-inset-bottom)) 12px !important; /* Minimal padding, no gap */
         margin: 0 !important;
         margin-bottom: 0 !important; /* No bottom margin */
         transition: bottom 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
