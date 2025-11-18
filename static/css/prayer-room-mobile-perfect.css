@@ -98,12 +98,12 @@
         gap: 8px !important;
     }
     
-    /* First row: Logo + Room Title + Participant Count */
+    /* First row: Logo centered */
     .room-info {
         width: 100% !important;
         display: flex !important;
         align-items: center !important;
-        justify-content: space-between !important;
+        justify-content: center !important;
         gap: 8px !important;
     }
     
@@ -111,6 +111,7 @@
         flex-shrink: 0 !important;
         display: flex !important;
         align-items: center !important;
+        justify-content: center !important;
     }
     
     .header-logo-img,
@@ -260,6 +261,7 @@
         background: #3b82f6 !important;
         color: #ffffff !important;
         border: none !important;
+        display: inline-flex !important; /* Allow JS to control visibility */
     }
     
     .header-actions .mute-btn,
@@ -1287,6 +1289,13 @@
         background: #3b82f6 !important;
         color: #ffffff !important;
         border: none !important;
+        /* Allow JS to control visibility - don't force display */
+    }
+    
+    /* Ensure JS can show/hide join audio button */
+    .join-audio-btn[style*="display: inline-flex"],
+    .control-btn.join-audio-btn[style*="display: inline-flex"] {
+        display: inline-flex !important;
     }
     
     .mute-btn,

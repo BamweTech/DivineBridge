@@ -1139,30 +1139,25 @@
     </style>
 </head>
 <body>
-    <!-- Minimized Prayer Room Window -->
+    <!-- Minimized Prayer Room Pill -->
     <div class="prayer-room-minimized" id="prayerRoomMinimized" style="display: none;">
         <div class="minimized-content">
-            <div class="minimized-info">
-                <div class="minimized-icon">🎙️</div>
-                <div class="minimized-text">
-                    <div class="minimized-title">Prayer Room Active</div>
+            <div class="minimized-speakers" id="minimizedSpeakers">
+                <div class="minimized-speaker-avatars" id="minimizedSpeakerAvatars">
+                    <!-- Speaker avatars will be populated here -->
+                </div>
+                <div class="minimized-speaker-info">
+                    <div class="minimized-speaker-names" id="minimizedSpeakerNames">Listening...</div>
                     <div class="minimized-status" id="minimizedStatus">Connected</div>
                 </div>
             </div>
-            <div class="minimized-actions">
-                <button class="minimized-btn restore-btn" id="restoreBtn" title="Restore prayer room">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
-                    </svg>
-                </button>
-                <button class="minimized-btn leave-btn" id="minimizedLeaveBtn" title="Leave room">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                        <polyline points="16 17 21 12 16 7"></polyline>
-                        <line x1="21" y1="12" x2="9" y2="12"></line>
-                    </svg>
-                </button>
-            </div>
+            <button class="minimized-btn leave-btn" id="minimizedLeaveBtn" title="Leave room">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+            </button>
         </div>
     </div>
     
@@ -1585,18 +1580,28 @@
             // Initialize minimize/restore functionality
             window.prayerRoomMinimize = {
                 isMinimized: false,
+                roomId: null,
                 
                 init() {
-                    // Check if we should restore from minimized state
+                    // Get room ID from service
+                    if (window.prayerRoomService) {
+                        this.roomId = window.prayerRoomService.roomId;
+                    }
+                    
+                    // Check if we should show minimized pill (user navigated away)
                     const wasMinimized = sessionStorage.getItem('prayerRoomMinimized') === 'true';
-                    if (wasMinimized && window.location.pathname !== '/prayer-room/' + window.prayerRoomService?.roomId) {
-                        // User navigated away, show minimized window
+                    const savedRoomId = sessionStorage.getItem('prayerRoomRoomId');
+                    const currentPath = window.location.pathname;
+                    const isPrayerRoomPage = currentPath.includes('/prayer-room/');
+                    
+                    if (wasMinimized && savedRoomId && !isPrayerRoomPage) {
+                        // User navigated away, show minimized pill
                         this.showMinimized();
                     }
                     
                     // Setup event listeners
                     const minimizeBtn = document.getElementById('minimizeBtn');
-                    const restoreBtn = document.getElementById('restoreBtn');
+                    const minimizedPill = document.getElementById('prayerRoomMinimized');
                     const minimizedLeaveBtn = document.getElementById('minimizedLeaveBtn');
                     const leaveBtn = document.getElementById('leaveBtn');
                     
@@ -1604,68 +1609,120 @@
                         minimizeBtn.addEventListener('click', () => this.minimize());
                     }
                     
-                    if (restoreBtn) {
-                        restoreBtn.addEventListener('click', () => this.restore());
-                    }
-                    
-                    if (minimizedLeaveBtn) {
-                        minimizedLeaveBtn.addEventListener('click', () => {
-                            if (leaveBtn) leaveBtn.click();
+                    // Make the entire pill clickable to restore
+                    if (minimizedPill) {
+                        minimizedPill.addEventListener('click', (e) => {
+                            // Don't restore if clicking the leave button
+                            if (!e.target.closest('.minimized-btn.leave-btn')) {
+                                this.restore();
+                            }
                         });
                     }
                     
-                    // Update status periodically
-                    setInterval(() => this.updateStatus(), 5000);
+                    if (minimizedLeaveBtn) {
+                        minimizedLeaveBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            if (leaveBtn) {
+                                leaveBtn.click();
+                            } else {
+                                // If leave button not found, leave directly
+                                if (window.prayerRoomService) {
+                                    window.prayerRoomService.leaveRoom();
+                                }
+                            }
+                        });
+                    }
+                    
+                    // Update speakers and status periodically
+                    setInterval(() => {
+                        if (this.isMinimized || wasMinimized) {
+                            this.updateSpeakers();
+                            this.updateStatus();
+                        }
+                    }, 2000);
                 },
                 
                 minimize() {
                     this.isMinimized = true;
-                    sessionStorage.setItem('prayerRoomMinimized', 'true');
-                    sessionStorage.setItem('prayerRoomUrl', window.location.href);
+                    const roomId = window.prayerRoomService?.roomId;
                     
-                    const container = document.getElementById('prayerRoomContainer');
-                    const minimized = document.getElementById('prayerRoomMinimized');
-                    
-                    if (container) {
-                        container.style.display = 'none';
+                    if (roomId) {
+                        sessionStorage.setItem('prayerRoomMinimized', 'true');
+                        sessionStorage.setItem('prayerRoomRoomId', roomId);
+                        sessionStorage.setItem('prayerRoomUrl', window.location.href);
                     }
                     
-                    if (minimized) {
-                        minimized.style.display = 'block';
-                    }
+                    // Update speakers before navigating
+                    this.updateSpeakers();
                     
-                    // Allow navigation
-                    this.updateStatus();
+                    // Navigate to home page
+                    window.location.href = '/';
                 },
                 
                 restore() {
                     this.isMinimized = false;
-                    sessionStorage.removeItem('prayerRoomMinimized');
-                    
-                    const container = document.getElementById('prayerRoomContainer');
-                    const minimized = document.getElementById('prayerRoomMinimized');
-                    
-                    if (container) {
-                        container.style.display = 'block';
-                    }
-                    
-                    if (minimized) {
-                        minimized.style.display = 'none';
-                    }
-                    
-                    // Navigate back to prayer room if we're on a different page
                     const savedUrl = sessionStorage.getItem('prayerRoomUrl');
-                    if (savedUrl && window.location.href !== savedUrl) {
+                    
+                    sessionStorage.removeItem('prayerRoomMinimized');
+                    sessionStorage.removeItem('prayerRoomRoomId');
+                    
+                    // Navigate back to prayer room
+                    if (savedUrl) {
                         window.location.href = savedUrl;
+                    } else {
+                        // Fallback: try to construct URL from room ID
+                        const roomId = sessionStorage.getItem('prayerRoomRoomId');
+                        if (roomId) {
+                            window.location.href = `/prayer-room/${roomId}`;
+                        }
                     }
                 },
                 
                 showMinimized() {
                     const minimized = document.getElementById('prayerRoomMinimized');
                     if (minimized) {
-                        minimized.style.display = 'block';
+                        minimized.style.display = 'flex';
+                        this.isMinimized = true;
+                        this.updateSpeakers();
+                        this.updateStatus();
                     }
-                    this.isMinimized = true;
+                },
+                
+                updateSpeakers() {
+                    if (!window.prayerRoomService) return;
+                    
+                    const avatarsContainer = document.getElementById('minimizedSpeakerAvatars');
+                    const namesContainer = document.getElementById('minimizedSpeakerNames');
+                    
+                    if (!avatarsContainer || !namesContainer) return;
+                    
+                    // Get current speakers from participants
+                    const speakers = (window.prayerRoomService.allParticipants || []).filter(
+                        p => (p.role || 'listener') === 'speaker'
+                    );
+                    
+                    if (speakers.length === 0) {
+                        avatarsContainer.innerHTML = '<div class="minimized-avatar-placeholder">🎙️</div>';
+                        namesContainer.textContent = 'Listening...';
+                        return;
+                    }
+                    
+                    // Show up to 3 speaker avatars
+                    const displaySpeakers = speakers.slice(0, 3);
+                    avatarsContainer.innerHTML = displaySpeakers.map(speaker => {
+                        const name = speaker.user_name || 'Speaker';
+                        const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                        return `<div class="minimized-speaker-avatar" title="${name}">${initials}</div>`;
+                    }).join('');
+                    
+                    // Show speaker names
+                    if (speakers.length === 1) {
+                        namesContainer.textContent = speakers[0].user_name || 'Speaker';
+                    } else if (speakers.length === 2) {
+                        namesContainer.textContent = `${speakers[0].user_name || 'Speaker'} & ${speakers[1].user_name || 'Speaker'}`;
+                    } else {
+                        namesContainer.textContent = `${speakers[0].user_name || 'Speaker'} +${speakers.length - 1} more`;
+                    }
                 },
                 
                 updateStatus() {
