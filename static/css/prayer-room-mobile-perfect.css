@@ -624,8 +624,8 @@
     }
     
     .chat-section {
-        width: 100%;
-        height: 100%;
+        width: 100% !important;
+        height: 100% !important;
         display: flex !important;
         flex-direction: column !important;
         overflow: hidden !important;
@@ -637,6 +637,10 @@
         margin-top: 0 !important;
         padding-top: 0 !important;
         background: #ffffff !important;
+        position: relative !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        z-index: 1 !important;
     }
     
     .chat-header {
@@ -663,8 +667,7 @@
         width: 100% !important;
         overflow-y: auto !important;
         overflow-x: hidden !important;
-        padding: 16px 12px 220px 12px !important; /* Extra padding: 16px top + 220px bottom (input ~140px + bottom tabs 56px + extra 24px) */
-        padding-top: 16px !important;
+        padding: 16px 12px 200px 12px !important; /* Top padding + bottom padding for input (140px) + tabs (56px) */
         background: #ffffff !important;
         -webkit-overflow-scrolling: touch !important;
         scroll-behavior: smooth !important;
@@ -673,18 +676,17 @@
         min-height: 0 !important;
         box-sizing: border-box !important;
         will-change: scroll-position !important;
-        min-height: 0 !important;
-        max-height: 100% !important;
         margin: 0 !important;
-        margin-top: 0 !important;
-        align-self: stretch !important;
         display: flex !important;
         flex-direction: column !important;
-        justify-content: flex-end !important; /* Start from bottom, expand upward */
+        justify-content: flex-start !important; /* Messages start from top */
         gap: 8px !important;
-        /* Teams-like: Ensure messages container fills available space */
         flex-grow: 1 !important;
         flex-shrink: 1 !important;
+        position: relative !important;
+        z-index: 1 !important;
+        visibility: visible !important;
+        opacity: 1 !important;
     }
     
     
@@ -695,6 +697,9 @@
         margin-bottom: 4px !important;
         clear: both !important;
         position: relative !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        width: 100% !important;
     }
     
     /* Group messages from same sender */
@@ -953,21 +958,19 @@
         font-size: 13px !important;
     }
     
-    /* ===== CHAT INPUT - FIXED AT BOTTOM ===== */
+    /* ===== CHAT INPUT - ATTACHED TO BOTTOM TABS ===== */
     .chat-input-section {
         position: fixed !important;
-        bottom: 56px !important; /* Directly above bottom tabs - no gap */
+        bottom: 56px !important; /* Attached directly above bottom tabs - no gap */
         left: 0 !important;
         right: 0 !important;
-        padding: 8px 12px 0 12px !important; /* Remove bottom padding to eliminate gap */
-        padding-bottom: 0 !important; /* No bottom padding - flush with tabs */
-        margin: 0 !important; /* Remove any margin */
-        margin-bottom: 0 !important; /* Ensure no bottom margin */
+        padding: 8px 12px 8px 12px !important; /* Consistent padding */
+        margin: 0 !important;
         background: #ffffff !important;
         border-top: 1px solid #e5e7eb !important;
         box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06) !important;
         z-index: 200 !important;
-        transition: bottom 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        transition: bottom 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
         pointer-events: auto !important;
         -webkit-transform: translateZ(0) !important;
         transform: translateZ(0) !important;
@@ -983,25 +986,22 @@
         position: relative !important;
         z-index: 1 !important;
         max-width: 100% !important;
-        padding: 0 0 8px 0 !important; /* Add bottom padding to container instead of section */
+        padding: 0 !important;
         margin: 0 !important;
     }
     
-    /* When keyboard is active - Teams-like positioning */
-    body.chat-input-focused .chat-input-section,
-    .chat-panel:not(.mobile-hidden) .chat-input-section:focus-within {
+    /* When keyboard is active - Input moves up with keyboard */
+    body.chat-input-focused .chat-input-section {
         position: fixed !important;
-        bottom: 0 !important;
+        bottom: 0 !important; /* Move to bottom when keyboard appears */
         z-index: 200 !important;
-        padding-bottom: 0 !important; /* No bottom padding when keyboard is open */
-        margin-bottom: 0 !important; /* No bottom margin */
-        /* Smooth transition */
+        padding-bottom: max(8px, env(safe-area-inset-bottom)) !important; /* Safe area padding */
         transition: bottom 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
     }
     
-    /* Ensure container has padding when keyboard is open */
+    /* Ensure container has proper spacing when keyboard is open */
     body.chat-input-focused .chat-input-container {
-        padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+        padding-bottom: 0 !important;
     }
     
     /* Hide bottom tabs when chat input is focused */
@@ -1012,13 +1012,11 @@
         transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease !important;
     }
     
-    /* Teams-like: Messages remain visible and scrollable when keyboard is open */
+    /* Messages remain visible and scrollable when keyboard is open */
     /* When input is focused, bottom tabs are hidden, so only need space for input */
     body.chat-input-focused .chat-messages {
-        padding-bottom: 140px !important; /* Space for input section (bottom tabs are hidden) */
+        padding-bottom: 160px !important; /* Space for input section (~140px) + safe area (bottom tabs are hidden) */
         scroll-behavior: smooth !important;
-        /* Use visual viewport height for accurate calculations */
-        max-height: calc(var(--viewport-height, 100vh) - var(--header-height, 56px) - 60px) !important;
         /* Ensure smooth scrolling */
         -webkit-overflow-scrolling: touch !important;
     }

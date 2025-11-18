@@ -574,16 +574,37 @@ class PrayerRoomService {
             
             // Enhanced focus handling for mobile
             chatInput.addEventListener('focus', () => {
+                // Add class to body for CSS styling when keyboard appears
+                document.body.classList.add('chat-input-focused');
+                
                 // Scroll chat to bottom when input is focused
                 setTimeout(() => {
                     scrollChatToBottom();
-                    // Ensure input is visible above keyboard
-                    if (window.innerWidth <= 768) {
-                        setTimeout(() => {
-                            chatInput.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                        }, 300);
-                    }
                 }, 100);
+                
+                // Use visual viewport API if available for better keyboard handling
+                if (window.visualViewport) {
+                    const handleViewportResize = () => {
+                        const viewport = window.visualViewport;
+                        // Adjust chat messages padding based on keyboard height
+                        const chatMessages = document.getElementById('chatMessages');
+                        if (chatMessages) {
+                            const keyboardHeight = window.innerHeight - viewport.height;
+                            if (keyboardHeight > 0) {
+                                chatMessages.style.paddingBottom = `${160 + keyboardHeight}px`;
+                            }
+                        }
+                    };
+                    
+                    window.visualViewport.addEventListener('resize', handleViewportResize);
+                    window.visualViewport.addEventListener('scroll', handleViewportResize);
+                    
+                    // Clean up on blur
+                    chatInput.addEventListener('blur', () => {
+                        window.visualViewport.removeEventListener('resize', handleViewportResize);
+                        window.visualViewport.removeEventListener('scroll', handleViewportResize);
+                    }, { once: true });
+                }
             });
             
             // Improved blur handling
@@ -593,7 +614,14 @@ class PrayerRoomService {
                     // Only remove focus class if not clicking send button
                     const sendBtn = document.getElementById('sendBtn');
                     if (!sendBtn || !sendBtn.matches(':active')) {
-                        // Input lost focus naturally
+                        // Remove focus class when keyboard closes
+                        document.body.classList.remove('chat-input-focused');
+                        
+                        // Reset chat messages padding
+                        const chatMessages = document.getElementById('chatMessages');
+                        if (chatMessages) {
+                            chatMessages.style.paddingBottom = '';
+                        }
                     }
                 }, 100);
             });
