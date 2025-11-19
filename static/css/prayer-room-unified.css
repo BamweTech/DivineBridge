@@ -1,0 +1,747 @@
+/* ========================================
+   PRAYER ROOM - UNIFIED MODERN DESIGN
+   Consolidates all previous styles into one cohesive system.
+   Features: Glassmorphism, Mobile-First, Modern Chat UI.
+   ======================================== */
+
+/* ===== 1. VARIABLES & THEME ===== */
+:root {
+    /* Brand Colors */
+    --color-primary: #3b82f6;
+    --color-primary-dark: #2563eb;
+    --color-primary-light: #60a5fa;
+    --color-accent: #8b5cf6; /* Purple accent */
+    --color-success: #10b981;
+    --color-danger: #ef4444;
+    --color-warning: #f59e0b;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    --gradient-accent: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+    --gradient-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.4) 100%);
+    
+    /* Backgrounds */
+    --bg-body: #f0f4f8;
+    --bg-surface: #ffffff;
+    --bg-glass: rgba(255, 255, 255, 0.75);
+    --bg-glass-strong: rgba(255, 255, 255, 0.95);
+    
+    /* Text */
+    --text-primary: #1e293b;
+    --text-secondary: #475569;
+    --text-tertiary: #94a3b8;
+    --text-inverse: #ffffff;
+    
+    /* Spacing */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+    
+    /* Borders & Radius */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 20px;
+    --radius-full: 9999px;
+    --border-light: rgba(148, 163, 184, 0.2);
+    
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+    
+    /* Blur */
+    --blur-glass: blur(12px);
+    
+    /* Mobile Specifics */
+    --mobile-header-height: 60px;
+    --mobile-tab-height: 60px;
+    --keyboard-height: 0px; /* Updated via JS */
+}
+
+/* ===== 2. RESET & BASE ===== */
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-body);
+    color: var(--text-primary);
+    overflow: hidden; /* App-like feel */
+}
+
+/* Background Decoration */
+body::before {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.08) 0%, transparent 50%);
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* ===== 3. LAYOUT STRUCTURE ===== */
+.prayer-room-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    max-width: 1600px;
+    margin: 0 auto;
+    position: relative;
+}
+
+/* Desktop Grid Layout */
+@media (min-width: 1024px) {
+    .prayer-room-container {
+        padding: var(--space-lg);
+    }
+    
+    .prayer-room-main {
+        display: grid;
+        grid-template-columns: 320px 1fr 400px; /* Participants | Stage | Chat */
+        gap: var(--space-lg);
+        flex: 1;
+        min-height: 0; /* Allow scrolling within grid items */
+        margin-top: var(--space-md);
+    }
+    
+    /* 2-Column fallback for smaller desktops */
+    @media (max-width: 1400px) {
+        .prayer-room-main {
+            grid-template-columns: 300px 1fr;
+        }
+        .stage-area {
+            display: none !important; /* Hide stage on smaller screens unless host */
+        }
+    }
+}
+
+/* ===== 4. HEADER ===== */
+.prayer-room-header {
+    background: var(--bg-glass-strong);
+    backdrop-filter: var(--blur-glass);
+    -webkit-backdrop-filter: var(--blur-glass);
+    border-bottom: 1px solid var(--border-light);
+    padding: var(--space-sm) var(--space-md);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 50;
+    flex-shrink: 0;
+}
+
+@media (min-width: 1024px) {
+    .prayer-room-header {
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border-light);
+        box-shadow: var(--shadow-sm);
+    }
+}
+
+.header-content {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: var(--space-md);
+}
+
+.room-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+.header-logo-img {
+    height: 32px;
+    width: auto;
+}
+
+.room-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.room-title {
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--text-primary);
+}
+
+.room-code-display {
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: rgba(0,0,0,0.05);
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-top: 2px;
+    display: inline-block;
+    width: fit-content;
+}
+
+/* Header Actions */
+.header-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.control-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    cursor: pointer;
+}
+
+.control-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* Button Variants */
+.btn-primary, .join-audio-btn {
+    background: var(--gradient-primary);
+    color: white;
+    box-shadow: var(--shadow-md);
+}
+
+.btn-primary:hover, .join-audio-btn:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+}
+
+.btn-danger, .mute-btn.muted {
+    background: var(--color-danger);
+    color: white;
+}
+
+.btn-secondary, .leave-btn {
+    background: transparent;
+    border-color: var(--border-light);
+    color: var(--text-secondary);
+}
+
+.btn-secondary:hover {
+    background: rgba(0,0,0,0.05);
+}
+
+/* Header Controls */
+.desktop-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.mobile-controls {
+    display: none;
+    position: relative;
+}
+
+.mobile-menu-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: var(--space-sm);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    min-width: 160px;
+    display: none;
+    flex-direction: column;
+    padding: var(--space-xs);
+    z-index: 100;
+}
+
+.mobile-menu-dropdown.active {
+    display: flex;
+    animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 10px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    text-align: left;
+    width: 100%;
+}
+
+.menu-item:hover {
+    background: rgba(0,0,0,0.05);
+}
+
+.menu-item.danger {
+    color: var(--color-danger);
+}
+
+.menu-item.danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* ===== 5. PANELS (Participants & Chat) ===== */
+.panel {
+    background: var(--bg-glass);
+    backdrop-filter: var(--blur-glass);
+    -webkit-backdrop-filter: var(--blur-glass);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: var(--shadow-glass);
+}
+
+.panel-header {
+    padding: var(--space-md);
+    border-bottom: 1px solid var(--border-light);
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Participants List */
+.participants-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-sm);
+}
+
+.participant-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm);
+    border-radius: var(--radius-md);
+    transition: background 0.2s;
+    cursor: pointer;
+}
+
+.participant-item:hover {
+    background: rgba(255,255,255,0.5);
+}
+
+.participant-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--gradient-primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.participant-avatar.speaking::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    border: 2px solid var(--color-success);
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(1.2); opacity: 0; }
+}
+
+.participant-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.participant-name {
+    font-weight: 600;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.participant-role {
+    font-size: 12px;
+    color: var(--text-tertiary);
+}
+
+/* ===== 6. MODERN CHAT UI ===== */
+.chat-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-md);
+    display: flex;
+    flex-direction: column;
+    gap: 2px; /* Tight grouping */
+}
+
+/* Message Grouping */
+.message-group {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: var(--space-md);
+    position: relative;
+}
+
+.message-group.own {
+    align-items: flex-end;
+}
+
+.message-group.other {
+    align-items: flex-start;
+    padding-left: 42px; /* Space for avatar */
+}
+
+/* Avatar for Other's Messages */
+.message-group.other .message-avatar {
+    position: absolute;
+    left: 0;
+    bottom: 0; /* Align with last message */
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--gradient-accent);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: var(--shadow-sm);
+}
+
+/* Message Bubbles */
+.message-bubble {
+    padding: 8px 12px;
+    font-size: 15px;
+    line-height: 1.4;
+    max-width: 85%;
+    position: relative;
+    word-wrap: break-word;
+    box-shadow: var(--shadow-sm);
+}
+
+/* Own Message Styles */
+.message-group.own .message-bubble {
+    background: var(--color-primary);
+    color: white;
+    border-radius: 18px 4px 4px 18px; /* Default middle shape */
+    margin-left: auto;
+}
+
+.message-group.own .message:first-child .message-bubble {
+    border-top-right-radius: 18px;
+}
+
+.message-group.own .message:last-child .message-bubble {
+    border-bottom-right-radius: 18px;
+}
+
+/* Other Message Styles */
+.message-group.other .message-bubble {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    border-radius: 4px 18px 18px 4px; /* Default middle shape */
+}
+
+.message-group.other .message:first-child .message-bubble {
+    border-top-left-radius: 18px;
+}
+
+.message-group.other .message:last-child .message-bubble {
+    border-bottom-left-radius: 18px;
+}
+
+/* Single Message (Rounded all corners) */
+.message-group .message:only-child .message-bubble {
+    border-radius: 18px;
+}
+
+/* Sender Name (Only show for first message in group) */
+.message-sender-name {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    margin-bottom: 4px;
+    margin-left: 12px;
+}
+
+/* Timestamp */
+.message-time {
+    font-size: 10px;
+    opacity: 0.7;
+    margin-top: 4px;
+    text-align: right;
+}
+
+/* Chat Input Area */
+.chat-input-area {
+    padding: var(--space-md);
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border-light);
+    display: flex;
+    align-items: flex-end;
+    gap: var(--space-sm);
+}
+
+.chat-input-wrapper {
+    flex: 1;
+    background: #f1f5f9;
+    border-radius: 24px;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    transition: box-shadow 0.2s;
+}
+
+.chat-input-wrapper:focus-within {
+    box-shadow: 0 0 0 2px var(--color-primary-light);
+    background: white;
+}
+
+.chat-input {
+    border: none;
+    background: transparent;
+    width: 100%;
+    max-height: 100px;
+    resize: none;
+    outline: none;
+    font-family: inherit;
+    font-size: 15px;
+    padding: 4px 0;
+}
+
+.send-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.send-btn:hover {
+    transform: scale(1.05);
+}
+
+.send-btn:disabled {
+    background: var(--text-tertiary);
+    cursor: not-allowed;
+}
+
+/* Empty State */
+.empty-chat-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-xl);
+    text-align: center;
+    height: 100%;
+    color: var(--text-tertiary);
+}
+
+.empty-chat-icon {
+    font-size: 48px;
+    margin-bottom: var(--space-md);
+    opacity: 0.5;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.empty-chat-state h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-sm);
+}
+
+.empty-chat-state p {
+    font-size: 14px;
+    max-width: 280px;
+    line-height: 1.5;
+}
+
+/* ===== 7. MOBILE OVERRIDES ===== */
+@media (max-width: 1023px) {
+    /* Reset Layout */
+    .prayer-room-container {
+        height: 100dvh;
+        padding: 0;
+        background: var(--bg-surface);
+    }
+
+    /* Header */
+    .prayer-room-header {
+        height: var(--mobile-header-height);
+        padding: 0 var(--space-md);
+        background: var(--bg-surface);
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+    }
+    
+    .header-logo-img {
+        height: 24px;
+    }
+    
+    .room-title {
+        font-size: 14px;
+    }
+    
+    /* Hide non-essential header items */
+    .room-code-display, .header-actions .btn-secondary {
+        display: none;
+    }
+    
+    .desktop-controls {
+        display: none;
+    }
+    
+    .mobile-controls {
+        display: block;
+    }
+
+    /* Main Content Area */
+    .prayer-room-main {
+        margin-top: var(--mobile-header-height);
+        margin-bottom: var(--mobile-tab-height);
+        display: block; /* Stacked */
+        position: relative;
+        height: calc(100dvh - var(--mobile-header-height) - var(--mobile-tab-height));
+        overflow: hidden;
+    }
+
+    /* Panels as Full Screen Views */
+    .panel {
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        height: 100%;
+        background: transparent;
+    }
+    
+    .participants-panel, .chat-panel {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    /* Tab Switching Logic */
+    .panel.hidden {
+        transform: translateX(100%);
+        pointer-events: none;
+    }
+    
+    .panel.active {
+        transform: translateX(0);
+    }
+
+    /* Bottom Navigation */
+    .mobile-bottom-tabs {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: var(--mobile-tab-height);
+        background: var(--bg-surface);
+        border-top: 1px solid var(--border-light);
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        z-index: 100;
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    
+    .mobile-tab-btn {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        color: var(--text-tertiary);
+        background: none;
+        border: none;
+        font-size: 10px;
+        font-weight: 600;
+    }
+    
+    .mobile-tab-btn.active {
+        color: var(--color-primary);
+    }
+    
+    .mobile-tab-btn svg {
+        width: 24px;
+        height: 24px;
+    }
+
+    /* Keyboard Handling */
+    body.keyboard-open .mobile-bottom-tabs {
+        display: none;
+    }
+    
+    body.keyboard-open .prayer-room-main {
+        margin-bottom: 0;
+        height: calc(100dvh - var(--mobile-header-height));
+    }
+    
+    body.keyboard-open .chat-input-area {
+        padding-bottom: max(var(--space-md), env(safe-area-inset-bottom));
+    }
+}
