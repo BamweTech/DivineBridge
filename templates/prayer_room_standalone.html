@@ -34,19 +34,17 @@
     </script>
     
     <!-- External CSS for prayer room styles -->
-    <!-- UNIFIED MODERN CSS - Replaces all previous stylesheets -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-unified.css') }}?v={{ range(100000, 999999) | random }}">
-    
-    <!-- LEGACY STYLES (Commented out for reference/fallback)
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room.css') }}?v={{ range(100000, 999999) | random }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-mobile.css') }}?v={{ range(100000, 999999) | random }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-redesign.css') }}?v={{ range(100000, 999999) | random }}">
+    <!-- MOBILE PERFECT - Must load last to override everything -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-mobile-perfect.css') }}?v={{ range(100000, 999999) | random }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-mobile-enhanced.css') }}?v={{ range(100000, 999999) | random }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-mobile-enhanced-part2.css') }}?v={{ range(100000, 999999) | random }}">
+    <!-- DESIGN SYSTEM - Based on profiles, loads before desktop overrides -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-design-system.css') }}?v={{ range(100000, 999999) | random }}">
+    <!-- DESKTOP OVERRIDES - Loads LAST to ensure desktop styles override mobile -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/prayer-room-desktop-overrides.css') }}?v={{ range(100000, 999999) | random }}">
-    -->
     
     <!-- Cache-busting meta tags -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -1195,52 +1193,13 @@
                                 <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
                         </button>
-                        
-                        <!-- Desktop Buttons -->
-                        <div class="desktop-controls">
-                            <button class="control-btn minimize-btn" id="minimizeBtn" title="Minimize prayer room (keep audio active while navigating)">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                                </svg>
-                            </button>
-                            <button class="control-btn" id="shareBtn" title="Share room">Share</button>
-                            <button class="control-btn leave" id="leaveBtn" title="Leave room">Leave</button>
-                        </div>
-
-                        <!-- Mobile More Menu -->
-                        <div class="mobile-controls">
-                            <button class="control-btn more-btn" id="mobileMoreBtn" title="More options">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="12" cy="12" r="1"></circle>
-                                    <circle cx="12" cy="5" r="1"></circle>
-                                    <circle cx="12" cy="19" r="1"></circle>
-                                </svg>
-                            </button>
-                            <div class="mobile-menu-dropdown" id="mobileMenuDropdown">
-                                <button class="menu-item" id="mobileMinimizeBtn">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                                    </svg>
-                                    Minimize
-                                </button>
-                                <button class="menu-item" id="mobileShareBtn">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
-                                        <polyline points="16 6 12 2 8 6"></polyline>
-                                        <line x1="12" y1="2" x2="12" y2="15"></line>
-                                    </svg>
-                                    Share
-                                </button>
-                                <button class="menu-item danger" id="mobileLeaveBtn">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                                        <polyline points="16 17 21 12 16 7"></polyline>
-                                        <line x1="21" y1="12" x2="9" y2="12"></line>
-                                    </svg>
-                                    Leave
-                                </button>
-                            </div>
-                        </div>
+                        <button class="control-btn minimize-btn" id="minimizeBtn" title="Minimize prayer room (keep audio active while navigating)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                        </button>
+                        <button class="control-btn" id="shareBtn" title="Share room">Share</button>
+                        <button class="control-btn leave" id="leaveBtn" title="Leave room">Leave</button>
                     </div>
                     <div class="header-status-text" id="requestSpeakerStatus">
                         Listening mode. Request if you would like to speak.

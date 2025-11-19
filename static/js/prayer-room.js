@@ -398,53 +398,6 @@ class PrayerRoomService {
         this.setupRealtimeListeners();
     }
     
-    setupMobileMenu() {
-        const mobileMoreBtn = document.getElementById('mobileMoreBtn');
-        const mobileMenuDropdown = document.getElementById('mobileMenuDropdown');
-        const mobileMinimizeBtn = document.getElementById('mobileMinimizeBtn');
-        const mobileShareBtn = document.getElementById('mobileShareBtn');
-        const mobileLeaveBtn = document.getElementById('mobileLeaveBtn');
-        
-        if (!mobileMoreBtn || !mobileMenuDropdown) return;
-        
-        // Toggle menu
-        mobileMoreBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            mobileMenuDropdown.classList.toggle('active');
-        });
-        
-        // Close menu when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!mobileMenuDropdown.contains(e.target) && e.target !== mobileMoreBtn) {
-                mobileMenuDropdown.classList.remove('active');
-            }
-        });
-        
-        // Menu actions
-        if (mobileMinimizeBtn) {
-            mobileMinimizeBtn.addEventListener('click', () => {
-                mobileMenuDropdown.classList.remove('active');
-                if (window.prayerRoomMinimize) {
-                    window.prayerRoomMinimize.minimize();
-                }
-            });
-        }
-        
-        if (mobileShareBtn) {
-            mobileShareBtn.addEventListener('click', () => {
-                mobileMenuDropdown.classList.remove('active');
-                this.shareRoom();
-            });
-        }
-        
-        if (mobileLeaveBtn) {
-            mobileLeaveBtn.addEventListener('click', () => {
-                mobileMenuDropdown.classList.remove('active');
-                this.leaveRoom();
-            });
-        }
-    }
-
     getRoomIdFromUrl() {
         const urlParams = new URLSearchParams(window.location.search);
         const roomId = urlParams.get('room') || window.roomId;
@@ -541,9 +494,6 @@ class PrayerRoomService {
         if (copyRoomCodeBtn) {
             copyRoomCodeBtn.addEventListener('click', () => this.copyRoomCode());
         }
-        
-        // Mobile Menu Setup
-        this.setupMobileMenu();
         
         if (chatSendBtn) {
             chatSendBtn.addEventListener('click', (e) => {
@@ -782,56 +732,6 @@ class PrayerRoomService {
         
         // Initialize audio controls
         this.updateAudioControls();
-        
-        // Setup mobile menu
-        this.setupMobileMenu();
-    }
-
-    setupMobileMenu() {
-        const mobileMoreBtn = document.getElementById('mobileMoreBtn');
-        const mobileMenuDropdown = document.getElementById('mobileMenuDropdown');
-        
-        if (!mobileMoreBtn || !mobileMenuDropdown) return;
-        
-        mobileMoreBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            mobileMenuDropdown.classList.toggle('active');
-        });
-        
-        // Close menu when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!mobileMenuDropdown.contains(e.target) && e.target !== mobileMoreBtn) {
-                mobileMenuDropdown.classList.remove('active');
-            }
-        });
-        
-        // Handle menu items
-        const mobileMinimizeBtn = document.getElementById('mobileMinimizeBtn');
-        const mobileShareBtn = document.getElementById('mobileShareBtn');
-        const mobileLeaveBtn = document.getElementById('mobileLeaveBtn');
-        
-        if (mobileMinimizeBtn) {
-            mobileMinimizeBtn.addEventListener('click', () => {
-                if (window.prayerRoomMinimize) window.prayerRoomMinimize.minimize();
-                mobileMenuDropdown.classList.remove('active');
-            });
-        }
-        
-        if (mobileShareBtn) {
-            mobileShareBtn.addEventListener('click', () => {
-                const shareBtn = document.getElementById('shareBtn');
-                if (shareBtn) shareBtn.click();
-                mobileMenuDropdown.classList.remove('active');
-            });
-        }
-        
-        if (mobileLeaveBtn) {
-            mobileLeaveBtn.addEventListener('click', () => {
-                const leaveBtn = document.getElementById('leaveBtn');
-                if (leaveBtn) leaveBtn.click();
-                mobileMenuDropdown.classList.remove('active');
-            });
-        }
     }
     
     updateUserInfo() {
@@ -2448,20 +2348,7 @@ class PrayerRoomService {
                 
                 // Create message group container
                 const messageGroup = document.createElement('div');
-                // Check sender of first message in group
-                const firstMsg = group.messages[0];
-                const isGroupOwn = firstMsg && firstMsg.user_id === this.userId;
-                messageGroup.className = `message-group ${isGroupOwn ? 'own' : 'other'}`;
-                
-                // Add avatar for other users
-                if (!isGroupOwn && firstMsg && firstMsg.message_type !== 'system_notification') {
-                    const senderName = firstMsg.user_name || 'User';
-                    const initials = senderName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-                    const avatar = document.createElement('div');
-                    avatar.className = 'message-avatar';
-                    avatar.textContent = initials;
-                    messageGroup.appendChild(avatar);
-                }
+                messageGroup.className = 'message-group';
                 
                 group.messages.forEach((message, msgIndex) => {
                     const messageEl = document.createElement('div');
@@ -2509,7 +2396,7 @@ class PrayerRoomService {
                     
                     messageEl.innerHTML = `
                         <div class="message-bubble">
-                            ${!isOwnMessage && showSender ? `<div class="message-sender-name">${this.escapeHtml(message.user_name)}</div>` : ''}
+                            ${!isOwnMessage && showSender ? `<div class="message-sender">${this.escapeHtml(message.user_name)}</div>` : ''}
                             <div class="message-content">${processedContent}</div>
                             ${reactionsHtml}
                             <div class="message-time">
@@ -2562,9 +2449,6 @@ class PrayerRoomService {
                         }
                     });
                     
-                    // Setup swipe to reply
-                    this.setupSwipeToReply(messageEl, message);
-                    
                     messageGroup.appendChild(messageEl);
                 });
                 
@@ -2595,143 +2479,7 @@ class PrayerRoomService {
             });
         } else {
             console.log('No chat messages - chat container is empty');
-            this.showEmptyChatState();
-        }
-    }
-
-    showEmptyChatState() {
-        const chatMessages = document.getElementById('chatMessages');
-        if (!chatMessages) return;
-        
-        chatMessages.innerHTML = `
-            <div class="empty-chat-state">
-                <div class="empty-chat-icon">🙏</div>
-                <h3>Welcome to the Prayer Room</h3>
-                <p>Be the first to share a prayer or encouragement.</p>
-            </div>
-        `;
-    }
-
-    setupSwipeToReply(messageEl, message) {
-        // Only enable on touch devices
-        if (!('ontouchstart' in window)) return;
-
-        let startX = 0;
-        let currentX = 0;
-        let startY = 0;
-        let isSwiping = false;
-        const threshold = 60; // px to trigger reply
-        const messageBubble = messageEl.querySelector('.message-bubble');
-        
-        if (!messageBubble) return;
-
-        // Create reply icon if it doesn't exist
-        let replyIcon = messageEl.querySelector('.reply-icon-indicator');
-        if (!replyIcon) {
-            replyIcon = document.createElement('div');
-            replyIcon.className = 'reply-icon-indicator';
-            replyIcon.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>';
-            replyIcon.style.cssText = `
-                position: absolute;
-                left: -40px;
-                top: 50%;
-                transform: translateY(-50%) scale(0);
-                color: var(--color-primary, #3b82f6);
-                transition: transform 0.2s;
-                opacity: 0;
-            `;
-            messageEl.appendChild(replyIcon);
-        }
-
-        messageEl.addEventListener('touchstart', (e) => {
-            startX = e.touches[0].clientX;
-            startY = e.touches[0].clientY;
-            isSwiping = false;
-            messageBubble.style.transition = 'none';
-        }, { passive: true });
-
-        messageEl.addEventListener('touchmove', (e) => {
-            currentX = e.touches[0].clientX;
-            const currentY = e.touches[0].clientY;
-            const diffX = currentX - startX;
-            const diffY = Math.abs(currentY - startY);
-
-            // If vertical scroll is dominant, ignore horizontal swipe
-            if (diffY > Math.abs(diffX)) return;
-
-            // Only allow swiping right (positive diff) and limit it
-            if (diffX > 0 && diffX < 120) {
-                isSwiping = true;
-                // Use transform on the bubble
-                messageBubble.style.transform = `translateX(${diffX}px)`;
-                
-                // Visual feedback
-                const progress = Math.min(diffX / threshold, 1);
-                replyIcon.style.opacity = progress;
-                replyIcon.style.transform = `translateY(-50%) scale(${progress})`;
-                replyIcon.style.left = `${diffX - 30}px`;
-                
-                if (diffX > threshold) {
-                    replyIcon.style.color = 'var(--color-primary-dark, #2563eb)';
-                } else {
-                    replyIcon.style.color = 'var(--color-primary, #3b82f6)';
-                }
-            }
-        }, { passive: true });
-
-        messageEl.addEventListener('touchend', (e) => {
-            if (!isSwiping) return;
-            
-            const diff = currentX - startX;
-            
-            // Reset styles
-            messageBubble.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-            messageBubble.style.transform = 'translateX(0)';
-            
-            replyIcon.style.transition = 'all 0.3s ease';
-            replyIcon.style.opacity = '0';
-            replyIcon.style.transform = 'translateY(-50%) scale(0)';
-            replyIcon.style.left = '-40px';
-            
-            if (diff > threshold) {
-                // Trigger reply
-                if (navigator.vibrate) navigator.vibrate(50);
-                this.replyToMessage(message);
-            }
-            
-            isSwiping = false;
-            startX = 0;
-            currentX = 0;
-        });
-    }
-
-    replyToMessage(message) {
-        const chatInput = document.getElementById('chatInput');
-        if (!chatInput) return;
-        
-        // Focus input
-        chatInput.focus();
-        
-        // Create quote text
-        const quote = `> @${message.user_name}: ${message.message}\n\n`;
-        
-        // Insert at cursor position or end
-        const startPos = chatInput.selectionStart;
-        const endPos = chatInput.selectionEnd;
-        const text = chatInput.value;
-        
-        chatInput.value = text.substring(0, startPos) + quote + text.substring(endPos);
-        
-        // Move cursor to end of quote
-        const newCursorPos = startPos + quote.length;
-        chatInput.setSelectionRange(newCursorPos, newCursorPos);
-        
-        // Trigger input event to resize textarea if needed
-        chatInput.dispatchEvent(new Event('input'));
-        
-        // Show toast
-        if (window.roomSubscription && window.roomSubscription.showToast) {
-            window.roomSubscription.showToast(`Replying to ${message.user_name}`, 'info');
+            // Don't show empty state - just leave it empty
         }
     }
     
