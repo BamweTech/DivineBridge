@@ -181,16 +181,31 @@ To unsubscribe: https://divinebridge.io/unsubscribe?email={recipient_email}
             .cta-text {{
                 font-size: 13px !important;
             }}
+            /* Center logo in mobile view */
             .logo-cell {{
                 text-align: center !important;
+                width: 100% !important;
+                padding: 0 !important;
             }}
             .logo-img {{
+                display: block !important;
+                margin: 0 auto 8px auto !important;
+                text-align: center !important;
+            }}
+            /* Ensure header table cell centers content */
+            .header-logo-table {{
+                width: 100% !important;
                 margin: 0 auto !important;
+            }}
+            .header-logo-table td {{
+                text-align: center !important;
+                width: 100% !important;
             }}
             .header-tagline {{
                 font-size: 11px !important;
                 letter-spacing: 0.5px !important;
                 white-space: nowrap !important;
+                text-align: center !important;
             }}
         }}
     </style>
