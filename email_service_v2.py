@@ -208,14 +208,14 @@ To unsubscribe: https://divinebridge.io/unsubscribe?email={recipient_email}
                     <!-- Header with Logo -->
                     <tr>
                         <td style="background: linear-gradient(135deg, #ffffff 0%, #e3f2fd 50%, #bbdefb 100%); padding: 40px 30px; text-align: center;">
-                            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0" class="header-logo-table">
                                 <tr>
-                                    <td class="logo-cell" align="center">
-                                        <img src="cid:logo_image" alt="Divine Bridge" class="logo-img" width="60" height="60" style="display: block; margin: 0 auto 8px auto; border: 0;" />
+                                    <td class="logo-cell" align="center" style="text-align: center; width: 100%;">
+                                        <img src="cid:logo_image" alt="Divine Bridge" class="logo-img" width="60" height="60" style="display: block; margin: 0 auto 8px auto; border: 0; text-align: center;" />
                                     </td>
                                 </tr>
                             </table>
-                            <div class="header-tagline" style="color: #0f56ff; font-size: 14px; font-weight: 600; letter-spacing: 1px;">UNITING HEARTS IN GLOBAL PRAYER</div>
+                            <div class="header-tagline" style="color: #0f56ff; font-size: 14px; font-weight: 600; letter-spacing: 1px; text-align: center;">UNITING HEARTS IN GLOBAL PRAYER</div>
                         </td>
                     </tr>
                     
