@@ -335,29 +335,59 @@
     border-color: transparent !important;
 }
 
+.control-btn.mute-btn {
+    position: relative !important;
+    overflow: hidden !important;
+}
+
 .control-btn.mute-btn .mic-icon,
 .control-btn.mute-btn .muted-icon {
     width: 18px !important;
     height: 18px !important;
-    position: relative !important;
-    display: block !important;
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    pointer-events: none !important; /* Prevent icon from blocking clicks */
 }
 
-/* Show/hide icons based on muted state */
+/* Default state: show mic icon, hide muted icon */
+.control-btn.mute-btn .mic-icon {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.control-btn.mute-btn .muted-icon {
+    display: block !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+
+/* When muted: hide mic icon, show muted icon */
 .control-btn.mute-btn.muted .mic-icon {
     display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
 }
 
 .control-btn.mute-btn.muted .muted-icon {
     display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
 }
 
+/* When not muted: show mic icon, hide muted icon */
 .control-btn.mute-btn:not(.muted) .mic-icon {
     display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
 }
 
 .control-btn.mute-btn:not(.muted) .muted-icon {
     display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
 }
 
 /* Add strike-through line for muted icon */

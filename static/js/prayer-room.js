@@ -7,6 +7,10 @@ class PrayerRoomService {
         this.isHost = false;
         this.isMuted = false;
         this.isAudioEnabled = false;
+        this.muteStateSyncing = false; // Track if mute state is being synced
+        this.muteDebounceTimeout = null; // For debouncing mute clicks
+        this.trackEnabledCheckInterval = null; // Interval for checking track enabled state
+        this.stateValidationInterval = null; // Interval for validating state consistency
         this.peers = new Map();
         this.localStream = null;
         this.simplePeer = null;
@@ -1553,6 +1557,9 @@ class PrayerRoomService {
             // Ensure audio is enabled now that we have the stream
             this.isAudioEnabled = true;
             
+            // Initialize mute state from server (check if user was previously muted)
+            await this.initializeMuteStateFromServer();
+            
             // Monitor local audio track for mute/unmute events
             const localTrack = audioTracks[0];
             if (localTrack) {
@@ -1564,6 +1571,7 @@ class PrayerRoomService {
                     readyState: localTrack.readyState
                 });
                 
+                // Listen for hardware mute events (track.muted - read-only)
                 localTrack.addEventListener('unmute', () => {
                     console.log('✅ Your microphone is now producing audio');
                 });
@@ -1573,16 +1581,40 @@ class PrayerRoomService {
                     this.showError('Your microphone stopped working. Check if another app is using it.');
                 });
                 
+                // Listen for enabled state changes (track.enabled - can be changed externally)
+                localTrack.addEventListener('ended', () => {
+                    console.warn('⚠️ Audio track ended');
+                    this.isAudioEnabled = false;
+                    this.updateAudioControls();
+                });
+                
+                // Monitor enabled state changes (if track is disabled externally)
+                let lastEnabledState = localTrack.enabled;
+                const checkEnabledState = () => {
+                    if (localTrack.enabled !== lastEnabledState) {
+                        console.log(`🔧 Track enabled state changed: ${lastEnabledState} → ${localTrack.enabled}`);
+                        lastEnabledState = localTrack.enabled;
+                        
+                        // Sync local state with track state
+                        if (localTrack.enabled !== !this.isMuted) {
+                            console.warn(`⚠️ Track enabled (${localTrack.enabled}) doesn't match mute state (${this.isMuted}), syncing...`);
+                            this.isMuted = !localTrack.enabled;
+                            this.updateAudioControls();
+                        }
+                    }
+                };
+                
+                // Check enabled state periodically (every 500ms)
+                this.trackEnabledCheckInterval = setInterval(checkEnabledState, 500);
+                
                 if (localTrack.muted) {
                     console.error('❌ Your microphone track is muted! It won\'t send audio.');
                     this.showError('Microphone not working. Close other apps using the mic and refresh.');
                 }
                 
-                // Ensure track is enabled
-                if (!localTrack.enabled) {
-                    console.log('🔧 Enabling audio track...');
-                    localTrack.enabled = true;
-                }
+                // Apply mute state from server/local state to track
+                localTrack.enabled = !this.isMuted;
+                console.log(`🔇 Applied mute state to track: enabled=${localTrack.enabled}, isMuted=${this.isMuted}`);
             } else {
                 throw new Error('No audio track found in microphone stream');
             }
@@ -1673,11 +1705,30 @@ class PrayerRoomService {
         this.isMuted = false;
         this.audioConnectionRetries = 0;
         this.isRetryingAudio = false; // Reset retry flag to allow new attempts
+        this.muteStateSyncing = false; // Reset mute sync flag
+        
+        // Clean up track enabled check interval
+        if (this.trackEnabledCheckInterval) {
+            clearInterval(this.trackEnabledCheckInterval);
+            this.trackEnabledCheckInterval = null;
+        }
+        
+        // Clean up state validation interval
+        if (this.stateValidationInterval) {
+            clearInterval(this.stateValidationInterval);
+            this.stateValidationInterval = null;
+        }
         
         // Clean up any existing stream
         if (this.localStream) {
             this.localStream.getTracks().forEach(track => track.stop());
             this.localStream = null;
+        }
+        
+        // Clean up processed stream if it exists
+        if (this.processedStream) {
+            this.processedStream.getTracks().forEach(track => track.stop());
+            this.processedStream = null;
         }
         
         // Update UI to show "Join Audio" button
@@ -1805,28 +1856,78 @@ class PrayerRoomService {
     }
     
     toggleMute() {
-        this.isMuted = !this.isMuted;
-        
-        if (this.localStream) {
-            this.localStream.getAudioTracks().forEach(track => {
-                track.enabled = !this.isMuted;
-            });
+        // Prevent multiple simultaneous mute operations
+        if (this.muteStateSyncing) {
+            console.log('🔇 Mute operation already in progress, ignoring click');
+            return;
         }
         
-        // Update mute button visual state immediately
-        const muteBtn = document.getElementById('muteBtn');
-        if (muteBtn) {
-            if (this.isMuted) {
-                muteBtn.classList.add('muted');
-            } else {
-                muteBtn.classList.remove('muted');
-            }
+        // Clear any pending debounce timeout (for future debouncing if needed)
+        if (this.muteDebounceTimeout) {
+            clearTimeout(this.muteDebounceTimeout);
+            this.muteDebounceTimeout = null;
         }
         
+        // Toggle mute state
+        const newMuteState = !this.isMuted;
+        
+        // Update local state immediately for responsive UI
+        this.isMuted = newMuteState;
+        
+        // Apply mute state to all audio tracks (including processed stream)
+        this.applyMuteStateToTracks(newMuteState);
+        
+        // Update UI (single update point - removed redundant update)
         this.updateAudioControls();
         
-        // Notify other participants
-        this.notifyMuteStatus();
+        // Notify server (with error handling and retry)
+        this.notifyMuteStatus(newMuteState).catch(error => {
+            console.error('Failed to sync mute state:', error);
+            // Show user feedback
+            this.showToast(`Failed to ${newMuteState ? 'mute' : 'unmute'}. Please try again.`, 'error');
+            // Rollback local state on failure
+            this.isMuted = !newMuteState;
+            this.applyMuteStateToTracks(!newMuteState);
+            this.updateAudioControls();
+        });
+    }
+    
+    applyMuteStateToTracks(isMuted) {
+        // Apply mute state to all audio tracks in the stream
+        if (!this.localStream) {
+            console.warn('⚠️ No local stream available to mute/unmute');
+            return;
+        }
+        
+        const audioTracks = this.localStream.getAudioTracks();
+        if (audioTracks.length === 0) {
+            console.warn('⚠️ No audio tracks found in stream');
+            return;
+        }
+        
+        const expectedEnabled = !isMuted;
+        
+        audioTracks.forEach((track, index) => {
+            const wasEnabled = track.enabled;
+            track.enabled = expectedEnabled;
+            
+            console.log(`🔇 Track ${index}: enabled=${track.enabled} (was ${wasEnabled}, mute=${isMuted})`);
+            
+            // Validate the change succeeded (track.enabled should equal expectedEnabled)
+            if (track.enabled !== expectedEnabled) {
+                console.error(`❌ Failed to ${isMuted ? 'mute' : 'unmute'} track ${index}: enabled=${track.enabled}, expected=${expectedEnabled}`);
+            }
+        });
+        
+        // Also update processed stream if it exists (from audio processing chain)
+        if (this.processedStream) {
+            const processedTracks = this.processedStream.getAudioTracks();
+            processedTracks.forEach((track, index) => {
+                const wasEnabled = track.enabled;
+                track.enabled = expectedEnabled;
+                console.log(`🔇 Processed track ${index}: enabled=${track.enabled} (was ${wasEnabled}, mute=${isMuted})`);
+            });
+        }
     }
     
     updateAudioControls() {
@@ -1865,11 +1966,17 @@ class PrayerRoomService {
             joinAudioBtn.style.setProperty('display', 'none', 'important');
             muteBtn.style.setProperty('display', 'inline-flex', 'important');
             
-            // Update mute button state using CSS classes
+            // Update mute button state using CSS classes and ARIA attributes
             if (this.isMuted) {
                 muteBtn.classList.add('muted');
+                muteBtn.setAttribute('aria-pressed', 'true');
+                muteBtn.setAttribute('aria-label', 'Unmute microphone');
+                muteBtn.setAttribute('title', 'Unmute microphone');
             } else {
                 muteBtn.classList.remove('muted');
+                muteBtn.setAttribute('aria-pressed', 'false');
+                muteBtn.setAttribute('aria-label', 'Mute microphone');
+                muteBtn.setAttribute('title', 'Mute microphone');
             }
         } else {
             // Audio not enabled - show join button, hide mute button
@@ -1888,21 +1995,51 @@ class PrayerRoomService {
         this.updateRoleUI();
     }
     
-    async notifyMuteStatus() {
+    async notifyMuteStatus(isMuted) {
+        // Use the new self-mute endpoint (works for all users, not just host)
+        if (this.muteStateSyncing) {
+            console.warn('⚠️ Mute status sync already in progress, skipping duplicate request');
+            return;
+        }
+        
+        this.muteStateSyncing = true;
+        
         try {
-            await fetch(`/api/prayer-room/${this.roomId}/mute`, {
+            const response = await fetch(`/api/prayer-room/${this.roomId}/self-mute`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 credentials: 'include',
                 body: JSON.stringify({
-                    user_id: this.userId,
-                    is_muted: this.isMuted
+                    is_muted: isMuted
                 })
             });
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                throw new Error(errorData?.error || `HTTP ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log(`✅ Mute status synced to server: ${isMuted}`);
+            
+            // Validate server response matches local state
+            if (result?.is_muted !== isMuted) {
+                console.warn(`⚠️ Server mute state (${result?.is_muted}) doesn't match local state (${isMuted}), syncing...`);
+                // Sync local state to server state (server is source of truth)
+                this.isMuted = result.is_muted ?? isMuted;
+                this.applyMuteStateToTracks(this.isMuted);
+                this.updateAudioControls();
+            }
+            
+            return result;
+            
         } catch (error) {
-            console.error('Error updating mute status:', error);
+            console.error('❌ Error updating mute status:', error);
+            throw error; // Re-throw for caller to handle
+        } finally {
+            this.muteStateSyncing = false;
         }
     }
     
@@ -1987,9 +2124,35 @@ class PrayerRoomService {
 
     async performLeave() {
         try {
+            // Clean up intervals
+            if (this.trackEnabledCheckInterval) {
+                clearInterval(this.trackEnabledCheckInterval);
+                this.trackEnabledCheckInterval = null;
+            }
+            
+            if (this.stateValidationInterval) {
+                clearInterval(this.stateValidationInterval);
+                this.stateValidationInterval = null;
+            }
+            
+            // Clear debounce timeout
+            if (this.muteDebounceTimeout) {
+                clearTimeout(this.muteDebounceTimeout);
+                this.muteDebounceTimeout = null;
+            }
+            
+            // Reset mute state
+            this.muteStateSyncing = false;
+            
             // Stop local stream
             if (this.localStream) {
                 this.localStream.getTracks().forEach(track => track.stop());
+            }
+            
+            // Stop processed stream if it exists
+            if (this.processedStream) {
+                this.processedStream.getTracks().forEach(track => track.stop());
+                this.processedStream = null;
             }
             
             // Stop voice activity detection
@@ -4585,6 +4748,11 @@ Listening for unmute event...`);
                 this.startAudioQualityMonitoring();
             }, 200);
             
+            // Start state validation (non-blocking)
+            setTimeout(() => {
+                this.startStateValidation();
+            }, 500);
+            
             console.log('🎛️ Advanced audio processing initialized');
             
         } catch (error) {
@@ -4605,6 +4773,12 @@ Listening for unmute event...`);
                 console.warn('🎛️ No audio track found in stream');
                 return;
             }
+            
+            // CRITICAL: Preserve current mute state before processing
+            const currentMuteState = this.isMuted;
+            const originalTrackEnabled = audioTrack.enabled;
+            
+            console.log(`🎛️ Preserving mute state before processing: isMuted=${currentMuteState}, track.enabled=${originalTrackEnabled}`);
             
             // Store original stream for fallback
             const originalStream = this.localStream;
@@ -4645,21 +4819,37 @@ Listening for unmute event...`);
             const destination = this.audioContext.createMediaStreamDestination();
             this.audioEnhancer.connect(destination);
             
+            // Store processed stream reference
+            this.processedStream = destination.stream;
+            
             // Replace the original stream with processed stream
-            // Keep original track settings
             const processedTracks = destination.stream.getAudioTracks();
             if (processedTracks.length > 0) {
-                // Copy track settings from original
-                const processedTrack = processedTracks[0];
-                processedTrack.enabled = audioTrack.enabled;
+                // CRITICAL: Apply preserved mute state to processed tracks
+                processedTracks.forEach(processedTrack => {
+                    processedTrack.enabled = !currentMuteState; // Apply mute state
+                    console.log(`🎛️ Applied mute state to processed track: enabled=${processedTrack.enabled}, isMuted=${currentMuteState}`);
+                });
                 
-                // Replace stream but keep track enabled state
+                // Replace stream
                 this.localStream = destination.stream;
                 
                 // Update all peer connections with new stream
                 this.updatePeerConnectionsWithProcessedStream();
                 
-                console.log('🎛️ Audio processing chain created and applied');
+                // Verify mute state is preserved
+                const verifyTracks = this.localStream.getAudioTracks();
+                const allTracksMatchState = verifyTracks.every(track => track.enabled === !currentMuteState);
+                
+                if (!allTracksMatchState) {
+                    console.error('❌ Mute state not properly applied to processed tracks!');
+                    // Force apply mute state again
+                    this.applyMuteStateToTracks(currentMuteState);
+                } else {
+                    console.log('✅ Mute state successfully preserved in processed stream');
+                }
+                
+                console.log('🎛️ Audio processing chain created and applied with mute state preserved');
             } else {
                 console.warn('🎛️ No audio tracks in processed stream, using original');
             }
@@ -4668,6 +4858,8 @@ Listening for unmute event...`);
             console.error('🎛️ Error setting up audio processing chain:', error);
             // Fallback: continue with original stream
             console.log('🎛️ Falling back to original stream without processing');
+            // Ensure mute state is still applied
+            this.applyMuteStateToTracks(this.isMuted);
         }
     }
     
@@ -4678,6 +4870,9 @@ Listening for unmute event...`);
         const audioTracks = this.localStream.getAudioTracks();
         if (audioTracks.length === 0) return;
         
+        // CRITICAL: Preserve mute state when replacing tracks
+        const muteState = this.isMuted;
+        
         Object.values(this.peers).forEach(peer => {
             if (peer.connection && peer.connection.getSenders) {
                 const senders = peer.connection.getSenders();
@@ -4686,12 +4881,61 @@ Listening for unmute event...`);
                 );
                 
                 if (audioSender && audioSender.replaceTrack) {
-                    audioSender.replaceTrack(audioTracks[0]).catch(error => {
+                    // Ensure track has correct mute state before replacing
+                    const trackToReplace = audioTracks[0];
+                    trackToReplace.enabled = !muteState;
+                    
+                    audioSender.replaceTrack(trackToReplace).catch(error => {
                         console.warn('🎛️ Error replacing track in peer connection:', error);
                     });
                 }
             }
         });
+    }
+    
+    async initializeMuteStateFromServer() {
+        try {
+            // Load participants to get current mute state from server
+            const response = await fetch(`/api/prayer-room/${this.roomId}/participants`, {
+                method: 'GET',
+                credentials: 'include'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                const participants = data.participants || [];
+                
+                // Find current user's participant data
+                const currentUserParticipant = participants.find(p => p.user_id === this.userId);
+                
+                if (currentUserParticipant && currentUserParticipant.hasOwnProperty('is_muted')) {
+                    const serverMuteState = currentUserParticipant.is_muted || false;
+                    
+                    // Sync local state with server state
+                    if (this.isMuted !== serverMuteState) {
+                        console.log(`🔄 Syncing mute state from server: local=${this.isMuted}, server=${serverMuteState}`);
+                        this.isMuted = serverMuteState;
+                        
+                        // Apply mute state to tracks
+                        this.applyMuteStateToTracks(serverMuteState);
+                        
+                        // Update UI
+                        this.updateAudioControls();
+                        
+                        console.log(`✅ Mute state initialized from server: ${serverMuteState ? 'muted' : 'unmuted'}`);
+                    } else {
+                        console.log(`✅ Mute state already in sync: ${serverMuteState ? 'muted' : 'unmuted'}`);
+                    }
+                } else {
+                    console.log('ℹ️ No mute state found on server, using default (unmuted)');
+                }
+            } else {
+                console.warn('⚠️ Failed to load participants to initialize mute state');
+            }
+        } catch (error) {
+            console.error('❌ Error initializing mute state from server:', error);
+            // Continue with default state (unmuted)
+        }
     }
 
     createNoiseSuppressor() {
@@ -4984,6 +5228,72 @@ Listening for unmute event...`);
         }
     }
 
+    startStateValidation() {
+        // Prevent multiple validation intervals
+        if (this.stateValidationInterval) {
+            return;
+        }
+        
+        // Validate state consistency every 2 seconds
+        this.stateValidationInterval = setInterval(() => {
+            this.validateMuteState();
+        }, 2000);
+        
+        console.log('✅ State validation started');
+    }
+    
+    validateMuteState() {
+        // Only validate if audio is enabled
+        if (!this.isAudioEnabled || !this.localStream) {
+            return;
+        }
+        
+        const audioTracks = this.localStream.getAudioTracks();
+        if (audioTracks.length === 0) {
+            return;
+        }
+        
+        // Check if track enabled state matches mute state
+        const expectedEnabled = !this.isMuted;
+        let stateMismatch = false;
+        
+        audioTracks.forEach((track, index) => {
+            if (track.enabled !== expectedEnabled) {
+                console.warn(`⚠️ State mismatch detected on track ${index}: expected enabled=${expectedEnabled}, actual=${track.enabled}, isMuted=${this.isMuted}`);
+                stateMismatch = true;
+            }
+        });
+        
+        // Also check processed stream if it exists
+        if (this.processedStream) {
+            const processedTracks = this.processedStream.getAudioTracks();
+            processedTracks.forEach((track, index) => {
+                if (track.enabled !== expectedEnabled) {
+                    console.warn(`⚠️ State mismatch detected on processed track ${index}: expected enabled=${expectedEnabled}, actual=${track.enabled}`);
+                    stateMismatch = true;
+                }
+            });
+        }
+        
+        // If mismatch detected, sync state
+        if (stateMismatch) {
+            console.log('🔧 Correcting state mismatch...');
+            this.applyMuteStateToTracks(this.isMuted);
+            this.updateAudioControls();
+        }
+        
+        // Validate UI state matches mute state
+        const muteBtn = document.getElementById('muteBtn');
+        if (muteBtn) {
+            const uiShowsMuted = muteBtn.classList.contains('muted');
+            if (uiShowsMuted !== this.isMuted) {
+                console.warn(`⚠️ UI state mismatch: UI shows muted=${uiShowsMuted}, actual isMuted=${this.isMuted}`);
+                // Sync UI (updateAudioControls will handle ARIA attributes)
+                this.updateAudioControls();
+            }
+        }
+    }
+    
     startAudioQualityMonitoring() {
         try {
             if (!this.audioAnalyser) return;

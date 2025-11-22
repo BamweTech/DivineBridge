@@ -725,7 +725,7 @@ def get_room_participants(room_id):
 
 @prayer_room_bp.route('/<room_id>/mute', methods=['POST'])
 def mute_participant(room_id):
-    """Mute/unmute a participant (host only)"""
+    """Mute/unmute a participant (host only - for muting other participants)"""
     try:
         data = request.get_json()
         user_id = data.get('user_id')
@@ -759,6 +759,7 @@ def mute_participant(room_id):
         for participant in participants:
             if participant['user_id'] == user_id:
                 participant['is_muted'] = is_muted
+                participant['mute_source'] = 'host'  # Track who muted
                 participant_found = True
                 break
         
@@ -777,6 +778,71 @@ def mute_participant(room_id):
     except Exception as e:
         logging.error(f"Error muting participant: {str(e)}")
         return jsonify({'error': 'Failed to mute participant'}), 500
+
+@prayer_room_bp.route('/<room_id>/self-mute', methods=['POST'])
+def self_mute_participant(room_id):
+    """Update own mute status (any authenticated user can mute/unmute themselves)"""
+    try:
+        data = request.get_json()
+        is_muted = data.get('is_muted', False)
+        
+        # Get the requesting user
+        requesting_user = get_user_from_session()
+        if not requesting_user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        user_id = requesting_user['user_id']
+        
+        db = get_firestore_client()
+        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_doc = room_ref.get()
+        
+        if not room_doc.exists:
+            return jsonify({'error': 'Room not found'}), 404
+        
+        room_data = room_doc.to_dict()
+        participants = room_data.get('participants', [])
+        
+        # Find and update the requesting user's mute status
+        participant_found = False
+        for participant in participants:
+            if participant.get('user_id') == user_id:
+                participant['is_muted'] = is_muted
+                # Store metadata about mute source (preserved by normalize_participants)
+                participant['mute_source'] = 'self'
+                participant['mute_updated_at'] = datetime.utcnow()
+                participant_found = True
+                break
+        
+        # If participant not found, create entry (shouldn't happen, but handle gracefully)
+        if not participant_found:
+            user_name = requesting_user.get('name', requesting_user.get('user_name', 'Anonymous'))
+            new_participant = {
+                'user_id': user_id,
+                'user_name': user_name,
+                'joined_at': datetime.utcnow(),
+                'is_muted': is_muted,
+                'is_host': user_id == room_data.get('host_id'),
+                'role': 'listener',
+                'mute_source': 'self',
+                'mute_updated_at': datetime.utcnow()
+            }
+            participants.append(new_participant)
+        
+        # Normalize participants (preserves all fields including mute_source and mute_updated_at)
+        normalized_participants, _, _ = normalize_participants(participants, room_data.get('host_id'))
+        room_ref.update({
+            'participants': normalized_participants,
+            'last_activity': datetime.utcnow(),
+            'max_speakers': get_max_speakers(room_data)
+        })
+        
+        logging.info(f"User {user_id} {'muted' if is_muted else 'unmuted'} themselves in room {room_id}")
+        return jsonify({'success': True, 'is_muted': is_muted})
+        
+    except Exception as e:
+        logging.error(f"Error updating self mute status: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to update mute status'}), 500
 
 
 @prayer_room_bp.route('/room/<room_id>/request-speaker', methods=['POST'])
