@@ -1320,7 +1320,7 @@
                     </svg>
                 </div>
                 <span class="tab-label">Chat</span>
-                <div class="unread-badge" id="unreadBadge" style="display: none;">0</div>
+                <div class="unread-badge" id="unreadBadge" style="display: none;"></div>
             </button>
         </div>
     </div>
@@ -2126,10 +2126,11 @@
                         // Only show badge if there are unread messages (more than 0)
                         if (unreadBadge) {
                             if (this.unreadCount > 0) {
-                                unreadBadge.textContent = this.unreadCount > 99 ? '99+' : this.unreadCount;
+                                unreadBadge.textContent = this.unreadCount > 99 ? '99+' : String(this.unreadCount);
                                 unreadBadge.style.display = 'flex';
                                 chatTab?.classList.add('has-unread');
                             } else {
+                                unreadBadge.textContent = ''; // Clear text
                                 unreadBadge.style.display = 'none';
                                 chatTab?.classList.remove('has-unread');
                             }
@@ -2177,10 +2178,11 @@
                         const chatTab = document.getElementById('chatTab');
                         if (unreadBadge) {
                             if (this.unreadCount > 0) {
-                                unreadBadge.textContent = this.unreadCount > 99 ? '99+' : this.unreadCount;
+                                unreadBadge.textContent = this.unreadCount > 99 ? '99+' : String(this.unreadCount);
                                 unreadBadge.style.display = 'flex';
                                 chatTab?.classList.add('has-unread');
                             } else {
+                                unreadBadge.textContent = ''; // Clear text
                                 unreadBadge.style.display = 'none';
                                 chatTab?.classList.remove('has-unread');
                             }

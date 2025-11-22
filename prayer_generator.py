@@ -98,11 +98,13 @@ Biblical Grounding:
 Closing:
 - End with hope rooted in Christ
 - Trust in God's sovereignty even amid suffering
-- The LAST LINE of your prayer MUST be EXACTLY (word-for-word):
+- ⚠️ CRITICAL REQUIREMENT - The LAST LINE of your prayer MUST be EXACTLY (word-for-word):
   
   In Jesus-Christ's name we pray. Amen!
   
-  (Do not change this ending. Do not add anything after it. Use these exact words.)
+  ⚠️ DO NOT change this ending. DO NOT add anything after it. DO NOT use variations like "In Jesus' name" or "In the name of Jesus". 
+  ⚠️ The EXACT text must be: "In Jesus-Christ's name we pray. Amen!"
+  ⚠️ This is a hard requirement - your prayer will be rejected if it doesn't end with these exact words.
 
 VOICE & TONE:
 ✅ Natural, conversational language (like speaking to a friend)
@@ -124,6 +126,39 @@ LENGTH: 150-250 words (concise and focused)
 
 CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no commentary. Just the prayer as if you're speaking it aloud to lead a community in prayer."""
         
+    def _fix_prayer_ending(self, response):
+        """Try to fix common ending issues before validation"""
+        if not response:
+            return response
+        
+        response_clean = response.strip()
+        required_ending = "In Jesus-Christ's name we pray. Amen!"
+        
+        # Check if ending is already correct
+        if response_clean.endswith(required_ending) or response_clean.endswith(required_ending[:-1]):
+            return response
+        
+        # Try to fix common variations
+        # Check if it ends with something close to the required ending
+        if "In Jesus" in response_clean[-50:] or "Amen" in response_clean[-20:]:
+            # If it has "Amen" but not the full ending, try to fix it
+            # Find the last sentence that might be the ending
+            sentences = response_clean.split('.')
+            if sentences:
+                last_sentence = sentences[-1].strip()
+                # If the last sentence doesn't have the required ending, replace it
+                if "In Jesus" not in last_sentence or "Amen" not in last_sentence:
+                    # Remove the last sentence and add the correct ending
+                    response_clean = '.'.join(sentences[:-1]).strip()
+                    if response_clean and not response_clean.endswith('.'):
+                        response_clean += '.'
+                    response_clean += ' ' + required_ending
+                    logger.info("Fixed prayer ending automatically")
+                    return response_clean
+        
+        # If no fix possible, return original
+        return response
+    
     def _validate_response(self, response):
         """Validate the prayer response format with strict requirements"""
         if not response:
@@ -154,11 +189,11 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
         logger.info(f"Prayer validation passed: {word_count} words")
         return response
         
-    def generate_prayer(self, max_retries=3):
+    def generate_prayer(self, max_retries=5):
         """Generate a new prayer and save it to storage with retry logic.
         
         Args:
-            max_retries: Maximum number of retry attempts if validation fails
+            max_retries: Maximum number of retry attempts if validation fails (increased from 3 to 5)
         
         Returns:
             dict: The generated prayer data if successful, None otherwise
@@ -182,14 +217,22 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
                     if attempt > 1 and last_error:
                         retry_prompt = f"""{self.prompt}
 
-IMPORTANT - Previous attempt was REJECTED for the following reason:
+⚠️⚠️⚠️ CRITICAL - Previous attempt was REJECTED for the following reason:
 {last_error}
 
-Please regenerate the prayer ensuring you address this issue. Remember:
-- START with "Heavenly Father" (not "Dear Heavenly Father")
-- END with EXACTLY "In Jesus-Christ's name we pray. Amen!"
-- LENGTH: 150-250 words (count carefully - be concise!)
-- NO <think> tags or explanations"""
+⚠️⚠️⚠️ You MUST fix this issue. Your prayer will be rejected again if you don't.
+
+CRITICAL REQUIREMENTS (DO NOT IGNORE):
+1. START with "Heavenly Father" (not "Dear Heavenly Father")
+2. END with EXACTLY "In Jesus-Christ's name we pray. Amen!" - NO VARIATIONS, NO CHANGES
+3. LENGTH: 150-250 words (count carefully - be concise!)
+4. NO <think> tags or explanations
+5. NO text after "Amen!" - stop immediately after those words
+
+If the error was about the ending, copy this EXACTLY as the last line:
+"In Jesus-Christ's name we pray. Amen!"
+
+DO NOT use "In Jesus' name" or "In the name of Jesus" or any other variation."""
                         response = self.client.query(retry_prompt)
                     else:
                         response = self.client.query(self.prompt)
@@ -200,6 +243,9 @@ Please regenerate the prayer ensuring you address this issue. Remember:
                     if response and "<think>" in response:
                         import re
                         response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL).strip()
+
+                    # Try to fix common ending issues before validation
+                    response = self._fix_prayer_ending(response)
 
                     # Validate and process the response
                     response = self._validate_response(response)

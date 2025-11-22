@@ -597,23 +597,32 @@ class PrayerRoomService {
                             const keyboardHeight = window.innerHeight - viewport.height;
                             
                             if (keyboardHeight > 0) {
-                                // Input stays fixed at bottom (above keyboard)
-                                // Messages area adjusts to fill space above input
-                                const inputHeight = chatInputSection.offsetHeight || 140;
-                                const availableHeight = viewport.height - inputHeight;
+                                // Input stays fixed at bottom (directly above keyboard - minimal gap)
+                                const inputHeight = chatInputSection.offsetHeight || 60;
+                                const headerOffset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mobile-header-offset')) || 176;
                                 
-                                // Set messages container height to fill available space
+                                // Calculate available height for messages (viewport - header - input)
+                                const availableHeight = viewport.height - headerOffset - inputHeight;
+                                
+                                // Set messages container height to fill available space above input
                                 chatMessages.style.height = `${availableHeight}px`;
                                 chatMessages.style.maxHeight = `${availableHeight}px`;
-                                chatMessages.style.paddingBottom = `${inputHeight + 20}px`;
+                                chatMessages.style.paddingBottom = `${inputHeight + 10}px`; // Reduced padding - closer to input
                                 
-                                // Ensure input stays fixed
+                                // Ensure input stays fixed at bottom (directly above keyboard)
                                 chatInputSection.style.bottom = '0px';
+                                chatInputSection.style.position = 'fixed';
+                                chatInputSection.style.zIndex = '200';
                                 
-                                // Scroll to bottom to show latest messages
+                                // Ensure input is always visible
+                                chatInputSection.style.visibility = 'visible';
+                                chatInputSection.style.opacity = '1';
+                                chatInputSection.style.display = 'flex';
+                                
+                                // Scroll to bottom to show latest messages above typing bar
                                 setTimeout(() => {
                                     scrollChatToBottom();
-                                }, 100);
+                                }, 150);
                             } else {
                                 // Keyboard closed - reset to normal
                                 chatMessages.style.height = '';
@@ -1487,7 +1496,10 @@ class PrayerRoomService {
                     googTypingNoiseDetection: true, // Detect and suppress typing
                     googAudioMirroring: false,
                     googDAEchoCancellation: true,   // Domain-specific echo cancellation
-                    googNoiseReduction: true        // Additional noise reduction
+                    googNoiseReduction: true,       // Additional noise reduction
+                    googEchoCancellation2: true,    // Enhanced echo cancellation
+                    googNoiseSuppression2: true,    // Enhanced noise suppression
+                    googAutoGainControl2: true      // Enhanced auto gain control
                 },
                 video: false
             };
@@ -4563,6 +4575,11 @@ Listening for unmute event...`);
                 this.setupAdvancedVoiceActivityDetection();
             }, 100);
             
+            // Start adaptive noise gate adjustment (non-blocking)
+            setTimeout(() => {
+                this.startAdaptiveNoiseGate();
+            }, 150);
+            
             // Start audio quality monitoring (non-blocking)
             setTimeout(() => {
                 this.startAudioQualityMonitoring();
@@ -4577,22 +4594,33 @@ Listening for unmute event...`);
 
     async setupAudioProcessingChain() {
         try {
-            if (!this.localStream || !this.audioContext) return;
+            if (!this.localStream || !this.audioContext) {
+                console.warn('🎛️ Cannot setup audio processing: missing stream or context');
+                return;
+            }
             
             // Get the audio track
             const audioTrack = this.localStream.getAudioTracks()[0];
-            if (!audioTrack) return;
+            if (!audioTrack) {
+                console.warn('🎛️ No audio track found in stream');
+                return;
+            }
+            
+            // Store original stream for fallback
+            const originalStream = this.localStream;
             
             // Create media stream source
             const source = this.audioContext.createMediaStreamSource(this.localStream);
             
             // Create audio processing nodes
             this.gainController = this.audioContext.createGain();
+            this.gainController.gain.value = 1.0; // Start at unity gain
+            
             this.audioAnalyser = this.audioContext.createAnalyser();
             
             // Configure analyser for better frequency analysis
             this.audioAnalyser.fftSize = 2048;
-            this.audioAnalyser.smoothingTimeConstant = 0.8;
+            this.audioAnalyser.smoothingTimeConstant = 0.7; // Slightly less smoothing for better detection
             
             // Create noise suppression using Web Audio API
             this.noiseSuppressor = this.createNoiseSuppressor();
@@ -4604,10 +4632,13 @@ Listening for unmute event...`);
             this.audioEnhancer = this.createAudioEnhancer();
             
             // Connect the audio processing chain
+            // Source -> Gain -> Noise Suppressor -> Echo Canceller -> Enhancer -> Analyser
             source.connect(this.gainController);
             this.gainController.connect(this.noiseSuppressor);
             this.noiseSuppressor.connect(this.echoCanceller);
             this.echoCanceller.connect(this.audioEnhancer);
+            
+            // Connect enhancer to analyser for monitoring (parallel, not in chain)
             this.audioEnhancer.connect(this.audioAnalyser);
             
             // Create destination for processed audio
@@ -4615,40 +4646,111 @@ Listening for unmute event...`);
             this.audioEnhancer.connect(destination);
             
             // Replace the original stream with processed stream
-            this.localStream = destination.stream;
-            
-            console.log('🎛️ Audio processing chain created');
+            // Keep original track settings
+            const processedTracks = destination.stream.getAudioTracks();
+            if (processedTracks.length > 0) {
+                // Copy track settings from original
+                const processedTrack = processedTracks[0];
+                processedTrack.enabled = audioTrack.enabled;
+                
+                // Replace stream but keep track enabled state
+                this.localStream = destination.stream;
+                
+                // Update all peer connections with new stream
+                this.updatePeerConnectionsWithProcessedStream();
+                
+                console.log('🎛️ Audio processing chain created and applied');
+            } else {
+                console.warn('🎛️ No audio tracks in processed stream, using original');
+            }
             
         } catch (error) {
             console.error('🎛️ Error setting up audio processing chain:', error);
+            // Fallback: continue with original stream
+            console.log('🎛️ Falling back to original stream without processing');
         }
+    }
+    
+    updatePeerConnectionsWithProcessedStream() {
+        // Update all existing peer connections with the processed stream
+        if (!this.localStream) return;
+        
+        const audioTracks = this.localStream.getAudioTracks();
+        if (audioTracks.length === 0) return;
+        
+        Object.values(this.peers).forEach(peer => {
+            if (peer.connection && peer.connection.getSenders) {
+                const senders = peer.connection.getSenders();
+                const audioSender = senders.find(sender => 
+                    sender.track && sender.track.kind === 'audio'
+                );
+                
+                if (audioSender && audioSender.replaceTrack) {
+                    audioSender.replaceTrack(audioTracks[0]).catch(error => {
+                        console.warn('🎛️ Error replacing track in peer connection:', error);
+                    });
+                }
+            }
+        });
     }
 
     createNoiseSuppressor() {
         try {
-            // Create a high-pass filter to remove low-frequency noise
+            // Create a gain node for overall control
+            const inputGain = this.audioContext.createGain();
+            inputGain.gain.value = 1.0;
+            
+            // Create a high-pass filter to remove low-frequency noise (rumble, wind, etc.)
             const highPassFilter = this.audioContext.createBiquadFilter();
             highPassFilter.type = 'highpass';
-            highPassFilter.frequency.value = 80; // Remove frequencies below 80Hz
-            highPassFilter.Q.value = 1;
+            highPassFilter.frequency.value = 100; // Increased from 80Hz - better noise removal
+            highPassFilter.Q.value = 0.7; // Slightly gentler slope
             
-            // Create a low-pass filter to remove high-frequency noise
+            // Create a low-pass filter to remove high-frequency noise (hiss, static)
             const lowPassFilter = this.audioContext.createBiquadFilter();
             lowPassFilter.type = 'lowpass';
-            lowPassFilter.frequency.value = 8000; // Remove frequencies above 8kHz
-            lowPassFilter.Q.value = 1;
+            lowPassFilter.frequency.value = 7000; // Reduced from 8kHz - focus on voice range
+            lowPassFilter.Q.value = 0.7; // Slightly gentler slope
             
-            // Create a notch filter for common noise frequencies
-            const notchFilter = this.audioContext.createBiquadFilter();
-            notchFilter.type = 'notch';
-            notchFilter.frequency.value = 60; // Remove 60Hz hum
-            notchFilter.Q.value = 30;
+            // Create notch filters for common noise frequencies
+            const notch60Hz = this.audioContext.createBiquadFilter();
+            notch60Hz.type = 'notch';
+            notch60Hz.frequency.value = 60; // Remove 60Hz electrical hum
+            notch60Hz.Q.value = 30;
             
-            // Connect filters in series
-            highPassFilter.connect(lowPassFilter);
-            lowPassFilter.connect(notchFilter);
+            const notch50Hz = this.audioContext.createBiquadFilter();
+            notch50Hz.type = 'notch';
+            notch50Hz.frequency.value = 50; // Remove 50Hz electrical hum (EU/Asia)
+            notch50Hz.Q.value = 30;
             
-            return highPassFilter;
+            // Create a bandpass filter to focus on voice frequencies (300Hz - 3400Hz)
+            const voiceBandpass = this.audioContext.createBiquadFilter();
+            voiceBandpass.type = 'bandpass';
+            voiceBandpass.frequency.value = 1850; // Center of voice range
+            voiceBandpass.Q.value = 0.5; // Wide band for natural sound
+            
+            // Create an adaptive noise gate
+            const noiseGate = this.audioContext.createDynamicsCompressor();
+            noiseGate.threshold.value = -50; // Lower threshold for better noise gating
+            noiseGate.knee.value = 5; // Sharp knee for noise gate effect
+            noiseGate.ratio.value = 20; // High ratio = gate effect
+            noiseGate.attack.value = 0.001; // Fast attack
+            noiseGate.release.value = 0.1; // Quick release
+            
+            // Connect filters in series for optimal noise reduction
+            inputGain.connect(highPassFilter);
+            highPassFilter.connect(notch60Hz);
+            notch60Hz.connect(notch50Hz);
+            notch50Hz.connect(lowPassFilter);
+            lowPassFilter.connect(voiceBandpass);
+            voiceBandpass.connect(noiseGate);
+            
+            // Store reference for dynamic adjustment
+            this.noiseGateNode = noiseGate;
+            this.voiceBandpassNode = voiceBandpass;
+            
+            console.log('🎛️ Enhanced noise suppressor created with adaptive gating');
+            return inputGain;
             
         } catch (error) {
             console.error('🎛️ Error creating noise suppressor:', error);
@@ -4658,15 +4760,31 @@ Listening for unmute event...`);
 
     createEchoCanceller() {
         try {
-            // Create a dynamic range compressor to reduce echo
-            const compressor = this.audioContext.createDynamicsCompressor();
-            compressor.threshold.value = -24;
-            compressor.knee.value = 30;
-            compressor.ratio.value = 12;
-            compressor.attack.value = 0.003;
-            compressor.release.value = 0.25;
+            // Create a multi-stage compressor for better echo reduction
+            const compressor1 = this.audioContext.createDynamicsCompressor();
+            compressor1.threshold.value = -30; // Lower threshold
+            compressor1.knee.value = 10; // Sharper knee
+            compressor1.ratio.value = 8; // Moderate ratio
+            compressor1.attack.value = 0.001; // Very fast attack to catch echoes
+            compressor1.release.value = 0.15; // Quick release
             
-            return compressor;
+            // Second stage compressor for fine-tuning
+            const compressor2 = this.audioContext.createDynamicsCompressor();
+            compressor2.threshold.value = -20;
+            compressor2.knee.value = 5;
+            compressor2.ratio.value = 4;
+            compressor2.attack.value = 0.003;
+            compressor2.release.value = 0.1;
+            
+            // Connect compressors in series
+            compressor1.connect(compressor2);
+            
+            // Store reference for dynamic adjustment
+            this.echoCompressor1 = compressor1;
+            this.echoCompressor2 = compressor2;
+            
+            console.log('🎛️ Enhanced echo canceller created with multi-stage compression');
+            return compressor1;
             
         } catch (error) {
             console.error('🎛️ Error creating echo canceller:', error);
@@ -4677,27 +4795,120 @@ Listening for unmute event...`);
     createAudioEnhancer() {
         try {
             // Create a multi-band equalizer for voice enhancement
-            const eq = this.audioContext.createBiquadFilter();
-            eq.type = 'peaking';
-            eq.frequency.value = 1000; // Enhance voice frequencies around 1kHz
-            eq.gain.value = 3; // Boost by 3dB
-            eq.Q.value = 1;
+            // Boost frequencies where human voice is strongest (300Hz - 3400Hz)
+            const eqLow = this.audioContext.createBiquadFilter();
+            eqLow.type = 'peaking';
+            eqLow.frequency.value = 500; // Lower voice frequencies
+            eqLow.gain.value = 2; // Slight boost
+            eqLow.Q.value = 1;
+            
+            const eqMid = this.audioContext.createBiquadFilter();
+            eqMid.type = 'peaking';
+            eqMid.frequency.value = 1500; // Mid voice frequencies (most important)
+            eqMid.gain.value = 4; // Stronger boost for clarity
+            eqMid.Q.value = 1.5;
+            
+            const eqHigh = this.audioContext.createBiquadFilter();
+            eqHigh.type = 'peaking';
+            eqHigh.frequency.value = 3000; // Higher voice frequencies
+            eqHigh.gain.value = 2; // Slight boost
+            eqHigh.Q.value = 1;
             
             // Create a gentle compressor for consistent volume
             const compressor = this.audioContext.createDynamicsCompressor();
-            compressor.threshold.value = -20;
-            compressor.knee.value = 20;
-            compressor.ratio.value = 4;
-            compressor.attack.value = 0.01;
-            compressor.release.value = 0.1;
+            compressor.threshold.value = -18; // Slightly lower threshold
+            compressor.knee.value = 15; // Softer knee
+            compressor.ratio.value = 3; // Gentler ratio for natural sound
+            compressor.attack.value = 0.005; // Quick attack
+            compressor.release.value = 0.08; // Quick release
             
-            eq.connect(compressor);
-            return eq;
+            // Connect EQ bands in series, then to compressor
+            eqLow.connect(eqMid);
+            eqMid.connect(eqHigh);
+            eqHigh.connect(compressor);
+            
+            // Store references for dynamic adjustment
+            this.eqLow = eqLow;
+            this.eqMid = eqMid;
+            this.eqHigh = eqHigh;
+            this.enhancerCompressor = compressor;
+            
+            console.log('🎛️ Enhanced audio enhancer created with multi-band EQ');
+            return eqLow;
             
         } catch (error) {
             console.error('🎛️ Error creating audio enhancer:', error);
             return this.audioContext.createGain(); // Fallback to simple gain
         }
+    }
+    
+    startAdaptiveNoiseGate() {
+        if (!this.audioAnalyser || !this.noiseGateNode) {
+            console.warn('🎛️ Cannot start adaptive noise gate: missing analyser or gate node');
+            return;
+        }
+        
+        // Prevent multiple instances
+        if (this.adaptiveNoiseGateActive) {
+            return;
+        }
+        
+        this.adaptiveNoiseGateActive = true;
+        const bufferLength = this.audioAnalyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        
+        let backgroundNoiseLevel = 0;
+        let samplesCollected = 0;
+        const calibrationSamples = 30; // Collect 30 samples (about 1 second) to calibrate
+        
+        const adjustNoiseGate = () => {
+            if (!this.adaptiveNoiseGateActive || !this.noiseGateNode) {
+                return;
+            }
+            
+            this.audioAnalyser.getByteFrequencyData(dataArray);
+            
+            // Calculate average noise level in low frequencies (background noise)
+            const noiseFreqRange = dataArray.slice(0, Math.floor(bufferLength * 0.1)); // First 10% of frequencies
+            const currentNoiseLevel = noiseFreqRange.reduce((a, b) => a + b, 0) / noiseFreqRange.length;
+            
+            // Calibration phase: collect samples to determine baseline noise
+            if (samplesCollected < calibrationSamples) {
+                backgroundNoiseLevel = (backgroundNoiseLevel * samplesCollected + currentNoiseLevel) / (samplesCollected + 1);
+                samplesCollected++;
+                
+                // Set initial gate threshold based on calibration
+                if (samplesCollected === calibrationSamples) {
+                    const threshold = Math.max(-50, -30 - (backgroundNoiseLevel / 2));
+                    this.noiseGateNode.threshold.value = threshold;
+                    console.log(`🎛️ Noise gate calibrated: background=${backgroundNoiseLevel.toFixed(1)}, threshold=${threshold.toFixed(1)}dB`);
+                }
+            } else {
+                // Adaptive adjustment: adjust gate threshold based on current noise
+                const noiseChange = currentNoiseLevel - backgroundNoiseLevel;
+                
+                // If noise increased significantly, lower threshold (more aggressive gating)
+                if (noiseChange > 5) {
+                    const newThreshold = Math.max(-60, this.noiseGateNode.threshold.value - 2);
+                    this.noiseGateNode.threshold.value = newThreshold;
+                }
+                // If noise decreased, raise threshold (less aggressive gating)
+                else if (noiseChange < -5) {
+                    const newThreshold = Math.min(-30, this.noiseGateNode.threshold.value + 1);
+                    this.noiseGateNode.threshold.value = newThreshold;
+                }
+                
+                // Update background noise level slowly (exponential moving average)
+                backgroundNoiseLevel = backgroundNoiseLevel * 0.95 + currentNoiseLevel * 0.05;
+            }
+            
+            // Continue monitoring
+            requestAnimationFrame(adjustNoiseGate);
+        };
+        
+        // Start monitoring
+        adjustNoiseGate();
+        console.log('🎛️ Adaptive noise gate started');
     }
 
     setupAdvancedVoiceActivityDetection() {
