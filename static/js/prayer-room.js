@@ -1619,9 +1619,23 @@ class PrayerRoomService {
                 throw new Error('No audio track found in microphone stream');
             }
             
+            // Ensure audio is enabled flag is set
+            this.isAudioEnabled = true;
+            
             // Update UI to show mute button now that stream is active
+            // CRITICAL: Hide join audio button and show mute button
             this.updateAudioControls();
             console.log('🎤 Audio controls updated after stream obtained');
+            
+            // Double-check that join audio button is hidden (defensive programming)
+            const joinAudioBtn = document.getElementById('joinAudioBtn');
+            const muteBtn = document.getElementById('muteBtn');
+            if (joinAudioBtn) {
+                joinAudioBtn.style.setProperty('display', 'none', 'important');
+            }
+            if (muteBtn && this.isAudioEnabled) {
+                muteBtn.style.setProperty('display', 'inline-flex', 'important');
+            }
             
             // Start lightweight initialization immediately
             console.log('🎤 Starting fast initialization...');

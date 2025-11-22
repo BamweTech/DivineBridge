@@ -266,10 +266,18 @@
     
     .header-actions .mute-btn,
     .header-actions .control-btn.mute-btn {
-        background: #ef4444 !important;
+        background: #ef4444 !important; /* Red when unmuted (mute action) */
         color: #ffffff !important;
         border: none !important;
         position: relative !important;
+        transition: background-color 0.2s ease !important;
+    }
+    
+    /* When muted: change to blue (unmute action) */
+    .header-actions .mute-btn.muted,
+    .header-actions .control-btn.mute-btn.muted {
+        background: #3b82f6 !important; /* Blue when muted (unmute action) */
+        color: #ffffff !important;
     }
     
     /* Ensure only one icon shows at a time for header mute button */
@@ -517,6 +525,30 @@
     .role-badge.speaker {
         background: rgba(34, 197, 94, 0.18) !important;
         color: #15803d !important;
+    }
+    
+    /* Muted indicator - more prominent styling */
+    .mute-indicator {
+        background: rgba(239, 68, 68, 0.25) !important; /* Red background */
+        color: #dc2626 !important; /* Dark red text */
+        font-weight: 700 !important; /* Bolder */
+        border: 1px solid rgba(239, 68, 68, 0.3) !important; /* Red border */
+    }
+    
+    /* Muted participant card styling - visual indicator */
+    .participant.muted {
+        opacity: 0.85 !important;
+        background: rgba(239, 68, 68, 0.08) !important; /* Light red background */
+        border-left: 3px solid #ef4444 !important; /* Red left border */
+    }
+    
+    .participant.muted .participant-avatar {
+        opacity: 0.7 !important;
+        filter: grayscale(30%) !important; /* Slight grayscale effect */
+    }
+    
+    .participant.muted .participant-name {
+        color: #64748b !important; /* Muted text color */
     }
     
     /* Host controls for participants - hidden by default */
@@ -805,37 +837,38 @@
         background: transparent !important;
     }
     
-    /* Override ALL other CSS files - ensure own messages are visible */
+    /* Own messages - ensure proper visibility with blue background */
     .message-own .message-bubble,
     .message.message-own .message-bubble,
     .chat-message.message-own .message-bubble {
-        background: transparent !important; /* No background - plain text */
-        background-color: transparent !important; /* Force override gradient */
-        background-image: none !important; /* Remove any gradient images */
-        border-radius: 0 !important; /* No rounded corners */
-        color: #1e293b !important; /* Dark text color - ensure visibility */
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important; /* Blue gradient */
+        background-color: #3b82f6 !important; /* Fallback blue */
+        border-radius: 16px 16px 4px 16px !important; /* Rounded corners */
+        color: #ffffff !important; /* White text for contrast */
         border: none !important;
-        box-shadow: none !important;
-        padding: 4px 0 !important; /* Minimal padding */
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3) !important; /* Blue shadow */
+        padding: 10px 14px !important; /* Proper padding */
         opacity: 1 !important; /* Ensure full opacity */
         visibility: visible !important; /* Ensure visible */
+        max-width: 75% !important;
     }
     
     .message-own .message-sender {
-        color: #1e293b !important; /* Dark text for readability */
+        color: rgba(255, 255, 255, 0.95) !important; /* Light white for sender */
         opacity: 1 !important;
         visibility: visible !important;
+        font-weight: 600 !important;
     }
     
     .message-own .message-content {
-        color: #1e293b !important; /* Dark text for readability */
+        color: #ffffff !important; /* White text for readability */
         opacity: 1 !important;
         visibility: visible !important;
         font-weight: 400 !important; /* Normal weight for readability */
     }
     
     .message-own .message-time {
-        color: #64748b !important; /* Gray for time */
+        color: rgba(255, 255, 255, 0.8) !important; /* Light white for time */
         opacity: 1 !important;
         visibility: visible !important;
     }
@@ -845,21 +878,23 @@
         opacity: 1 !important;
         visibility: visible !important;
         display: flex !important;
+        justify-content: flex-end !important; /* Right align */
+        margin-bottom: 12px !important;
     }
     
+    /* Other messages styling */
     .message-other .message-content,
     .message-other .message-sender,
     .message-other .message-time {
         color: #1e293b !important; /* Dark text */
     }
     
-    .message-own .message-content,
-    .message-own .message-sender {
-        color: #1e293b !important; /* Dark text for readability */
-    }
-    
-    .message-own .message-time {
-        color: #64748b !important; /* Gray for time */
+    .message-other .message-bubble {
+        background: #ffffff !important;
+        border-radius: 16px 16px 16px 4px !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important;
+        padding: 10px 14px !important;
+        max-width: 75% !important;
     }
     
     /* Override ALL CSS files - ensure no backgrounds on any message bubbles */

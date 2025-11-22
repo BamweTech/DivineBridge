@@ -810,8 +810,10 @@
 }
 
 .mute-indicator {
-    background: rgba(239, 68, 68, 0.18);
-    color: #b91c1c;
+    background: rgba(239, 68, 68, 0.25) !important; /* More prominent red background */
+    color: #dc2626 !important; /* Darker red text */
+    font-weight: 700 !important; /* Bolder */
+    border: 1px solid rgba(239, 68, 68, 0.3) !important; /* Red border */
 }
 
 /* Base styles for all screens */

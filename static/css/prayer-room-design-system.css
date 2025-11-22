@@ -330,9 +330,14 @@
 }
 
 .control-btn.mute-btn.muted {
-    background: var(--gradient-danger) !important;
+    background: var(--gradient-primary) !important; /* Blue gradient when muted (unmute action) */
     color: white !important;
     border-color: transparent !important;
+}
+
+/* Default unmuted state: red (mute action) */
+.control-btn.mute-btn:not(.muted) {
+    background: var(--gradient-danger) !important; /* Red when unmuted (mute action) */
 }
 
 .control-btn.mute-btn {
