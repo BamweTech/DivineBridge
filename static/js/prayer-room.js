@@ -1212,8 +1212,12 @@ class PrayerRoomService {
                 if (participant.is_speaking && !participant.is_muted && participantRole === 'speaker') {
                     participantEl.classList.add('speaking');
                 }
+                // Add muted class to participant element for styling
                 if (participant.is_muted) {
                     participantEl.classList.add('muted');
+                    console.log(`🔇 Adding muted class to participant ${participant.user_name}`);
+                } else {
+                    participantEl.classList.remove('muted');
                 }
                 if (requestedSpeaker) {
                     participantEl.classList.add('requested-speaker');
@@ -1234,8 +1238,10 @@ class PrayerRoomService {
                 if (participant.is_speaking && !participant.is_muted && participantRole === 'speaker') {
                     badges.push('<span class="speaking-indicator">Speaking</span>');
                 }
+                // Always show muted badge if participant is muted
                 if (participant.is_muted) {
-                    badges.push('<span class="mute-indicator">Muted</span>');
+                    badges.push('<span class="mute-indicator" style="display: inline-block !important; visibility: visible !important; opacity: 1 !important;">Muted</span>');
+                    console.log(`🔇 Participant ${participant.user_name} is muted - adding muted badge`);
                 }
                 
                 const controls = [];
@@ -1622,19 +1628,39 @@ class PrayerRoomService {
             // Ensure audio is enabled flag is set
             this.isAudioEnabled = true;
             
+            // CRITICAL: Hide join audio button FIRST before updating controls
+            const joinAudioBtn = document.getElementById('joinAudioBtn');
+            const muteBtn = document.getElementById('muteBtn');
+            
+            if (joinAudioBtn) {
+                joinAudioBtn.style.setProperty('display', 'none', 'important');
+                joinAudioBtn.classList.add('hidden');
+                joinAudioBtn.setAttribute('aria-hidden', 'true');
+            }
+            
+            if (muteBtn) {
+                muteBtn.style.setProperty('display', 'inline-flex', 'important');
+                muteBtn.classList.remove('hidden');
+                muteBtn.removeAttribute('aria-hidden');
+            }
+            
             // Update UI to show mute button now that stream is active
-            // CRITICAL: Hide join audio button and show mute button
             this.updateAudioControls();
             console.log('🎤 Audio controls updated after stream obtained');
             
-            // Double-check that join audio button is hidden (defensive programming)
-            const joinAudioBtn = document.getElementById('joinAudioBtn');
-            const muteBtn = document.getElementById('muteBtn');
-            if (joinAudioBtn) {
-                joinAudioBtn.style.setProperty('display', 'none', 'important');
-            }
-            if (muteBtn && this.isAudioEnabled) {
-                muteBtn.style.setProperty('display', 'inline-flex', 'important');
+            // Final verification - ensure only one button is visible
+            if (joinAudioBtn && muteBtn) {
+                setTimeout(() => {
+                    const joinVisible = joinAudioBtn.style.display !== 'none' && !joinAudioBtn.classList.contains('hidden');
+                    const muteVisible = muteBtn.style.display !== 'none' && !muteBtn.classList.contains('hidden');
+                    
+                    if (joinVisible && muteVisible) {
+                        console.error('❌ BOTH buttons visible after join! Forcing join audio to hide...');
+                        joinAudioBtn.style.setProperty('display', 'none', 'important');
+                        joinAudioBtn.classList.add('hidden');
+                        joinAudioBtn.setAttribute('aria-hidden', 'true');
+                    }
+                }, 100); // Small delay to ensure DOM updates
             }
             
             // Start lightweight initialization immediately
@@ -1947,6 +1973,7 @@ class PrayerRoomService {
     updateAudioControls() {
         const joinAudioBtn = document.getElementById('joinAudioBtn');
         const muteBtn = document.getElementById('muteBtn');
+        const controlButtons = document.querySelector('.header-actions .control-buttons');
         
         console.log('🔧 updateAudioControls called:', {
             isAudioEnabled: this.isAudioEnabled,
@@ -1958,55 +1985,128 @@ class PrayerRoomService {
         });
         
         if (!joinAudioBtn || !muteBtn) {
+            console.warn('⚠️ Missing audio control buttons:', { joinAudioBtn: !!joinAudioBtn, muteBtn: !!muteBtn });
             return;
         }
 
+        // Set data attribute on container for CSS targeting
+        if (controlButtons) {
+            controlButtons.setAttribute('data-audio-enabled', this.isAudioEnabled ? 'true' : 'false');
+        }
+
+        // CRITICAL: Always ensure only one button is visible at a time
+        // Use multiple methods to ensure hiding works
+        
         // Hosts should never see join audio button - they're always speakers
         if (this.isHost) {
+            // Force hide join audio button for hosts (multiple methods)
             joinAudioBtn.style.setProperty('display', 'none', 'important');
+            joinAudioBtn.style.setProperty('visibility', 'hidden', 'important');
+            joinAudioBtn.classList.add('hidden');
+            joinAudioBtn.setAttribute('aria-hidden', 'true');
+            
             // Hosts can mute/unmute, so show mute button if audio is enabled
             if (this.isAudioEnabled) {
                 muteBtn.style.setProperty('display', 'flex', 'important');
+                muteBtn.style.setProperty('visibility', 'visible', 'important');
+                muteBtn.classList.remove('hidden');
+                muteBtn.removeAttribute('aria-hidden');
             } else {
                 muteBtn.style.setProperty('display', 'none', 'important');
+                muteBtn.style.setProperty('visibility', 'hidden', 'important');
+                muteBtn.classList.add('hidden');
+                muteBtn.setAttribute('aria-hidden', 'true');
             }
+            
+            // Update mute button state
+            this.updateMuteButtonState(muteBtn);
             return;
         }
 
         // If audio is enabled (microphone is active), show mute button regardless of role
-        // This allows users to control their microphone after joining audio
         if (this.isAudioEnabled) {
-            // Show mute button, hide join audio button
+            // CRITICAL: Hide join audio button using MULTIPLE methods
             joinAudioBtn.style.setProperty('display', 'none', 'important');
-            muteBtn.style.setProperty('display', 'inline-flex', 'important');
+            joinAudioBtn.style.setProperty('visibility', 'hidden', 'important');
+            joinAudioBtn.style.setProperty('opacity', '0', 'important');
+            joinAudioBtn.style.setProperty('pointer-events', 'none', 'important');
+            joinAudioBtn.classList.add('hidden');
+            joinAudioBtn.setAttribute('aria-hidden', 'true');
             
-            // Update mute button state using CSS classes and ARIA attributes
-            if (this.isMuted) {
-                muteBtn.classList.add('muted');
-                muteBtn.setAttribute('aria-pressed', 'true');
-                muteBtn.setAttribute('aria-label', 'Unmute microphone');
-                muteBtn.setAttribute('title', 'Unmute microphone');
-            } else {
-                muteBtn.classList.remove('muted');
-                muteBtn.setAttribute('aria-pressed', 'false');
-                muteBtn.setAttribute('aria-label', 'Mute microphone');
-                muteBtn.setAttribute('title', 'Mute microphone');
-            }
+            // Show mute button
+            muteBtn.style.setProperty('display', 'inline-flex', 'important');
+            muteBtn.style.setProperty('visibility', 'visible', 'important');
+            muteBtn.style.setProperty('opacity', '1', 'important');
+            muteBtn.style.setProperty('pointer-events', 'auto', 'important');
+            muteBtn.classList.remove('hidden');
+            muteBtn.removeAttribute('aria-hidden');
+            
+            // Update mute button state
+            this.updateMuteButtonState(muteBtn);
         } else {
             // Audio not enabled - show join button, hide mute button
-            // Show join button for all non-hosts (listeners and speakers who haven't joined yet)
-            joinAudioBtn.style.setProperty('display', 'inline-flex', 'important');
+            // CRITICAL: Hide mute button using MULTIPLE methods
             muteBtn.style.setProperty('display', 'none', 'important');
+            muteBtn.style.setProperty('visibility', 'hidden', 'important');
+            muteBtn.style.setProperty('opacity', '0', 'important');
+            muteBtn.style.setProperty('pointer-events', 'none', 'important');
+            muteBtn.classList.add('hidden');
+            muteBtn.setAttribute('aria-hidden', 'true');
+            
+            // Show join button for all non-hosts
+            joinAudioBtn.style.setProperty('display', 'inline-flex', 'important');
+            joinAudioBtn.style.setProperty('visibility', 'visible', 'important');
+            joinAudioBtn.style.setProperty('opacity', '1', 'important');
+            joinAudioBtn.style.setProperty('pointer-events', 'auto', 'important');
+            joinAudioBtn.classList.remove('hidden');
+            joinAudioBtn.removeAttribute('aria-hidden');
         }
+        
+        // Final verification - ensure only one button is visible
+        setTimeout(() => {
+            const joinVisible = joinAudioBtn.style.display !== 'none' && 
+                               !joinAudioBtn.classList.contains('hidden') &&
+                               joinAudioBtn.style.visibility !== 'hidden';
+            const muteVisible = muteBtn.style.display !== 'none' && 
+                               !muteBtn.classList.contains('hidden') &&
+                               muteBtn.style.visibility !== 'hidden';
+            
+            if (joinVisible && muteVisible) {
+                console.error('❌ BOTH buttons visible! Forcing join audio to hide...');
+                joinAudioBtn.style.setProperty('display', 'none', 'important');
+                joinAudioBtn.style.setProperty('visibility', 'hidden', 'important');
+                joinAudioBtn.classList.add('hidden');
+            }
+        }, 50);
         
         console.log('🔧 Audio controls updated:', {
             joinAudioDisplay: joinAudioBtn.style.display,
+            joinAudioVisibility: joinAudioBtn.style.visibility,
+            joinAudioHidden: joinAudioBtn.classList.contains('hidden'),
             muteDisplay: muteBtn.style.display,
+            muteVisibility: muteBtn.style.visibility,
+            muteHidden: muteBtn.classList.contains('hidden'),
             isAudioEnabled: this.isAudioEnabled,
             isMuted: this.isMuted
         });
 
         this.updateRoleUI();
+    }
+    
+    updateMuteButtonState(muteBtn) {
+        if (!muteBtn) return;
+        
+        if (this.isMuted) {
+            muteBtn.classList.add('muted');
+            muteBtn.setAttribute('aria-pressed', 'true');
+            muteBtn.setAttribute('aria-label', 'Unmute microphone');
+            muteBtn.setAttribute('title', 'Unmute microphone');
+        } else {
+            muteBtn.classList.remove('muted');
+            muteBtn.setAttribute('aria-pressed', 'false');
+            muteBtn.setAttribute('aria-label', 'Mute microphone');
+            muteBtn.setAttribute('title', 'Mute microphone');
+        }
     }
     
     async notifyMuteStatus(isMuted) {

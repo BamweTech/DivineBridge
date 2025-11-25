@@ -240,8 +240,38 @@
     
     /* Allow JavaScript to hide buttons */
     .header-actions .control-btn[style*="display: none"],
-    .header-actions .control-btn[style*="display:none"] {
+    .header-actions .control-btn[style*="display:none"],
+    .header-actions .control-btn.hidden {
         display: none !important;
+    }
+    
+    /* CRITICAL: Hide join audio button when mute button is visible (using data attribute) */
+    .header-actions .control-buttons[data-audio-enabled="true"] .join-audio-btn {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+    
+    /* CRITICAL: Hide mute button when join audio button should be visible */
+    .header-actions .control-buttons[data-audio-enabled="false"] .mute-btn {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+    
+    /* CRITICAL: Ensure hidden class always hides buttons */
+    .header-actions .join-audio-btn.hidden,
+    .header-actions .mute-btn.hidden {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        width: 0 !important;
+        height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }
     
     /* Hide text labels on very small screens, keep icons */
@@ -261,7 +291,30 @@
         background: #3b82f6 !important;
         color: #ffffff !important;
         border: none !important;
-        display: inline-flex !important; /* Allow JS to control visibility */
+        /* Don't force display - let JavaScript control visibility */
+    }
+    
+    /* CRITICAL: Ensure join audio button is hidden when mute button is shown */
+    .header-actions .control-btn.mute-btn[style*="display: flex"],
+    .header-actions .control-btn.mute-btn[style*="display:inline-flex"],
+    .header-actions .control-btn.mute-btn[style*="display: flex !important"],
+    .header-actions .control-btn.mute-btn[style*="display:inline-flex !important"] {
+        /* When mute button is visible, ensure join audio is hidden */
+    }
+    
+    /* When mute button is visible, hide join audio button */
+    .header-actions .control-buttons:has(.mute-btn[style*="display: flex"]),
+    .header-actions .control-buttons:has(.mute-btn[style*="display:inline-flex"]),
+    .header-actions .control-buttons:has(.mute-btn[style*="display: flex !important"]),
+    .header-actions .control-buttons:has(.mute-btn[style*="display:inline-flex !important"]) {
+        /* Hide join audio when mute is visible */
+    }
+    
+    .header-actions .control-buttons:has(.mute-btn[style*="display: flex"]) .join-audio-btn,
+    .header-actions .control-buttons:has(.mute-btn[style*="display:inline-flex"]) .join-audio-btn,
+    .header-actions .control-buttons:has(.mute-btn[style*="display: flex !important"]) .join-audio-btn,
+    .header-actions .control-buttons:has(.mute-btn[style*="display:inline-flex !important"]) .join-audio-btn {
+        display: none !important;
     }
     
     .header-actions .mute-btn,
@@ -529,26 +582,41 @@
     
     /* Muted indicator - more prominent styling */
     .mute-indicator {
-        background: rgba(239, 68, 68, 0.25) !important; /* Red background */
+        background: rgba(239, 68, 68, 0.3) !important; /* More visible red background */
         color: #dc2626 !important; /* Dark red text */
         font-weight: 700 !important; /* Bolder */
-        border: 1px solid rgba(239, 68, 68, 0.3) !important; /* Red border */
+        border: 1px solid rgba(239, 68, 68, 0.5) !important; /* More visible red border */
+        display: inline-block !important; /* Ensure it displays */
+        visibility: visible !important; /* Force visibility */
+        opacity: 1 !important; /* Full opacity */
+        padding: 4px 10px !important; /* Better padding */
+        font-size: 10px !important; /* Consistent size */
     }
     
     /* Muted participant card styling - visual indicator */
     .participant.muted {
-        opacity: 0.85 !important;
-        background: rgba(239, 68, 68, 0.08) !important; /* Light red background */
-        border-left: 3px solid #ef4444 !important; /* Red left border */
+        opacity: 0.9 !important; /* Slightly reduced but still visible */
+        background: rgba(239, 68, 68, 0.12) !important; /* More visible light red background */
+        border-left: 4px solid #ef4444 !important; /* Thicker red left border */
+        border-radius: 8px !important; /* Rounded corners */
     }
     
     .participant.muted .participant-avatar {
-        opacity: 0.7 !important;
-        filter: grayscale(30%) !important; /* Slight grayscale effect */
+        opacity: 0.75 !important;
+        filter: grayscale(40%) !important; /* More noticeable grayscale effect */
+        border: 2px solid rgba(239, 68, 68, 0.3) !important; /* Red border on avatar */
     }
     
     .participant.muted .participant-name {
         color: #64748b !important; /* Muted text color */
+        font-weight: 500 !important; /* Slightly lighter weight */
+    }
+    
+    /* Ensure muted badge is always visible when participant is muted */
+    .participant.muted .mute-indicator {
+        display: inline-block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
     }
     
     /* Host controls for participants - hidden by default */
