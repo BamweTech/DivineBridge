@@ -178,6 +178,11 @@ def get_prayers():
             if is_daily_prayer:
                 # Only include if it matches the client's local date
                 if prayer.get('date') == today:
+                    # Remove citations from prayer content
+                    if 'content' in prayer and prayer['content']:
+                        import re
+                        prayer['content'] = re.sub(r'\[\d+\]', '', prayer['content'])
+                        prayer['content'] = re.sub(r'\s+', ' ', prayer['content']).strip()
                     filtered_prayers.append(prayer)
                     logger.debug(f"Including daily prayer for date: {today}")
             else:

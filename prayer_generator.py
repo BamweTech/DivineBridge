@@ -121,11 +121,29 @@ VOICE & TONE:
 ❌ No repetitive phrases or clichés
 ❌ NO thinking process, explanations, or reasoning (PRAYER TEXT ONLY)
 ❌ No special characters or formatting
+❌ NO numbered citations or references like [1], [2], [3] - remove all citation numbers
+❌ NO numbered citations or references like [1], [2], [3] - remove all citation numbers
 
 LENGTH: 150-250 words (concise and focused)
 
 CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no commentary. Just the prayer as if you're speaking it aloud to lead a community in prayer."""
         
+    def _remove_citations(self, text):
+        """Remove numbered citations/references like [1], [2], [3], etc. from prayer text"""
+        if not text:
+            return text
+        
+        import re
+        # Remove numbered citations in brackets: [1], [2], [3], etc.
+        # Also handle variations like [1][2][3] (multiple consecutive)
+        text = re.sub(r'\[\d+\]', '', text)
+        
+        # Remove any extra spaces that might result from citation removal
+        text = re.sub(r'\s+', ' ', text)
+        text = text.strip()
+        
+        return text
+    
     def _fix_prayer_ending(self, response):
         """Try to fix common ending issues before validation"""
         if not response:
@@ -204,6 +222,12 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
             today = datetime.now().strftime('%Y-%m-%d')
             existing_prayer = self.storage.get_prayer(today)
             if existing_prayer:
+                # Clean citations from existing prayer before returning
+                if isinstance(existing_prayer, dict) and 'content' in existing_prayer:
+                    existing_prayer['content'] = self._remove_citations(existing_prayer['content'])
+                    logger.info(f"Cleaned citations from existing prayer for {today}")
+                elif isinstance(existing_prayer, str):
+                    existing_prayer = self._remove_citations(existing_prayer)
                 logger.info(f"Using existing prayer for {today}")
                 return existing_prayer
             
@@ -244,6 +268,9 @@ DO NOT use "In Jesus' name" or "In the name of Jesus" or any other variation."""
                         import re
                         response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL).strip()
 
+                    # Remove numbered citations/references like [1], [2], [3], etc.
+                    response = self._remove_citations(response)
+
                     # Try to fix common ending issues before validation
                     response = self._fix_prayer_ending(response)
 
@@ -270,6 +297,9 @@ DO NOT use "In Jesus' name" or "In the name of Jesus" or any other variation."""
                 # Remove everything from <think> to </think>
                 import re
                 response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+            
+            # Remove any citations that might have been added
+            response = self._remove_citations(response)
             
             # Find the start of the actual prayer
             if "Heavenly Father" in response:
@@ -343,6 +373,11 @@ DO NOT use "In Jesus' name" or "In the name of Jesus" or any other variation."""
             try:
                 prayer = self.storage.get_prayer(date)
                 if prayer:
+                    # Clean citations from existing prayer if present
+                    if isinstance(prayer, dict) and 'content' in prayer:
+                        prayer['content'] = self._remove_citations(prayer['content'])
+                    elif isinstance(prayer, str):
+                        prayer = self._remove_citations(prayer)
                     logger.info(f"Successfully retrieved prayer for {date}")
                     return prayer
             except Exception as e:
