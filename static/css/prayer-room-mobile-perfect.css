@@ -253,6 +253,14 @@
         pointer-events: none !important;
     }
     
+    /* CRITICAL: Show join audio button when audio is NOT enabled */
+    .header-actions .control-buttons[data-audio-enabled="false"] .join-audio-btn {
+        display: inline-flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+    
     /* CRITICAL: Hide mute button when join audio button should be visible */
     .header-actions .control-buttons[data-audio-enabled="false"] .mute-btn {
         display: none !important;
@@ -291,7 +299,18 @@
         background: #3b82f6 !important;
         color: #ffffff !important;
         border: none !important;
-        /* Don't force display - let JavaScript control visibility */
+        /* Default: visible unless explicitly hidden by JS or CSS */
+        display: inline-flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+    
+    /* Only hide if explicitly marked as hidden or when audio is enabled */
+    .header-actions .join-audio-btn:not(.hidden):not([aria-hidden="true"]) {
+        display: inline-flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
     }
     
     /* CRITICAL: Ensure join audio button is hidden when mute button is shown */
@@ -310,10 +329,21 @@
         /* Hide join audio when mute is visible */
     }
     
-    .header-actions .control-buttons:has(.mute-btn[style*="display: flex"]) .join-audio-btn,
-    .header-actions .control-buttons:has(.mute-btn[style*="display:inline-flex"]) .join-audio-btn,
-    .header-actions .control-buttons:has(.mute-btn[style*="display: flex !important"]) .join-audio-btn,
-    .header-actions .control-buttons:has(.mute-btn[style*="display:inline-flex !important"]) .join-audio-btn {
+    /* Only hide join audio when mute is visible AND audio is enabled (data attribute takes precedence) */
+    .header-actions .control-buttons[data-audio-enabled="false"]:has(.mute-btn[style*="display: flex"]) .join-audio-btn,
+    .header-actions .control-buttons[data-audio-enabled="false"]:has(.mute-btn[style*="display:inline-flex"]) .join-audio-btn,
+    .header-actions .control-buttons[data-audio-enabled="false"]:has(.mute-btn[style*="display: flex !important"]) .join-audio-btn,
+    .header-actions .control-buttons[data-audio-enabled="false"]:has(.mute-btn[style*="display:inline-flex !important"]) .join-audio-btn {
+        /* Don't hide - data-attribute says audio is disabled, so show join button */
+        display: inline-flex !important;
+        visibility: visible !important;
+    }
+    
+    /* Hide join audio when mute is visible AND audio is enabled */
+    .header-actions .control-buttons[data-audio-enabled="true"]:has(.mute-btn[style*="display: flex"]) .join-audio-btn,
+    .header-actions .control-buttons[data-audio-enabled="true"]:has(.mute-btn[style*="display:inline-flex"]) .join-audio-btn,
+    .header-actions .control-buttons[data-audio-enabled="true"]:has(.mute-btn[style*="display: flex !important"]) .join-audio-btn,
+    .header-actions .control-buttons[data-audio-enabled="true"]:has(.mute-btn[style*="display:inline-flex !important"]) .join-audio-btn {
         display: none !important;
     }
     
@@ -1127,24 +1157,20 @@
     
     /* ===== CHAT INPUT - FIXED ABOVE KEYBOARD (Teams-like) ===== */
     .chat-input-section {
+        /* Section wrapper - can be used for spacing or other purposes */
+        display: none !important; /* Hidden since container is now standalone */
+    }
+    
+    .chat-input-container {
         position: fixed !important;
         bottom: 56px !important; /* Attached directly to bottom tabs - no gap */
         left: 0 !important;
         right: 0 !important;
-        padding: 8px 12px max(8px, env(safe-area-inset-bottom)) 12px !important; /* Minimal padding, account for safe area */
-        margin: 0 !important;
-        margin-bottom: 0 !important; /* No bottom margin */
-        background: #ffffff !important;
-        border-top: 1px solid #e5e7eb !important;
-        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06) !important;
         z-index: 200 !important;
         transition: bottom 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
         pointer-events: auto !important;
         -webkit-transform: translateZ(0) !important;
         transform: translateZ(0) !important;
-        display: flex !important;
-        flex-direction: column !important;
-        /* Prevent scrolling */
         will-change: bottom !important;
     }
     
@@ -1156,13 +1182,16 @@
         position: relative !important;
         z-index: 1 !important;
         max-width: 100% !important;
-        padding: 0 !important;
+        padding: 8px 12px max(8px, env(safe-area-inset-bottom)) 12px !important; /* Match chat-input-section padding */
         margin: 0 !important;
         margin-bottom: 0 !important; /* No bottom margin to eliminate gap */
+        background: #ffffff !important;
+        border-top: 1px solid #e5e7eb !important;
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06) !important;
     }
     
     /* When keyboard is active - Input stays fixed above keyboard (Teams-like) */
-    body.chat-input-focused .chat-input-section {
+    body.chat-input-focused .chat-input-container {
         position: fixed !important;
         bottom: 0 !important; /* Fixed at bottom, directly above keyboard - minimal gap */
         z-index: 200 !important;
@@ -1224,8 +1253,8 @@
         overflow: hidden !important;
     }
     
-    /* Ensure input section stays fixed above keyboard - never scrolls */
-    body.chat-input-focused .chat-input-section {
+    /* Ensure input container stays fixed above keyboard - never scrolls */
+    body.chat-input-focused .chat-input-container {
         position: fixed !important;
         bottom: 0 !important;
         transform: translateZ(0) !important;
@@ -1234,7 +1263,7 @@
         will-change: bottom !important;
     }
     
-    /* Note: chat-input-section z-index is set above in the main rule */
+    /* Note: chat-input-container z-index is set above in the main rule */
     
     /* Send button - Icon only, Teams style - FIXED TOUCH TARGET */
     .chat-send-btn,
@@ -1630,11 +1659,31 @@
         font-size: 10px !important;
         font-weight: 700 !important;
         border-radius: 9px !important;
-        display: flex !important;
+        display: none !important; /* Hidden by default */
         align-items: center !important;
         justify-content: center !important;
         box-shadow: 0 2px 4px rgba(239, 68, 68, 0.4) !important;
         animation: badgePulse 2s infinite !important;
+        visibility: hidden !important; /* Hidden by default */
+    }
+    
+    /* Only show badge when it has content and is explicitly displayed */
+    .unread-badge[style*="display: flex"],
+    .unread-badge[style*="display:inline-flex"] {
+        display: flex !important;
+        visibility: visible !important;
+    }
+    
+    /* Hide badge completely when empty or hidden */
+    .unread-badge:empty,
+    .unread-badge[style*="display: none"] {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        height: 0 !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }
     
     @keyframes badgePulse {

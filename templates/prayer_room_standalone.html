@@ -1278,28 +1278,28 @@
                         </button>
                     </div>
                     <div class="chat-messages" id="chatMessages">
-                        <!-- Messages will be loaded here -->
+<!-- Messages will be loaded here -->
                     </div>
                     <div class="chat-input-section">
-                        <div class="chat-input-container">
-                            <button class="emoji-picker-btn" id="emojiPickerBtn" aria-label="Emoji picker" title="Add emoji">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
-                                    <line x1="9" y1="9" x2="9.01" y2="9"></line>
-                                    <line x1="15" y1="9" x2="15.01" y2="9"></line>
-                                </svg>
-                            </button>
-                            <textarea class="chat-input" id="chatInput" placeholder="Type a message... (use @ to mention)" rows="1" maxlength="1000"></textarea>
-                            <div class="chat-input-counter" id="chatInputCounter"></div>
-                            <div class="mention-autocomplete" id="mentionAutocomplete"></div>
-                            <button class="send-btn" id="sendBtn" aria-label="Send message" title="Send">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                                </svg>
-                            </button>
-                        </div>
+                    </div>
+                    <div class="chat-input-container">
+                        <button class="emoji-picker-btn" id="emojiPickerBtn" aria-label="Emoji picker" title="Add emoji">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                                <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                                <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                            </svg>
+                        </button>
+                        <textarea class="chat-input" id="chatInput" placeholder="Type a message... (use @ to mention)" rows="1" maxlength="1000"></textarea>
+                        <div class="chat-input-counter" id="chatInputCounter"></div>
+                        <div class="mention-autocomplete" id="mentionAutocomplete"></div>
+                        <button class="send-btn" id="sendBtn" aria-label="Send message" title="Send">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1929,6 +1929,17 @@
                 lastMessageCount: 0,
                 
                 init() {
+                    // Initialize badge state - ensure it's hidden on startup
+                    const unreadBadge = document.getElementById('unreadBadge');
+                    const chatTab = document.getElementById('chatTab');
+                    if (unreadBadge) {
+                        unreadBadge.style.display = 'none';
+                        unreadBadge.textContent = '';
+                    }
+                    if (chatTab) {
+                        chatTab.classList.remove('has-unread');
+                    }
+                    
                     this.setupTabs();
                     this.setupMarquee();
                     this.monitorChat();
@@ -1974,7 +1985,7 @@
                             // Adjust chat messages container height
                             if (chatMessages) {
                                 const headerHeight = document.querySelector('.prayer-room-header')?.offsetHeight || 56;
-                                const inputHeight = document.querySelector('.chat-input-section')?.offsetHeight || 60;
+                                const inputHeight = document.querySelector('.chat-input-container')?.offsetHeight || 60;
                                 const availableHeight = viewportHeight - headerHeight - inputHeight;
                                 
                                 chatMessages.style.maxHeight = `${availableHeight}px`;
@@ -2052,7 +2063,7 @@
                             // Update chat messages height dynamically
                             if (document.activeElement === chatInput && chatMessages) {
                                 const headerHeight = document.querySelector('.prayer-room-header')?.offsetHeight || 56;
-                                const inputHeight = document.querySelector('.chat-input-section')?.offsetHeight || 60;
+                                const inputHeight = document.querySelector('.chat-input-container')?.offsetHeight || 60;
                                 const availableHeight = currentHeight - headerHeight - inputHeight;
                                 
                                 chatMessages.style.maxHeight = `${availableHeight}px`;
@@ -2108,10 +2119,7 @@
                         
                         // Clear unread when opening chat
                         this.unreadCount = 0;
-                        if (unreadBadge) {
-                            unreadBadge.style.display = 'none';
-                        }
-                        chatTab?.classList.remove('has-unread');
+                        this.updateUnreadBadge();
                         
                         // Scroll chat to bottom
                         setTimeout(() => {
@@ -2126,20 +2134,28 @@
                 incrementUnread() {
                     if (this.currentTab !== 'chat') {
                         this.unreadCount++;
-                        const unreadBadge = document.getElementById('unreadBadge');
-                        const chatTab = document.getElementById('chatTab');
-                        
-                        // Only show badge if there are unread messages (more than 0)
-                        if (unreadBadge) {
-                            if (this.unreadCount > 0) {
-                                unreadBadge.textContent = this.unreadCount > 99 ? '99+' : String(this.unreadCount);
-                                unreadBadge.style.display = 'flex';
-                                chatTab?.classList.add('has-unread');
-                            } else {
-                                unreadBadge.textContent = ''; // Clear text
-                                unreadBadge.style.display = 'none';
-                                chatTab?.classList.remove('has-unread');
-                            }
+                        this.updateUnreadBadge();
+                    }
+                },
+                
+                updateUnreadBadge() {
+                    const unreadBadge = document.getElementById('unreadBadge');
+                    const chatTab = document.getElementById('chatTab');
+                    
+                    // CRITICAL: Only show badge when there are unread messages (count > 0)
+                    if (unreadBadge && chatTab) {
+                        if (this.unreadCount > 0) {
+                            // Show badge with count
+                            unreadBadge.textContent = this.unreadCount > 99 ? '99+' : String(this.unreadCount);
+                            unreadBadge.style.display = 'flex';
+                            unreadBadge.style.visibility = 'visible';
+                            chatTab.classList.add('has-unread');
+                        } else {
+                            // Hide badge completely when no unread messages
+                            unreadBadge.textContent = '';
+                            unreadBadge.style.display = 'none';
+                            unreadBadge.style.visibility = 'hidden';
+                            chatTab.classList.remove('has-unread');
                         }
                     }
                 },
@@ -2180,19 +2196,7 @@
                         }
                         
                         // Update badge visibility based on unread count (ensure it's hidden when 0)
-                        const unreadBadge = document.getElementById('unreadBadge');
-                        const chatTab = document.getElementById('chatTab');
-                        if (unreadBadge) {
-                            if (this.unreadCount > 0) {
-                                unreadBadge.textContent = this.unreadCount > 99 ? '99+' : String(this.unreadCount);
-                                unreadBadge.style.display = 'flex';
-                                chatTab?.classList.add('has-unread');
-                            } else {
-                                unreadBadge.textContent = ''; // Clear text
-                                unreadBadge.style.display = 'none';
-                                chatTab?.classList.remove('has-unread');
-                            }
-                        }
+                        this.updateUnreadBadge();
                         
                         this.lastMessageCount = currentCount;
                     }, 500);

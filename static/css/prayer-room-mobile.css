@@ -410,17 +410,10 @@
         }
     }
     
-    /* Tab with unread messages */
+    /* Tab with unread messages - only show red dot if badge is not visible */
+    /* The badge itself shows the count, so we don't need the red dot */
     .mobile-tab-btn.has-unread::after {
-        content: '';
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        width: 8px;
-        height: 8px;
-        background: #ef4444;
-        border-radius: 50%;
-        animation: dotPulse 2s infinite;
+        display: none !important; /* Disable red dot - use badge instead */
     }
     
     @keyframes dotPulse {

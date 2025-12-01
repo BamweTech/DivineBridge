@@ -490,20 +490,37 @@
         border-radius: 10px !important;
         font-size: 11px !important;
         font-weight: 700 !important;
-        display: flex !important;
+        display: none !important; /* Hidden by default */
         align-items: center !important;
         justify-content: center !important;
+        background: #ef4444 !important;
+        color: white !important;
+        animation: badgePulse 2s infinite !important;
+        visibility: hidden !important; /* Hidden by default */
+    }
+    
+    /* Only show badge when it has content and is explicitly displayed */
+    .unread-badge[style*="display: flex"],
+    .unread-badge[style*="display:inline-flex"] {
+        display: flex !important;
+        visibility: visible !important;
+    }
+    
+    /* Hide badge completely when empty or hidden */
+    .unread-badge:empty,
+    .unread-badge[style*="display: none"] {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        height: 0 !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }
     
     .participant-count-badge {
         background: #3b82f6 !important;
         color: white !important;
-    }
-    
-    .unread-badge {
-        background: #ef4444 !important;
-        color: white !important;
-        animation: badgePulse 2s infinite !important;
     }
     
     @keyframes badgePulse {

@@ -594,15 +594,15 @@ class PrayerRoomService {
                     const handleViewportResize = () => {
                         const viewport = window.visualViewport;
                         const chatMessages = document.getElementById('chatMessages');
-                        const chatInputSection = document.querySelector('.chat-input-section');
+                        const chatInputContainer = document.querySelector('.chat-input-container');
                         
-                        if (chatMessages && chatInputSection) {
+                        if (chatMessages && chatInputContainer) {
                             // Calculate keyboard height
                             const keyboardHeight = window.innerHeight - viewport.height;
                             
                             if (keyboardHeight > 0) {
                                 // Input stays fixed at bottom (directly above keyboard - minimal gap)
-                                const inputHeight = chatInputSection.offsetHeight || 60;
+                                const inputHeight = chatInputContainer.offsetHeight || 60;
                                 const headerOffset = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mobile-header-offset')) || 176;
                                 
                                 // Calculate available height for messages (viewport - header - input)
@@ -614,14 +614,14 @@ class PrayerRoomService {
                                 chatMessages.style.paddingBottom = `${inputHeight + 10}px`; // Reduced padding - closer to input
                                 
                                 // Ensure input stays fixed at bottom (directly above keyboard)
-                                chatInputSection.style.bottom = '0px';
-                                chatInputSection.style.position = 'fixed';
-                                chatInputSection.style.zIndex = '200';
+                                chatInputContainer.style.bottom = '0px';
+                                chatInputContainer.style.position = 'fixed';
+                                chatInputContainer.style.zIndex = '200';
                                 
                                 // Ensure input is always visible
-                                chatInputSection.style.visibility = 'visible';
-                                chatInputSection.style.opacity = '1';
-                                chatInputSection.style.display = 'flex';
+                                chatInputContainer.style.visibility = 'visible';
+                                chatInputContainer.style.opacity = '1';
+                                chatInputContainer.style.display = 'flex';
                                 
                                 // Scroll to bottom to show latest messages above typing bar
                                 setTimeout(() => {
@@ -1895,11 +1895,30 @@ class PrayerRoomService {
         }, duration);
     }
     
-    toggleMute() {
+    async toggleMute() {
         // Prevent multiple simultaneous mute operations
         if (this.muteStateSyncing) {
             console.log('🔇 Mute operation already in progress, ignoring click');
             return;
+        }
+        
+        // If audio is not enabled, enable it first (especially important for hosts)
+        if (!this.isAudioEnabled) {
+            console.log('🎤 Audio not enabled, enabling audio first...');
+            try {
+                await this.joinAudio();
+                // After joining audio, start unmuted so host can speak immediately
+                // The button will show as "unmuted" (mic icon) after audio is enabled
+                this.isMuted = false;
+                this.applyMuteStateToTracks(false);
+                await this.notifyMuteStatus(false);
+                this.updateAudioControls();
+                return;
+            } catch (error) {
+                console.error('Failed to enable audio:', error);
+                this.showToast('Failed to enable audio. Please try again.', 'error');
+                return;
+            }
         }
         
         // Clear any pending debounce timeout (for future debouncing if needed)
@@ -2005,20 +2024,15 @@ class PrayerRoomService {
             joinAudioBtn.classList.add('hidden');
             joinAudioBtn.setAttribute('aria-hidden', 'true');
             
-            // Hosts can mute/unmute, so show mute button if audio is enabled
-            if (this.isAudioEnabled) {
-                muteBtn.style.setProperty('display', 'flex', 'important');
-                muteBtn.style.setProperty('visibility', 'visible', 'important');
-                muteBtn.classList.remove('hidden');
-                muteBtn.removeAttribute('aria-hidden');
-            } else {
-                muteBtn.style.setProperty('display', 'none', 'important');
-                muteBtn.style.setProperty('visibility', 'hidden', 'important');
-                muteBtn.classList.add('hidden');
-                muteBtn.setAttribute('aria-hidden', 'true');
-            }
+            // Hosts should ALWAYS see the mute button - even when audio is not enabled
+            // This allows them to enable audio by clicking mute/unmute
+            // When audio is not enabled, clicking mute will enable audio first
+            muteBtn.style.setProperty('display', 'flex', 'important');
+            muteBtn.style.setProperty('visibility', 'visible', 'important');
+            muteBtn.classList.remove('hidden');
+            muteBtn.removeAttribute('aria-hidden');
             
-            // Update mute button state
+            // Update mute button state (will show appropriate icon/text)
             this.updateMuteButtonState(muteBtn);
             return;
         }
@@ -2095,6 +2109,15 @@ class PrayerRoomService {
     
     updateMuteButtonState(muteBtn) {
         if (!muteBtn) return;
+        
+        // If audio is not enabled, show button as "enable audio" state
+        if (!this.isAudioEnabled) {
+            muteBtn.classList.remove('muted');
+            muteBtn.setAttribute('aria-pressed', 'false');
+            muteBtn.setAttribute('aria-label', 'Enable audio');
+            muteBtn.setAttribute('title', 'Enable audio to speak');
+            return;
+        }
         
         if (this.isMuted) {
             muteBtn.classList.add('muted');
