@@ -1425,7 +1425,7 @@ class PrayerRoomService {
         });
     }
     
-    async joinAudio(retryAttempt = 0) {
+    async joinAudio(retryAttempt = 0, startUnmuted = false) {
         try {
             // Prevent multiple simultaneous join attempts (but allow retries)
             if (this.isRetryingAudio && retryAttempt === 0) {
@@ -1520,17 +1520,35 @@ class PrayerRoomService {
                 // If constraints fail, try with minimal constraints
                 if (constraintError.name === 'OverconstrainedError' || constraintError.name === 'ConstraintNotSatisfiedError') {
                     console.warn('⚠️ Advanced constraints not supported, falling back to basic constraints:', constraintError);
-                    constraints = {
-                        audio: {
-                            echoCancellation: true,
-                            noiseSuppression: true,
-                            autoGainControl: true
-                        },
-                        video: false
-                    };
-                    this.localStream = await getUserMediaFn(constraints);
+                    try {
+                        constraints = {
+                            audio: {
+                                echoCancellation: true,
+                                noiseSuppression: true,
+                                autoGainControl: true
+                            },
+                            video: false
+                        };
+                        this.localStream = await getUserMediaFn(constraints);
+                    } catch (basicError) {
+                        // If basic constraints also fail, try absolute minimal (for mobile)
+                        console.warn('⚠️ Basic constraints failed, trying minimal constraints for mobile:', basicError);
+                        constraints = {
+                            audio: true,  // Minimal constraint - just request audio
+                            video: false
+                        };
+                        this.localStream = await getUserMediaFn(constraints);
+                    }
+                } else if (constraintError.name === 'NotAllowedError' || constraintError.name === 'PermissionDeniedError') {
+                    // Permission denied - provide helpful error message
+                    console.error('❌ Microphone permission denied:', constraintError);
+                    throw new Error('Microphone permission denied. Please allow microphone access in your browser settings and try again.');
+                } else if (constraintError.name === 'NotFoundError' || constraintError.name === 'DevicesNotFoundError') {
+                    // No microphone found
+                    console.error('❌ No microphone found:', constraintError);
+                    throw new Error('No microphone found. Please connect a microphone and try again.');
                 } else {
-                    // Re-throw if it's not a constraint error
+                    // Re-throw other errors
                     throw constraintError;
                 }
             }
@@ -1564,7 +1582,13 @@ class PrayerRoomService {
             this.isAudioEnabled = true;
             
             // Initialize mute state from server (check if user was previously muted)
-            await this.initializeMuteStateFromServer();
+            // Unless we're explicitly starting unmuted (e.g., from toggleMute for hosts)
+            if (!startUnmuted) {
+                await this.initializeMuteStateFromServer();
+            } else {
+                console.log('🎤 Starting audio unmuted (requested by caller)');
+                this.isMuted = false;
+            }
             
             // Monitor local audio track for mute/unmute events
             const localTrack = audioTracks[0];
@@ -1906,17 +1930,76 @@ class PrayerRoomService {
         if (!this.isAudioEnabled) {
             console.log('🎤 Audio not enabled, enabling audio first...');
             try {
-                await this.joinAudio();
+                // Pass startUnmuted=true so host starts with microphone enabled
+                await this.joinAudio(0, true);
+                
+                // Wait for stream to be fully ready before applying mute state
+                let waitAttempts = 0;
+                while ((!this.localStream || !this.localStream.active || this.localStream.getAudioTracks().length === 0) && waitAttempts < 20) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    waitAttempts++;
+                }
+                
+                if (!this.localStream || !this.localStream.active) {
+                    throw new Error('Audio stream not ready after joining');
+                }
+                
+                const audioTracks = this.localStream.getAudioTracks();
+                if (audioTracks.length === 0) {
+                    throw new Error('No audio tracks available after joining');
+                }
+                
+                console.log('✅ Stream ready, enabling microphone...');
+                
                 // After joining audio, start unmuted so host can speak immediately
                 // The button will show as "unmuted" (mic icon) after audio is enabled
                 this.isMuted = false;
+                
+                // Apply mute state to tracks (ensure microphone is enabled)
                 this.applyMuteStateToTracks(false);
+                
+                // Verify the track is actually enabled
+                const track = audioTracks[0];
+                if (track && !track.enabled) {
+                    console.warn('⚠️ Track not enabled after applying state, forcing enable...');
+                    track.enabled = true;
+                }
+                
+                // Notify server of unmuted state
                 await this.notifyMuteStatus(false);
+                
+                // Update UI
                 this.updateAudioControls();
+                
+                console.log('✅ Audio enabled and unmuted successfully');
                 return;
             } catch (error) {
-                console.error('Failed to enable audio:', error);
-                this.showToast('Failed to enable audio. Please try again.', 'error');
+                console.error('❌ Failed to enable audio:', error);
+                console.error('Error details:', {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack,
+                    isAudioEnabled: this.isAudioEnabled,
+                    hasLocalStream: !!this.localStream,
+                    streamActive: this.localStream?.active
+                });
+                
+                // Reset state on failure
+                this.isAudioEnabled = false;
+                this.localStream = null;
+                this.updateAudioControls();
+                
+                // Provide specific error message based on error type
+                let errorMessage = 'Failed to enable audio. ';
+                if (error.message.includes('permission')) {
+                    errorMessage += 'Please allow microphone access in your browser settings.';
+                } else if (error.message.includes('microphone') || error.message.includes('device')) {
+                    errorMessage += 'Please check that your microphone is connected and try again.';
+                } else {
+                    errorMessage += 'Please try again or refresh the page.';
+                }
+                
+                this.showToast(errorMessage, 'error');
                 return;
             }
         }

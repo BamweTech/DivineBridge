@@ -1973,22 +1973,52 @@
                             chatPanel.classList.remove('mobile-hidden');
                         }
                         
-                        // Use Visual Viewport API for accurate keyboard height
+                        // Use Visual Viewport API for accurate keyboard height (Native mobile approach)
                         if (window.visualViewport) {
-                            const viewportHeight = window.visualViewport.height;
+                            const viewport = window.visualViewport;
+                            const viewportHeight = viewport.height;
                             const windowHeight = window.innerHeight;
                             const keyboardHeight = windowHeight - viewportHeight;
                             
                             // Set CSS variable for keyboard height
                             document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`);
+                            document.documentElement.style.setProperty('--viewport-height', `${viewportHeight}px`);
                             
-                            // Adjust chat messages container height
+                            // Calculate available space for messages (viewport - header - input)
+                            const headerHeight = document.querySelector('.prayer-room-header')?.offsetHeight || 56;
+                            const inputContainer = document.querySelector('.chat-input-container');
+                            const inputHeight = inputContainer?.offsetHeight || 60;
+                            const availableHeight = viewportHeight - headerHeight - inputHeight;
+                            
+                            // Adjust chat messages container to fill available space
                             if (chatMessages) {
-                                const headerHeight = document.querySelector('.prayer-room-header')?.offsetHeight || 56;
-                                const inputHeight = document.querySelector('.chat-input-container')?.offsetHeight || 60;
-                                const availableHeight = viewportHeight - headerHeight - inputHeight;
-                                
+                                chatMessages.style.height = `${availableHeight}px`;
                                 chatMessages.style.maxHeight = `${availableHeight}px`;
+                                chatMessages.style.paddingBottom = '8px'; // Minimal padding
+                            }
+                            
+                            // Position input container at bottom of viewport (above keyboard)
+                            if (inputContainer) {
+                                inputContainer.style.bottom = '0px';
+                                inputContainer.style.position = 'fixed';
+                                inputContainer.style.zIndex = '10000';
+                            }
+                            
+                            // Adjust chat panel to fill viewport
+                            if (chatPanel) {
+                                chatPanel.style.height = `${viewportHeight}px`;
+                                chatPanel.style.maxHeight = `${viewportHeight}px`;
+                                chatPanel.style.top = `${headerHeight}px`;
+                            }
+                        } else {
+                            // Fallback for browsers without Visual Viewport API
+                            const headerHeight = document.querySelector('.prayer-room-header')?.offsetHeight || 56;
+                            const inputHeight = document.querySelector('.chat-input-container')?.offsetHeight || 60;
+                            const estimatedKeyboardHeight = 300; // Estimate for mobile keyboards
+                            const availableHeight = window.innerHeight - headerHeight - inputHeight - estimatedKeyboardHeight;
+                            
+                            if (chatMessages) {
+                                chatMessages.style.maxHeight = `${Math.max(availableHeight, 200)}px`;
                             }
                         }
                         
@@ -2060,13 +2090,28 @@
                                 handleKeyboardHide();
                             }
                             
-                            // Update chat messages height dynamically
+                            // Update chat messages height dynamically as keyboard adjusts
                             if (document.activeElement === chatInput && chatMessages) {
                                 const headerHeight = document.querySelector('.prayer-room-header')?.offsetHeight || 56;
-                                const inputHeight = document.querySelector('.chat-input-container')?.offsetHeight || 60;
+                                const inputContainer = document.querySelector('.chat-input-container');
+                                const inputHeight = inputContainer?.offsetHeight || 60;
                                 const availableHeight = currentHeight - headerHeight - inputHeight;
                                 
+                                // Update messages container height
+                                chatMessages.style.height = `${availableHeight}px`;
                                 chatMessages.style.maxHeight = `${availableHeight}px`;
+                                
+                                // Update input container position
+                                if (inputContainer) {
+                                    inputContainer.style.bottom = '0px';
+                                }
+                                
+                                // Update chat panel height
+                                const chatPanel = document.getElementById('chatPanel');
+                                if (chatPanel) {
+                                    chatPanel.style.height = `${currentHeight}px`;
+                                    chatPanel.style.maxHeight = `${currentHeight}px`;
+                                }
                                 
                                 // Keep scrolling to bottom as keyboard adjusts
                                 requestAnimationFrame(() => {
