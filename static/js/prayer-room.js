@@ -1926,82 +1926,12 @@ class PrayerRoomService {
             return;
         }
         
-        // If audio is not enabled, enable it first (especially important for hosts)
+        // If audio is not enabled, user should use "Join Audio" button instead
+        // Don't auto-enable audio from mute button - this was causing issues
         if (!this.isAudioEnabled) {
-            console.log('🎤 Audio not enabled, enabling audio first...');
-            try {
-                // Pass startUnmuted=true so host starts with microphone enabled
-                await this.joinAudio(0, true);
-                
-                // Wait for stream to be fully ready before applying mute state
-                let waitAttempts = 0;
-                while ((!this.localStream || !this.localStream.active || this.localStream.getAudioTracks().length === 0) && waitAttempts < 20) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    waitAttempts++;
-                }
-                
-                if (!this.localStream || !this.localStream.active) {
-                    throw new Error('Audio stream not ready after joining');
-                }
-                
-                const audioTracks = this.localStream.getAudioTracks();
-                if (audioTracks.length === 0) {
-                    throw new Error('No audio tracks available after joining');
-                }
-                
-                console.log('✅ Stream ready, enabling microphone...');
-                
-                // After joining audio, start unmuted so host can speak immediately
-                // The button will show as "unmuted" (mic icon) after audio is enabled
-                this.isMuted = false;
-                
-                // Apply mute state to tracks (ensure microphone is enabled)
-                this.applyMuteStateToTracks(false);
-                
-                // Verify the track is actually enabled
-                const track = audioTracks[0];
-                if (track && !track.enabled) {
-                    console.warn('⚠️ Track not enabled after applying state, forcing enable...');
-                    track.enabled = true;
-                }
-                
-                // Notify server of unmuted state
-                await this.notifyMuteStatus(false);
-                
-                // Update UI
-                this.updateAudioControls();
-                
-                console.log('✅ Audio enabled and unmuted successfully');
-                return;
-            } catch (error) {
-                console.error('❌ Failed to enable audio:', error);
-                console.error('Error details:', {
-                    name: error.name,
-                    message: error.message,
-                    stack: error.stack,
-                    isAudioEnabled: this.isAudioEnabled,
-                    hasLocalStream: !!this.localStream,
-                    streamActive: this.localStream?.active
-                });
-                
-                // Reset state on failure
-                this.isAudioEnabled = false;
-                this.localStream = null;
-                this.updateAudioControls();
-                
-                // Provide specific error message based on error type
-                let errorMessage = 'Failed to enable audio. ';
-                if (error.message.includes('permission')) {
-                    errorMessage += 'Please allow microphone access in your browser settings.';
-                } else if (error.message.includes('microphone') || error.message.includes('device')) {
-                    errorMessage += 'Please check that your microphone is connected and try again.';
-                } else {
-                    errorMessage += 'Please try again or refresh the page.';
-                }
-                
-                this.showToast(errorMessage, 'error');
-                return;
-            }
+            console.log('🎤 Audio not enabled. Please use "Join Audio" button first.');
+            this.showToast('Please click "Join Audio" to enable your microphone first.', 'info');
+            return;
         }
         
         // Clear any pending debounce timeout (for future debouncing if needed)
@@ -2098,29 +2028,9 @@ class PrayerRoomService {
 
         // CRITICAL: Always ensure only one button is visible at a time
         // Use multiple methods to ensure hiding works
+        // Hosts now use the same flow as regular users - show Join Audio when not enabled
         
-        // Hosts should never see join audio button - they're always speakers
-        if (this.isHost) {
-            // Force hide join audio button for hosts (multiple methods)
-            joinAudioBtn.style.setProperty('display', 'none', 'important');
-            joinAudioBtn.style.setProperty('visibility', 'hidden', 'important');
-            joinAudioBtn.classList.add('hidden');
-            joinAudioBtn.setAttribute('aria-hidden', 'true');
-            
-            // Hosts should ALWAYS see the mute button - even when audio is not enabled
-            // This allows them to enable audio by clicking mute/unmute
-            // When audio is not enabled, clicking mute will enable audio first
-            muteBtn.style.setProperty('display', 'flex', 'important');
-            muteBtn.style.setProperty('visibility', 'visible', 'important');
-            muteBtn.classList.remove('hidden');
-            muteBtn.removeAttribute('aria-hidden');
-            
-            // Update mute button state (will show appropriate icon/text)
-            this.updateMuteButtonState(muteBtn);
-            return;
-        }
-
-        // If audio is enabled (microphone is active), show mute button regardless of role
+        // If audio is enabled (microphone is active), show mute button regardless of role (including hosts)
         if (this.isAudioEnabled) {
             // CRITICAL: Hide join audio button using MULTIPLE methods
             joinAudioBtn.style.setProperty('display', 'none', 'important');
@@ -2150,7 +2060,7 @@ class PrayerRoomService {
             muteBtn.classList.add('hidden');
             muteBtn.setAttribute('aria-hidden', 'true');
             
-            // Show join button for all non-hosts
+            // Show join button for all users (including hosts)
             joinAudioBtn.style.setProperty('display', 'inline-flex', 'important');
             joinAudioBtn.style.setProperty('visibility', 'visible', 'important');
             joinAudioBtn.style.setProperty('opacity', '1', 'important');
@@ -2193,14 +2103,9 @@ class PrayerRoomService {
     updateMuteButtonState(muteBtn) {
         if (!muteBtn) return;
         
-        // If audio is not enabled, show button as "enable audio" state
-        if (!this.isAudioEnabled) {
-            muteBtn.classList.remove('muted');
-            muteBtn.setAttribute('aria-pressed', 'false');
-            muteBtn.setAttribute('aria-label', 'Enable audio');
-            muteBtn.setAttribute('title', 'Enable audio to speak');
-            return;
-        }
+        // Mute button should only be visible when audio is enabled
+        // If audio is not enabled, this function shouldn't be called
+        // (Join Audio button should be shown instead)
         
         if (this.isMuted) {
             muteBtn.classList.add('muted');
@@ -6415,18 +6320,17 @@ Listening for unmute event...`);
         const muteBtn = document.getElementById('muteBtn');
         const joinText = joinAudioBtn ? joinAudioBtn.querySelector('.join-text') : null;
 
-        // Hosts should never see request/join audio buttons - they're always speakers
+        // Hosts can now use the same audio controls as regular users
+        // They'll see "Join Audio" when audio is not enabled, just like other participants
+        // Only hide the "Request to Speak" button for hosts (they don't need to request)
         if (this.isHost) {
             if (requestBtn) {
                 requestBtn.style.display = 'none';
             }
-            if (joinAudioBtn) {
-                joinAudioBtn.style.display = 'none';
-            }
             if (requestStatus) {
-                requestStatus.textContent = 'You are the host. You can speak at any time.';
+                requestStatus.textContent = 'You are the host. Click "Join Audio" to enable your microphone.';
             }
-            return; // Early return for hosts
+            // Don't return early - let hosts use the same audio flow as regular users
         }
 
         if (requestBtn) {
