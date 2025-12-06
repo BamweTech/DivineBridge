@@ -412,22 +412,47 @@
                 displayName: `${firstName} ${lastName}`
             });
             
-            // Get the ID token
-            const idToken = await user.getIdToken();
+            // Small delay to ensure user is fully created in Firebase
+            await new Promise(resolve => setTimeout(resolve, 500));
             
-            // Send token to server
-            const response = await fetch('/api/auth/signup', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'include',
-                body: JSON.stringify({
-                    idToken: idToken,
-                    firstName: firstName,
-                    lastName: lastName
-                })
-            });
+            // Force refresh the token to ensure it's valid
+            // This is important because the token might not be immediately available after user creation
+            let idToken = await user.getIdToken(true); // Force refresh and get token
+            
+            // Retry logic for token verification (sometimes token needs a moment to be valid)
+            let response;
+            let retries = 2;
+            let success = false;
+            
+            while (retries > 0 && !success) {
+                // Use login endpoint with signup flag - this handles new user creation in Firestore
+                // The login endpoint already handles OAuth signups, so we'll use the same pattern
+                response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        idToken: idToken,
+                        isOAuthSignup: true, // Flag to create Firestore profile if doesn't exist
+                        firstName: firstName,
+                        lastName: lastName
+                    })
+                });
+                
+                if (response.ok) {
+                    success = true;
+                } else if (response.status === 401 && retries > 1) {
+                    // Token might not be ready yet, wait and refresh
+                    console.log('Token verification failed, retrying after delay...');
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    idToken = await user.getIdToken(true); // Refresh token
+                    retries--;
+                } else {
+                    retries = 0; // Stop retrying
+                }
+            }
             
             if (response.ok) {
                 showSuccess('Account created successfully! Redirecting...');
@@ -436,7 +461,7 @@
                 }, 1000);
             } else {
                 const data = await response.json();
-                showError(data.error || 'Registration failed');
+                showError(data.error || 'Registration failed. Please try signing in.');
             }
         } catch (error) {
             console.error('Registration error:', error);

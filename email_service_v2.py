@@ -329,6 +329,137 @@ To unsubscribe: https://divinebridge.io/unsubscribe?email={recipient_email}
 """
 
 
+    def send_new_user_notification(self, admin_email, user_name, user_email, user_id, signup_date, auth_provider='email'):
+        """
+        Send notification email to admin when a new user signs up
+        
+        Args:
+            admin_email: Admin email address to notify
+            user_name: Full name of the new user
+            user_email: Email of the new user
+            user_id: Firebase user ID
+            signup_date: Signup date/time string
+            auth_provider: Authentication provider (email, google, etc.)
+        
+        Returns:
+            bool: True if sent successfully
+        """
+        try:
+            # Create message
+            msg = MIMEMultipart('alternative')
+            msg['From'] = formataddr(("Divine Bridge", self.sender_email))
+            msg['To'] = admin_email
+            msg['Subject'] = f'New User Signup: {user_name}'
+            
+            # Plain text version
+            plain_text = f"""
+New User Signup - Divine Bridge
+
+A new user has signed up for Divine Bridge.
+
+Name: {user_name}
+Auth Provider: {auth_provider}
+Signup Date: {signup_date}
+
+This is an automated notification from Divine Bridge.
+"""
+            
+            # HTML version
+            html_body = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }}
+        .container {{
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }}
+        h2 {{
+            color: #1f3c88;
+            margin-top: 0;
+        }}
+        .info-box {{
+            background: #f8f9fa;
+            border-left: 4px solid #0f56ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }}
+        .info-row {{
+            margin: 10px 0;
+        }}
+        .label {{
+            font-weight: 600;
+            color: #333;
+        }}
+        .value {{
+            color: #666;
+        }}
+        .footer {{
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 12px;
+            color: #999;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>New User Signup - Divine Bridge</h2>
+        <p>A new user has signed up for Divine Bridge.</p>
+        
+        <div class="info-box">
+            <div class="info-row">
+                <span class="label">Name:</span> <span class="value">{user_name}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Auth Provider:</span> <span class="value">{auth_provider}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Signup Date:</span> <span class="value">{signup_date}</span>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>This is an automated notification from Divine Bridge.</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+            
+            # Attach both versions
+            msg.attach(MIMEText(plain_text, 'plain', 'utf-8'))
+            msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+            
+            # Send email
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                server.starttls()
+                server.login(self.sender_email, self.sender_password)
+                server.send_message(msg)
+            
+            logger.info(f"New user notification email sent to {admin_email} for user: {user_email}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error sending new user notification email: {e}")
+            return False
+
+
 # Singleton instance
 _email_service = None
 

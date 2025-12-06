@@ -153,7 +153,9 @@ def verify_token(id_token):
             logger.info("Attempting to verify token with Firebase...")
             
             try:
-                decoded_token = auth.verify_id_token(id_token)
+                # Allow clock skew of up to 5 seconds to handle timing differences
+                # This is important for newly created tokens that might be slightly ahead of server time
+                decoded_token = auth.verify_id_token(id_token, clock_skew_seconds=5)
                 logger.info(f"Token verified successfully for user: {decoded_token.get('uid')}")
                 logger.info(f"Decoded token claims: {decoded_token}")
                 logger.info(f"Token expiration: {decoded_token.get('exp')}")
@@ -161,11 +163,25 @@ def verify_token(id_token):
                 logger.info(f"Token issuer: {decoded_token.get('iss')}")
                 return decoded_token
             except auth.InvalidIdTokenError as e:
-                logger.error(f"Invalid ID token: {str(e)}")
-                logger.error(f"Error type: {type(e)}")
-                logger.error(f"Error args: {e.args}")
-                logger.error(f"Error traceback: {traceback.format_exc()}")
-                return None
+                error_str = str(e)
+                # Check if it's a clock skew issue
+                if "too early" in error_str.lower() or "clock" in error_str.lower():
+                    logger.warning(f"Token clock skew detected: {error_str}")
+                    logger.warning("Retrying with increased clock skew tolerance...")
+                    try:
+                        # Retry with larger clock skew tolerance (10 seconds)
+                        decoded_token = auth.verify_id_token(id_token, clock_skew_seconds=10)
+                        logger.info(f"Token verified successfully on retry for user: {decoded_token.get('uid')}")
+                        return decoded_token
+                    except Exception as retry_error:
+                        logger.error(f"Token verification failed on retry: {retry_error}")
+                        return None
+                else:
+                    logger.error(f"Invalid ID token: {error_str}")
+                    logger.error(f"Error type: {type(e)}")
+                    logger.error(f"Error args: {e.args}")
+                    logger.error(f"Error traceback: {traceback.format_exc()}")
+                    return None
             except auth.ExpiredIdTokenError as e:
                 logger.error(f"Expired ID token: {str(e)}")
                 logger.error(f"Error type: {type(e)}")

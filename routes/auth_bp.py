@@ -77,11 +77,14 @@ def login():
                 return jsonify({'error': 'Invalid token format'}), 400
                 
             logger.info("Token format validation passed")
+            logger.info(f"Token length: {len(id_token)}, Token preview: {id_token[:50]}...")
+            
             decoded_token = verify_token(id_token)
             
             if not decoded_token:
-                logger.warning("Token verification failed - no decoded token returned")
-                return jsonify({'error': 'Invalid token'}), 401
+                logger.warning(f"Token verification failed - token preview: {id_token[:50] if id_token else 'None'}...")
+                logger.warning("This might be due to token not being ready yet after user creation")
+                return jsonify({'error': 'Token verification failed. Please try signing in again.'}), 401
                 
             logger.info(f"Token verified successfully. Decoded token: {decoded_token}")
             
@@ -97,7 +100,7 @@ def login():
             logger.info("Clearing existing session data...")
             session.clear()  # Clear any existing session data
             
-            # Check if this is an OAuth signup (create Firestore profile if needed)
+            # Check if this is an OAuth signup or email/password signup (create Firestore profile if needed)
             is_oauth_signup = data.get('isOAuthSignup', False)
             if is_oauth_signup and user:
                 try:
@@ -107,13 +110,24 @@ def login():
                     
                     # Check if profile exists
                     if not user_ref.get().exists:
-                        # Parse display name for first/last name
-                        display_name = user.display_name or user.email.split('@')[0]
-                        name_parts = display_name.split(' ', 1)
-                        first_name = name_parts[0] if name_parts else 'User'
-                        last_name = name_parts[1] if len(name_parts) > 1 else ''
+                        # Get first/last name from request data if provided (email/password signup)
+                        # Otherwise parse from display name (OAuth signup)
+                        first_name = data.get('firstName')
+                        last_name = data.get('lastName')
                         
-                        # Create Firestore profile for OAuth user
+                        if not first_name or not last_name:
+                            # Parse display name for first/last name (OAuth flow)
+                            display_name = user.display_name or user.email.split('@')[0]
+                            name_parts = display_name.split(' ', 1)
+                            first_name = name_parts[0] if name_parts else 'User'
+                            last_name = name_parts[1] if len(name_parts) > 1 else ''
+                        else:
+                            # Sanitize the provided names
+                            first_name = sanitize_string(first_name, max_length=50)
+                            last_name = sanitize_string(last_name, max_length=50)
+                        
+                        # Create Firestore profile for new user
+                        auth_provider = 'google' if 'google' in str(user.provider_data).lower() else 'email'
                         user_ref.set({
                             'email': user.email,
                             'firstName': first_name,
@@ -122,9 +136,33 @@ def login():
                             'timezone': 'America/New_York',
                             'createdAt': firestore.SERVER_TIMESTAMP,
                             'emailVerified': user.email_verified,
-                            'authProvider': 'google'
+                            'authProvider': auth_provider
                         })
-                        logger.info(f"Created Firestore profile for OAuth user: {user.uid}")
+                        logger.info(f"Created Firestore profile for user: {user.uid} (provider: {auth_provider})")
+                        
+                        # Send notification email to admin about new user signup
+                        try:
+                            from email_service_v2 import get_email_service
+                            signup_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
+                            user_name = f"{first_name} {last_name}"
+                            
+                            email_service = get_email_service()
+                            success = email_service.send_new_user_notification(
+                                admin_email='jeancalmere.kubwayo@divinebridge.io',
+                                user_name=user_name,
+                                user_email=user.email,
+                                user_id=user.uid,
+                                signup_date=signup_date,
+                                auth_provider=auth_provider
+                            )
+                            
+                            if success:
+                                logger.info(f"Sent new user notification email for: {user.email}")
+                            else:
+                                logger.warning(f"Failed to send new user notification email for: {user.email}")
+                        except Exception as e:
+                            logger.error(f"Error sending new user notification email: {e}")
+                            # Don't fail signup if email notification fails
                 except Exception as e:
                     logger.error(f"Error creating OAuth Firestore profile: {e}")
             
@@ -198,48 +236,112 @@ def login():
 @auth_bp.route('/signup', methods=['POST'])
 @limiter.limit("5 per hour")
 @limiter.limit("20 per day")
-@validate_request('signup')
 def signup():
     try:
         data = request.get_json()
-        email = sanitize_string(data.get('email'), max_length=255)
-        password = data.get('password')
-        first_name = sanitize_string(data.get('firstName'), max_length=50)
-        last_name = sanitize_string(data.get('lastName'), max_length=50)
+        id_token = data.get('idToken')
         
-        # Additional password strength validation
-        is_strong, error_msg = validate_password_strength(password)
-        if not is_strong:
-            return jsonify({'error': error_msg}), 400
-        
-        if not all([email, password, first_name, last_name]):
-            return jsonify({'error': 'Missing required fields'}), 400
+        # Handle case where user is already created in Firebase Auth (frontend flow)
+        if id_token:
+            # Ensure Firebase is initialized
+            if not initialize_firebase():
+                logger.error("Firebase not initialized, cannot verify token")
+                return jsonify({'error': 'Authentication service unavailable'}), 503
             
-        # Create user in Firebase
-        user = create_user(email, password, first_name, last_name)
-        if not user:
-            # Check if the error was due to the user already existing
+            # Verify the token to get user info
             try:
-                auth.get_user_by_email(email)
-                return jsonify({'error': 'A user with this email already exists.'}), 400
-            except auth.UserNotFoundError:
-                return jsonify({'error': 'Failed to create user'}), 500
+                decoded_token = verify_token(id_token)
+                if not decoded_token:
+                    logger.warning(f"Token verification failed for signup attempt - token: {id_token[:20] if id_token else 'None'}...")
+                    return jsonify({'error': 'Invalid or expired token. Please try signing up again.'}), 401
+            except Exception as e:
+                logger.error(f"Error during token verification in signup: {e}")
+                return jsonify({'error': 'Token verification failed. Please try again.'}), 401
+            
+            # Get user from Firebase
+            try:
+                user = auth.get_user(decoded_token['uid'])
+                email = user.email
+                first_name = sanitize_string(data.get('firstName'), max_length=50)
+                last_name = sanitize_string(data.get('lastName'), max_length=50)
+                
+                if not all([email, first_name, last_name]):
+                    logger.warning(f"Missing required fields for signup - email: {email}, firstName: {first_name}, lastName: {last_name}")
+                    return jsonify({'error': 'Missing required fields'}), 400
+            except Exception as e:
+                logger.error(f"Error getting user from Firebase: {e}")
+                return jsonify({'error': 'Failed to retrieve user information. Please try again.'}), 500
+        else:
+            # Legacy flow: create user with email/password
+            email = sanitize_string(data.get('email'), max_length=255)
+            password = data.get('password')
+            first_name = sanitize_string(data.get('firstName'), max_length=50)
+            last_name = sanitize_string(data.get('lastName'), max_length=50)
+            
+            # Additional password strength validation
+            is_strong, error_msg = validate_password_strength(password)
+            if not is_strong:
+                return jsonify({'error': error_msg}), 400
+            
+            if not all([email, password, first_name, last_name]):
+                return jsonify({'error': 'Missing required fields'}), 400
+                
+            # Create user in Firebase
+            user = create_user(email, password, first_name, last_name)
+            if not user:
+                # Check if the error was due to the user already existing
+                try:
+                    auth.get_user_by_email(email)
+                    return jsonify({'error': 'A user with this email already exists.'}), 400
+                except auth.UserNotFoundError:
+                    return jsonify({'error': 'Failed to create user'}), 500
         
         # Create user profile in Firestore with email subscription enabled by default
         try:
             from firebase_admin import firestore
             db = firestore.client()
             user_ref = db.collection('users').document(user.uid)
-            user_ref.set({
-                'email': email,
-                'firstName': first_name,
-                'lastName': last_name,
-                'email_subscribed': True,  # Subscribe to daily emails by default
-                'timezone': 'America/New_York',  # Default timezone
-                'createdAt': firestore.SERVER_TIMESTAMP,
-                'emailVerified': False
-            })
-            logger.info(f"Created Firestore profile for user: {user.uid}")
+            
+            # Check if profile already exists
+            is_new_user = not user_ref.get().exists
+            if is_new_user:
+                user_ref.set({
+                    'email': email,
+                    'firstName': first_name,
+                    'lastName': last_name,
+                    'email_subscribed': True,  # Subscribe to daily emails by default
+                    'timezone': 'America/New_York',  # Default timezone
+                    'createdAt': firestore.SERVER_TIMESTAMP,
+                    'emailVerified': user.email_verified if hasattr(user, 'email_verified') else False
+                })
+                logger.info(f"Created Firestore profile for user: {user.uid}")
+            else:
+                logger.info(f"Firestore profile already exists for user: {user.uid}, skipping creation")
+            
+            # Send notification email to admin about new user signup (only for new users)
+            if is_new_user:
+                try:
+                    from email_service_v2 import get_email_service
+                    signup_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
+                    user_name = f"{first_name} {last_name}"
+                    
+                    email_service = get_email_service()
+                    success = email_service.send_new_user_notification(
+                        admin_email='jeancalmere.kubwayo@divinebridge.io',
+                        user_name=user_name,
+                        user_email=email,
+                        user_id=user.uid,
+                        signup_date=signup_date,
+                        auth_provider='email'
+                    )
+                    
+                    if success:
+                        logger.info(f"Sent new user notification email for: {email}")
+                    else:
+                        logger.warning(f"Failed to send new user notification email for: {email}")
+                except Exception as e:
+                    logger.error(f"Error sending new user notification email: {e}")
+                    # Don't fail signup if email notification fails
         except Exception as e:
             logger.error(f"Error creating Firestore profile: {e}")
             # Don't fail signup if Firestore write fails
