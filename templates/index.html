@@ -1101,7 +1101,19 @@
             }
             
             if (dailyPrayer) {
-                contentEl.textContent = dailyPrayer.content;
+                // Display prayer - convert newlines to <br> for better mobile compatibility
+                // Escape HTML first to prevent XSS, then convert newlines to breaks
+                const escapedContent = dailyPrayer.content
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+                // Convert double newlines to paragraph breaks, single newlines to line breaks
+                const formattedContent = escapedContent
+                    .replace(/\n\n/g, '<br><br>')
+                    .replace(/\n/g, '<br>');
+                contentEl.innerHTML = formattedContent;
                 
                 // Use user's current local date (not backend UTC timestamp)
                 // This ensures the date always matches the user's timezone

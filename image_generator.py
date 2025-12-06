@@ -9,6 +9,7 @@ from io import BytesIO
 import textwrap
 import os
 import tempfile
+import re
 # Removed selenium imports - using pure PIL approach
 
 logger = logging.getLogger(__name__)
@@ -449,9 +450,9 @@ class ImageGenerator:
         # 7. Call to action footer with recommended spacing
         # Three-line inspiring message (manually formatted, center-justified)
         cta_lines = [
-            "Join thousands of",
-            "believers in a unified mission",
-            "of faith, hope, and spiritual growth."
+            "Join a global mission",
+            "of prayer, unity,",
+            "and spiritual growth."
         ]
         
         # Draw each line of the CTA (center-justified)
@@ -923,15 +924,44 @@ class ImageGenerator:
         max_width = (self.prayer_width - 160) * scale  # Increased margins (80px each side)
         
         # Separate the closing line from the main prayer text
-        closing_phrase = "In Jesus-Christ's name we pray. Amen!"
-        
-        # Remove the closing from the prayer text if present (with or without exclamation mark)
+        # Check for various forms of the closing phrase and remove them
         prayer_body = prayer_text
-        if closing_phrase in prayer_text:
-            prayer_body = prayer_text.replace(closing_phrase, '').strip()
-        elif "In Jesus-Christ's name we pray. Amen" in prayer_text:
-            # Handle case without exclamation mark
-            prayer_body = prayer_text.replace("In Jesus-Christ's name we pray. Amen", '').strip()
+        
+        # List of possible closing phrase variations (case-insensitive matching)
+        closing_phrases = [
+            "In Jesus-Christ's name we pray. Amen!",
+            "In Jesus-Christ's name we pray. Amen",
+            "In Jesus's Name we Pray",
+            "In Jesus's Name we Pray.",
+            "In Jesus's Name we Pray. Amen",
+            "In Jesus's Name we Pray. Amen!",
+            "In Jesus' name we pray",
+            "In Jesus' name we pray.",
+            "In Jesus' name we pray. Amen",
+            "In Jesus' name we pray. Amen!",
+            "In the name of Jesus we pray",
+            "In the name of Jesus we pray.",
+            "In the name of Jesus we pray. Amen",
+            "In the name of Jesus we pray. Amen!",
+        ]
+        
+        # Remove any matching closing phrase (case-insensitive)
+        for phrase in closing_phrases:
+            # Create case-insensitive regex pattern
+            pattern = re.escape(phrase)
+            # Match at end of string or before whitespace/newlines
+            pattern = r'(?i)' + pattern + r'(?:\s*\.?\s*)?$'
+            if re.search(pattern, prayer_body):
+                prayer_body = re.sub(pattern, '', prayer_body, flags=re.IGNORECASE).strip()
+                logger.info(f"Removed closing phrase variation: {phrase}")
+                break
+        
+        # Also check if the prayer ends with any variation (more flexible matching)
+        # Look for patterns like "In Jesus[any punctuation]s[any punctuation] name we pray"
+        flexible_pattern = r'(?i)In\s+Jesus[\'\-]?s[\'\-]?\s+[Nn]ame\s+we\s+[Pp]ray.*?\.?\s*(?:Amen!?)?\s*$'
+        if re.search(flexible_pattern, prayer_body):
+            prayer_body = re.sub(flexible_pattern, '', prayer_body, flags=re.IGNORECASE).strip()
+            logger.info("Removed closing phrase using flexible pattern matching")
         
         # Split into paragraphs and wrap text
         paragraphs = prayer_body.split('\n\n')
@@ -955,8 +985,10 @@ class ImageGenerator:
         current_y += 20 * scale
         
         # 5b. Prayer closing line (bold, centered, on its own line)
+        # Use standard closing phrase for image
+        standard_closing = "In Jesus's Name we Pray"
         font_closing = font_sans(22 * scale, bold=True)  # Slightly larger and bold
-        draw.text((render_width/2, current_y), closing_phrase, font=font_closing,
+        draw.text((render_width/2, current_y), standard_closing, font=font_closing,
                  fill=dark_blue, anchor="mm")
         current_y += 60 * scale  # Spacing after closing
         
@@ -974,9 +1006,9 @@ class ImageGenerator:
         # 8. Call to action footer (three lines, center-justified)
         
         cta_lines = [
-            "Join thousands of",
-            "believers in a unified mission",
-            "of faith, hope, and spiritual growth."
+            "Join a global mission",
+            "of prayer, unity,",
+            "and spiritual growth."
         ]
         
         # Draw each line of the CTA

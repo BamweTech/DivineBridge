@@ -124,7 +124,7 @@ VOICE & TONE:
 ❌ NO numbered citations or references like [1], [2], [3] - remove all citation numbers
 ❌ NO numbered citations or references like [1], [2], [3] - remove all citation numbers
 
-LENGTH: 150-250 words (concise and focused)
+LENGTH: 150-200 words (concise and focused)
 
 CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no commentary. Just the prayer as if you're speaking it aloud to lead a community in prayer."""
         
@@ -139,7 +139,8 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
         text = re.sub(r'\[\d+\]', '', text)
         
         # Remove any extra spaces that might result from citation removal
-        text = re.sub(r'\s+', ' ', text)
+        # BUT preserve newlines (paragraph breaks) - only normalize spaces and tabs
+        text = re.sub(r'[ \t]+', ' ', text)  # Only replace spaces and tabs, not newlines
         text = text.strip()
         
         return text
@@ -197,12 +198,12 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
             logger.error(f"Prayer must end with '{required_ending}[!]'. Actual end: {response_clean[-150:]}")
             raise ValueError(f"Prayer must end with '{required_ending}!'")
         
-        # Check word count (150-250 words as specified, with flexibility)
+        # Check word count (150-200 words as specified, with small flexibility)
         word_count = len(response_clean.split())
-        if word_count < 140:  # Allow slight flexibility (140-270)
+        if word_count < 140:  # Allow slight flexibility (140-205)
             raise ValueError(f"Prayer too short: {word_count} words (minimum 140)")
-        if word_count > 270:
-            raise ValueError(f"Prayer too long: {word_count} words (maximum 270)")
+        if word_count > 205:
+            raise ValueError(f"Prayer too long: {word_count} words (maximum 200)")
         
         logger.info(f"Prayer validation passed: {word_count} words")
         return response
@@ -249,7 +250,7 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
 CRITICAL REQUIREMENTS (DO NOT IGNORE):
 1. START with "Heavenly Father" (not "Dear Heavenly Father")
 2. END with EXACTLY "In Jesus-Christ's name we pray. Amen!" - NO VARIATIONS, NO CHANGES
-3. LENGTH: 150-250 words (count carefully - be concise!)
+3. LENGTH: 150-200 words (count carefully - be concise!)
 4. NO <think> tags or explanations
 5. NO text after "Amen!" - stop immediately after those words
 

@@ -250,8 +250,19 @@
                 );
                 
                 if (dailyPrayer) {
-                    // Display prayer
-                    prayerText.textContent = dailyPrayer.content;
+                    // Display prayer - convert newlines to <br> for better mobile compatibility
+                    // Escape HTML first to prevent XSS, then convert newlines to breaks
+                    const escapedContent = dailyPrayer.content
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/'/g, '&#039;');
+                    // Convert double newlines to paragraph breaks, single newlines to line breaks
+                    const formattedContent = escapedContent
+                        .replace(/\n\n/g, '<br><br>')
+                        .replace(/\n/g, '<br>');
+                    prayerText.innerHTML = formattedContent;
                     
                     const date = new Date(dailyPrayer.created_at);
                     prayerDate.textContent = date.toLocaleDateString('en-US', {
