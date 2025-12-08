@@ -468,13 +468,24 @@
     }
 
     .business-card-website {
-        text-align: center;
+        position: absolute;
+        bottom: 1rem;
+        left: 1rem;
         color: var(--blue);
         font-size: 0.9rem;
-        margin-top: 1rem;
         font-weight: 500;
     }
 
+    .business-card-website a {
+        color: var(--blue);
+        text-decoration: none;
+        transition: opacity 0.3s ease;
+    }
+
+    .business-card-website a:hover {
+        opacity: 0.8;
+        text-decoration: underline;
+    }
 
     @media (max-width: 768px) {
         .business-card {
@@ -485,6 +496,12 @@
             position: static;
             text-align: center;
             max-width: 100%;
+            margin-top: 1rem;
+        }
+
+        .business-card-website {
+            position: static;
+            text-align: center;
             margin-top: 1rem;
         }
     }
@@ -1442,7 +1459,7 @@
                     ${phone ? `<div class="business-card-contact-item">📱 <a href="tel:${phone}">${escapeHtml(phone)}</a></div>` : ''}
                     ${linkedin ? `<div class="business-card-contact-item">💼 <a href="${linkedin}" target="_blank" rel="noopener">My LinkedIn</a></div>` : ''}
                 </div>
-                <div class="business-card-website">divinebridge.io</div>
+                <div class="business-card-website"><a href="https://divinebridge.io" target="_blank" rel="noopener">divinebridge.io</a></div>
                 <div class="business-card-verse">
                     "Therefore I tell you, whatever you ask for in prayer, believe that you have received it, and it will be yours."
                     <div class="business-card-verse-reference">Mark 11:24</div>
