@@ -1,4 +1,6 @@
-from flask import Flask, render_template, request, jsonify, redirect, session
+from flask import Flask, render_template, request, jsonify, redirect, session, send_file, Response
+import io
+import qrcode
 import logging
 from datetime import datetime, timedelta
 import os
@@ -635,6 +637,11 @@ def create_app():
         """Serve the change password page"""
         return render_template('change_password.html')
     
+    @app.route('/card/<user_id>')
+    def public_card(user_id):
+        """Serve the public business card page"""
+        return render_template('public_card.html', user_id=user_id)
+    
     return app
 
 # Create the Flask application
@@ -749,6 +756,168 @@ def health_check():
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")
         return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
+
+@app.route('/api/card/<user_id>/vcard')
+def get_vcard(user_id):
+    """Generate and download vCard file for user's business card"""
+    try:
+        from firebase_admin import firestore
+        db = firestore.client()
+        user_ref = db.collection('users').document(user_id)
+        user_doc = user_ref.get()
+        
+        if not user_doc.exists:
+            return jsonify({'error': 'User not found'}), 404
+        
+        user_data = user_doc.to_dict()
+        
+        # Check if business card is enabled
+        if not user_data.get('businessCardEnabled', False):
+            return jsonify({'error': 'Business card not available'}), 404
+        
+        # Get user data
+        first_name = user_data.get('firstName', '')
+        last_name = user_data.get('lastName', '')
+        email = user_data.get('email', '')
+        phone = user_data.get('phoneNumber', '')
+        linkedin = user_data.get('linkedin', '')
+        
+        # Generate vCard
+        vcard_lines = ['BEGIN:VCARD', 'VERSION:3.0']
+        
+        # Name
+        if first_name or last_name:
+            vcard_lines.append(f'N:{last_name};{first_name};;;')
+            vcard_lines.append(f'FN:{first_name} {last_name}'.strip())
+        
+        # Email
+        if email:
+            vcard_lines.append(f'EMAIL;TYPE=INTERNET:{email}')
+        
+        # Phone
+        if phone:
+            # Normalize phone number (remove formatting)
+            phone_clean = ''.join(filter(str.isdigit, phone))
+            vcard_lines.append(f'TEL;TYPE=CELL:{phone_clean}')
+        
+        # URL (LinkedIn)
+        if linkedin:
+            vcard_lines.append(f'URL:{linkedin}')
+        
+        # Website
+        vcard_lines.append('URL;TYPE=WORK:https://divinebridge.io')
+        
+        vcard_lines.append('END:VCARD')
+        
+        vcard_content = '\n'.join(vcard_lines)
+        
+        # Create response
+        response = Response(
+            vcard_content,
+            mimetype='text/vcard',
+            headers={
+                'Content-Disposition': f'attachment; filename="{first_name}_{last_name}.vcf"'.replace(' ', '_')
+            }
+        )
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error generating vCard: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({'error': 'Failed to generate vCard'}), 500
+
+@app.route('/api/card/<user_id>/qr')
+def get_qr_code(user_id):
+    """Generate QR code image for user's business card"""
+    try:
+        from firebase_admin import firestore
+        db = firestore.client()
+        user_ref = db.collection('users').document(user_id)
+        user_doc = user_ref.get()
+        
+        if not user_doc.exists:
+            logger.warning(f"QR code requested for non-existent user: {user_id}")
+            return jsonify({'error': 'User not found'}), 404
+        
+        user_data = user_doc.to_dict()
+        
+        # Get the public card URL (generate QR even if not enabled, for preview purposes)
+        request_url = request.url_root.rstrip('/')
+        card_url = f"{request_url}/card/{user_id}"
+        
+        # Generate QR code
+        try:
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=4,
+            )
+            qr.add_data(card_url)
+            qr.make(fit=True)
+            
+            # Create image
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            # Convert to bytes
+            img_bytes = io.BytesIO()
+            img.save(img_bytes, format='PNG')
+            img_bytes.seek(0)
+            
+            logger.info(f"Successfully generated QR code for user: {user_id}")
+            return send_file(
+                img_bytes,
+                mimetype='image/png',
+                as_attachment=False
+            )
+        except Exception as qr_error:
+            logger.error(f"Error in QR code generation: {qr_error}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return jsonify({'error': 'Failed to generate QR code image'}), 500
+        
+    except Exception as e:
+        logger.error(f"Error generating QR code: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({'error': 'Failed to generate QR code'}), 500
+
+@app.route('/api/card/<user_id>')
+def get_card_data(user_id):
+    """Get public business card data (for API access)"""
+    try:
+        from firebase_admin import firestore
+        db = firestore.client()
+        user_ref = db.collection('users').document(user_id)
+        user_doc = user_ref.get()
+        
+        if not user_doc.exists:
+            return jsonify({'error': 'User not found'}), 404
+        
+        user_data = user_doc.to_dict()
+        
+        # Check if business card is enabled
+        if not user_data.get('businessCardEnabled', False):
+            return jsonify({'error': 'Business card not available'}), 404
+        
+        # Return card data
+        card_data = {
+            'firstName': user_data.get('firstName', ''),
+            'lastName': user_data.get('lastName', ''),
+            'email': user_data.get('email', ''),
+            'phoneNumber': user_data.get('phoneNumber', ''),
+            'linkedin': user_data.get('linkedin', '')
+        }
+        
+        return jsonify(card_data), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting card data: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({'error': 'Failed to get card data'}), 500
 
 if __name__ == '__main__':
     # Respect PORT env (Cloud Run uses 8080); default to 5001 locally

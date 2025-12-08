@@ -563,4 +563,103 @@ def logout():
         return jsonify({'message': 'Logged out successfully'}), 200
     except Exception as e:
         logger.error(f"Error during logout: {e}")
-        return jsonify({'error': 'Failed to logout'}), 500 
+        return jsonify({'error': 'Failed to logout'}), 500
+
+@auth_bp.route('/profile/business-card', methods=['GET'])
+@limiter.limit("30 per minute")
+def get_business_card():
+    """Get user's business card data"""
+    try:
+        if 'user' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+        
+        user_id = session['user']['uid']
+        
+        # Get user data from Firestore
+        from firebase_admin import firestore
+        db = firestore.client()
+        user_ref = db.collection('users').document(user_id)
+        user_doc = user_ref.get()
+        
+        if not user_doc.exists:
+            return jsonify({'error': 'User profile not found'}), 404
+        
+        user_data = user_doc.to_dict()
+        
+        # Return business card data
+        business_card = {
+            'firstName': user_data.get('firstName', ''),
+            'lastName': user_data.get('lastName', ''),
+            'email': user_data.get('email', ''),
+            'phoneNumber': user_data.get('phoneNumber', ''),
+            'linkedin': user_data.get('linkedin', ''),
+            'businessCardEnabled': user_data.get('businessCardEnabled', False)
+        }
+        
+        return jsonify(business_card), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting business card: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({'error': 'Failed to get business card'}), 500
+
+@auth_bp.route('/profile/business-card', methods=['POST'])
+@limiter.limit("10 per minute")
+def update_business_card():
+    """Update user's business card data"""
+    try:
+        if 'user' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+        
+        data = request.get_json()
+        user_id = session['user']['uid']
+        
+        # Validate and sanitize input
+        phone_number = data.get('phoneNumber', '').strip()
+        linkedin = data.get('linkedin', '').strip()
+        business_card_enabled = data.get('businessCardEnabled', False)
+        
+        # Validate phone number format (optional, but if provided should be valid)
+        if phone_number:
+            # Remove common formatting characters for validation
+            phone_digits = ''.join(filter(str.isdigit, phone_number))
+            if len(phone_digits) < 10:
+                return jsonify({'error': 'Invalid phone number format'}), 400
+        
+        # Validate LinkedIn URL (optional)
+        if linkedin:
+            # Normalize LinkedIn URL
+            if not linkedin.startswith('http'):
+                if linkedin.startswith('linkedin.com') or linkedin.startswith('www.linkedin.com'):
+                    linkedin = 'https://' + linkedin
+                elif '/' not in linkedin:
+                    linkedin = f'https://linkedin.com/in/{linkedin}'
+                else:
+                    linkedin = f'https://{linkedin}'
+            
+            if 'linkedin.com' not in linkedin:
+                return jsonify({'error': 'Invalid LinkedIn URL'}), 400
+        
+        # Update Firestore
+        from firebase_admin import firestore
+        db = firestore.client()
+        user_ref = db.collection('users').document(user_id)
+        
+        update_data = {}
+        if 'phoneNumber' in data:
+            update_data['phoneNumber'] = phone_number if phone_number else None
+        if 'linkedin' in data:
+            update_data['linkedin'] = linkedin if linkedin else None
+        if 'businessCardEnabled' in data:
+            update_data['businessCardEnabled'] = bool(business_card_enabled)
+        
+        user_ref.update(update_data)
+        
+        logger.info(f"Updated business card for user: {user_id}")
+        
+        return jsonify({'message': 'Business card updated successfully'}), 200
+        
+    except Exception as e:
+        logger.error(f"Error updating business card: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({'error': 'Failed to update business card'}), 500 
