@@ -640,7 +640,26 @@ def create_app():
     @app.route('/card/<user_id>')
     def public_card(user_id):
         """Serve the public business card page"""
-        return render_template('public_card.html', user_id=user_id)
+        try:
+            from firebase_admin import firestore
+            db = firestore.client()
+            user_ref = db.collection('users').document(user_id)
+            user_doc = user_ref.get()
+            
+            # Get user data for OG meta tags
+            user_name = "Business Card"
+            if user_doc.exists:
+                user_data = user_doc.to_dict()
+                first_name = user_data.get('firstName', '')
+                last_name = user_data.get('lastName', '')
+                if first_name or last_name:
+                    user_name = f"{first_name} {last_name}".strip()
+            
+            return render_template('public_card.html', user_id=user_id, user_name=user_name)
+        except Exception as e:
+            logger.error(f"Error loading user data for card page: {e}")
+            # Fallback to default if error
+            return render_template('public_card.html', user_id=user_id, user_name="Business Card")
     
     return app
 

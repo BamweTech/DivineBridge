@@ -388,11 +388,11 @@
 
     .business-card-logo {
         text-align: center;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1rem;
     }
 
     .business-card-logo img {
-        max-height: 80px;
+        max-height: 50px;
         width: auto;
     }
 
@@ -402,7 +402,21 @@
         font-weight: 700;
         color: var(--blue);
         text-align: center;
-        margin-bottom: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .business-card-qr-after-name {
+        text-align: center;
+        margin: 1rem 0 1.5rem;
+    }
+
+    .business-card-qr-after-name img {
+        width: 100px;
+        height: 100px;
+        background: white;
+        padding: 8px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
 
     .business-card-contact {
@@ -430,23 +444,27 @@
     }
 
     .business-card-verse {
-        text-align: center;
+        position: absolute;
+        bottom: 1rem;
+        right: 1rem;
+        text-align: right;
         font-style: italic;
         color: var(--black);
-        font-size: 0.95rem;
-        line-height: 1.6;
-        margin: 1.5rem 0;
-        padding: 1rem;
+        font-size: 0.75rem;
+        line-height: 1.4;
+        max-width: 200px;
+        padding: 0.5rem;
         background: rgba(255, 255, 255, 0.2);
-        border-radius: 12px;
-        border-left: 4px solid var(--gold);
+        border-radius: 8px;
+        border-left: 3px solid var(--gold);
     }
 
     .business-card-verse-reference {
         font-weight: 600;
         color: var(--blue);
-        margin-top: 0.5rem;
+        margin-top: 0.25rem;
         font-style: normal;
+        font-size: 0.7rem;
     }
 
     .business-card-website {
@@ -457,34 +475,17 @@
         font-weight: 500;
     }
 
-    .business-card-qr {
-        position: absolute;
-        bottom: 1rem;
-        right: 1rem;
-        width: 120px;
-        height: 120px;
-        background: white;
-        padding: 8px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
-
-    .business-card-qr img {
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-    }
 
     @media (max-width: 768px) {
         .business-card {
             padding: 1.5rem;
         }
 
-        .business-card-qr {
+        .business-card-verse {
             position: static;
-            margin: 1rem auto 0;
-            width: 100px;
-            height: 100px;
+            text-align: center;
+            max-width: 100%;
+            margin-top: 1rem;
         }
     }
 </style>
@@ -1295,7 +1296,15 @@
     async function loadBusinessCardStatus() {
         try {
             const user = firebase.auth().currentUser;
-            if (!user) return;
+            if (!user) {
+                // User not authenticated, set default status
+                const statusEl = document.getElementById('business-card-status');
+                if (statusEl) {
+                    statusEl.textContent = 'Not available';
+                    statusEl.style.color = '#6c757d';
+                }
+                return;
+            }
             
             currentUserId = user.uid;
             const response = await fetch('/api/auth/profile/business-card', {
@@ -1310,9 +1319,24 @@
                     statusEl.textContent = data.businessCardEnabled ? 'Enabled' : 'Disabled';
                     statusEl.style.color = data.businessCardEnabled ? '#28a745' : '#6c757d';
                 }
+            } else if (response.status === 401) {
+                // Not authenticated - this is expected if session expired
+                console.log('Business card: User not authenticated');
+                const statusEl = document.getElementById('business-card-status');
+                if (statusEl) {
+                    statusEl.textContent = 'Not available';
+                    statusEl.style.color = '#6c757d';
+                }
+            } else {
+                console.error('Error loading business card status:', response.status, response.statusText);
             }
         } catch (error) {
             console.error('Error loading business card status:', error);
+            const statusEl = document.getElementById('business-card-status');
+            if (statusEl) {
+                statusEl.textContent = 'Error loading';
+                statusEl.style.color = '#dc3545';
+            }
         }
     }
 
@@ -1410,18 +1434,18 @@
                     <img src="/static/images/LogoOnly1.png" alt="Divine Bridge" onerror="this.src='/assets/logos/LogoOnly1.png'">
                 </div>
                 <div class="business-card-name">${escapeHtml(fullName)}</div>
+                <div class="business-card-qr-after-name">
+                    <img src="${qrUrl}" alt="QR Code" onerror="console.error('Failed to load QR code:', event); this.style.display='none'; this.parentElement.innerHTML='<div style=\\'text-align:center;padding:1rem;color:#666;font-size:0.8rem;\\'>QR Code<br/>Not Available</div>';">
+                </div>
                 <div class="business-card-contact">
                     ${email ? `<div class="business-card-contact-item">📧 <a href="mailto:${email}">${escapeHtml(email)}</a></div>` : ''}
                     ${phone ? `<div class="business-card-contact-item">📱 <a href="tel:${phone}">${escapeHtml(phone)}</a></div>` : ''}
-                    ${linkedin ? `<div class="business-card-contact-item">💼 <a href="${linkedin}" target="_blank" rel="noopener">${escapeHtml(linkedin)}</a></div>` : ''}
+                    ${linkedin ? `<div class="business-card-contact-item">💼 <a href="${linkedin}" target="_blank" rel="noopener">My LinkedIn</a></div>` : ''}
                 </div>
+                <div class="business-card-website">divinebridge.io</div>
                 <div class="business-card-verse">
                     "Therefore I tell you, whatever you ask for in prayer, believe that you have received it, and it will be yours."
                     <div class="business-card-verse-reference">Mark 11:24</div>
-                </div>
-                <div class="business-card-website">divinebridge.io</div>
-                <div class="business-card-qr">
-                    <img src="${qrUrl}" alt="QR Code" onerror="console.error('Failed to load QR code:', event); this.style.display='none'; this.parentElement.innerHTML='<div style=\\'text-align:center;padding:1rem;color:#666;\\'>QR Code<br/>Not Available</div>';">
                 </div>
             </div>
         `;
