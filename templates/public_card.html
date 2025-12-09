@@ -42,6 +42,8 @@
         position: relative;
         background: linear-gradient(135deg, rgba(31, 60, 136, 0.1) 0%, rgba(15, 86, 255, 0.1) 100%);
         margin-bottom: 2rem;
+        overflow: hidden;
+        word-wrap: break-word;
     }
 
     .business-card-logo {
@@ -82,6 +84,8 @@
         flex-direction: column;
         gap: 0.75rem;
         margin-bottom: 1.5rem;
+        max-width: 100%;
+        overflow: hidden;
     }
 
     .business-card-contact-item {
@@ -90,11 +94,20 @@
         gap: 0.75rem;
         color: var(--black);
         font-size: 1rem;
+        word-break: break-word;
+        overflow-wrap: break-word;
+        max-width: 100%;
+        min-width: 0;
     }
 
     .business-card-contact-item a {
         color: var(--blue);
         text-decoration: none;
+        word-break: break-word;
+        overflow-wrap: break-word;
+        max-width: 100%;
+        min-width: 0;
+        flex: 1;
     }
 
     .business-card-contact-item a:hover {

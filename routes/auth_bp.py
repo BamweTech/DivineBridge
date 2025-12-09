@@ -570,10 +570,14 @@ def logout():
 def get_business_card():
     """Get user's business card data"""
     try:
-        if 'user' not in session:
+        # Use shared authentication helper that handles Firebase tokens and session regeneration
+        from auth_helpers import get_user_from_session
+        user_info = get_user_from_session()
+        
+        if not user_info:
             return jsonify({'error': 'Not authenticated'}), 401
         
-        user_id = session['user']['uid']
+        user_id = user_info['user_id']
         
         # Get user data from Firestore
         from firebase_admin import firestore
@@ -608,11 +612,15 @@ def get_business_card():
 def update_business_card():
     """Update user's business card data"""
     try:
-        if 'user' not in session:
+        # Use shared authentication helper that handles Firebase tokens and session regeneration
+        from auth_helpers import get_user_from_session
+        user_info = get_user_from_session()
+        
+        if not user_info:
             return jsonify({'error': 'Not authenticated'}), 401
         
         data = request.get_json()
-        user_id = session['user']['uid']
+        user_id = user_info['user_id']
         
         # Validate and sanitize input
         phone_number = data.get('phoneNumber', '').strip()

@@ -384,6 +384,8 @@
         margin: 0 auto;
         position: relative;
         background: linear-gradient(135deg, rgba(31, 60, 136, 0.1) 0%, rgba(15, 86, 255, 0.1) 100%);
+        overflow: hidden;
+        word-wrap: break-word;
     }
 
     .business-card-logo {
@@ -432,11 +434,20 @@
         gap: 0.75rem;
         color: var(--black);
         font-size: 1rem;
+        word-break: break-word;
+        overflow-wrap: break-word;
+        max-width: 100%;
+        min-width: 0;
     }
 
     .business-card-contact-item a {
         color: var(--blue);
         text-decoration: none;
+        word-break: break-word;
+        overflow-wrap: break-word;
+        max-width: 100%;
+        min-width: 0;
+        flex: 1;
     }
 
     .business-card-contact-item a:hover {
@@ -1310,6 +1321,131 @@
     let currentBusinessCardData = null;
     let currentUserId = null;
 
+    async function getFirebaseIdToken(forceRefresh = false) {
+        /**
+         * Get Firebase ID token for authenticated requests
+         * This ensures auth persists across deployments
+         * 
+         * @param {boolean} forceRefresh - Force token refresh (useful after 401 errors)
+         */
+        try {
+            if (typeof firebase === 'undefined' || !firebase.auth) {
+                console.warn('⚠️ Firebase not initialized');
+                return null;
+            }
+            
+            // Wait for Firebase auth state to be ready (5 second timeout)
+            const user = await new Promise((resolve) => {
+                let resolved = false;
+                const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
+                    if (!resolved) {
+                        resolved = true;
+                        unsubscribe();
+                        resolve(user);
+                    }
+                });
+                
+                // Check if user is already available (faster path)
+                const currentUser = firebase.auth().currentUser;
+                if (currentUser && !resolved) {
+                    resolved = true;
+                    unsubscribe();
+                    resolve(currentUser);
+                }
+                
+                // Timeout after 5 seconds
+                setTimeout(() => {
+                    if (!resolved) {
+                        resolved = true;
+                        unsubscribe();
+                        console.warn('⚠️ Firebase auth state check timed out');
+                        resolve(null);
+                    }
+                }, 5000);
+            });
+            
+            if (!user) {
+                console.warn('⚠️ No Firebase user found - user may need to sign in');
+                return null;
+            }
+            
+            // Get token with retry logic for network errors
+            let token = null;
+            let retries = 0;
+            const maxRetries = 3;
+            
+            while (retries < maxRetries && !token) {
+                try {
+                    token = await Promise.race([
+                        user.getIdToken(forceRefresh),
+                        new Promise((_, reject) => 
+                            setTimeout(() => reject(new Error('Token fetch timeout')), 5000)
+                        )
+                    ]);
+                    break;
+                } catch (error) {
+                    retries++;
+                    if (retries < maxRetries) {
+                        console.warn(`⚠️ Token fetch failed (attempt ${retries}/${maxRetries}), retrying...`);
+                        await new Promise(resolve => setTimeout(resolve, 500 * retries)); // Exponential backoff
+                    } else {
+                        console.error('❌ Failed to get Firebase ID token after retries:', error);
+                    }
+                }
+            }
+            
+            return token;
+        } catch (error) {
+            console.error('❌ Error getting Firebase ID token:', error);
+            return null;
+        }
+    }
+
+    async function makeAuthenticatedRequest(url, options = {}) {
+        /**
+         * Make an authenticated request with automatic token refresh on 401
+         * @returns {Response} - The fetch Response object
+         */
+        const makeRequest = async (idToken) => {
+            const headers = {
+                'Content-Type': 'application/json',
+                ...options.headers
+            };
+            
+            if (idToken) {
+                headers['Authorization'] = `Bearer ${idToken}`;
+            }
+            
+            return await fetch(url, {
+                ...options,
+                headers,
+                credentials: 'include'
+            });
+        };
+        
+        try {
+            // First attempt: Get token (cached)
+            let idToken = await getFirebaseIdToken(false);
+            let response = await makeRequest(idToken);
+            
+            // If 401, try refreshing the token
+            if (response.status === 401) {
+                console.log('⚠️ 401 error, attempting token refresh...');
+                idToken = await getFirebaseIdToken(true);
+                
+                if (idToken) {
+                    console.log('🔄 Retrying request with refreshed token...');
+                    response = await makeRequest(idToken);
+                }
+            }
+            
+            return response;
+        } catch (error) {
+            console.error('❌ Request error:', error);
+            throw error;
+        }
+    }
+
     async function loadBusinessCardStatus() {
         try {
             const user = firebase.auth().currentUser;
@@ -1324,9 +1460,7 @@
             }
             
             currentUserId = user.uid;
-            const response = await fetch('/api/auth/profile/business-card', {
-                credentials: 'include'
-            });
+            const response = await makeAuthenticatedRequest('/api/auth/profile/business-card');
             
             if (response.ok) {
                 const data = await response.json();
@@ -1379,10 +1513,8 @@
             const linkedin = document.getElementById('business-card-linkedin').value.trim();
             const enabled = document.getElementById('business-card-enabled').checked;
             
-            const response = await fetch('/api/auth/profile/business-card', {
+            const response = await makeAuthenticatedRequest('/api/auth/profile/business-card', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                credentials: 'include',
                 body: JSON.stringify({
                     phoneNumber: phone,
                     linkedin: linkedin,
@@ -1409,9 +1541,7 @@
             const user = firebase.auth().currentUser;
             if (!user) return;
             
-            const response = await fetch('/api/auth/profile/business-card', {
-                credentials: 'include'
-            });
+            const response = await makeAuthenticatedRequest('/api/auth/profile/business-card');
             
             if (!response.ok) {
                 alert('Failed to load business card data');
