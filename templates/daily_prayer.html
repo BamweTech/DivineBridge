@@ -444,6 +444,12 @@
         const prayerText = document.getElementById('prayer-text');
         const prayerDate = document.getElementById('prayer-date');
 
+        // Validate elements exist
+        if (!loadingState || !contentSection || !errorState || !prayerText || !prayerDate) {
+            console.error('Required elements not found on page');
+            return;
+        }
+
         try {
             // Send client's local date
             const clientDate = getClientLocalDate();
@@ -453,11 +459,12 @@
             
             if (response.ok) {
                 const data = await response.json();
+                console.log('Prayer API response:', data);
                 
                 // Find today's daily prayer
-                const dailyPrayer = data.prayers.find(p => 
+                const dailyPrayer = data.prayers ? data.prayers.find(p => 
                     p.source === 'generated' && !p.title
-                );
+                ) : null;
                 
                 if (dailyPrayer) {
                     // Display prayer - convert newlines to <br> for better mobile compatibility
@@ -485,23 +492,30 @@
                     // Show content, hide loading
                     loadingState.style.display = 'none';
                     contentSection.style.display = 'block';
+                    errorState.style.display = 'none';
                     
-                    // Load interactions if user is logged in
-                    const clientDate = getClientLocalDate();
+                    // Load interactions
                     loadDailyPrayerInteractions(clientDate);
                 } else {
                     // No prayer found
+                    console.log('No daily prayer found for date:', clientDate);
                     loadingState.style.display = 'none';
+                    contentSection.style.display = 'none';
                     errorState.style.display = 'block';
                 }
             } else {
-                // API error
+                // API error - log the response for debugging
+                const errorText = await response.text();
+                console.error('API error response:', response.status, errorText);
                 loadingState.style.display = 'none';
+                contentSection.style.display = 'none';
                 errorState.style.display = 'block';
             }
         } catch (error) {
             console.error('Error loading daily prayer:', error);
+            // Always hide loading and show error on failure
             loadingState.style.display = 'none';
+            contentSection.style.display = 'none';
             errorState.style.display = 'block';
         }
     }
@@ -910,7 +924,36 @@
     }
     
     // Load prayer when page loads
-    document.addEventListener('DOMContentLoaded', loadDailyPrayer);
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('Daily prayer page loaded, starting to load prayer...');
+        
+        // Set a timeout to ensure loading state doesn't stay forever
+        const timeout = setTimeout(() => {
+            console.warn('Prayer load timeout - showing error state');
+            const loadingState = document.getElementById('loading-state');
+            const errorState = document.getElementById('error-state');
+            const contentSection = document.getElementById('prayer-content-section');
+            if (loadingState) loadingState.style.display = 'none';
+            if (contentSection) contentSection.style.display = 'none';
+            if (errorState) errorState.style.display = 'block';
+        }, 10000); // 10 second timeout
+        
+        loadDailyPrayer()
+            .then(() => {
+                clearTimeout(timeout);
+            })
+            .catch(error => {
+                clearTimeout(timeout);
+                console.error('Failed to load daily prayer:', error);
+                // Ensure loading state is hidden on error
+                const loadingState = document.getElementById('loading-state');
+                const errorState = document.getElementById('error-state');
+                const contentSection = document.getElementById('prayer-content-section');
+                if (loadingState) loadingState.style.display = 'none';
+                if (contentSection) contentSection.style.display = 'none';
+                if (errorState) errorState.style.display = 'block';
+            });
+    });
 </script>
 {% endblock %}
 
