@@ -149,6 +149,149 @@
             justify-content: center;
         }
     }
+    
+    /* Daily Prayer Interaction Buttons - Facebook/Instagram Style */
+    #daily-prayer-interactions button:hover {
+        background: rgba(0, 0, 0, 0.05);
+    }
+    
+    #daily-prayer-interactions button.liked {
+        color: var(--blue);
+    }
+    
+    #daily-prayer-interactions button.liked svg {
+        fill: var(--blue);
+    }
+    
+    /* Comment Modal */
+    .comment-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+    }
+    
+    .comment-modal.active {
+        display: flex;
+    }
+    
+    .comment-modal-content {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        max-width: 500px;
+        width: 100%;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    }
+    
+    .comment-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+    
+    .comment-modal-header h3 {
+        margin: 0;
+        color: var(--blue);
+    }
+    
+    .comment-modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: var(--gray);
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        transition: all 0.2s ease;
+    }
+    
+    .comment-modal-close:hover {
+        background: rgba(0, 0, 0, 0.1);
+    }
+    
+    .comment-form {
+        margin-bottom: 2rem;
+    }
+    
+    .comment-form textarea {
+        width: 100%;
+        min-height: 100px;
+        padding: 0.75rem;
+        border: 2px solid rgba(31, 60, 136, 0.2);
+        border-radius: 8px;
+        font-size: 1rem;
+        font-family: inherit;
+        resize: vertical;
+        margin-bottom: 1rem;
+    }
+    
+    .comment-form textarea:focus {
+        outline: none;
+        border-color: var(--blue);
+    }
+    
+    .comment-form button {
+        background: var(--blue);
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 25px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .comment-form button:hover {
+        background: #2c5282;
+        transform: translateY(-2px);
+    }
+    
+    .comments-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .comment-item {
+        padding: 1rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        margin-bottom: 0.5rem;
+    }
+    
+    .comment-item:last-child {
+        border-bottom: none;
+    }
+    
+    .comment-author {
+        font-weight: 600;
+        color: var(--blue);
+        margin-bottom: 0.25rem;
+    }
+    
+    .comment-text {
+        color: #333;
+        margin-bottom: 0.5rem;
+    }
+    
+    .comment-date {
+        font-size: 0.85rem;
+        color: var(--gray);
+    }
 </style>
 {% endblock %}
 
@@ -196,6 +339,73 @@
                 <div class="prayer-text" id="prayer-text">
                     Loading prayer content...
                 </div>
+            </div>
+            
+            <!-- Daily Prayer Interactions (visible to all, requires login to interact) -->
+            <div id="daily-prayer-interactions" style="display: flex; margin-top: 1rem; padding: 0.5rem 0; justify-content: flex-start; gap: 1rem; flex-wrap: wrap; align-items: center;">
+                <button id="like-btn" onclick="toggleLike()" style="
+                    background: transparent;
+                    border: none;
+                    border-radius: 8px;
+                    padding: 0.4rem 0.75rem;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.4rem;
+                    font-size: 0.875rem;
+                    color: #65676b;
+                    transition: all 0.2s ease;
+                    font-weight: 600;
+                ">
+                    <svg id="like-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                    </svg>
+                    <span id="like-count">0</span>
+                </button>
+                
+                <button id="comment-btn" onclick="showCommentModal()" style="
+                    background: transparent;
+                    border: none;
+                    border-radius: 8px;
+                    padding: 0.4rem 0.75rem;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.4rem;
+                    font-size: 0.875rem;
+                    color: #65676b;
+                    transition: all 0.2s ease;
+                    font-weight: 600;
+                ">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    <span id="comment-count">0</span>
+                </button>
+                
+                <button id="share-btn" onclick="shareDailyPrayer()" style="
+                    background: transparent;
+                    border: none;
+                    border-radius: 8px;
+                    padding: 0.4rem 0.75rem;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.4rem;
+                    font-size: 0.875rem;
+                    color: #65676b;
+                    transition: all 0.2s ease;
+                    font-weight: 600;
+                ">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="18" cy="5" r="3"></circle>
+                        <circle cx="6" cy="12" r="3"></circle>
+                        <circle cx="18" cy="19" r="3"></circle>
+                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                    </svg>
+                    <span id="share-count">0</span>
+                </button>
             </div>
 
             <div class="prayer-actions">
@@ -275,6 +485,10 @@
                     // Show content, hide loading
                     loadingState.style.display = 'none';
                     contentSection.style.display = 'block';
+                    
+                    // Load interactions if user is logged in
+                    const clientDate = getClientLocalDate();
+                    loadDailyPrayerInteractions(clientDate);
                 } else {
                     // No prayer found
                     loadingState.style.display = 'none';
@@ -335,6 +549,329 @@
         }
     }
 
+    // Daily Prayer Interactions Functions
+    let currentPrayerDatePage = null;
+    let userLikedPage = false;
+    
+    async function getFirebaseIdTokenPage() {
+        if (typeof firebase !== 'undefined' && firebase.auth().currentUser) {
+            try {
+                return await firebase.auth().currentUser.getIdToken();
+            } catch (error) {
+                console.error('Error getting Firebase token:', error);
+                return null;
+            }
+        }
+        return null;
+    }
+    
+    async function loadDailyPrayerInteractions(date) {
+        currentPrayerDatePage = date;
+        const interactionsEl = document.getElementById('daily-prayer-interactions');
+        interactionsEl.style.display = 'flex';
+        
+        try {
+            const token = await getFirebaseIdTokenPage();
+            const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+            
+            const response = await fetch(`/api/prayer/daily-prayer/${date}/interactions`, {
+                headers: headers
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                
+                // Update like button
+                document.getElementById('like-count').textContent = data.likes.count || 0;
+                userLikedPage = data.likes.liked || false;
+                const likeBtn = document.getElementById('like-btn');
+                if (userLikedPage) {
+                    likeBtn.classList.add('liked');
+                } else {
+                    likeBtn.classList.remove('liked');
+                }
+                
+                // Update comment count
+                document.getElementById('comment-count').textContent = data.comments.count || 0;
+                
+                // Update share count
+                document.getElementById('share-count').textContent = data.shares.count || 0;
+            }
+        } catch (error) {
+            console.error('Error loading interactions:', error);
+            // Still show buttons even if loading fails
+            document.getElementById('like-count').textContent = '0';
+            document.getElementById('comment-count').textContent = '0';
+            document.getElementById('share-count').textContent = '0';
+        }
+    }
+    
+    function promptLoginPage(action) {
+        const currentPath = window.location.pathname;
+        if (confirm(`Please sign in to ${action}. Would you like to sign in now?`)) {
+            window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+        }
+    }
+    
+    async function toggleLike() {
+        if (!currentPrayerDatePage) return;
+        
+        // Check if user is logged in
+        if (typeof currentUser === 'undefined' || !currentUser) {
+            promptLoginPage('like prayers');
+            return;
+        }
+        
+        try {
+            const token = await getFirebaseIdTokenPage();
+            if (!token) {
+                promptLoginPage('like prayers');
+                return;
+            }
+            
+            const method = userLikedPage ? 'DELETE' : 'POST';
+            const response = await fetch(`/api/prayer/daily-prayer/${currentPrayerDatePage}/like`, {
+                method: method,
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                userLikedPage = !userLikedPage;
+                const likeBtn = document.getElementById('like-btn');
+                const countEl = document.getElementById('like-count');
+                
+                if (userLikedPage) {
+                    likeBtn.classList.add('liked');
+                    countEl.textContent = parseInt(countEl.textContent) + 1;
+                } else {
+                    likeBtn.classList.remove('liked');
+                    countEl.textContent = Math.max(0, parseInt(countEl.textContent) - 1);
+                }
+            } else {
+                const error = await response.json();
+                alert(error.error || 'Failed to update like');
+            }
+        } catch (error) {
+            console.error('Error toggling like:', error);
+            alert('Failed to update like. Please try again.');
+        }
+    }
+    
+    function showCommentModal() {
+        if (!currentPrayerDatePage) return;
+        
+        // Check if user is logged in
+        if (typeof currentUser === 'undefined' || !currentUser) {
+            promptLoginPage('comment on prayers');
+            return;
+        }
+        
+        // Create modal if it doesn't exist
+        let modal = document.getElementById('comment-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'comment-modal';
+            modal.className = 'comment-modal';
+            modal.innerHTML = `
+                <div class="comment-modal-content">
+                    <div class="comment-modal-header">
+                        <h3>Comments</h3>
+                        <button class="comment-modal-close" onclick="closeCommentModal()">&times;</button>
+                    </div>
+                    <div class="comment-form">
+                        <textarea id="comment-text" placeholder="Share your thoughts..."></textarea>
+                        <button onclick="submitComment()">Post Comment</button>
+                    </div>
+                    <div id="comments-list" class="comments-list"></div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Close on background click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeCommentModal();
+                }
+            });
+        }
+        
+        modal.classList.add('active');
+        loadComments();
+    }
+    
+    function closeCommentModal() {
+        const modal = document.getElementById('comment-modal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    }
+    
+    async function loadComments() {
+        if (!currentPrayerDatePage) return;
+        
+        try {
+            const token = await getFirebaseIdTokenPage();
+            const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+            
+            const response = await fetch(`/api/prayer/daily-prayer/${currentPrayerDatePage}/comments`, {
+                headers: headers
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                const commentsList = document.getElementById('comments-list');
+                
+                if (data.comments && data.comments.length > 0) {
+                    commentsList.innerHTML = data.comments.map(comment => `
+                        <div class="comment-item">
+                            <div class="comment-author">${escapeHtml(comment.user_name || 'Anonymous')}</div>
+                            <div class="comment-text">${escapeHtml(comment.comment)}</div>
+                            <div class="comment-date">${formatDate(comment.created_at)}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    commentsList.innerHTML = '<p style="text-align: center; color: var(--gray); padding: 2rem;">No comments yet. Be the first to comment!</p>';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading comments:', error);
+        }
+    }
+    
+    async function submitComment() {
+        if (!currentPrayerDatePage) return;
+        
+        const commentText = document.getElementById('comment-text').value.trim();
+        if (!commentText) {
+            alert('Please enter a comment');
+            return;
+        }
+        
+        try {
+            const token = await getFirebaseIdTokenPage();
+            if (!token) {
+                alert('Please log in to comment');
+                return;
+            }
+            
+            const response = await fetch(`/api/prayer/daily-prayer/${currentPrayerDatePage}/comment`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ comment: commentText })
+            });
+            
+            if (response.ok) {
+                document.getElementById('comment-text').value = '';
+                const countEl = document.getElementById('comment-count');
+                countEl.textContent = parseInt(countEl.textContent) + 1;
+                loadComments();
+            } else {
+                const error = await response.json();
+                if (response.status === 401) {
+                    promptLoginPage('comment on prayers');
+                } else {
+                    alert(error.error || 'Failed to post comment');
+                }
+            }
+        } catch (error) {
+            console.error('Error submitting comment:', error);
+            alert('Failed to post comment. Please try again.');
+        }
+    }
+    
+    async function shareDailyPrayer() {
+        if (!currentPrayerDatePage) return;
+        
+        // Check if user is logged in
+        if (typeof currentUser === 'undefined' || !currentUser) {
+            promptLoginPage('share prayers');
+            return;
+        }
+        
+        const shareUrl = window.location.href;
+        const shareText = 'Check out today\'s daily prayer on Divine Bridge!';
+        
+        try {
+            // Track share
+            const token = await getFirebaseIdTokenPage();
+            if (token) {
+                fetch(`/api/prayer/daily-prayer/${currentPrayerDatePage}/share`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ platform: 'web' })
+                }).then(() => {
+                    const countEl = document.getElementById('share-count');
+                    countEl.textContent = parseInt(countEl.textContent) + 1;
+                }).catch(err => console.error('Error tracking share:', err));
+            }
+            
+            // Use Web Share API if available
+            if (navigator.share) {
+                await navigator.share({
+                    title: 'Daily Prayer - Divine Bridge',
+                    text: shareText,
+                    url: shareUrl
+                });
+            } else {
+                // Fallback: Copy to clipboard
+                await navigator.clipboard.writeText(shareUrl);
+                alert('Link copied to clipboard!');
+            }
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                // Fallback: Copy to clipboard
+                try {
+                    await navigator.clipboard.writeText(shareUrl);
+                    alert('Link copied to clipboard!');
+                } catch (clipboardError) {
+                    // Final fallback: show URL
+                    prompt('Copy this link:', shareUrl);
+                }
+            }
+        }
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+    }
+    
+    // Update interactions when auth state changes (reload to update like status)
+    if (typeof firebase !== 'undefined') {
+        firebase.auth().onAuthStateChanged((user) => {
+            // Reload interactions if prayer is already loaded (to update like status)
+            if (currentPrayerDatePage) {
+                loadDailyPrayerInteractions(currentPrayerDatePage);
+            }
+        });
+    }
+    
     // Load prayer when page loads
     document.addEventListener('DOMContentLoaded', loadDailyPrayer);
 </script>

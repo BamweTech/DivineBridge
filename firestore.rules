@@ -232,6 +232,72 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
+    // Daily prayers collection - public read, authenticated interactions
+    match /daily_prayers/{date} {
+      allow read: if true;
+      
+      // Likes subcollection
+      match /likes/{likeId} {
+        allow read: if true;
+        allow create: if request.auth != null &&
+                    request.resource.data.user_id == request.auth.uid &&
+                    request.resource.data.keys().hasAll(['user_id', 'user_name', 'created_at']) &&
+                    request.resource.data.user_id == request.auth.uid;
+        allow delete: if request.auth != null &&
+                    resource.data.user_id == request.auth.uid;
+      }
+      
+      // Comments subcollection
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if request.auth != null &&
+                    request.resource.data.user_id == request.auth.uid &&
+                    request.resource.data.keys().hasAll(['user_id', 'user_name', 'comment', 'created_at']) &&
+                    request.resource.data.comment is string &&
+                    request.resource.data.comment.size() <= 500 &&
+                    request.resource.data.user_name is string &&
+                    request.resource.data.user_name.size() <= 50;
+        allow update, delete: if request.auth != null &&
+                            resource.data.user_id == request.auth.uid;
+      }
+      
+      // Shares subcollection
+      match /shares/{shareId} {
+        allow read: if true;
+        allow create: if request.auth != null &&
+                    request.resource.data.user_id == request.auth.uid &&
+                    request.resource.data.keys().hasAll(['user_id', 'user_name', 'platform', 'created_at']) &&
+                    request.resource.data.platform is string &&
+                    request.resource.data.platform.size() <= 50;
+      }
+    }
+    
+    // Daily verses collection - public read, authenticated interactions
+    match /daily_verses/{date} {
+      allow read: if true;
+      
+      // Likes subcollection
+      match /likes/{likeId} {
+        allow read: if true;
+        allow create: if request.auth != null &&
+                    request.resource.data.user_id == request.auth.uid &&
+                    request.resource.data.keys().hasAll(['user_id', 'user_name', 'created_at']) &&
+                    request.resource.data.user_id == request.auth.uid;
+        allow delete: if request.auth != null &&
+                    resource.data.user_id == request.auth.uid;
+      }
+      
+      // Shares subcollection
+      match /shares/{shareId} {
+        allow read: if true;
+        allow create: if request.auth != null &&
+                    request.resource.data.user_id == request.auth.uid &&
+                    request.resource.data.keys().hasAll(['user_id', 'user_name', 'platform', 'created_at']) &&
+                    request.resource.data.platform is string &&
+                    request.resource.data.platform.size() <= 50;
+      }
+    }
+    
     // Deny all other access
     match /{document=**} {
       allow read, write: if false;

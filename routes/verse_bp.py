@@ -1,6 +1,8 @@
 from flask import Blueprint, jsonify, current_app, request, send_file
 import logging
 from datetime import datetime
+from auth_helpers import get_user_from_session
+from firebase_auth import get_firestore_client
 
 logger = logging.getLogger(__name__)
 verse_bp = Blueprint('verse', __name__)
@@ -118,4 +120,168 @@ def download_verse_image():
         
     except Exception as e:
         logger.error(f"Error generating verse image: {e}")
-        return jsonify({'error': 'Failed to generate image'}), 500 
+        return jsonify({'error': 'Failed to generate image'}), 500
+
+# Daily Verse Interactions Endpoints
+@verse_bp.route('/today-verse/<date>/like', methods=['POST', 'DELETE'])
+def toggle_daily_verse_like(date):
+    """Like or unlike a daily verse"""
+    try:
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        user_id = user.get('user_id')
+        db = get_firestore_client()
+        if not db:
+            return jsonify({'error': 'Database unavailable'}), 500
+        
+        verse_ref = db.collection('daily_verses').document(date)
+        likes_ref = verse_ref.collection('likes').document(user_id)
+        
+        if request.method == 'POST':
+            # Like the verse
+            likes_ref.set({
+                'user_id': user_id,
+                'user_name': user.get('user_name', 'Anonymous'),
+                'created_at': datetime.now().isoformat()
+            })
+            logger.info(f"User {user_id} liked daily verse for {date}")
+            return jsonify({'message': 'Verse liked', 'liked': True}), 200
+        else:
+            # Unlike the verse
+            likes_ref.delete()
+            logger.info(f"User {user_id} unliked daily verse for {date}")
+            return jsonify({'message': 'Verse unliked', 'liked': False}), 200
+            
+    except Exception as e:
+        logger.error(f"Error toggling verse like: {e}")
+        logger.exception("Full traceback for verse like error:")
+        return jsonify({'error': 'Failed to update like'}), 500
+
+@verse_bp.route('/today-verse/<date>/likes', methods=['GET'])
+def get_daily_verse_likes(date):
+    """Get likes count and check if current user has liked"""
+    try:
+        db = get_firestore_client()
+        if not db:
+            return jsonify({'error': 'Database unavailable'}), 500
+        
+        verse_ref = db.collection('daily_verses').document(date)
+        likes = verse_ref.collection('likes').stream()
+        
+        likes_list = [like.to_dict() for like in likes]
+        likes_count = len(likes_list)
+        
+        # Check if current user has liked
+        user = get_user_from_session()
+        user_liked = False
+        if user:
+            user_id = user.get('user_id')
+            user_liked = any(like.get('user_id') == user_id for like in likes_list)
+        
+        return jsonify({
+            'count': likes_count,
+            'liked': user_liked
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting verse likes: {e}")
+        return jsonify({'error': 'Failed to get likes', 'count': 0, 'liked': False}), 500
+
+@verse_bp.route('/today-verse/<date>/share', methods=['POST'])
+def track_daily_verse_share(date):
+    """Track a share of a daily verse"""
+    try:
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        user_id = user.get('user_id')
+        data = request.get_json() or {}
+        platform = data.get('platform', 'unknown')
+        
+        db = get_firestore_client()
+        if not db:
+            return jsonify({'error': 'Database unavailable'}), 500
+        
+        verse_ref = db.collection('daily_verses').document(date)
+        share_ref = verse_ref.collection('shares').document()
+        
+        share_ref.set({
+            'user_id': user_id,
+            'user_name': user.get('user_name', 'Anonymous'),
+            'platform': platform,
+            'created_at': datetime.now().isoformat()
+        })
+        
+        logger.info(f"User {user_id} shared daily verse for {date} on {platform}")
+        return jsonify({'message': 'Share tracked'}), 200
+        
+    except Exception as e:
+        logger.error(f"Error tracking verse share: {e}")
+        return jsonify({'error': 'Failed to track share'}), 500
+
+@verse_bp.route('/today-verse/<date>/shares', methods=['GET'])
+def get_daily_verse_shares(date):
+    """Get shares count for a daily verse"""
+    try:
+        db = get_firestore_client()
+        if not db:
+            return jsonify({'error': 'Database unavailable'}), 500
+        
+        verse_ref = db.collection('daily_verses').document(date)
+        shares = verse_ref.collection('shares').stream()
+        
+        shares_count = len(list(shares))
+        
+        return jsonify({
+            'count': shares_count
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting verse shares: {e}")
+        return jsonify({'error': 'Failed to get shares', 'count': 0}), 500
+
+@verse_bp.route('/today-verse/<date>/interactions', methods=['GET'])
+def get_daily_verse_interactions(date):
+    """Get all interaction counts for a daily verse (likes, shares)"""
+    try:
+        db = get_firestore_client()
+        if not db:
+            return jsonify({'error': 'Database unavailable'}), 500
+        
+        verse_ref = db.collection('daily_verses').document(date)
+        
+        # Get likes
+        likes = list(verse_ref.collection('likes').stream())
+        likes_count = len(likes)
+        
+        # Get shares count
+        shares = list(verse_ref.collection('shares').stream())
+        shares_count = len(shares)
+        
+        # Check if current user has liked
+        user = get_user_from_session()
+        user_liked = False
+        if user:
+            user_id = user.get('user_id')
+            user_liked = any(like.to_dict().get('user_id') == user_id for like in likes)
+        
+        return jsonify({
+            'likes': {
+                'count': likes_count,
+                'liked': user_liked
+            },
+            'shares': {
+                'count': shares_count
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting verse interactions: {e}")
+        return jsonify({
+            'error': 'Failed to get interactions',
+            'likes': {'count': 0, 'liked': False},
+            'shares': {'count': 0}
+        }), 500 

@@ -6,6 +6,8 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from input_validation import validate_request, sanitize_string
 from auth_decorators import verify_cloud_scheduler
+from auth_helpers import get_user_from_session
+from firebase_auth import get_firestore_client
 
 logger = logging.getLogger(__name__)
 prayer_bp = Blueprint('prayer', __name__)
@@ -562,4 +564,246 @@ def download_prayer_image():
     except Exception as e:
         logger.error(f"Error generating prayer image: {e}")
         logger.exception("Full traceback:")
-        return jsonify({'error': 'Failed to generate image'}), 500 
+        return jsonify({'error': 'Failed to generate image'}), 500
+
+# Daily Prayer Interactions Endpoints
+@prayer_bp.route('/daily-prayer/<date>/like', methods=['POST', 'DELETE'])
+def toggle_daily_prayer_like(date):
+    """Like or unlike a daily prayer"""
+    try:
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        user_id = user.get('user_id')
+        db = get_firestore_client()
+        if not db:
+            return jsonify({'error': 'Database unavailable'}), 500
+        
+        prayer_ref = db.collection('daily_prayers').document(date)
+        likes_ref = prayer_ref.collection('likes').document(user_id)
+        
+        if request.method == 'POST':
+            # Like the prayer
+            likes_ref.set({
+                'user_id': user_id,
+                'user_name': user.get('user_name', 'Anonymous'),
+                'created_at': datetime.now().isoformat()
+            })
+            logger.info(f"User {user_id} liked daily prayer for {date}")
+            return jsonify({'message': 'Prayer liked', 'liked': True}), 200
+        else:
+            # Unlike the prayer
+            likes_ref.delete()
+            logger.info(f"User {user_id} unliked daily prayer for {date}")
+            return jsonify({'message': 'Prayer unliked', 'liked': False}), 200
+            
+    except Exception as e:
+        logger.error(f"Error toggling like: {e}")
+        logger.exception("Full traceback for like error:")
+        return jsonify({'error': 'Failed to update like'}), 500
+
+@prayer_bp.route('/daily-prayer/<date>/likes', methods=['GET'])
+def get_daily_prayer_likes(date):
+    """Get likes count and check if current user has liked"""
+    try:
+        db = get_firestore_client()
+        if not db:
+            return jsonify({'error': 'Database unavailable'}), 500
+        
+        prayer_ref = db.collection('daily_prayers').document(date)
+        likes = prayer_ref.collection('likes').stream()
+        
+        likes_list = [like.to_dict() for like in likes]
+        likes_count = len(likes_list)
+        
+        # Check if current user has liked
+        user = get_user_from_session()
+        user_liked = False
+        if user:
+            user_id = user.get('user_id')
+            user_liked = any(like.get('user_id') == user_id for like in likes_list)
+        
+        return jsonify({
+            'count': likes_count,
+            'liked': user_liked
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting likes: {e}")
+        return jsonify({'error': 'Failed to get likes', 'count': 0, 'liked': False}), 500
+
+@prayer_bp.route('/daily-prayer/<date>/comment', methods=['POST'])
+def add_daily_prayer_comment(date):
+    """Add a comment to a daily prayer"""
+    try:
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        data = request.get_json()
+        comment_text = sanitize_string(data.get('comment', ''), max_length=500)
+        
+        if not comment_text:
+            return jsonify({'error': 'Comment text is required'}), 400
+        
+        user_id = user.get('user_id')
+        user_name = user.get('user_name', 'Anonymous')
+        
+        db = get_firestore_client()
+        if not db:
+            return jsonify({'error': 'Database unavailable'}), 500
+        
+        prayer_ref = db.collection('daily_prayers').document(date)
+        comment_ref = prayer_ref.collection('comments').document()
+        
+        comment_data = {
+            'user_id': user_id,
+            'user_name': user_name,
+            'comment': comment_text,
+            'created_at': datetime.now().isoformat()
+        }
+        
+        comment_ref.set(comment_data)
+        comment_data['id'] = comment_ref.id
+        
+        logger.info(f"User {user_id} commented on daily prayer for {date}")
+        return jsonify({
+            'message': 'Comment added',
+            'comment': comment_data
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error adding comment: {e}")
+        return jsonify({'error': 'Failed to add comment'}), 500
+
+@prayer_bp.route('/daily-prayer/<date>/comments', methods=['GET'])
+def get_daily_prayer_comments(date):
+    """Get comments count for a daily prayer"""
+    try:
+        db = get_firestore_client()
+        if not db:
+            return jsonify({'error': 'Database unavailable'}), 500
+        
+        prayer_ref = db.collection('daily_prayers').document(date)
+        comments = prayer_ref.collection('comments').order_by('created_at', direction='DESCENDING').limit(100).stream()
+        
+        comments_list = []
+        for comment in comments:
+            comment_data = comment.to_dict()
+            comment_data['id'] = comment.id
+            comments_list.append(comment_data)
+        
+        return jsonify({
+            'count': len(comments_list),
+            'comments': comments_list
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting comments: {e}")
+        return jsonify({'error': 'Failed to get comments', 'count': 0, 'comments': []}), 500
+
+@prayer_bp.route('/daily-prayer/<date>/share', methods=['POST'])
+def track_daily_prayer_share(date):
+    """Track a share of a daily prayer"""
+    try:
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        user_id = user.get('user_id')
+        data = request.get_json() or {}
+        platform = data.get('platform', 'unknown')  # e.g., 'facebook', 'twitter', 'copy_link'
+        
+        db = get_firestore_client()
+        if not db:
+            return jsonify({'error': 'Database unavailable'}), 500
+        
+        prayer_ref = db.collection('daily_prayers').document(date)
+        share_ref = prayer_ref.collection('shares').document()
+        
+        share_ref.set({
+            'user_id': user_id,
+            'user_name': user.get('user_name', 'Anonymous'),
+            'platform': platform,
+            'created_at': datetime.now().isoformat()
+        })
+        
+        logger.info(f"User {user_id} shared daily prayer for {date} on {platform}")
+        return jsonify({'message': 'Share tracked'}), 200
+        
+    except Exception as e:
+        logger.error(f"Error tracking share: {e}")
+        return jsonify({'error': 'Failed to track share'}), 500
+
+@prayer_bp.route('/daily-prayer/<date>/shares', methods=['GET'])
+def get_daily_prayer_shares(date):
+    """Get shares count for a daily prayer"""
+    try:
+        db = get_firestore_client()
+        if not db:
+            return jsonify({'error': 'Database unavailable'}), 500
+        
+        prayer_ref = db.collection('daily_prayers').document(date)
+        shares = prayer_ref.collection('shares').stream()
+        
+        shares_count = len(list(shares))
+        
+        return jsonify({
+            'count': shares_count
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting shares: {e}")
+        return jsonify({'error': 'Failed to get shares', 'count': 0}), 500
+
+@prayer_bp.route('/daily-prayer/<date>/interactions', methods=['GET'])
+def get_daily_prayer_interactions(date):
+    """Get all interaction counts for a daily prayer (likes, comments, shares)"""
+    try:
+        db = get_firestore_client()
+        if not db:
+            return jsonify({'error': 'Database unavailable'}), 500
+        
+        prayer_ref = db.collection('daily_prayers').document(date)
+        
+        # Get likes
+        likes = list(prayer_ref.collection('likes').stream())
+        likes_count = len(likes)
+        
+        # Get comments count
+        comments = list(prayer_ref.collection('comments').stream())
+        comments_count = len(comments)
+        
+        # Get shares count
+        shares = list(prayer_ref.collection('shares').stream())
+        shares_count = len(shares)
+        
+        # Check if current user has liked
+        user = get_user_from_session()
+        user_liked = False
+        if user:
+            user_id = user.get('user_id')
+            user_liked = any(like.to_dict().get('user_id') == user_id for like in likes)
+        
+        return jsonify({
+            'likes': {
+                'count': likes_count,
+                'liked': user_liked
+            },
+            'comments': {
+                'count': comments_count
+            },
+            'shares': {
+                'count': shares_count
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting interactions: {e}")
+        return jsonify({
+            'error': 'Failed to get interactions',
+            'likes': {'count': 0, 'liked': False},
+            'comments': {'count': 0},
+            'shares': {'count': 0}
+        }), 500 
