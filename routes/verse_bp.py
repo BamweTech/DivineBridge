@@ -339,4 +339,62 @@ def get_daily_verse_interactions(date):
             'error': 'Failed to get interactions',
             'likes': {'count': 0, 'liked': False},
             'shares': {'count': 0}
+        }), 500
+
+@verse_bp.route('/upcoming-verses', methods=['GET'])
+def get_upcoming_verses():
+    """Get verses for the next 7 days"""
+    try:
+        from datetime import timedelta
+        
+        # Get client's local date from query parameter
+        client_date = request.args.get('client_date')
+        
+        if client_date:
+            try:
+                base_date = datetime.strptime(client_date, '%Y-%m-%d')
+            except ValueError:
+                logger.warning(f"Invalid client_date format: {client_date}, using server time")
+                base_date = datetime.now()
+        else:
+            base_date = datetime.now()
+        
+        # Get verses for next 7 days
+        verses_list = []
+        for i in range(7):
+            date = base_date + timedelta(days=i)
+            date_str = date.strftime('%Y-%m-%d')
+            day_of_year = date.timetuple().tm_yday
+            
+            # Get verse for this day
+            verse = current_app.verse_cache.get_today_verse(day_of_year=day_of_year)
+            
+            if verse:
+                verses_list.append({
+                    'date': date_str,
+                    'day_name': date.strftime('%A'),
+                    'day_of_year': day_of_year,
+                    'verse': verse['verse'],
+                    'reference': verse['reference']
+                })
+            else:
+                # Fallback if verse not found
+                verses_list.append({
+                    'date': date_str,
+                    'day_name': date.strftime('%A'),
+                    'day_of_year': day_of_year,
+                    'verse': 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.',
+                    'reference': 'John 3:16'
+                })
+        
+        return jsonify({
+            'success': True,
+            'verses': verses_list
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting upcoming verses: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Failed to get upcoming verses'
         }), 500 
