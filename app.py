@@ -638,11 +638,6 @@ def create_app():
         """Serve the change password page"""
         return render_template('change_password.html')
     
-    @app.route('/upcoming-verses')
-    def upcoming_verses():
-        """Serve the upcoming verses page"""
-        return render_template('upcoming_verses.html')
-    
     @app.route('/card/<user_id>')
     def public_card(user_id):
         """Serve the public business card page"""
