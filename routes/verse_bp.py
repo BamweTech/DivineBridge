@@ -122,6 +122,61 @@ def download_verse_image():
         logger.error(f"Error generating verse image: {e}")
         return jsonify({'error': 'Failed to generate image'}), 500
 
+@verse_bp.route('/today-verse/<date>/image', methods=['GET'])
+def get_daily_verse_image(date):
+    """Serve daily verse image for sharing (not download)"""
+    try:
+        # Try to get cached image first
+        cached_image = current_app.storage_handler.get_verse_image(date)
+        if cached_image:
+            logger.info(f"Serving verse image for sharing: {date}")
+            from io import BytesIO
+            image_data = BytesIO(cached_image)
+            return send_file(
+                image_data,
+                mimetype='image/jpeg',
+                as_attachment=False
+            )
+        
+        # If no cached image, generate it
+        try:
+            client_datetime = datetime.strptime(date, '%Y-%m-%d')
+            day_of_year = client_datetime.timetuple().tm_yday
+            date_str = client_datetime.strftime('%B %d, %Y')
+        except ValueError:
+            day_of_year = None
+            date_str = datetime.now().strftime('%B %d, %Y')
+        
+        verse = current_app.verse_cache.get_today_verse(day_of_year=day_of_year)
+        if not verse:
+            return jsonify({'error': 'No verse available'}), 404
+        
+        # Generate image
+        from image_generator import get_image_generator
+        generator = get_image_generator()
+        
+        image_data = generator.generate_verse_image(
+            verse_text=verse['verse'],
+            reference=verse['reference'],
+            date=date_str
+        )
+        
+        # Save to cache
+        image_bytes = image_data.getvalue()
+        current_app.storage_handler.save_verse_image(date, image_bytes)
+        
+        # Reset and send
+        image_data.seek(0)
+        return send_file(
+            image_data,
+            mimetype='image/jpeg',
+            as_attachment=False
+        )
+        
+    except Exception as e:
+        logger.error(f"Error serving verse image: {e}")
+        return jsonify({'error': 'Failed to generate image'}), 500
+
 # Daily Verse Interactions Endpoints
 @verse_bp.route('/today-verse/<date>/like', methods=['POST', 'DELETE'])
 def toggle_daily_verse_like(date):

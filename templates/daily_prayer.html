@@ -553,6 +553,18 @@
     let currentPrayerDatePage = null;
     let userLikedPage = false;
     
+    // Helper function to update count display (hide when 0)
+    function updateCountDisplay(elementId, count) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            if (count > 0) {
+                element.textContent = count;
+            } else {
+                element.textContent = '';
+            }
+        }
+    }
+    
     async function getFirebaseIdTokenPage() {
         if (typeof firebase !== 'undefined' && firebase.auth().currentUser) {
             try {
@@ -582,7 +594,7 @@
                 const data = await response.json();
                 
                 // Update like button
-                document.getElementById('like-count').textContent = data.likes.count || 0;
+                updateCountDisplay('like-count', data.likes.count || 0);
                 userLikedPage = data.likes.liked || false;
                 const likeBtn = document.getElementById('like-btn');
                 if (userLikedPage) {
@@ -592,17 +604,17 @@
                 }
                 
                 // Update comment count
-                document.getElementById('comment-count').textContent = data.comments.count || 0;
+                updateCountDisplay('comment-count', data.comments.count || 0);
                 
                 // Update share count
-                document.getElementById('share-count').textContent = data.shares.count || 0;
+                updateCountDisplay('share-count', data.shares.count || 0);
             }
         } catch (error) {
             console.error('Error loading interactions:', error);
             // Still show buttons even if loading fails
-            document.getElementById('like-count').textContent = '0';
-            document.getElementById('comment-count').textContent = '0';
-            document.getElementById('share-count').textContent = '0';
+            updateCountDisplay('like-count', 0);
+            updateCountDisplay('comment-count', 0);
+            updateCountDisplay('share-count', 0);
         }
     }
     
@@ -642,13 +654,14 @@
                 userLikedPage = !userLikedPage;
                 const likeBtn = document.getElementById('like-btn');
                 const countEl = document.getElementById('like-count');
+                const currentCount = parseInt(countEl.textContent) || 0;
                 
                 if (userLikedPage) {
                     likeBtn.classList.add('liked');
-                    countEl.textContent = parseInt(countEl.textContent) + 1;
+                    updateCountDisplay('like-count', currentCount + 1);
                 } else {
                     likeBtn.classList.remove('liked');
-                    countEl.textContent = Math.max(0, parseInt(countEl.textContent) - 1);
+                    updateCountDisplay('like-count', Math.max(0, currentCount - 1));
                 }
             } else {
                 const error = await response.json();
@@ -769,7 +782,8 @@
             if (response.ok) {
                 document.getElementById('comment-text').value = '';
                 const countEl = document.getElementById('comment-count');
-                countEl.textContent = parseInt(countEl.textContent) + 1;
+                const currentCount = parseInt(countEl.textContent) || 0;
+                updateCountDisplay('comment-count', currentCount + 1);
                 loadComments();
             } else {
                 const error = await response.json();
@@ -796,6 +810,7 @@
         
         const shareUrl = window.location.href;
         const shareText = 'Check out today\'s daily prayer on Divine Bridge!';
+        const imageUrl = `${window.location.origin}/api/prayer/daily-prayer/${currentPrayerDatePage}/image`;
         
         try {
             // Track share
@@ -810,12 +825,34 @@
                     body: JSON.stringify({ platform: 'web' })
                 }).then(() => {
                     const countEl = document.getElementById('share-count');
-                    countEl.textContent = parseInt(countEl.textContent) + 1;
+                    const currentCount = parseInt(countEl.textContent) || 0;
+                    updateCountDisplay('share-count', currentCount + 1);
                 }).catch(err => console.error('Error tracking share:', err));
             }
             
             // Use Web Share API if available
             if (navigator.share) {
+                try {
+                    // Fetch the image as a File for sharing
+                    const imageResponse = await fetch(imageUrl);
+                    const imageBlob = await imageResponse.blob();
+                    const imageFile = new File([imageBlob], `daily_prayer_${currentPrayerDatePage}.jpg`, { type: 'image/jpeg' });
+                    
+                    // Check if files can be shared
+                    if (navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+                        await navigator.share({
+                            title: 'Daily Prayer - Divine Bridge',
+                            text: shareText,
+                            url: shareUrl,
+                            files: [imageFile]
+                        });
+                        return;
+                    }
+                } catch (imageError) {
+                    console.log('Could not share with image, falling back to text-only share:', imageError);
+                }
+                
+                // Fallback: Share without image
                 await navigator.share({
                     title: 'Daily Prayer - Divine Bridge',
                     text: shareText,

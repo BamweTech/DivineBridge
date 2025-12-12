@@ -566,6 +566,66 @@ def download_prayer_image():
         logger.exception("Full traceback:")
         return jsonify({'error': 'Failed to generate image'}), 500
 
+@prayer_bp.route('/daily-prayer/<date>/image', methods=['GET'])
+def get_daily_prayer_image(date):
+    """Serve daily prayer image for sharing (not download)"""
+    try:
+        # Try to get cached image first
+        cached_image = current_app.storage_handler.get_prayer_image(date)
+        if cached_image:
+            logger.info(f"Serving prayer image for sharing: {date}")
+            from io import BytesIO
+            image_data = BytesIO(cached_image)
+            return send_file(
+                image_data,
+                mimetype='image/jpeg',
+                as_attachment=False
+            )
+        
+        # If no cached image, generate it
+        prayer = current_app.storage_handler.get_prayer(date)
+        if not prayer:
+            return jsonify({'error': 'No prayer available'}), 404
+        
+        # Extract prayer content
+        if isinstance(prayer, dict):
+            prayer_content = prayer.get('content', '')
+        else:
+            prayer_content = prayer
+        
+        if not prayer_content:
+            return jsonify({'error': 'Prayer content is empty'}), 404
+        
+        # Generate image
+        from image_generator import get_image_generator
+        generator = get_image_generator()
+        try:
+            client_datetime = datetime.strptime(date, '%Y-%m-%d')
+            date_str = client_datetime.strftime('%B %d, %Y')
+        except ValueError:
+            date_str = datetime.now().strftime('%B %d, %Y')
+        
+        image_data = generator.generate_prayer_image(
+            prayer_text=prayer_content,
+            date=date_str
+        )
+        
+        # Save to cache
+        image_bytes = image_data.getvalue()
+        current_app.storage_handler.save_prayer_image(date, image_bytes)
+        
+        # Reset and send
+        image_data.seek(0)
+        return send_file(
+            image_data,
+            mimetype='image/jpeg',
+            as_attachment=False
+        )
+        
+    except Exception as e:
+        logger.error(f"Error serving prayer image: {e}")
+        return jsonify({'error': 'Failed to generate image'}), 500
+
 # Daily Prayer Interactions Endpoints
 @prayer_bp.route('/daily-prayer/<date>/like', methods=['POST', 'DELETE'])
 def toggle_daily_prayer_like(date):

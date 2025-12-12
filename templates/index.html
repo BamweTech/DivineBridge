@@ -1860,6 +1860,7 @@
         
         const shareUrl = `${window.location.origin}/daily-prayer`;
         const shareText = 'Check out today\'s daily prayer on Divine Bridge!';
+        const imageUrl = `${window.location.origin}/api/prayer/daily-prayer/${currentPrayerDate}/image`;
         
         try {
             // Track share
@@ -1881,6 +1882,27 @@
             
             // Use Web Share API if available
             if (navigator.share) {
+                try {
+                    // Fetch the image as a File for sharing
+                    const imageResponse = await fetch(imageUrl);
+                    const imageBlob = await imageResponse.blob();
+                    const imageFile = new File([imageBlob], `daily_prayer_${currentPrayerDate}.jpg`, { type: 'image/jpeg' });
+                    
+                    // Check if files can be shared
+                    if (navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+                        await navigator.share({
+                            title: 'Daily Prayer - Divine Bridge',
+                            text: shareText,
+                            url: shareUrl,
+                            files: [imageFile]
+                        });
+                        return;
+                    }
+                } catch (imageError) {
+                    console.log('Could not share with image, falling back to text-only share:', imageError);
+                }
+                
+                // Fallback: Share without image
                 await navigator.share({
                     title: 'Daily Prayer - Divine Bridge',
                     text: shareText,
@@ -2034,6 +2056,7 @@
         const verseText = document.querySelector('.verse-text')?.textContent || '';
         const verseRef = document.querySelector('.verse-reference span')?.textContent || '';
         const shareText = `${verseText} - ${verseRef}`;
+        const imageUrl = `${window.location.origin}/api/today-verse/${currentVerseDate}/image`;
         
         try {
             // Track share
@@ -2055,6 +2078,27 @@
             
             // Use Web Share API if available
             if (navigator.share) {
+                try {
+                    // Fetch the image as a File for sharing
+                    const imageResponse = await fetch(imageUrl);
+                    const imageBlob = await imageResponse.blob();
+                    const imageFile = new File([imageBlob], `daily_verse_${currentVerseDate}.jpg`, { type: 'image/jpeg' });
+                    
+                    // Check if files can be shared
+                    if (navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+                        await navigator.share({
+                            title: 'Daily Verse - Divine Bridge',
+                            text: shareText,
+                            url: shareUrl,
+                            files: [imageFile]
+                        });
+                        return;
+                    }
+                } catch (imageError) {
+                    console.log('Could not share with image, falling back to text-only share:', imageError);
+                }
+                
+                // Fallback: Share without image
                 await navigator.share({
                     title: 'Daily Verse - Divine Bridge',
                     text: shareText,
