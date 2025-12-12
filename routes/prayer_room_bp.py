@@ -2010,9 +2010,13 @@ def get_my_scheduled_rooms():
         # Sort by scheduled_time in Python (since we can't order_by in the query)
         scheduled_rooms.sort(key=lambda x: x.get('scheduled_time', 0), reverse=False)
         
-        # Filter out past scheduled meetings
+        # Filter out past scheduled meetings and cancelled rooms
         now = datetime.now().timestamp()
-        future_scheduled_rooms = [room for room in scheduled_rooms if room.get('scheduled_time', 0) > now]
+        future_scheduled_rooms = [
+            room for room in scheduled_rooms 
+            if room.get('scheduled_time', 0) > now 
+            and room.get('status') != 'cancelled'
+        ]
         
         return jsonify({'scheduled_rooms': future_scheduled_rooms})
         
@@ -2022,7 +2026,14 @@ def get_my_scheduled_rooms():
 
 @prayer_room_bp.route('/scheduled-room/<scheduled_room_id>', methods=['DELETE'])
 def cancel_scheduled_room(scheduled_room_id):
-    """Cancel a scheduled room"""
+    """Cancel a scheduled room
+    
+    Handles both regular scheduled rooms and recurring sessions:
+    - If canceling a recurring parent (is_recurring=True), cancels all future instances
+    - If canceling a recurring instance (is_recurring_instance=True), can cancel:
+      * Just this instance (default)
+      * Entire series (if cancel_all=true query parameter)
+    """
     try:
         user = get_user_from_session()
         
@@ -2030,6 +2041,9 @@ def cancel_scheduled_room(scheduled_room_id):
             return jsonify({'error': 'Authentication required'}), 401
         
         db = get_firestore_client()
+        
+        # Get query parameter for canceling entire series
+        cancel_all = request.args.get('cancel_all', 'false').lower() == 'true'
         
         # Get the scheduled room
         scheduled_room_ref = db.collection('scheduled_rooms').document(scheduled_room_id)
@@ -2044,10 +2058,91 @@ def cancel_scheduled_room(scheduled_room_id):
         if scheduled_room_data.get('host_id') != user['user_id']:
             return jsonify({'error': 'Only the host can cancel scheduled rooms'}), 403
         
-        # Delete the scheduled room
-        scheduled_room_ref.delete()
+        is_recurring = scheduled_room_data.get('is_recurring', False)
+        is_recurring_instance = scheduled_room_data.get('is_recurring_instance', False)
+        parent_recurring_id = scheduled_room_data.get('parent_recurring_id')
         
-        return jsonify({'success': True})
+        # Handle recurring session cancellation
+        if is_recurring:
+            # This is a recurring parent - cancel all future instances
+            logging.info(f"Canceling recurring parent session {scheduled_room_id}")
+            
+            # Find all future instances linked to this parent
+            now = datetime.utcnow()
+            future_instances = db.collection('scheduled_rooms')\
+                .where('parent_recurring_id', '==', scheduled_room_id)\
+                .where('scheduled_time', '>', now)\
+                .where('status', '==', 'scheduled')\
+                .stream()
+            
+            instances_canceled = 0
+            for instance_doc in future_instances:
+                instance_doc.reference.delete()
+                instances_canceled += 1
+            
+            # Mark the parent as cancelled (don't delete, so we can track it)
+            scheduled_room_ref.update({
+                'status': 'cancelled',
+                'cancelled_at': datetime.utcnow()
+            })
+            
+            logging.info(f"Cancelled recurring parent {scheduled_room_id} and {instances_canceled} future instances")
+            return jsonify({
+                'success': True,
+                'recurring_parent': True,
+                'instances_canceled': instances_canceled
+            })
+        
+        elif is_recurring_instance and cancel_all:
+            # Cancel entire recurring series by canceling the parent
+            if not parent_recurring_id:
+                return jsonify({'error': 'Parent recurring session not found'}), 404
+            
+            parent_ref = db.collection('scheduled_rooms').document(parent_recurring_id)
+            parent_doc = parent_ref.get()
+            
+            if not parent_doc.exists:
+                return jsonify({'error': 'Parent recurring session not found'}), 404
+            
+            parent_data = parent_doc.to_dict()
+            
+            # Verify user owns the parent
+            if parent_data.get('host_id') != user['user_id']:
+                return jsonify({'error': 'Only the host can cancel the entire series'}), 403
+            
+            # Cancel all future instances
+            now = datetime.utcnow()
+            future_instances = db.collection('scheduled_rooms')\
+                .where('parent_recurring_id', '==', parent_recurring_id)\
+                .where('scheduled_time', '>', now)\
+                .where('status', '==', 'scheduled')\
+                .stream()
+            
+            instances_canceled = 0
+            for instance_doc in future_instances:
+                instance_doc.reference.delete()
+                instances_canceled += 1
+            
+            # Mark the parent as cancelled
+            parent_ref.update({
+                'status': 'cancelled',
+                'cancelled_at': datetime.utcnow()
+            })
+            
+            # Delete the current instance
+            scheduled_room_ref.delete()
+            
+            logging.info(f"Cancelled entire recurring series {parent_recurring_id} and {instances_canceled} future instances")
+            return jsonify({
+                'success': True,
+                'recurring_series_canceled': True,
+                'instances_canceled': instances_canceled
+            })
+        
+        else:
+            # Regular scheduled room or single recurring instance
+            scheduled_room_ref.delete()
+            return jsonify({'success': True})
         
     except Exception as e:
         logging.error(f"Error canceling scheduled room: {str(e)}")
@@ -3190,7 +3285,7 @@ def generate_recurring_instances():
         # - "active" = currently live (but still need to generate future instances)
         all_recurring = []
         
-        # Get scheduled recurring sessions
+        # Get scheduled recurring sessions (exclude cancelled)
         scheduled_recurring = db.collection('scheduled_rooms')\
             .where('is_recurring', '==', True)\
             .where('status', '==', 'scheduled')\
@@ -3203,6 +3298,9 @@ def generate_recurring_instances():
             .where('status', '==', 'active')\
             .stream()
         all_recurring.extend(list(active_recurring))
+        
+        # Filter out cancelled recurring sessions
+        all_recurring = [doc for doc in all_recurring if doc.to_dict().get('status') != 'cancelled']
         
         logging.info(f"Found {len(all_recurring)} recurring sessions (scheduled + active)")
         

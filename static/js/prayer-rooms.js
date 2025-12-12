@@ -451,7 +451,7 @@ class PrayerRoomsDirectory {
                             <button class="btn btn-outline" onclick="shareScheduledRoom('${room.scheduled_room_id}', '${this.escapeHtml(room.room_name)}', '${room.scheduled_time}', '${room.room_code || ''}', '${room.room_privacy}')">
                                 Share
                             </button>
-                            <button class="btn btn-danger" onclick="cancelScheduledRoom('${room.scheduled_room_id}')">
+                            <button class="btn btn-danger" onclick="cancelScheduledRoom('${room.scheduled_room_id}', '${this.escapeHtml(room.room_name)}', ${room.is_recurring ? 'true' : 'false'}, ${room.is_recurring_instance ? 'true' : 'false'}, '${room.parent_recurring_id || ''}')">
                                 Cancel
                             </button>` :
                             `<button class="btn btn-secondary" onclick="reopenRoom('${room.room_id || room.original_room_id || room.scheduled_room_id}')">
@@ -581,16 +581,25 @@ class PrayerRoomsDirectory {
         }
     }
 
-    async cancelScheduledRoom(scheduledRoomId) {
+    async cancelScheduledRoom(scheduledRoomId, cancelAll = false) {
         try {
-            console.log('Canceling scheduled room:', scheduledRoomId);
+            console.log('Canceling scheduled room:', scheduledRoomId, 'cancelAll:', cancelAll);
             
-            const result = await this.makeAuthenticatedRequest(`/api/prayer-room/scheduled-room/${scheduledRoomId}`, {
+            const url = `/api/prayer-room/scheduled-room/${scheduledRoomId}`;
+            const queryParams = cancelAll ? '?cancel_all=true' : '';
+            
+            const result = await this.makeAuthenticatedRequest(url + queryParams, {
                 method: 'DELETE'
             });
             
             if (result.success) {
-                alert('Scheduled room canceled successfully!');
+                const responseData = result.data || {};
+                const message = responseData.recurring_series_canceled 
+                    ? `Recurring series canceled successfully! ${responseData.instances_canceled || 0} future instances were also canceled.`
+                    : responseData.recurring_parent
+                    ? `Recurring session canceled successfully! ${responseData.instances_canceled || 0} future instances were also canceled.`
+                    : 'Scheduled room canceled successfully!';
+                alert(message);
                 // Reload the scheduled rooms
                 this.loadMyScheduledRooms();
             } else if (result.needsLogin) {
@@ -960,23 +969,7 @@ function reopenRoom(originalRoomId) {
     prayerRoomsDirectory.reopenRoom(originalRoomId);
 }
 
-function cancelScheduledRoom(scheduledRoomId) {
-    if (!scheduledRoomId) {
-        alert('Scheduled room ID not found');
-        return;
-    }
-    
-    const confirmed = confirm('Are you sure you want to cancel this scheduled room?');
-    if (!confirmed) return;
-    
-    const prayerRoomsDirectory = window.prayerRoomsDirectory;
-    if (!prayerRoomsDirectory) {
-        alert('Prayer rooms directory not initialized');
-        return;
-    }
-    
-    prayerRoomsDirectory.cancelScheduledRoom(scheduledRoomId);
-}
+// Legacy function removed - use the async version below
 
 function deletePastScheduledRoom(scheduledRoomId, roomName = 'this session') {
     if (!scheduledRoomId) {
@@ -1145,23 +1138,54 @@ async function reopenRoom(roomId) {
     await prayerRoomsDirectory.reopenRoom(roomId);
 }
 
-async function cancelScheduledRoom(scheduledRoomId, roomName = '') {
-    const confirmMessage = roomName ? 
-        `Are you sure you want to cancel the scheduled room "${roomName}"?` :
-        'Are you sure you want to cancel this scheduled room?';
-        
-    if (!confirm(confirmMessage)) {
-        return;
-    }
-    
+async function cancelScheduledRoom(scheduledRoomId, roomName = '', isRecurring = false, isRecurringInstance = false, parentRecurringId = '') {
     const prayerRoomsDirectory = window.prayerRoomsDirectory;
     if (!prayerRoomsDirectory) {
         alert('Prayer rooms directory not initialized');
         return;
     }
     
+    let cancelAll = false;
+    
+    // Handle recurring session cancellation
+    if (isRecurring) {
+        // This is a recurring parent - cancel entire series
+        const confirmMessage = roomName ? 
+            `Are you sure you want to cancel the entire recurring series "${roomName}"?\n\nThis will cancel all future instances of this recurring session.` :
+            'Are you sure you want to cancel this entire recurring series?\n\nThis will cancel all future instances.';
+        
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+        cancelAll = true; // For parent, always cancel all
+    } else if (isRecurringInstance) {
+        // This is a recurring instance - ask if they want to cancel just this one or the entire series
+        const instanceMessage = roomName ? 
+            `This is part of a recurring series "${roomName}".\n\nWould you like to:` :
+            'This is part of a recurring series.\n\nWould you like to:';
+        
+        const cancelChoice = confirm(
+            instanceMessage + '\n\nOK = Cancel entire series\nCancel = Cancel only this instance'
+        );
+        
+        if (cancelChoice === null) {
+            return; // User closed the dialog
+        }
+        
+        cancelAll = cancelChoice; // true = cancel entire series, false = cancel just this instance
+    } else {
+        // Regular scheduled room
+        const confirmMessage = roomName ? 
+            `Are you sure you want to cancel the scheduled room "${roomName}"?` :
+            'Are you sure you want to cancel this scheduled room?';
+        
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+    }
+    
     // Use the class method which handles authentication properly
-    await prayerRoomsDirectory.cancelScheduledRoom(scheduledRoomId);
+    await prayerRoomsDirectory.cancelScheduledRoom(scheduledRoomId, cancelAll);
 }
 
 function copyRoomCode(roomCode) {
