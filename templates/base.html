@@ -4,19 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <title>{% block title %}Divine Bridge{% endblock %}</title>
+    <title>{% block title %}Divine Bridge - Global Prayer Community{% endblock %}</title>
     
     <!-- SEO Meta Tags -->
-    <meta name="description" content="{% block meta_description %}Join thousands of believers worldwide in daily prayer. Get today's inspiring Bible verse and unite in global prayer for those affected by disasters, wars, and crises.{% endblock %}">
-    <meta name="keywords" content="{% block meta_keywords %}Christian prayer, daily devotional, prayer request, Bible verses, global prayer community, disaster prayer, prayer support, spiritual growth{% endblock %}">
+    <meta name="description" content="{% block meta_description %}Divine Bridge connects believers worldwide in daily prayer. Join thousands in global prayer, get today's Bible verse, and unite in faith for those affected by disasters and crises.{% endblock %}">
+    <meta name="keywords" content="{% block meta_keywords %}Divine Bridge, divine bridge, Christian prayer, daily devotional, prayer request, Bible verses, global prayer community, disaster prayer, prayer support, spiritual growth{% endblock %}">
     <meta name="author" content="Divine Bridge">
     <link rel="canonical" href="{{ request.url }}">
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="{{ request.url }}">
-    <meta property="og:title" content="{% block og_title %}Divine Bridge - Unite in Faith, Hope and Prayer{% endblock %}">
-    <meta property="og:description" content="{% block og_description %}Join thousands of believers worldwide in daily prayer and spiritual growth. Get today's inspiring verse and global prayer.{% endblock %}">
+    <meta property="og:title" content="{% block og_title %}Divine Bridge - Global Prayer Community | Unite in Faith, Hope and Prayer{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}Divine Bridge connects believers worldwide in daily prayer and spiritual growth. Join thousands in global prayer, get today's inspiring verse, and unite in faith.{% endblock %}">
     <meta property="og:image" content="{% block og_image %}{{ request.url_root }}api/og-image{% endblock %}">
     <meta property="og:image:width" content="1080">
     <meta property="og:image:height" content="1350">
@@ -26,9 +26,58 @@
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:url" content="{{ request.url }}">
-    <meta name="twitter:title" content="{% block twitter_title %}Divine Bridge - Unite in Faith, Hope and Prayer{% endblock %}">
-    <meta name="twitter:description" content="{% block twitter_description %}Join thousands of believers worldwide in daily prayer and spiritual growth.{% endblock %}">
+    <meta name="twitter:title" content="{% block twitter_title %}Divine Bridge - Global Prayer Community | Unite in Faith, Hope and Prayer{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}Divine Bridge connects believers worldwide in daily prayer and spiritual growth. Join thousands in global prayer community.{% endblock %}">
     <meta name="twitter:image" content="{% block twitter_image %}{{ request.url_root }}api/og-image{% endblock %}">
+    
+    <!-- Organization Schema Markup for Brand Recognition -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Divine Bridge",
+      "alternateName": "DivineBridge",
+      "url": "https://divinebridge.io",
+      "logo": "{{ request.url_root }}static/images/LogowithName.svg",
+      "description": "Divine Bridge is a global Christian prayer community connecting believers worldwide in daily prayer, Bible verses, and spiritual support for those affected by disasters and crises.",
+      "foundingDate": "2024",
+      "sameAs": [
+        "https://divinebridge.io"
+      ],
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "Prayer Support",
+        "url": "https://divinebridge.io/contact"
+      },
+      "areaServed": {
+        "@type": "Place",
+        "name": "Worldwide"
+      },
+      "knowsAbout": [
+        "Christian Prayer",
+        "Daily Devotional",
+        "Bible Verses",
+        "Prayer Requests",
+        "Disaster Relief Prayer",
+        "Global Prayer Community"
+      ]
+    }
+    </script>
+    
+    <!-- Website Schema Markup -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Divine Bridge",
+      "url": "https://divinebridge.io",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://divinebridge.io/search?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
     
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-M61WPJL2E7"></script>
