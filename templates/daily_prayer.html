@@ -460,13 +460,31 @@
             if (response.ok) {
                 const data = await response.json();
                 console.log('Prayer API response:', data);
+                console.log('Prayers array length:', data.prayers ? data.prayers.length : 0);
                 
                 // Find today's daily prayer
-                const dailyPrayer = data.prayers ? data.prayers.find(p => 
-                    p.source === 'generated' && !p.title
-                ) : null;
+                // Check for daily prayer: source='generated' and (no title or empty title) and date matches
+                const dailyPrayer = data.prayers ? data.prayers.find(p => {
+                    const isGenerated = p.source === 'generated';
+                    const hasNoTitle = !p.title || p.title === '';
+                    const dateMatches = p.date === clientDate;
+                    const matches = isGenerated && hasNoTitle && dateMatches;
+                    console.log('Checking prayer:', { 
+                        source: p.source, 
+                        title: p.title, 
+                        date: p.date, 
+                        clientDate: clientDate,
+                        isGenerated, 
+                        hasNoTitle, 
+                        dateMatches,
+                        matches 
+                    });
+                    return matches;
+                }) : null;
                 
-                if (dailyPrayer) {
+                console.log('Found daily prayer:', dailyPrayer ? 'Yes' : 'No');
+                
+                if (dailyPrayer && dailyPrayer.content) {
                     // Display prayer - convert newlines to <br> for better mobile compatibility
                     // Escape HTML first to prevent XSS, then convert newlines to breaks
                     const escapedContent = dailyPrayer.content
@@ -497,8 +515,20 @@
                     // Load interactions
                     loadDailyPrayerInteractions(clientDate);
                 } else {
-                    // No prayer found
+                    // No prayer found - log details for debugging
                     console.log('No daily prayer found for date:', clientDate);
+                    console.log('Available prayers:', data.prayers ? data.prayers.map(p => ({
+                        source: p.source,
+                        title: p.title,
+                        date: p.date,
+                        hasContent: !!p.content
+                    })) : 'none');
+                    
+                    // Check if there are any prayers at all
+                    if (!data.prayers || data.prayers.length === 0) {
+                        console.error('No prayers returned from API');
+                    }
+                    
                     loadingState.style.display = 'none';
                     contentSection.style.display = 'none';
                     errorState.style.display = 'block';
