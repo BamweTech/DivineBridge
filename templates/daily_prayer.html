@@ -610,24 +610,58 @@
     }
     
     async function getFirebaseIdTokenPage() {
-        if (typeof firebase !== 'undefined' && firebase.auth().currentUser) {
-            try {
-                return await firebase.auth().currentUser.getIdToken();
-            } catch (error) {
-                console.error('Error getting Firebase token:', error);
-                return null;
-            }
+        // Check if Firebase is loaded and initialized
+        if (typeof firebase === 'undefined') {
+            return null;
         }
+        
+        // Check if Firebase app is initialized
+        try {
+            const apps = firebase.apps;
+            if (!apps || apps.length === 0) {
+                // Firebase not initialized yet, wait a bit and try again
+                await new Promise(resolve => setTimeout(resolve, 500));
+                const appsAfterWait = firebase.apps;
+                if (!appsAfterWait || appsAfterWait.length === 0) {
+                    return null;
+                }
+            }
+            
+            // Check if auth is available and user is logged in
+            if (firebase.auth && firebase.auth().currentUser) {
+                try {
+                    return await firebase.auth().currentUser.getIdToken();
+                } catch (error) {
+                    console.error('Error getting Firebase token:', error);
+                    return null;
+                }
+            }
+        } catch (error) {
+            console.error('Firebase not initialized:', error);
+            return null;
+        }
+        
         return null;
     }
     
     async function loadDailyPrayerInteractions(date) {
         currentPrayerDatePage = date;
         const interactionsEl = document.getElementById('daily-prayer-interactions');
+        if (!interactionsEl) {
+            console.warn('Interactions element not found');
+            return;
+        }
         interactionsEl.style.display = 'flex';
         
         try {
-            const token = await getFirebaseIdTokenPage();
+            // Get Firebase token if available (non-blocking)
+            let token = null;
+            try {
+                token = await getFirebaseIdTokenPage();
+            } catch (firebaseError) {
+                console.log('Firebase not available for interactions, continuing without auth');
+            }
+            
             const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
             
             const response = await fetch(`/api/prayer/daily-prayer/${date}/interactions`, {
@@ -944,14 +978,41 @@
     }
     
     // Update interactions when auth state changes (reload to update like status)
-    if (typeof firebase !== 'undefined') {
-        firebase.auth().onAuthStateChanged((user) => {
-            // Reload interactions if prayer is already loaded (to update like status)
-            if (currentPrayerDatePage) {
-                loadDailyPrayerInteractions(currentPrayerDatePage);
+    // Wait for Firebase to be initialized before setting up auth listener
+    function setupFirebaseAuthListener() {
+        if (typeof firebase === 'undefined') {
+            // Firebase SDK not loaded yet, try again after a delay
+            setTimeout(setupFirebaseAuthListener, 500);
+            return;
+        }
+        
+        try {
+            // Check if Firebase app is initialized
+            const apps = firebase.apps;
+            if (!apps || apps.length === 0) {
+                // Firebase not initialized yet, wait for it
+                setTimeout(setupFirebaseAuthListener, 500);
+                return;
             }
-        });
+            
+            // Firebase is initialized, set up auth listener
+            if (firebase.auth) {
+                firebase.auth().onAuthStateChanged((user) => {
+                    // Reload interactions if prayer is already loaded (to update like status)
+                    if (currentPrayerDatePage) {
+                        loadDailyPrayerInteractions(currentPrayerDatePage);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error setting up Firebase auth listener:', error);
+            // Try again after a delay
+            setTimeout(setupFirebaseAuthListener, 1000);
+        }
     }
+    
+    // Start trying to set up the listener
+    setupFirebaseAuthListener();
     
     // Load prayer when page loads
     document.addEventListener('DOMContentLoaded', () => {
