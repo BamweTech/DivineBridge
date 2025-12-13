@@ -2062,13 +2062,16 @@ def cancel_scheduled_room(scheduled_room_id):
         is_recurring_instance = scheduled_room_data.get('is_recurring_instance', False)
         parent_recurring_id = scheduled_room_data.get('parent_recurring_id')
         
+        # Import timezone for timezone-aware datetime comparisons
+        from datetime import timezone
+        
         # Handle recurring session cancellation
         if is_recurring:
             # This is a recurring parent - cancel all future instances
             logging.info(f"Canceling recurring parent session {scheduled_room_id}")
             
             # Find all future instances linked to this parent
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             future_instances = db.collection('scheduled_rooms')\
                 .where('parent_recurring_id', '==', scheduled_room_id)\
                 .where('scheduled_time', '>', now)\
@@ -2083,7 +2086,7 @@ def cancel_scheduled_room(scheduled_room_id):
             # Mark the parent as cancelled (don't delete, so we can track it)
             scheduled_room_ref.update({
                 'status': 'cancelled',
-                'cancelled_at': datetime.utcnow()
+                'cancelled_at': datetime.now(timezone.utc)
             })
             
             logging.info(f"Cancelled recurring parent {scheduled_room_id} and {instances_canceled} future instances")
@@ -2113,11 +2116,18 @@ def cancel_scheduled_room(scheduled_room_id):
                 return jsonify({'error': 'Only the host can cancel the entire series'}), 403
             
             # Cancel all future instances (including the current one if it's in the future)
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             try:
                 # Get current instance's scheduled time to check if it's in the future
                 current_instance_time = scheduled_room_data.get('scheduled_time')
-                current_is_future = current_instance_time and current_instance_time > now
+                # Handle both timezone-aware and naive datetimes
+                if current_instance_time:
+                    # If current_instance_time is naive, make it timezone-aware
+                    if current_instance_time.tzinfo is None:
+                        current_instance_time = current_instance_time.replace(tzinfo=timezone.utc)
+                    current_is_future = current_instance_time > now
+                else:
+                    current_is_future = False
                 
                 # Query for all future instances (this may or may not include the current instance)
                 future_instances_query = db.collection('scheduled_rooms')\
@@ -2146,7 +2156,7 @@ def cancel_scheduled_room(scheduled_room_id):
                 # Mark the parent as cancelled
                 parent_ref.update({
                     'status': 'cancelled',
-                    'cancelled_at': datetime.utcnow()
+                    'cancelled_at': datetime.now(timezone.utc)
                 })
                 
                 logging.info(f"Cancelled entire recurring series {parent_recurring_id} and {instances_canceled} future instances (current instance {'included' if current_is_future else 'separate'})")
