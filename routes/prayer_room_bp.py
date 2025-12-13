@@ -2096,12 +2096,14 @@ def cancel_scheduled_room(scheduled_room_id):
         elif is_recurring_instance and cancel_all:
             # Cancel entire recurring series by canceling the parent
             if not parent_recurring_id:
+                logging.error(f"Recurring instance {scheduled_room_id} has no parent_recurring_id")
                 return jsonify({'error': 'Parent recurring session not found'}), 404
             
             parent_ref = db.collection('scheduled_rooms').document(parent_recurring_id)
             parent_doc = parent_ref.get()
             
             if not parent_doc.exists:
+                logging.error(f"Parent recurring session {parent_recurring_id} not found in database")
                 return jsonify({'error': 'Parent recurring session not found'}), 404
             
             parent_data = parent_doc.to_dict()
@@ -2110,34 +2112,52 @@ def cancel_scheduled_room(scheduled_room_id):
             if parent_data.get('host_id') != user['user_id']:
                 return jsonify({'error': 'Only the host can cancel the entire series'}), 403
             
-            # Cancel all future instances
+            # Cancel all future instances (including the current one if it's in the future)
             now = datetime.utcnow()
-            future_instances = db.collection('scheduled_rooms')\
-                .where('parent_recurring_id', '==', parent_recurring_id)\
-                .where('scheduled_time', '>', now)\
-                .where('status', '==', 'scheduled')\
-                .stream()
-            
-            instances_canceled = 0
-            for instance_doc in future_instances:
-                instance_doc.reference.delete()
-                instances_canceled += 1
-            
-            # Mark the parent as cancelled
-            parent_ref.update({
-                'status': 'cancelled',
-                'cancelled_at': datetime.utcnow()
-            })
-            
-            # Delete the current instance
-            scheduled_room_ref.delete()
-            
-            logging.info(f"Cancelled entire recurring series {parent_recurring_id} and {instances_canceled} future instances")
-            return jsonify({
-                'success': True,
-                'recurring_series_canceled': True,
-                'instances_canceled': instances_canceled
-            })
+            try:
+                # Get current instance's scheduled time to check if it's in the future
+                current_instance_time = scheduled_room_data.get('scheduled_time')
+                current_is_future = current_instance_time and current_instance_time > now
+                
+                # Query for all future instances (this may or may not include the current instance)
+                future_instances_query = db.collection('scheduled_rooms')\
+                    .where('parent_recurring_id', '==', parent_recurring_id)\
+                    .where('scheduled_time', '>', now)\
+                    .where('status', '==', 'scheduled')\
+                    .stream()
+                
+                instances_canceled = 0
+                instance_ids_to_delete = []
+                for instance_doc in future_instances_query:
+                    instance_ids_to_delete.append(instance_doc.id)
+                    instances_canceled += 1
+                
+                # Delete all future instances
+                for instance_id in instance_ids_to_delete:
+                    db.collection('scheduled_rooms').document(instance_id).delete()
+                
+                # Delete the current instance if it's not already included in future instances
+                # (i.e., if it's in the past or present)
+                if scheduled_room_id not in instance_ids_to_delete:
+                    scheduled_room_ref.delete()
+                    # Current instance was separate, so we count it separately
+                    # (it's not a "future" instance, but we still canceled it)
+                
+                # Mark the parent as cancelled
+                parent_ref.update({
+                    'status': 'cancelled',
+                    'cancelled_at': datetime.utcnow()
+                })
+                
+                logging.info(f"Cancelled entire recurring series {parent_recurring_id} and {instances_canceled} future instances (current instance {'included' if current_is_future else 'separate'})")
+                return jsonify({
+                    'success': True,
+                    'recurring_series_canceled': True,
+                    'instances_canceled': instances_canceled
+                })
+            except Exception as query_error:
+                logging.error(f"Error querying/deleting future instances: {str(query_error)}", exc_info=True)
+                raise
         
         else:
             # Regular scheduled room or single recurring instance
@@ -2145,8 +2165,14 @@ def cancel_scheduled_room(scheduled_room_id):
             return jsonify({'success': True})
         
     except Exception as e:
-        logging.error(f"Error canceling scheduled room: {str(e)}")
-        return jsonify({'error': 'Failed to cancel scheduled room'}), 500
+        import traceback
+        error_trace = traceback.format_exc()
+        logging.error(f"Error canceling scheduled room {scheduled_room_id}: {str(e)}\n{error_trace}")
+        # Include error details in development for debugging
+        error_message = 'Failed to cancel scheduled room'
+        if os.getenv('FLASK_ENV') != 'production':
+            error_message = f'Failed to cancel scheduled room: {str(e)}'
+        return jsonify({'error': error_message}), 500
 
 def notify_subscribers_about_reopened_room(original_room_id, new_room_id, room_name, room_code, host_name):
     """Send email notifications to room subscribers when room is reopened"""
