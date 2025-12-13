@@ -30,6 +30,16 @@
     <meta name="twitter:description" content="{% block twitter_description %}Join thousands of believers worldwide in daily prayer and spiritual growth.{% endblock %}">
     <meta name="twitter:image" content="{% block twitter_image %}{{ request.url_root }}api/og-image{% endblock %}">
     
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-M61WPJL2E7"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-M61WPJL2E7');
+    </script>
+    
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
     
     <!-- Firebase SDK -->
