@@ -5,6 +5,7 @@ Separate from daily prayer flow, triggered every hour to find breaking disasters
 
 import logging
 import json
+import re
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from config import get_config
@@ -60,19 +61,22 @@ class DisasterPrayerService:
             from datetime import datetime
             current_time = datetime.now().strftime("%B %d, %Y %H:%M UTC")
             
-            prompt = f"""You are a breaking news monitor searching for disasters and crises that occurred in the LAST 3-6 HOURS worldwide.
+            prompt = f"""You are a breaking news monitor searching for RECENT disasters and crises that occurred in the LAST 12-24 HOURS worldwide.
 
 CURRENT TIME: {current_time}
 
 SEARCH INSTRUCTIONS:
-1. Search the web for BREAKING NEWS about disasters that happened in the last 3-6 hours. Use specific search queries like:
+1. Search the web for BREAKING NEWS and RECENT disasters. Use time-specific search queries like:
+   - "disaster breaking news last 12 hours" OR "disaster breaking news last 24 hours"
+   - "natural disaster news {current_time.split()[0]} {current_time.split()[1]}" (today's date)
+   - "emergency response today" OR "disaster alert today"
    - "earthquake today" OR "earthquake breaking news"
    - "flood [country] today" OR "flooding breaking news"
    - "hurricane breaking news" OR "typhoon today"
    - "wildfire breaking news" OR "fire [location] today"
    - "mass shooting today" OR "gun violence breaking news"
    - "conflict breaking news" OR "war [region] today"
-   - "earthquake [country] [date]" (use today's date)
+   - "developing disaster" OR "ongoing emergency"
    - "natural disaster breaking news today"
 
 2. Use diverse sources:
@@ -84,7 +88,22 @@ SEARCH INSTRUCTIONS:
 
 3. Focus on these disaster types: {disaster_types_str}
 
-4. CRITICAL: Only include disasters that occurred in the LAST 3-6 HOURS. Check timestamps carefully.
+4. TIME WINDOW GUIDANCE (be flexible and inclusive):
+   - PRIMARY: Disasters from the last 12 hours (highest priority)
+   - SECONDARY: Disasters from 12-24 hours ago that are:
+     * Still developing or ongoing
+     * Have breaking updates or new developments
+     * Are part of active emergency response
+   - INCLUDE: 
+     * Ongoing disasters that started recently and are still active
+     * Disasters mentioned in TODAY's news articles (even if exact timing unclear)
+     * Flood alerts, warnings, or emergency responses happening TODAY
+     * Any disaster reported in news from the current date
+   - BE INCLUSIVE: If a disaster is mentioned in today's news or is ongoing, include it even if:
+     * Exact timing is unclear
+     * Some details are missing
+     * It's part of a developing situation
+   - EXCLUDE: Only disasters clearly older than 24 hours with no recent updates
 
 5. Prioritize disasters with:
    - Significant casualties or injuries
@@ -108,23 +127,49 @@ For each BREAKING disaster found, return a JSON array with this EXACT structure:
 ]
 
 CRITICAL REQUIREMENTS:
-- Only include disasters that happened in the LAST 3-6 HOURS (breaking news)
+- INCLUDE disasters if they meet ANY of these criteria:
+  * Mentioned in TODAY's news articles (December 15, 2025)
+  * Reported as happening in the last 12-24 hours
+  * Still developing or ongoing
+  * Have breaking updates or new information
+  * Part of active emergency response
+  * Flood alerts, warnings, or emergency situations happening TODAY
+- Be INCLUSIVE: If a disaster appears in today's news, include it even if exact timing is unclear or some details are missing
 - Be specific with country names (full names, not abbreviations like 'US' - use 'United States')
 - Include specific details from the news in the summary (what happened, where, impact)
-- If no breaking disasters found in last 3-6 hours, return empty array []
+- If a disaster is mentioned in today's news articles, include it - don't exclude due to incomplete timing information
+- Only return empty array [] if NO disasters are found in today's news or the past 24 hours
 - Return ONLY valid JSON array, no explanations, no markdown, no code blocks
 - Verify information from multiple sources when possible
 - Focus on verified, reliable news sources
+- When in doubt, INCLUDE the disaster rather than exclude it
 
 Return ONLY the JSON array, nothing else. Example format:
 [{{"type":"earthquake","country":"Japan","location":"Tokyo","severity":"severe","casualties":150,"news_summary":"A magnitude 7.2 earthquake struck Tokyo at 2:30 PM local time, causing widespread damage to buildings and infrastructure. Emergency services are responding to multiple collapsed structures. At least 150 people are reported injured.","news_source":"Reuters","timestamp":"2025-01-15T14:30:00Z"}}]"""
 
             response = self.client.query(prompt)
             
-            # Parse response
+            # Log the raw response first to see what Perplexity actually returned
+            logger.info(f"Perplexity RAW response (first 2000 chars): {response[:2000]}")
+            logger.info(f"Perplexity RAW response (full length): {len(response)} chars")
+            # Also log the end of the response to see if JSON is there
+            if len(response) > 2000:
+                logger.info(f"Perplexity RAW response (last 500 chars): {response[-500:]}")
+            
+            # Log the cleaned response (after removing think tags) for better readability
+            import re
+            cleaned_for_log = re.sub(r'<think>.*?</think>', '[reasoning removed]', response, flags=re.DOTALL | re.IGNORECASE)
+            logger.info(f"Perplexity response (first 1000 chars, cleaned): {cleaned_for_log[:1000]}")
+            logger.debug(f"Perplexity full response (cleaned): {cleaned_for_log}")
+            
+            # Parse response (will strip think tags during parsing)
             disasters = self._parse_disaster_response(response)
             
-            logger.info(f"Found {len(disasters)} breaking disasters")
+            logger.info(f"Found {len(disasters)} breaking disasters after parsing")
+            if len(disasters) == 0 and response:
+                logger.warning(f"Parsing returned 0 disasters but response was not empty. Response length: {len(response)}")
+                logger.debug(f"Full response for debugging: {response}")
+            
             return disasters
             
         except Exception as e:
@@ -134,10 +179,21 @@ Return ONLY the JSON array, nothing else. Example format:
     def _parse_disaster_response(self, response: str) -> List[Dict]:
         """Parse the AI response into list of disaster dictionaries"""
         try:
+            original_response = response
             response = response.strip()
+            
+            logger.debug(f"Parsing disaster response. Length: {len(response)}, starts with: {response[:50]}")
+            
+            # Remove <think> tags if present (Perplexity sometimes includes these)
+            import re
+            if '<think>' in response.lower():
+                logger.debug("Removing <think> tags from response")
+                response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL | re.IGNORECASE)
+                response = response.strip()
             
             # Remove markdown code blocks if present
             if response.startswith('```'):
+                logger.debug("Removing markdown code blocks")
                 response = response.split('```')[1]
                 if response.startswith('json'):
                     response = response[4:]
@@ -145,22 +201,28 @@ Return ONLY the JSON array, nothing else. Example format:
             
             # Try to find JSON array in response
             if response.startswith('['):
+                logger.debug("Response starts with '[', parsing as JSON array")
                 disasters = json.loads(response)
             elif '{' in response:
+                logger.debug("Response contains '{', trying to extract JSON")
                 # Try to extract JSON object
                 start = response.find('[')
                 end = response.rfind(']') + 1
                 if start >= 0 and end > start:
+                    logger.debug(f"Found JSON array at positions {start}-{end}")
                     disasters = json.loads(response[start:end])
                 else:
                     # Single object, wrap in array
                     start = response.find('{')
                     end = response.rfind('}') + 1
                     if start >= 0 and end > start:
+                        logger.debug(f"Found JSON object at positions {start}-{end}, wrapping in array")
                         disasters = [json.loads(response[start:end])]
                     else:
+                        logger.warning("Could not find JSON array or object in response")
                         disasters = []
             else:
+                logger.warning(f"Response does not contain '[' or '{{'. Response preview: {response[:200]}")
                 disasters = []
             
             # Validate and normalize disasters
@@ -176,11 +238,24 @@ Return ONLY the JSON array, nothing else. Example format:
             return validated_disasters
             
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse disaster response: {e}")
-            logger.error(f"Response was: {response[:500]}")
+            logger.error(f"Failed to parse disaster response as JSON: {e}")
+            logger.error(f"Response preview (first 1000 chars): {original_response[:1000]}")
+            logger.error(f"Response length: {len(original_response)}")
+            # Try to log the problematic part
+            try:
+                error_pos = getattr(e, 'pos', None)
+                if error_pos:
+                    start = max(0, error_pos - 200)
+                    end = min(len(original_response), error_pos + 200)
+                    logger.error(f"Error around position {error_pos}: {original_response[start:end]}")
+            except:
+                pass
             return []
         except Exception as e:
             logger.error(f"Error parsing disaster response: {e}")
+            logger.error(f"Response preview: {original_response[:500]}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return []
     
     def _normalize_disaster_type(self, disaster_type: str) -> str:
@@ -280,7 +355,7 @@ VOICE & TONE:
 
 CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no commentary. Just the prayer as if you're speaking it aloud to lead a community in prayer for this specific breaking news event."""
 
-            response = self.client.generate_response(prompt)
+            response = self.client.query(prompt)
             
             # Clean the response
             import re
@@ -322,7 +397,7 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
     
     def save_disaster_prayer(self, disaster: Dict, prayer: str) -> bool:
         """
-        Save disaster prayer to storage with 3-day expiry
+        Save disaster prayer to storage with 3-day expiry (legacy method for backward compatibility)
         
         Args:
             disaster: Disaster dictionary
@@ -369,18 +444,71 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
             logger.error(f"Error saving disaster prayer: {e}")
             return False
     
+    def save_grouped_disaster_prayer(self, disaster_type: str, info: Dict, result: Dict) -> bool:
+        """
+        Save grouped disaster prayer by type with all affected countries
+        
+        Args:
+            disaster_type: Type of disaster (normalized)
+            info: Comprehensive information dictionary
+            result: Dictionary with 'summary' and 'prayer' keys
+            
+        Returns:
+            True if saved successfully
+        """
+        try:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            prayer_id = f"{disaster_type}_grouped_{timestamp}"
+            
+            # Create grouped prayer data
+            prayer_data = {
+                'id': prayer_id,
+                'disaster_type': disaster_type,
+                'disaster_type_display': disaster_type.replace('_', ' ').replace('-', ' ').title(),
+                'affected_countries': info.get('affected_countries', []),
+                'affected_regions': info.get('affected_regions', []),
+                'overall_severity': info.get('overall_severity', 'moderate'),
+                'total_casualties': info.get('total_casualties'),
+                'summary': result.get('summary', ''),
+                'prayer': result.get('prayer', ''),
+                'comprehensive_summary': info.get('comprehensive_summary', ''),
+                'key_details': info.get('key_details', []),
+                'all_news_summaries': info.get('all_news_summaries', []),
+                'created_at': datetime.now().isoformat(),
+                'expires_at': (datetime.now() + timedelta(days=3)).isoformat(),
+                'source': 'disaster_prayer_service_grouped',
+                'is_grouped': True
+            }
+            
+            # Save to storage
+            blob_path = f"disaster_prayers/grouped/{prayer_id}.json"
+            blob = self.storage.bucket.blob(blob_path)
+            blob.upload_from_string(
+                json.dumps(prayer_data, indent=2),
+                content_type='application/json'
+            )
+            
+            logger.info(f"Saved grouped disaster prayer: {prayer_id} for {disaster_type} covering {len(info.get('affected_countries', []))} countries")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error saving grouped disaster prayer: {e}")
+            return False
+    
     def get_active_disaster_prayers(self) -> List[Dict]:
         """
         Get all active disaster prayers (not expired, within 3 days)
+        Prioritizes grouped prayers, falls back to individual prayers
         
         Returns:
-            List of disaster prayer dictionaries
+            List of disaster prayer dictionaries (grouped prayers first)
         """
         try:
             prayers = []
+            grouped_prayers = []
             now = datetime.now()
             
-            # List all disaster prayers
+            # List all disaster prayers (both grouped and individual)
             blobs = self.storage.bucket.list_blobs(prefix='disaster_prayers/')
             
             for blob in blobs:
@@ -394,7 +522,11 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                         if expires_at_str:
                             expires_at = datetime.fromisoformat(expires_at_str)
                             if expires_at > now:
-                                prayers.append(prayer_data)
+                                # Separate grouped and individual prayers
+                                if prayer_data.get('is_grouped') or 'grouped' in blob.name:
+                                    grouped_prayers.append(prayer_data)
+                                else:
+                                    prayers.append(prayer_data)
                             else:
                                 # Delete expired prayer
                                 blob.delete()
@@ -404,17 +536,382 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                         continue
             
             # Sort by created_at (most recent first)
+            grouped_prayers.sort(key=lambda x: x.get('created_at', ''), reverse=True)
             prayers.sort(key=lambda x: x.get('created_at', ''), reverse=True)
             
-            return prayers
+            # Return grouped prayers first, then individual prayers
+            return grouped_prayers + prayers
             
         except Exception as e:
             logger.error(f"Error getting active disaster prayers: {e}")
             return []
     
+    def _is_duplicate_disaster(self, new_disaster: Dict, existing_prayers: List[Dict]) -> bool:
+        """
+        Check if a disaster is a duplicate of an existing prayer
+        
+        Args:
+            new_disaster: The new disaster to check
+            existing_prayers: List of existing disaster prayers
+            
+        Returns:
+            True if duplicate found, False otherwise
+        """
+        new_type = self._normalize_disaster_type(new_disaster.get('type', '')).replace(' ', '_')
+        new_country = new_disaster.get('country', '').lower().strip()
+        new_location = new_disaster.get('location', '').lower().strip()
+        new_timestamp_str = new_disaster.get('timestamp', '')
+        
+        # Try to parse timestamp to get approximate time
+        new_time = None
+        if new_timestamp_str:
+            try:
+                # Try ISO format first
+                new_time = datetime.fromisoformat(new_timestamp_str.replace('Z', '+00:00'))
+            except:
+                try:
+                    # Try common formats
+                    for fmt in ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                        try:
+                            new_time = datetime.strptime(new_timestamp_str[:19], fmt)
+                            break
+                        except:
+                            continue
+                except:
+                    pass
+        
+        for existing in existing_prayers:
+            existing_type = self._normalize_disaster_type(existing.get('disaster_type', '')).replace(' ', '_')
+            existing_country = existing.get('country', '').lower().strip()
+            existing_location = existing.get('location', '').lower().strip()
+            existing_created = datetime.fromisoformat(existing.get('created_at', '2000-01-01'))
+            
+            # Check 1: Exact match on type + country + location
+            if (new_type == existing_type and 
+                new_country == existing_country and 
+                new_location == existing_location):
+                # If created within last 12 hours, consider it a duplicate
+                if (datetime.now() - existing_created).total_seconds() < 43200:  # 12 hours
+                    logger.debug(f"Duplicate found: exact match {new_type} in {new_location}, {new_country}")
+                    return True
+            
+            # Check 2: Same type + country, different location but same day
+            if (new_type == existing_type and 
+                new_country == existing_country and
+                new_location != existing_location):
+                # If created within last 6 hours and same country, likely related
+                if (datetime.now() - existing_created).total_seconds() < 21600:  # 6 hours
+                    logger.debug(f"Duplicate found: same type/country {new_type} in {new_country} (different location)")
+                    return True
+            
+            # Check 3: Same type + country, check if timestamps are very close (same event)
+            if (new_type == existing_type and 
+                new_country == existing_country and
+                new_time and existing_created):
+                time_diff = abs((new_time - existing_created).total_seconds())
+                # If timestamps are within 2 hours, likely the same event
+                if time_diff < 7200:  # 2 hours
+                    logger.debug(f"Duplicate found: same type/country with close timestamps {new_type} in {new_country}")
+                    return True
+            
+            # Check 4: Similar news summary (simple keyword matching)
+            new_summary = new_disaster.get('news_summary', '').lower()
+            existing_summary = existing.get('news_summary', '').lower()
+            if new_summary and existing_summary:
+                # Extract key words (location, disaster type, key numbers)
+                new_keywords = set([w for w in new_summary.split() if len(w) > 4])
+                existing_keywords = set([w for w in existing_summary.split() if len(w) > 4])
+                # If more than 30% keyword overlap and same type/country, likely duplicate
+                if (new_type == existing_type and 
+                    new_country == existing_country and
+                    len(new_keywords & existing_keywords) / max(len(new_keywords), 1) > 0.3):
+                    if (datetime.now() - existing_created).total_seconds() < 43200:  # 12 hours
+                        logger.debug(f"Duplicate found: similar summary keywords {new_type} in {new_country}")
+                        return True
+        
+        return False
+    
+    def _collect_disaster_info_by_type(self, disaster_type: str, disasters: List[Dict]) -> Dict:
+        """
+        Collect comprehensive information about all affected countries for a disaster type
+        
+        Args:
+            disaster_type: Type of disaster (e.g., 'flood', 'earthquake')
+            disasters: List of disaster dictionaries for this type
+            
+        Returns:
+            Dictionary with collected information
+        """
+        try:
+            from datetime import datetime
+            current_time = datetime.now().strftime("%B %d, %Y %H:%M UTC")
+            
+            # Build list of affected countries/regions with details
+            affected_areas = []
+            for disaster in disasters:
+                country = disaster.get('country', '')
+                location = disaster.get('location', '')
+                news_summary = disaster.get('news_summary', '')
+                casualties = disaster.get('casualties')
+                severity = disaster.get('severity', 'moderate')
+                news_source = disaster.get('news_source', '')
+                timestamp = disaster.get('timestamp', '')
+                
+                area_info = {
+                    'country': country,
+                    'location': location if location else country,
+                    'news_summary': news_summary,
+                    'casualties': casualties,
+                    'severity': severity,
+                    'news_source': news_source,
+                    'timestamp': timestamp
+                }
+                affected_areas.append(area_info)
+            
+            # Query 1: Collect comprehensive info about this disaster type
+            areas_list = "\n".join([
+                f"- {area['location']}, {area['country']}: {area['news_summary']}"
+                for area in affected_areas
+            ])
+            
+            prompt = f"""You are analyzing {disaster_type} disasters affecting multiple countries/regions.
+
+CURRENT TIME: {current_time}
+
+AFFECTED AREAS AND NEWS DETAILS:
+{areas_list}
+
+TASK: Analyze all the information above and provide a comprehensive summary that includes:
+1. All affected countries/regions
+2. Overall impact and severity
+3. Key details from the news about what happened
+4. Current situation status
+
+Return a JSON object with this structure:
+{{
+    "affected_countries": ["Country1", "Country2", ...],
+    "affected_regions": ["Region1, Country1", "Region2, Country2", ...],
+    "overall_severity": "minor|moderate|severe|catastrophic",
+    "total_casualties": number or null,
+    "comprehensive_summary": "Detailed summary (3-5 sentences) covering all affected areas and the overall situation",
+    "key_details": ["Detail 1", "Detail 2", "Detail 3"]
+}}
+
+Return ONLY valid JSON, no explanations."""
+            
+            response = self.client.query(prompt)
+            
+            # Parse response
+            import re
+            cleaned_response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL | re.IGNORECASE).strip()
+            
+            # Extract JSON
+            json_match = re.search(r'\{.*\}', cleaned_response, re.DOTALL)
+            if json_match:
+                info = json.loads(json_match.group())
+                info['all_news_summaries'] = [area['news_summary'] for area in affected_areas]
+                info['all_areas'] = affected_areas
+                return info
+            else:
+                logger.warning(f"Could not parse info collection response for {disaster_type}")
+                # Fallback: create basic info from disasters
+                countries = list(set([d.get('country', '') for d in disasters if d.get('country')]))
+                return {
+                    'affected_countries': countries,
+                    'affected_regions': [f"{d.get('location', d.get('country', ''))}, {d.get('country', '')}" for d in disasters],
+                    'overall_severity': max([d.get('severity', 'moderate') for d in disasters], key=lambda x: ['minor', 'moderate', 'severe', 'catastrophic'].index(x) if x in ['minor', 'moderate', 'severe', 'catastrophic'] else 1),
+                    'total_casualties': sum([d.get('casualties') or 0 for d in disasters]),
+                    'comprehensive_summary': f"{disaster_type.title()} affecting {len(countries)} countries/regions.",
+                    'key_details': [d.get('news_summary', '')[:100] for d in disasters[:3]],
+                    'all_news_summaries': [d.get('news_summary', '') for d in disasters],
+                    'all_areas': affected_areas
+                }
+                
+        except Exception as e:
+            logger.error(f"Error collecting disaster info for {disaster_type}: {e}")
+            # Fallback
+            countries = list(set([d.get('country', '') for d in disasters if d.get('country')]))
+            return {
+                'affected_countries': countries,
+                'affected_regions': [f"{d.get('location', d.get('country', ''))}, {d.get('country', '')}" for d in disasters],
+                'overall_severity': 'moderate',
+                'total_casualties': None,
+                'comprehensive_summary': f"{disaster_type.title()} affecting multiple regions.",
+                'key_details': [],
+                'all_news_summaries': [d.get('news_summary', '') for d in disasters],
+                'all_areas': [{'country': d.get('country', ''), 'location': d.get('location', ''), 'news_summary': d.get('news_summary', '')} for d in disasters]
+            }
+    
+    def _merge_with_existing_info(self, disaster_type: str, new_info: Dict) -> Dict:
+        """
+        Merge new disaster info with existing active prayers for the same type
+        
+        Args:
+            disaster_type: Type of disaster
+            new_info: Newly collected information
+            
+        Returns:
+            Merged information dictionary
+        """
+        try:
+            existing_prayers = self.get_active_disaster_prayers()
+            
+            # Find existing prayers for this disaster type
+            existing_for_type = [
+                p for p in existing_prayers 
+                if self._normalize_disaster_type(p.get('disaster_type', '')) == self._normalize_disaster_type(disaster_type)
+            ]
+            
+            if not existing_for_type:
+                return new_info
+            
+            # Extract existing affected countries/regions
+            existing_countries = set()
+            existing_regions = []
+            existing_summaries = []
+            
+            for prayer in existing_for_type:
+                country = prayer.get('country', '')
+                location = prayer.get('location', '')
+                if country:
+                    existing_countries.add(country)
+                if location:
+                    existing_regions.append(f"{location}, {country}" if location != country else country)
+                if prayer.get('news_summary'):
+                    existing_summaries.append(prayer.get('news_summary'))
+            
+            # Merge countries
+            merged_countries = list(set(new_info.get('affected_countries', []) + list(existing_countries)))
+            
+            # Merge regions
+            merged_regions = list(set(new_info.get('affected_regions', []) + existing_regions))
+            
+            # Merge summaries
+            merged_summaries = new_info.get('all_news_summaries', []) + existing_summaries
+            
+            # Update info
+            merged_info = new_info.copy()
+            merged_info['affected_countries'] = merged_countries
+            merged_info['affected_regions'] = merged_regions
+            merged_info['all_news_summaries'] = merged_summaries
+            
+            logger.info(f"Merged info for {disaster_type}: {len(merged_countries)} countries total")
+            
+            return merged_info
+            
+        except Exception as e:
+            logger.error(f"Error merging existing info for {disaster_type}: {e}")
+            return new_info
+    
+    def _generate_grouped_summary_and_prayer(self, disaster_type: str, info: Dict) -> Dict:
+        """
+        Generate AI summary and prayer for grouped disaster type
+        
+        Args:
+            disaster_type: Type of disaster
+            info: Comprehensive information dictionary
+            
+        Returns:
+            Dictionary with 'summary' and 'prayer' keys
+        """
+        try:
+            from datetime import datetime
+            current_time = datetime.now().strftime("%B %d, %Y %H:%M UTC")
+            
+            # Build comprehensive context
+            countries_str = ", ".join(info.get('affected_countries', []))
+            regions_str = "\n".join([f"- {r}" for r in info.get('affected_regions', [])])
+            all_summaries = "\n\n".join([
+                f"News from {area.get('location', area.get('country', 'Unknown'))}, {area.get('country', 'Unknown')}:\n{area.get('news_summary', '')}"
+                for area in info.get('all_areas', [])
+            ])
+            
+            # Query 2: Generate summary
+            summary_prompt = f"""Based on the following information about {disaster_type} disasters affecting multiple countries, generate a brief, compassionate summary (2-3 sentences) that:
+- Mentions all affected countries/regions
+- Describes the overall impact
+- Is suitable for display on a prayer card
+
+AFFECTED COUNTRIES: {countries_str}
+
+AFFECTED REGIONS:
+{regions_str}
+
+DETAILED NEWS FROM ALL AREAS:
+{all_summaries}
+
+Return ONLY the summary text (2-3 sentences), no explanations, no JSON."""
+            
+            summary_response = self.client.query(summary_prompt)
+            summary = re.sub(r'<think>.*?</think>', '', summary_response, flags=re.DOTALL | re.IGNORECASE).strip()
+            
+            # Query 3: Generate prayer
+            prayer_prompt = f"""You are a compassionate prayer leader writing a customized prayer for those affected by {disaster_type} in multiple countries/regions.
+
+AFFECTED COUNTRIES AND REGIONS:
+{countries_str}
+
+DETAILED NEWS FROM ALL AFFECTED AREAS (use these specific details in your prayer):
+{all_summaries}
+
+COMPREHENSIVE SUMMARY:
+{info.get('comprehensive_summary', '')}
+
+PRAYER REQUIREMENTS:
+- Start with "Heavenly Father," (not "Dear Heavenly Father")
+- ⚠️ CRITICAL: Start with PRAISE - acknowledge God's goodness, faithfulness, sovereignty, love, or power before making any requests
+- Length: 150-200 words (detailed and comprehensive)
+- Mention ALL affected countries/regions specifically by name: {countries_str}
+- Reference the SPECIFIC situations described in the news summaries above
+- Address the needs of:
+  * All those directly affected by {disaster_type} in {countries_str}
+  * Families who lost loved ones or are searching for missing family members across all affected areas
+  * Those injured and receiving medical care
+  * Children who are scared and traumatized
+  * Rescue workers and first responders in all affected regions
+  * Medical teams treating the injured
+  * Government leaders coordinating response efforts
+  * Communities coming together to help
+- Include a brief biblical reference or promise relevant to this situation
+- Call on Jesus Christ and the Holy Spirit by name
+- End with hope rooted in Christ
+- End with "In Jesus-Christ's name we pray. Amen!" (EXACTLY this ending)
+- Make it feel urgent and relevant to THIS specific multi-country crisis
+- Use "we" and "our" throughout (praying as a community)
+- Natural, conversational language
+- Authentic emotion - let the weight of this crisis show through
+- NO explanations, NO thinking tags, NO commentary - just the prayer text
+
+CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no commentary."""
+            
+            prayer_response = self.client.query(prayer_prompt)
+            prayer = re.sub(r'<think>.*?</think>', '', prayer_response, flags=re.DOTALL | re.IGNORECASE).strip()
+            
+            # Ensure proper formatting
+            if not prayer.startswith("Heavenly Father"):
+                prayer = "Heavenly Father, " + prayer
+            
+            if not prayer.endswith("Amen!") and not prayer.endswith("Amen"):
+                if "In Jesus-Christ's name" not in prayer:
+                    prayer = prayer.rstrip('.') + ". In Jesus-Christ's name we pray. Amen!"
+            
+            return {
+                'summary': summary,
+                'prayer': prayer
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating grouped summary and prayer for {disaster_type}: {e}")
+            # Fallback
+            countries_str = ", ".join(info.get('affected_countries', []))
+            return {
+                'summary': f"{disaster_type.title()} affecting {countries_str}.",
+                'prayer': self._generate_fallback_prayer({'type': disaster_type, 'country': countries_str})
+            }
+    
     def process_hourly_disasters(self) -> Dict:
         """
-        Main method called hourly to search for breaking disasters and generate prayers
+        Main method called hourly to search for breaking disasters and generate grouped prayers by type
         
         Returns:
             Dictionary with processing results
@@ -433,44 +930,41 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                     'prayers_generated': 0
                 }
             
-            # Generate prayers for each disaster
-            prayers_generated = 0
+            # Group disasters by type
+            disasters_by_type = {}
             for disaster in disasters:
+                disaster_type = self._normalize_disaster_type(disaster.get('type', ''))
+                if disaster_type not in disasters_by_type:
+                    disasters_by_type[disaster_type] = []
+                disasters_by_type[disaster_type].append(disaster)
+            
+            logger.info(f"Found {len(disasters)} disasters across {len(disasters_by_type)} disaster types")
+            
+            # Process each disaster type
+            prayers_generated = 0
+            for disaster_type, type_disasters in disasters_by_type.items():
                 try:
-                    # Check if we already have a recent prayer for this disaster
-                    # (avoid duplicates within 24 hours)
-                    country = disaster.get('country', '').lower()
-                    disaster_type = disaster.get('type', '').replace(' ', '_')
+                    logger.info(f"Processing {disaster_type}: {len(type_disasters)} disasters")
                     
-                    # Check existing prayers
-                    existing_prayers = self.get_active_disaster_prayers()
-                    recent_duplicate = False
-                    for existing in existing_prayers:
-                        if (existing.get('country', '').lower() == country and
-                            existing.get('disaster_type', '').replace(' ', '_') == disaster_type):
-                            # Check if created within last 24 hours
-                            created_at = datetime.fromisoformat(existing.get('created_at', '2000-01-01'))
-                            if (datetime.now() - created_at).total_seconds() < 86400:
-                                recent_duplicate = True
-                                break
+                    # Step 1: Collect comprehensive info
+                    info = self._collect_disaster_info_by_type(disaster_type, type_disasters)
                     
-                    if recent_duplicate:
-                        logger.info(f"Skipping duplicate disaster: {disaster_type} in {country}")
-                        continue
+                    # Step 2: Merge with existing info
+                    merged_info = self._merge_with_existing_info(disaster_type, info)
                     
-                    # Generate customized prayer
-                    prayer = self.generate_customized_prayer(disaster)
+                    # Step 3: Generate summary and prayer
+                    result = self._generate_grouped_summary_and_prayer(disaster_type, merged_info)
                     
-                    # Save prayer
-                    if self.save_disaster_prayer(disaster, prayer):
+                    # Step 4: Save grouped prayer
+                    if self.save_grouped_disaster_prayer(disaster_type, merged_info, result):
                         prayers_generated += 1
-                        logger.info(f"Generated prayer for {disaster_type} in {country}")
+                        logger.info(f"Generated grouped prayer for {disaster_type} covering {len(merged_info.get('affected_countries', []))} countries")
                     
                 except Exception as e:
-                    logger.error(f"Error processing disaster {disaster}: {e}")
+                    logger.error(f"Error processing disaster type {disaster_type}: {e}")
                     continue
             
-            logger.info(f"Hourly processing complete: {prayers_generated} prayers generated from {len(disasters)} disasters")
+            logger.info(f"Hourly processing complete: {prayers_generated} grouped prayers generated from {len(disasters)} disasters")
             
             return {
                 'success': True,

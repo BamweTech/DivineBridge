@@ -130,14 +130,24 @@ class NonprofitService:
             # 2. Get 2 disaster-specific organizations (deduplicated)
             if prayer_disasters:
                 logger.info(f"Fetching disaster-specific organizations for {len(prayer_disasters)} disasters")
+                logger.debug(f"Disaster details: {[{'type': d.get('type'), 'locations': d.get('locations', [])} for d in prayer_disasters[:2]]}")
                 # Track already selected org names
                 selected_names = {org.get('name', '').lower() for org in selected_orgs}
                 
+                disaster_orgs_found = 0
                 for disaster in prayer_disasters[:2]:  # Top 2 disasters
+                    disaster_type = disaster.get('type', 'unknown')
+                    disaster_locations = disaster.get('locations', [])
+                    logger.info(f"Looking for organizations for {disaster_type} in {disaster_locations}")
+                    
                     disaster_orgs = self._get_disaster_organizations(disaster)
+                    logger.info(f"Found {len(disaster_orgs)} organizations for {disaster_type}")
+                    
                     if disaster_orgs:
                         # Filter out duplicates
                         disaster_orgs = [o for o in disaster_orgs if o.get('name', '').lower() not in selected_names]
+                        logger.info(f"After deduplication: {len(disaster_orgs)} organizations available")
+                        
                         if disaster_orgs:
                             # Use date as seed
                             random.seed(f"{date}-{disaster.get('type')}")
@@ -145,7 +155,17 @@ class NonprofitService:
                             selected_orgs.extend(selected_disaster)
                             # Update selected names
                             selected_names.update(org.get('name', '').lower() for org in selected_disaster)
-                            logger.info(f"Selected organization for {disaster.get('type')} disaster")
+                            logger.info(f"Selected organization for {disaster_type} disaster: {selected_disaster[0].get('name')}")
+                            disaster_orgs_found += 1
+                        else:
+                            logger.warning(f"All organizations for {disaster_type} were duplicates")
+                    else:
+                        logger.warning(f"No organizations found for {disaster_type} in {disaster_locations}")
+                
+                if disaster_orgs_found == 0:
+                    logger.warning(f"No disaster-specific organizations were added. Total disasters checked: {len(prayer_disasters[:2])}")
+            else:
+                logger.warning(f"No disasters provided to get_organizations_for_user. prayer_disasters is empty or None.")
             
             # 3. Fill to 6 if needed with more general orgs or fallback
             if len(selected_orgs) < 6:

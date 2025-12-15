@@ -1,9 +1,10 @@
 """
 SEO Blueprint - Sitemap, structured data, and SEO optimization
 """
-from flask import Blueprint, request, make_response, jsonify, render_template_string
+from flask import Blueprint, request, make_response, jsonify, render_template_string, Response
 from datetime import datetime, timedelta
 import logging
+import requests
 from auth_decorators import verify_cloud_scheduler
 
 seo_bp = Blueprint('seo', __name__)
@@ -423,7 +424,7 @@ def generate_hourly_disaster_prayers():
 
 @seo_bp.route('/disasters')
 def disasters_hub():
-    """Hub page showing all current disasters from hourly breaking news monitoring"""
+    """Hub page showing all current disasters grouped by type from hourly breaking news monitoring"""
     try:
         from flask import current_app
         from disaster_prayer_service import get_disaster_prayer_service
@@ -431,37 +432,53 @@ def disasters_hub():
         # Get disaster prayer service
         service = get_disaster_prayer_service(current_app.storage_handler)
         
-        # Get active disaster prayers (within 3 days)
+        # Get active disaster prayers (prioritizes grouped prayers)
         disaster_prayers = service.get_active_disaster_prayers()
         
-        # Transform to display format
-        all_disasters = []
+        # Group by disaster type
+        disasters_by_type = {}
         for prayer_data in disaster_prayers:
-            disaster_type = prayer_data.get('disaster_type', '')
-            country = prayer_data.get('country', '')
-            location = prayer_data.get('location', '')
+            # Check if it's a grouped prayer
+            if prayer_data.get('is_grouped') or prayer_data.get('affected_countries'):
+                disaster_type = prayer_data.get('disaster_type', '')
+                disaster_type_normalized = disaster_type.lower().replace(' ', '_').replace('-', '_')
+                
+                # Use the most recent prayer for each type
+                if disaster_type_normalized not in disasters_by_type:
+                    disasters_by_type[disaster_type_normalized] = prayer_data
+                else:
+                    # Keep the most recent one
+                    existing_date = datetime.fromisoformat(disasters_by_type[disaster_type_normalized].get('created_at', '2000-01-01'))
+                    new_date = datetime.fromisoformat(prayer_data.get('created_at', '2000-01-01'))
+                    if new_date > existing_date:
+                        disasters_by_type[disaster_type_normalized] = prayer_data
+        
+        # Transform to display format
+        grouped_disasters = []
+        for disaster_type, prayer_data in disasters_by_type.items():
+            affected_countries = prayer_data.get('affected_countries', [])
             
-            # Use location if available, otherwise country
-            display_location = location if location else country
+            # Get flag codes for all affected countries
+            country_flags = []
+            for country in affected_countries:
+                flag_code = get_country_flag_code(country)
+                if flag_code:
+                    country_flags.append({
+                        'country': country,
+                        'flag_code': flag_code
+                    })
             
             # Create URL slug
-            disaster_slug = disaster_type.lower().replace(' ', '-').replace('_', '-')
-            location_slug = display_location.lower().replace(' ', '-').replace(',', '')
-            url_slug = f"{disaster_slug}/{location_slug}"
+            disaster_slug = disaster_type.lower().replace('_', '-').replace(' ', '-')
+            url_slug = disaster_slug
             
-            # Get country flag code
-            flag_code = get_country_flag_code(country)
-            
-            all_disasters.append({
+            grouped_disasters.append({
                 'type': disaster_type,
-                'type_display': disaster_type.replace('_', ' ').replace('-', ' ').title(),
-                'country': country,
-                'country_flag_code': flag_code,
-                'location': display_location,
-                'location_display': display_location.title(),
-                'severity': prayer_data.get('severity', 'moderate'),
-                'casualties': prayer_data.get('casualties'),
-                'news_summary': prayer_data.get('news_summary', ''),
+                'type_display': prayer_data.get('disaster_type_display', disaster_type.replace('_', ' ').replace('-', ' ').title()),
+                'affected_countries': affected_countries,
+                'country_flags': country_flags,
+                'summary': prayer_data.get('summary', ''),
+                'severity': prayer_data.get('overall_severity', 'moderate'),
                 'created_at': prayer_data.get('created_at', ''),
                 'url_slug': url_slug,
                 'prayer_id': prayer_data.get('id', '')
@@ -469,66 +486,101 @@ def disasters_hub():
         
         # Sort by created_at (most recent first) and severity
         severity_order = {'catastrophic': 0, 'severe': 1, 'moderate': 2, 'minor': 3}
-        all_disasters.sort(key=lambda x: (
+        grouped_disasters.sort(key=lambda x: (
             severity_order.get(x.get('severity', 'moderate'), 3),
             x.get('created_at', '')
         ), reverse=True)
         
-        # Group by country for better organization
-        disasters_by_country = {}
-        for disaster in all_disasters:
-            country = disaster.get('country', 'Unknown')
-            if country not in disasters_by_country:
-                disasters_by_country[country] = []
-            disasters_by_country[country].append(disaster)
-        
         today = datetime.now()
         
         return render_template_string(DISASTERS_HUB_TEMPLATE, 
-                                     disasters=all_disasters,
-                                     disasters_by_country=disasters_by_country,
-                                     today=today.strftime('%B %d, %Y'))
+                                    disasters=grouped_disasters,
+                                    disasters_by_country={},  # Keep for backward compatibility
+                                    today=today.strftime('%B %d, %Y'))
         
     except Exception as e:
         logger.error(f"Error rendering disasters hub: {e}")
         return jsonify({'error': 'Failed to load disasters'}), 500
 
 
-@seo_bp.route('/prayers/disaster/<disaster_type>/<location>')
-def disaster_prayer_page(disaster_type, location):
-    """SEO-optimized landing page for specific disasters with custom prayer"""
+@seo_bp.route('/api/flags/<country_code>')
+def proxy_flag(country_code):
+    """Proxy flag images to avoid CORB issues"""
+    try:
+        # Use correct flagcdn.com format: 60x45 (width x height) instead of w60
+        flag_url = f"https://flagcdn.com/60x45/{country_code.lower()}.png"
+        logger.info(f"Fetching flag from {flag_url} for country code {country_code}")
+        response = requests.get(flag_url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+        
+        logger.info(f"Flag response status: {response.status_code}, content length: {len(response.content)}, content-type: {response.headers.get('Content-Type', 'unknown')}")
+        
+        if response.status_code == 200 and len(response.content) > 100:
+            return Response(
+                response.content,
+                mimetype='image/png',
+                headers={
+                    'Cache-Control': 'public, max-age=86400',
+                    'Access-Control-Allow-Origin': '*',
+                    'Content-Length': str(len(response.content))
+                }
+            )
+        else:
+            logger.warning(f"Flag request failed for {country_code}: status={response.status_code}, size={len(response.content)}")
+            # Fallback to default flag
+            fallback_url = "https://flagcdn.com/60x45/xx.png"
+            fallback_response = requests.get(fallback_url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+            if fallback_response.status_code == 200 and len(fallback_response.content) > 100:
+                return Response(
+                    fallback_response.content,
+                    mimetype='image/png',
+                    headers={
+                        'Cache-Control': 'public, max-age=86400',
+                        'Access-Control-Allow-Origin': '*',
+                        'Content-Length': str(len(fallback_response.content))
+                    }
+                )
+    except Exception as e:
+        logger.error(f"Error proxying flag {country_code}: {e}", exc_info=True)
+    
+    # Return empty 1x1 transparent PNG if all else fails
+    logger.warning(f"Returning transparent PNG fallback for {country_code}")
+    transparent_png = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xdb\x00\x00\x00\x00IEND\xaeB`\x82'
+    return Response(transparent_png, mimetype='image/png', headers={'Cache-Control': 'no-cache'})
+
+
+@seo_bp.route('/prayers/watchtower/<disaster_type>')
+def disaster_prayer_page(disaster_type):
+    """SEO-optimized landing page for grouped disaster prayers by type"""
     try:
         from flask import current_app
         from disaster_prayer_service import get_disaster_prayer_service
         
         # Format for display
-        location_display = location.replace('-', ' ').title()
-        disaster_display = disaster_type.replace('-', ' ').title()
+        disaster_display = disaster_type.replace('-', ' ').replace('_', ' ').title()
+        disaster_type_normalized = disaster_type.lower().replace('-', '_').replace(' ', '_')
         
         storage_handler = current_app.storage_handler
         service = get_disaster_prayer_service(storage_handler)
         
-        # First, try to get from new disaster prayer service (3-day active prayers)
+        # Get active disaster prayers and find matching grouped prayer
         disaster_prayer = None
         disaster_data = None
         
-        # Get active disaster prayers and find matching one
         active_prayers = service.get_active_disaster_prayers()
         for prayer_data in active_prayers:
-            prayer_location = prayer_data.get('location', '') or prayer_data.get('country', '')
-            prayer_location_slug = prayer_location.lower().replace(' ', '-').replace(',', '')
-            prayer_disaster_type = prayer_data.get('disaster_type', '').lower().replace(' ', '-').replace('_', '-')
-            
-            if (prayer_location_slug == location.lower() and 
-                prayer_disaster_type == disaster_type.lower()):
-                disaster_prayer = prayer_data.get('prayer', '')
-                disaster_data = prayer_data
-                logger.info(f"Found active disaster prayer for {disaster_type}/{location}")
-                break
+            # Check if it's a grouped prayer for this type
+            if prayer_data.get('is_grouped') or prayer_data.get('affected_countries'):
+                prayer_disaster_type = prayer_data.get('disaster_type', '').lower().replace(' ', '_').replace('-', '_')
+                
+                if prayer_disaster_type == disaster_type_normalized:
+                    disaster_prayer = prayer_data.get('prayer', '')
+                    disaster_data = prayer_data
+                    logger.info(f"Found grouped disaster prayer for {disaster_type}")
+                    break
         
-        # If not found in active prayers, try old cache system (backward compatibility)
+        # If not found, try old cache system (backward compatibility)
         if not disaster_prayer:
-            cache_key = f"disaster_prayer_{disaster_type}_{location}"
+            cache_key = f"disaster_prayer_{disaster_type}"
             try:
                 cached = storage_handler.bucket.blob(f'cache/{cache_key}.json').download_as_text()
                 import json
@@ -536,46 +588,43 @@ def disaster_prayer_page(disaster_type, location):
                 cached_data = json.loads(cached)
                 cache_time = dt.fromisoformat(cached_data.get('timestamp', '2020-01-01'))
                 
-                # Check if cache is still fresh (within 24 hours)
                 if (datetime.now() - cache_time).total_seconds() < 86400:
                     disaster_prayer = cached_data['prayer']
-                    logger.info(f"Using cached disaster prayer for {disaster_type}/{location}")
+                    logger.info(f"Using cached disaster prayer for {disaster_type}")
             except:
                 pass
         
-        # If still no prayer, generate new one (fallback)
+        # If still no prayer, generate fallback
         if not disaster_prayer:
-            disaster_prayer = _generate_disaster_prayer(disaster_display, location_display)
-            
-            # Cache for 24 hours
-            try:
-                import json
-                cache_data = {
-                    'prayer': disaster_prayer,
-                    'timestamp': datetime.now().isoformat(),
-                    'disaster_type': disaster_display,
-                    'location': location_display
-                }
-                blob = storage_handler.bucket.blob(f'cache/{cache_key}.json')
-                blob.upload_from_string(json.dumps(cache_data))
-                logger.info(f"Cached disaster prayer for {disaster_type}/{location}")
-            except Exception as e:
-                logger.warning(f"Failed to cache disaster prayer: {e}")
+            disaster_prayer = _generate_disaster_prayer(disaster_display, "affected regions")
         
-        # Get country flag code if we have disaster data
-        country_flag_code = None
+        # Get country flags for all affected countries
+        country_flags = []
+        affected_countries = []
+        summary = ''
         if disaster_data:
-            country = disaster_data.get('country', '')
-            country_flag_code = get_country_flag_code(country)
+            affected_countries = disaster_data.get('affected_countries', [])
+            summary = disaster_data.get('summary', '')
+            for country in affected_countries:
+                flag_code = get_country_flag_code(country)
+                if flag_code:
+                    country_flags.append({
+                        'country': country,
+                        'flag_code': flag_code
+                    })
         
         today = datetime.now()
         
         return render_template_string(DISASTER_PAGE_TEMPLATE,
-                                     disaster_type=disaster_display,
-                                     location=location_display,
-                                     disaster_prayer=disaster_prayer,
-                                     country_flag_code=country_flag_code,
-                                     today=today.strftime('%B %d, %Y'))
+                                    disaster_type=disaster_display,
+                                    location=None,
+                                    disaster_prayer=disaster_prayer,
+                                    prayer=disaster_prayer,
+                                    country_flag_code=None,
+                                    country_flags=country_flags,
+                                    affected_countries=affected_countries,
+                                    summary=summary,
+                                    today=today.strftime('%B %d, %Y'))
         
     except Exception as e:
         logger.error(f"Error rendering disaster page: {e}")
@@ -586,16 +635,16 @@ def disaster_prayer_page(disaster_type, location):
 DISASTER_PAGE_TEMPLATE = '''
 {% extends "base.html" %}
 
-{% block title %}Prayer for People Affected by {{ disaster_type }} in {{ location }} | Divine Bridge{% endblock %}
+{% block title %}Prayer for People Affected by {{ disaster_type }}{% if location %} in {{ location }}{% endif %} | Divine Bridge{% endblock %}
 
-{% block og_title %}Join Us in Prayer for People Affected by {{ disaster_type }} in {{ location }}{% endblock %}
-{% block og_description %}Unite with thousands of believers praying for those affected by {{ disaster_type }} in {{ location }}. Submit prayer requests and find hope.{% endblock %}
+{% block og_title %}Join Us in Prayer for People Affected by {{ disaster_type }}{% if location %} in {{ location }}{% endif %}{% endblock %}
+{% block og_description %}Unite with thousands of believers praying for those affected by {{ disaster_type }}{% if location %} in {{ location }}{% endif %}. Submit prayer requests and find hope.{% endblock %}
 
 {% block extra_css %}
 <style>
     .disaster-hero {
-        background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
-        color: white;
+        background: linear-gradient(to bottom, #f8f8f8 0%, #e8e8e8 100%);
+        color: #333;
         padding: 4rem 2rem;
         text-align: center;
         margin-bottom: 3rem;
@@ -641,7 +690,7 @@ DISASTER_PAGE_TEMPLATE = '''
     }
     
     .cta-section {
-        background: linear-gradient(135deg, rgba(15, 86, 255, 0.1) 0%, rgba(31, 60, 136, 0.1) 100%);
+        background: #f5f5f5;
         padding: 3rem 2rem;
         text-align: center;
         margin-top: 3rem;
@@ -650,7 +699,7 @@ DISASTER_PAGE_TEMPLATE = '''
     
     .cta-button {
         display: inline-block;
-        background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%);
+        background: #0f56ff;
         color: white;
         padding: 1rem 2rem;
         border-radius: 12px;
@@ -703,13 +752,33 @@ DISASTER_PAGE_TEMPLATE = '''
 {% block content %}
 <!-- Disaster Prayer Landing Page -->
 <div class="disaster-hero">
-    <h1>🙏 Prayer for People Affected by {{ disaster_type }} in {{ location }}</h1>
-    <p>Join thousands of believers worldwide lifting up those affected by {{ disaster_type }} in {{ location }}. You are not alone in prayer.</p>
+    <h1>🙏 Prayer for People Affected by {{ disaster_type }}{% if location %} in {{ location }}{% endif %}</h1>
+    <p>Join thousands of believers worldwide lifting up those affected by {{ disaster_type }}{% if location %} in {{ location }}{% endif %}. You are not alone in prayer.</p>
 </div>
 
 <div class="prayer-content">
     <div class="prayer-card">
+        {% if location %}
         <h2 style="color: #0f56ff; margin-bottom: 1.5rem; font-size: 1.5rem;">A Prayer for People Affected by {{ disaster_type }} in {{ location }}</h2>
+        {% else %}
+        <h2 style="color: #0f56ff; margin-bottom: 1.5rem; font-size: 1.5rem;">A Prayer for People Affected by {{ disaster_type }}</h2>
+        {% if affected_countries %}
+        <div style="margin-bottom: 1.5rem; text-align: center;">
+            <p style="color: #666; margin-bottom: 0.5rem;">Affected Countries:</p>
+            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-bottom: 1rem;">
+                {% for flag_info in country_flags %}
+                <img src="/api/flags/{{ flag_info.flag_code }}" 
+                     alt="{{ flag_info.country }} flag" 
+                     style="width: 48px; height: 36px; object-fit: fill; display: block; animation: none !important; transform: none !important; transition: none !important; border-radius: 0 !important; filter: none !important; border: none !important; box-shadow: none !important;"
+                     onerror="this.src='/api/flags/xx';">
+                {% endfor %}
+            </div>
+            {% if summary %}
+            <p style="color: #666; font-style: italic; font-size: 0.95rem;">{{ summary }}</p>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% endif %}
         <div class="prayer-text">{{ disaster_prayer }}</div>
     </div>
     
@@ -722,7 +791,7 @@ DISASTER_PAGE_TEMPLATE = '''
     <div class="cta-section">
         <h2 style="margin-bottom: 1.5rem;">How You Can Help</h2>
         <p style="margin-bottom: 2rem; max-width: 600px; margin-left: auto; margin-right: auto;">
-            Whether you're affected by {{ disaster_type }} in {{ location }} or want to support those who are, we're here for you.
+            Whether you're affected by {{ disaster_type }}{% if location %} in {{ location }}{% endif %} or want to support those who are, we're here for you.
         </p>
         <a href="/prayers" class="cta-button">Request Prayer</a>
         <a href="/prayers" class="cta-button">Join Prayer Room</a>
@@ -741,7 +810,7 @@ DISASTERS_HUB_TEMPLATE = '''
 
 {% block meta_description %}Find prayers for current disasters worldwide. Dedicated prayer pages for floods, earthquakes, conflicts, and humanitarian crises. Join our global prayer community.{% endblock %}
 
-{% block og_title %}Current Disasters We're Praying For - Divine Bridge{% endblock %}
+{% block og_title %}Join us in prayer for affected communities by recent events - Divine Bridge{% endblock %}
 {% block og_description %}Discover prayer support for current disasters and crises worldwide. Each disaster has a dedicated prayer page with specific prayers for affected communities.{% endblock %}
 
 {% block extra_css %}
@@ -749,16 +818,8 @@ DISASTERS_HUB_TEMPLATE = '''
     .disasters-page {
         min-height: calc(100vh - 200px);
         padding: 6rem 2rem 4rem;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #00f2fe 100%);
-        background-size: 400% 400%;
-        animation: gradientShift 15s ease infinite;
+        background: linear-gradient(to bottom, #ffffff 0%, #f5f5f5 50%, #e8e8e8 100%);
         position: relative;
-    }
-    
-    @keyframes gradientShift {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
     }
     
     .disasters-page::before {
@@ -768,8 +829,8 @@ DISASTERS_HUB_TEMPLATE = '''
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
+        background: rgba(255, 255, 255, 0.5);
+        backdrop-filter: blur(5px);
     }
     
     .disasters-container {
@@ -792,15 +853,14 @@ DISASTERS_HUB_TEMPLATE = '''
     
     .page-title {
         font-size: 3rem;
-        color: white;
+        color: #1a1a1a;
         margin-bottom: 1rem;
-        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
         font-weight: 700;
     }
     
     .page-subtitle {
         font-size: 1.2rem;
-        color: rgba(255, 255, 255, 0.95);
+        color: #4a4a4a;
         max-width: 800px;
         margin: 0 auto;
         line-height: 1.6;
@@ -814,12 +874,11 @@ DISASTERS_HUB_TEMPLATE = '''
     }
     
     .disaster-card {
-        background: rgba(255, 255, 255, 0.2);
-        backdrop-filter: blur(20px);
+        background: #ffffff;
         border-radius: 24px;
         padding: 2rem;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e0e0e0;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
         transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         position: relative;
         overflow: hidden;
@@ -832,28 +891,22 @@ DISASTERS_HUB_TEMPLATE = '''
         left: 0;
         right: 0;
         height: 4px;
-        background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #4facfe);
+        background: #c0c0c0;
         opacity: 0.8;
     }
     
     .disaster-card:hover {
         transform: translateY(-8px) scale(1.02);
-        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
-        border-color: rgba(255, 255, 255, 0.5);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        border-color: #c0c0c0;
     }
     
     .disaster-card.severe::before {
-        background: linear-gradient(90deg, #dc2626, #991b1b, #ef4444);
+        background: #dc2626;
     }
     
     .disaster-card.catastrophic::before {
-        background: linear-gradient(90deg, #7c2d12, #dc2626, #ef4444);
-        animation: pulse 2s ease-in-out infinite;
-    }
-    
-    @keyframes pulse {
-        0%, 100% { opacity: 0.8; }
-        50% { opacity: 1; }
+        background: #dc2626;
     }
     
     .disaster-card-header {
@@ -866,11 +919,55 @@ DISASTERS_HUB_TEMPLATE = '''
     .country-flag {
         width: 48px;
         height: 36px;
-        border-radius: 8px;
-        object-fit: cover;
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        object-fit: fill;
         flex-shrink: 0;
+        animation: none !important;
+        transform: none !important;
+        transition: none !important;
+        border-radius: 0 !important;
+        filter: none !important;
+        border: none !important;
+        box-shadow: none !important;
+        clip-path: none !important;
+        mask: none !important;
+        -webkit-mask: none !important;
+        image-rendering: auto !important;
+    }
+    
+    .country-flag-small {
+        width: 48px;
+        height: 36px;
+        object-fit: fill;
+        display: block;
+        animation: none !important;
+        transform: none !important;
+        transition: none !important;
+        border-radius: 0 !important;
+        filter: none !important;
+        border: none !important;
+        box-shadow: none !important;
+        clip-path: none !important;
+        mask: none !important;
+        -webkit-mask: none !important;
+        image-rendering: auto !important;
+    }
+    
+    img.country-flag,
+    img.country-flag-small {
+        width: 48px !important;
+        height: 36px !important;
+        object-fit: fill !important;
+        border-radius: 0 !important;
+        filter: none !important;
+        transform: none !important;
+        animation: none !important;
+        transition: none !important;
+        clip-path: inset(0) !important;
+        mask: none !important;
+        -webkit-mask: none !important;
+        image-rendering: auto !important;
+        -webkit-image-rendering: auto !important;
+        image-rendering: crisp-edges !important;
     }
     
     .disaster-card-title {
@@ -879,109 +976,89 @@ DISASTERS_HUB_TEMPLATE = '''
     
     .disaster-type {
         display: inline-block;
-        background: rgba(255, 255, 255, 0.25);
-        backdrop-filter: blur(10px);
-        color: white;
+        background: #f5f5f5;
+        color: #333;
         padding: 0.5rem 1rem;
         border-radius: 12px;
         font-size: 0.85rem;
         font-weight: 600;
         margin-bottom: 0.5rem;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        border: 1px solid #e0e0e0;
     }
     
     .disaster-card.severe .disaster-type {
-        background: rgba(220, 38, 38, 0.3);
-        border-color: rgba(220, 38, 38, 0.4);
+        background: #fee2e2;
+        border-color: #dc2626;
+        color: #dc2626;
     }
     
     .disaster-location {
         font-size: 1.5rem;
         font-weight: 700;
-        color: white;
+        color: #1a1a1a;
         margin: 0;
-        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     }
     
     .disaster-news-summary {
         font-size: 0.95rem;
-        color: rgba(255, 255, 255, 0.9);
+        color: #4a4a4a;
         line-height: 1.6;
         margin: 1rem 0;
         padding: 1rem;
-        background: rgba(0, 0, 0, 0.1);
+        background: #f9f9f9;
         border-radius: 12px;
-        border-left: 3px solid rgba(255, 255, 255, 0.3);
+        border-left: 3px solid #c0c0c0;
     }
     
-    .disaster-meta {
+    .disaster-card-footer {
         display: flex;
-        gap: 1rem;
-        margin: 1rem 0;
-        flex-wrap: wrap;
-    }
-    
-    .disaster-meta-item {
-        display: flex;
+        justify-content: space-between;
         align-items: center;
-        gap: 0.5rem;
-        font-size: 0.9rem;
-        color: rgba(255, 255, 255, 0.85);
+        margin-top: 1.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e0e0e0;
     }
     
-    .disaster-meta-item strong {
-        color: white;
-        font-weight: 600;
-    }
-    
-    .disaster-date {
-        font-size: 0.85rem;
-        color: rgba(255, 255, 255, 0.8);
-        margin-top: 1rem;
+    .disaster-card-footer .disaster-type {
+        margin-left: auto;
     }
     
     .disaster-link {
         display: inline-flex;
         align-items: center;
-        gap: 0.5rem;
-        background: rgba(255, 255, 255, 0.25);
-        backdrop-filter: blur(10px);
+        background: #0f56ff;
         color: white;
         padding: 0.875rem 1.75rem;
         border-radius: 12px;
         text-decoration: none;
         font-weight: 600;
         transition: all 0.3s ease;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        margin-top: 1rem;
-        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        border: 1px solid #0f56ff;
     }
     
     .disaster-link:hover {
-        background: rgba(255, 255, 255, 0.35);
-        transform: translateX(4px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        background: #1f3c88;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(15, 86, 255, 0.3);
     }
     
     .empty-state {
         text-align: center;
         padding: 4rem 2rem;
-        background: rgba(255, 255, 255, 0.15);
-        backdrop-filter: blur(20px);
+        background: #ffffff;
         border-radius: 24px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        color: white;
+        border: 1px solid #e0e0e0;
+        color: #1a1a1a;
     }
     
     .empty-state p {
         font-size: 1.2rem;
         margin-bottom: 1rem;
-        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        color: #4a4a4a;
     }
     
     .empty-state a {
-        color: white;
+        color: #0f56ff;
         font-weight: 600;
         text-decoration: underline;
     }
@@ -990,22 +1067,20 @@ DISASTERS_HUB_TEMPLATE = '''
         text-align: center;
         margin-top: 4rem;
         padding: 3rem 2rem;
-        background: rgba(255, 255, 255, 0.15);
-        backdrop-filter: blur(20px);
+        background: #ffffff;
         border-radius: 24px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e0e0e0;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
     }
     
     .info-section h3 {
-        color: white;
+        color: #1a1a1a;
         margin-bottom: 1rem;
         font-size: 1.8rem;
-        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     }
     
     .info-section p {
-        color: rgba(255, 255, 255, 0.95);
+        color: #4a4a4a;
         margin-bottom: 1.5rem;
         max-width: 700px;
         margin-left: auto;
@@ -1015,22 +1090,20 @@ DISASTERS_HUB_TEMPLATE = '''
     
     .info-section a {
         display: inline-block;
-        background: rgba(255, 255, 255, 0.25);
-        backdrop-filter: blur(10px);
+        background: #0f56ff;
         color: white;
         padding: 1rem 2rem;
         border-radius: 12px;
         text-decoration: none;
         font-weight: 600;
         transition: all 0.3s ease;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        border: 1px solid #0f56ff;
     }
     
     .info-section a:hover {
-        background: rgba(255, 255, 255, 0.35);
+        background: #1f3c88;
         transform: translateY(-2px);
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 8px 16px rgba(15, 86, 255, 0.3);
     }
     
     @media (max-width: 768px) {
@@ -1059,58 +1132,47 @@ DISASTERS_HUB_TEMPLATE = '''
 <div class="disasters-page">
     <div class="disasters-container">
         <div class="page-header">
-            <h1 class="page-title">🌍 Current Disasters We're Praying For</h1>
-            <p class="page-subtitle">
-                Breaking news disasters with customized prayers. Updated hourly based on real-time global news monitoring.
-            </p>
+            <h1 class="page-title">Join us in prayer, for the affected communities by recent events</h1>
+            <div class="prayer-verse" style="margin-top: 2rem; padding: 1.5rem; background: #ffffff; border-radius: 16px; border: 1px solid #e0e0e0; text-align: center; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
+                <p style="font-size: 1.1rem; font-style: italic; margin-bottom: 0.5rem; color: #1a1a1a;">
+                    "Do not be anxious about anything, but in every situation, by prayer and petition, with thanksgiving, present your requests to God."
+                </p>
+                <p style="font-size: 0.9rem; color: #666;">
+                    — Philippians 4:6
+                </p>
+            </div>
         </div>
         
         {% if disasters %}
         <div class="disasters-grid">
             {% for disaster in disasters %}
             <div class="disaster-card {{ disaster.severity }}">
-                <div class="disaster-card-header">
-                    <img src="https://flagcdn.com/w80/{{ disaster.country_flag_code or 'xx' }}.png" 
-                         alt="{{ disaster.country }} flag" 
-                         class="country-flag"
-                         onerror="this.src='https://flagcdn.com/w80/xx.png'">
-                    <div class="disaster-card-title">
-                        <span class="disaster-type">{{ disaster.type_display }}</span>
-                        <h2 class="disaster-location">{{ disaster.location_display }}</h2>
+                <div class="disaster-card-header-grouped" style="text-align: center; margin-bottom: 1.5rem;">
+                    <h2 class="disaster-type-title" style="font-size: 1.8rem; font-weight: 700; color: #1a1a1a; margin-bottom: 1rem;">
+                        {{ disaster.type_display }}
+                    </h2>
+                    <div class="country-flags-group" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-bottom: 1rem;">
+                        {% for flag_info in disaster.country_flags %}
+                        <img src="/api/flags/{{ flag_info.flag_code }}" 
+                             alt="{{ flag_info.country }} flag" 
+                             class="country-flag-small"
+                             style="width: 48px; height: 36px; object-fit: fill; display: block; animation: none !important; transform: none !important; transition: none !important; border-radius: 0 !important; filter: none !important; border: none !important; box-shadow: none !important;"
+                             onerror="this.src='/api/flags/xx';">
+                        {% endfor %}
                     </div>
                 </div>
                 
-                {% if disaster.news_summary %}
-                <div class="disaster-news-summary">
-                    {{ disaster.news_summary }}
+                {% if disaster.summary %}
+                <div class="disaster-news-summary" style="text-align: center;">
+                    {{ disaster.summary }}
                 </div>
                 {% endif %}
                 
-                {% if disaster.country_flag_code %}
-                <script>
-                    // Update flag src with proper country code
-                    document.querySelector('.disaster-card .country-flag').src = 'https://flagcdn.com/w80/{{ disaster.country_flag_code }}.png';
-                </script>
-                {% endif %}
-                
-                <div class="disaster-meta">
-                    {% if disaster.casualties %}
-                    <div class="disaster-meta-item">
-                        <strong>Casualties:</strong> {{ disaster.casualties }}
-                    </div>
-                    {% endif %}
-                    <div class="disaster-meta-item">
-                        <strong>Severity:</strong> {{ disaster.severity|title }}
-                    </div>
+                <div class="disaster-card-footer" style="justify-content: center;">
+                    <a href="/prayers/watchtower/{{ disaster.url_slug }}" class="disaster-link">
+                        Let Pray
+                    </a>
                 </div>
-                
-                <p class="disaster-date">
-                    Prayer created: {{ disaster.created_at[:10] }}
-                </p>
-                
-                <a href="/prayers/disaster/{{ disaster.url_slug }}" class="disaster-link">
-                    View Customized Prayer →
-                </a>
             </div>
             {% endfor %}
         </div>
@@ -1120,16 +1182,6 @@ DISASTERS_HUB_TEMPLATE = '''
             <p>Visit our <a href="/prayers">Prayer Room</a> for today's global prayer.</p>
         </div>
         {% endif %}
-        
-        <div class="info-section">
-            <h3>How We Monitor Disasters</h3>
-            <p>
-                Our system automatically searches for breaking news about disasters worldwide every hour. 
-                When a breaking disaster is found, we generate a customized prayer specifically tailored to that event, 
-                referencing the actual news details. These prayers are displayed for 3 days to ensure timely support.
-            </p>
-            <a href="/prayers">View Today's Global Prayer</a>
-        </div>
     </div>
 </div>
 {% endblock %}
