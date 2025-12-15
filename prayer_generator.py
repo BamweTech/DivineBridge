@@ -52,6 +52,7 @@ RESEARCH & NEWS GATHERING:
 1. Search the web for the latest (last 72 hours) news worldwide about:
    - Natural disasters (earthquakes, floods, storms, wildfires, etc.)
    - Wars and armed conflicts
+   - Mass shootings and gun violence
    - Disease outbreaks and public health crises
    - Human rights violations
    - Poverty and hunger
@@ -70,12 +71,16 @@ RESEARCH & NEWS GATHERING:
    - Specific locations and human impact
    - Accuracy and verification from multiple sources
 
+⚠️ CRITICAL: If there were ANY mass shootings or gun violence incidents in the last 72 hours, you MUST include them in your prayer. Search specifically for "mass shooting", "gun violence", "shooting incident", "active shooter" in your research. Use search queries like "mass shooting today", "gun violence December 2025", "shooting incident last 3 days". If you find ANY mass shootings, you MUST mention them explicitly in the prayer body (e.g., "We pray for victims of recent mass shootings", "We lift up communities shattered by gun violence", "We remember those affected by shootings").
+
 PRAYER STRUCTURE & CONTENT:
 Write a prayer that addresses current global challenges with both structure and warmth:
 
 Opening:
 - Begin with "Heavenly Father" (not "Dear Heavenly Father")
-- Open with genuine, heartfelt acknowledgment of God's presence
+- ⚠️ CRITICAL: Start with PRAISE - acknowledge God's goodness, faithfulness, sovereignty, love, or power before making any requests
+- Examples of praise: "we praise you for your unfailing love", "we thank you for your faithfulness", "we worship you as the sovereign Lord", "we acknowledge your goodness", "we glorify you for your mercy"
+- After praise, open with genuine, heartfelt acknowledgment of God's presence
 - Use "we" and "our" throughout (praying as a community)
 
 Body (2-3 paragraphs):
@@ -83,10 +88,15 @@ Body (2-3 paragraphs):
   * Name the regions/countries affected
   * Acknowledge the suffering without graphic details or specific casualty numbers
   * Pray for specific groups: families, children, aid workers, leaders, those grieving
+  * ⚠️ CRITICAL REQUIREMENT: If ANY mass shootings occurred in the last 72 hours, you MUST include them in your prayer. Search for "mass shooting December 2025", "gun violence today", "shooting incident last 3 days". If found, mention them explicitly in the first or second paragraph (e.g., "We pray for victims of recent mass shootings", "We lift up communities shattered by gun violence", "We remember those affected by shootings and their families"). DO NOT skip mass shootings if they occurred.
+  * Include victims of wars and armed conflicts around the world
 - ALWAYS include prayer for:
   * Those who are sick and fighting illness
   * Those facing hunger and lacking daily provisions
   * Those who feel lost, hopeless, or spiritually adrift
+  * Victims of mass shootings and wars around the world
+
+⚠️ MANDATORY SECTION: You MUST ALWAYS include a sentence or phrase about mass shootings and gun violence victims in your prayer, even if you don't find specific recent incidents. Include something like: "We pray for victims of mass shootings and gun violence" OR "We lift up communities shattered by shootings" OR "We remember those affected by gun violence and their families" OR "We pray for all who have been touched by the tragedy of mass shootings". This is REQUIRED in every prayer - do not skip it, even if focusing on other crises.
 - Show genuine compassion and emotion (not generic or stiff)
 - Let the weight of the crisis show through authentic language
 
