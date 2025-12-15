@@ -93,9 +93,21 @@ class NonprofitService:
                 not user_location.get('city')
             )
             
-            # If default location, use global organizations instead of local
+            # If default location, use global organizations for general orgs
+            # BUT still try to get disaster-specific organizations if disasters exist
             if is_default_location:
-                logger.info("Using default location, returning global organizations")
+                logger.info("Using default location, will use global organizations for general orgs")
+                # Don't return early - continue to get disaster-specific orgs if disasters exist
+                general_orgs = []  # Will use fallback later
+            else:
+                # 1. Get 4 general local organizations (from cache or Perplexity)
+                logger.info(f"Fetching general organizations for {user_location.get('city', 'Unknown')}")
+                general_orgs = self._get_general_organizations(user_location)
+            
+            # Get general organizations (local or fallback)
+            if is_default_location or not general_orgs or len(general_orgs) < 4:
+                # Use fallback for general organizations
+                logger.info("Using global fallback organizations for general orgs")
                 fallback = self._get_fallback_organizations()
                 
                 # Fetch logos for fallback organizations if not cached
@@ -105,26 +117,15 @@ class NonprofitService:
                         org['logo_url'] = logo_url
                 
                 random.seed(date)
-                # Get all 6 from fallback when location is not detected
-                selected_orgs.extend(random.sample(fallback, min(6, len(fallback))))
-                return selected_orgs
-            
-            # 1. Get 4 general local organizations (from cache or Perplexity)
-            logger.info(f"Fetching general organizations for {user_location.get('city', 'Unknown')}")
-            general_orgs = self._get_general_organizations(user_location)
-            
-            if general_orgs and len(general_orgs) >= 4:
-                # Use date as seed for daily consistency
+                selected_general = random.sample(fallback, min(4, len(fallback)))
+                selected_orgs.extend(selected_general)
+                logger.info(f"Selected {len(selected_general)} general organizations from fallback")
+            else:
+                # Use local organizations
                 random.seed(date)
                 selected_general = random.sample(general_orgs, min(4, len(general_orgs)))
                 selected_orgs.extend(selected_general)
-                logger.info(f"Selected {len(selected_general)} general organizations")
-            else:
-                # Not enough local orgs, use fallback
-                logger.warning(f"Not enough general orgs found, using fallback")
-                fallback = self._get_fallback_organizations()
-                random.seed(date)
-                selected_orgs.extend(random.sample(fallback, min(4, len(fallback))))
+                logger.info(f"Selected {len(selected_general)} general local organizations")
             
             # 2. Get 2 disaster-specific organizations (deduplicated)
             if prayer_disasters:
