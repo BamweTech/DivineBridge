@@ -5,6 +5,7 @@ API routes for organization recommendations and location management.
 
 from flask import Blueprint, jsonify, request, current_app
 import logging
+import json
 from datetime import datetime
 from location_service import get_location_service
 from nonprofit_service import get_nonprofit_service
@@ -76,16 +77,29 @@ def get_organizations():
         # Extract disasters from prayer (or use cached metadata)
         prayer_disasters = []
         if prayer_data:
+            logger.debug(f"Prayer data keys: {list(prayer_data.keys()) if isinstance(prayer_data, dict) else 'Not a dict'}")
+            
             if 'metadata' in prayer_data and 'disasters' in prayer_data['metadata']:
                 # Use cached metadata
                 prayer_disasters = prayer_data['metadata']['disasters']
-                logger.info(f"Using cached disasters from prayer metadata")
+                logger.info(f"Using cached disasters from prayer metadata: {len(prayer_disasters)} disasters found")
+                
+                # Log metadata structure for debugging
+                if len(prayer_disasters) == 0:
+                    logger.warning(f"Prayer metadata exists but disasters array is empty. Metadata keys: {list(prayer_data['metadata'].keys())}")
+                    logger.debug(f"Full metadata: {json.dumps(prayer_data['metadata'], indent=2)[:500]}")
+                else:
+                    logger.info(f"Disaster details: {[{'type': d.get('type'), 'locations': d.get('locations', [])} for d in prayer_disasters[:3]]}")
             else:
                 # Extract on-the-fly (shouldn't happen if integration is working)
                 logger.warning("Prayer missing metadata, extracting disasters now...")
+                logger.debug(f"Prayer content preview: {prayer_data.get('content', '')[:200] if isinstance(prayer_data, dict) else 'No content'}")
                 extractor = get_disaster_extractor()
                 metadata = extractor.extract_disasters(prayer_data.get('content', ''))
                 prayer_disasters = metadata.get('disasters', [])
+                logger.info(f"Extracted {len(prayer_disasters)} disasters from prayer content")
+        else:
+            logger.warning(f"No prayer data found for today ({today})")
         
         t3 = time.time()
         logger.debug(f"⏱️ Prayer: {(t3-t2)*1000:.0f}ms")
@@ -94,6 +108,13 @@ def get_organizations():
         from disaster_extractor import get_disaster_extractor
         extractor = get_disaster_extractor()
         primary_disasters = extractor.get_primary_disasters({'disasters': prayer_disasters}, limit=2)
+        
+        if primary_disasters:
+            logger.info(f"Found {len(primary_disasters)} primary disasters for organization matching: {[d.get('type') + ' in ' + ', '.join(d.get('locations', [])) for d in primary_disasters]}")
+        else:
+            logger.warning(f"No primary disasters found. Total disasters in prayer: {len(prayer_disasters)}")
+            if prayer_disasters:
+                logger.info(f"Disaster details: {json.dumps(prayer_disasters[:3], indent=2)}")
         
         t4 = time.time()
         logger.debug(f"⏱️ Disasters: {(t4-t3)*1000:.0f}ms")

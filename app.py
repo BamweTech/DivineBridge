@@ -282,8 +282,8 @@ def create_app():
         from routes.prayer_room_bp import prayer_room_bp
         from routes.admin_bp import admin_bp
         
-        # Exempt auth, prayer, verse, email, testimony, prayer room, nonprofit, and admin blueprints from CSRF protection
-        # Auth uses Firebase token auth, Prayer/Email use Cloud Scheduler verification, Admin uses passcode
+        # Exempt auth, prayer, verse, email, testimony, prayer room, nonprofit, seo, and admin blueprints from CSRF protection
+        # Auth uses Firebase token auth, Prayer/Email/SEO use Cloud Scheduler verification, Admin uses passcode
         csrf.exempt(auth_bp)
         csrf.exempt(prayer_bp)
         csrf.exempt(verse_bp)
@@ -291,6 +291,7 @@ def create_app():
         csrf.exempt(testimony_bp)
         csrf.exempt(prayer_room_bp)
         csrf.exempt(nonprofit_bp)
+        csrf.exempt(seo_bp)
         csrf.exempt(admin_bp)
         
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
