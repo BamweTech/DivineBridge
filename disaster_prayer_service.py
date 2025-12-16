@@ -65,6 +65,8 @@ class DisasterPrayerService:
 
 CURRENT TIME: {current_time}
 
+CRITICAL: Only include disasters that occurred in the LAST 24 HOURS. Do NOT include disasters from last year, last month, or even last week. Only include disasters that happened TODAY or YESTERDAY.
+
 SEARCH INSTRUCTIONS:
 1. Search the web for BREAKING NEWS and RECENT disasters. Use time-specific search queries like:
    - "disaster breaking news last 12 hours" OR "disaster breaking news last 24 hours"
@@ -88,22 +90,21 @@ SEARCH INSTRUCTIONS:
 
 3. Focus on these disaster types: {disaster_types_str}
 
-4. TIME WINDOW GUIDANCE (be flexible and inclusive):
+4. TIME WINDOW GUIDANCE (STRICT - only recent disasters):
    - PRIMARY: Disasters from the last 12 hours (highest priority)
    - SECONDARY: Disasters from 12-24 hours ago that are:
      * Still developing or ongoing
      * Have breaking updates or new developments
      * Are part of active emergency response
-   - INCLUDE: 
-     * Ongoing disasters that started recently and are still active
-     * Disasters mentioned in TODAY's news articles (even if exact timing unclear)
-     * Flood alerts, warnings, or emergency responses happening TODAY
-     * Any disaster reported in news from the current date
-   - BE INCLUSIVE: If a disaster is mentioned in today's news or is ongoing, include it even if:
-     * Exact timing is unclear
-     * Some details are missing
-     * It's part of a developing situation
-   - EXCLUDE: Only disasters clearly older than 24 hours with no recent updates
+   - STRICTLY EXCLUDE:
+     * Disasters from last year, last month, or last week
+     * Disasters older than 24 hours unless they have breaking updates TODAY
+     * Historical disasters mentioned in news articles
+     * Disasters that occurred more than 24 hours ago with no recent updates
+   - ONLY INCLUDE disasters that:
+     * Occurred in the last 24 hours
+     * Have breaking updates or new developments TODAY
+     * Are part of active emergency response happening NOW
 
 5. Prioritize disasters with:
    - Significant casualties or injuries
@@ -127,22 +128,21 @@ For each BREAKING disaster found, return a JSON array with this EXACT structure:
 ]
 
 CRITICAL REQUIREMENTS:
-- INCLUDE disasters if they meet ANY of these criteria:
-  * Mentioned in TODAY's news articles (December 15, 2025)
-  * Reported as happening in the last 12-24 hours
-  * Still developing or ongoing
-  * Have breaking updates or new information
-  * Part of active emergency response
-  * Flood alerts, warnings, or emergency situations happening TODAY
-- Be INCLUSIVE: If a disaster appears in today's news, include it even if exact timing is unclear or some details are missing
+- STRICTLY EXCLUDE disasters that occurred more than 24 hours ago
+- STRICTLY EXCLUDE disasters from last year, last month, or last week
+- ONLY INCLUDE disasters if they meet ALL of these criteria:
+  * Occurred in the last 12-24 hours (check the timestamp/date carefully)
+  * Have a timestamp showing TODAY or YESTERDAY's date
+  * Are breaking news or have updates from TODAY
 - Be specific with country names (full names, not abbreviations like 'US' - use 'United States')
 - Include specific details from the news in the summary (what happened, where, impact)
-- If a disaster is mentioned in today's news articles, include it - don't exclude due to incomplete timing information
-- Only return empty array [] if NO disasters are found in today's news or the past 24 hours
+- Include accurate timestamp showing when the disaster occurred (must be within last 24 hours)
+- Verify the date/timestamp before including - if a disaster occurred last year, DO NOT include it
+- Only return empty array [] if NO disasters are found in the past 24 hours
 - Return ONLY valid JSON array, no explanations, no markdown, no code blocks
 - Verify information from multiple sources when possible
 - Focus on verified, reliable news sources
-- When in doubt, INCLUDE the disaster rather than exclude it
+- When in doubt about timing, EXCLUDE the disaster rather than include old news
 
 Return ONLY the JSON array, nothing else. Example format:
 [{{"type":"earthquake","country":"Japan","location":"Tokyo","severity":"severe","casualties":150,"news_summary":"A magnitude 7.2 earthquake struck Tokyo at 2:30 PM local time, causing widespread damage to buildings and infrastructure. Emergency services are responding to multiple collapsed structures. At least 150 people are reported injured.","news_source":"Reuters","timestamp":"2025-01-15T14:30:00Z"}}]"""
@@ -497,7 +497,7 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
     
     def get_active_disaster_prayers(self) -> List[Dict]:
         """
-        Get all active disaster prayers (not expired, within 3 days)
+        Get all active disaster prayers (not expired, within 3 days, and disasters from last week)
         Prioritizes grouped prayers, falls back to individual prayers
         
         Returns:
@@ -507,6 +507,8 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
             prayers = []
             grouped_prayers = []
             now = datetime.now()
+            # Only show disasters from the last week (7 days)
+            max_disaster_age = timedelta(days=7)
             
             # List all disaster prayers (both grouped and individual)
             blobs = self.storage.bucket.list_blobs(prefix='disaster_prayers/')
@@ -521,16 +523,95 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                         expires_at_str = prayer_data.get('expires_at')
                         if expires_at_str:
                             expires_at = datetime.fromisoformat(expires_at_str)
-                            if expires_at > now:
-                                # Separate grouped and individual prayers
-                                if prayer_data.get('is_grouped') or 'grouped' in blob.name:
-                                    grouped_prayers.append(prayer_data)
-                                else:
-                                    prayers.append(prayer_data)
-                            else:
+                            if expires_at <= now:
                                 # Delete expired prayer
                                 blob.delete()
                                 logger.info(f"Deleted expired disaster prayer: {blob.name}")
+                                continue
+                        
+                        # Check disaster timestamp for grouped prayers
+                        if prayer_data.get('is_grouped') or 'grouped' in blob.name:
+                            # For grouped prayers, check created_at (when we generated the prayer)
+                            # Only include if created within last week
+                            created_at_str = prayer_data.get('created_at')
+                            if created_at_str:
+                                try:
+                                    created_at = datetime.fromisoformat(created_at_str)
+                                    if (now - created_at) <= max_disaster_age:
+                                        grouped_prayers.append(prayer_data)
+                                    else:
+                                        logger.info(f"Filtered out old grouped prayer: {blob.name} (created {now - created_at} ago)")
+                                        # Delete old prayer
+                                        blob.delete()
+                                        logger.info(f"Deleted old grouped disaster prayer: {blob.name}")
+                                except Exception as e:
+                                    logger.warning(f"Error parsing created_at for {blob.name}: {e}")
+                                    continue
+                        else:
+                            # For individual prayers, check the disaster timestamp
+                            timestamp_str = prayer_data.get('timestamp')
+                            if timestamp_str:
+                                try:
+                                    # Try to parse timestamp
+                                    disaster_time = None
+                                    try:
+                                        disaster_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                                    except:
+                                        try:
+                                            for fmt in ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                                                try:
+                                                    disaster_time = datetime.strptime(timestamp_str[:19], fmt)
+                                                    break
+                                                except:
+                                                    continue
+                                        except:
+                                            pass
+                                    
+                                    if disaster_time:
+                                        # Check if disaster is within last week
+                                        if (now - disaster_time.replace(tzinfo=None)) <= max_disaster_age:
+                                            prayers.append(prayer_data)
+                                        else:
+                                            logger.info(f"Filtered out old disaster: {blob.name} (disaster occurred {now - disaster_time.replace(tzinfo=None)} ago)")
+                                            # Delete old prayer
+                                            blob.delete()
+                                            logger.info(f"Deleted old disaster prayer: {blob.name}")
+                                    else:
+                                        # If timestamp parsing fails, use created_at as fallback
+                                        created_at_str = prayer_data.get('created_at')
+                                        if created_at_str:
+                                            try:
+                                                created_at = datetime.fromisoformat(created_at_str)
+                                                if (now - created_at) <= max_disaster_age:
+                                                    prayers.append(prayer_data)
+                                                else:
+                                                    blob.delete()
+                                                    logger.info(f"Deleted old disaster prayer (fallback): {blob.name}")
+                                            except:
+                                                # If both fail, skip this prayer
+                                                logger.warning(f"Could not determine age for {blob.name}, skipping")
+                                                continue
+                                except Exception as e:
+                                    logger.warning(f"Error checking timestamp for {blob.name}: {e}")
+                                    # Fallback to created_at
+                                    created_at_str = prayer_data.get('created_at')
+                                    if created_at_str:
+                                        try:
+                                            created_at = datetime.fromisoformat(created_at_str)
+                                            if (now - created_at) <= max_disaster_age:
+                                                prayers.append(prayer_data)
+                                        except:
+                                            continue
+                            else:
+                                # No timestamp, use created_at as fallback
+                                created_at_str = prayer_data.get('created_at')
+                                if created_at_str:
+                                    try:
+                                        created_at = datetime.fromisoformat(created_at_str)
+                                        if (now - created_at) <= max_disaster_age:
+                                            prayers.append(prayer_data)
+                                    except:
+                                        continue
                     except Exception as e:
                         logger.warning(f"Error reading disaster prayer {blob.name}: {e}")
                         continue
@@ -538,6 +619,8 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
             # Sort by created_at (most recent first)
             grouped_prayers.sort(key=lambda x: x.get('created_at', ''), reverse=True)
             prayers.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+            
+            logger.info(f"Returning {len(grouped_prayers)} grouped prayers and {len(prayers)} individual prayers (all within last week)")
             
             # Return grouped prayers first, then individual prayers
             return grouped_prayers + prayers

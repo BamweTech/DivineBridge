@@ -769,7 +769,7 @@ DISASTER_PAGE_TEMPLATE = '''
                 {% for flag_info in country_flags %}
                 <img src="/api/flags/{{ flag_info.flag_code }}" 
                      alt="{{ flag_info.country }} flag" 
-                     style="width: 48px; height: 36px; object-fit: fill; display: block; animation: none !important; transform: none !important; transition: none !important; border-radius: 0 !important; filter: none !important; border: none !important; box-shadow: none !important;"
+                     style="width: 32px; height: 24px; object-fit: fill; display: block; animation: none !important; transform: none !important; transition: none !important; border-radius: 0 !important; filter: none !important; border: none !important; box-shadow: none !important; will-change: auto !important; backface-visibility: visible !important; perspective: none !important; -webkit-transform: none !important;"
                      onerror="this.src='/api/flags/xx';">
                 {% endfor %}
             </div>
@@ -917,8 +917,8 @@ DISASTERS_HUB_TEMPLATE = '''
     }
     
     .country-flag {
-        width: 48px;
-        height: 36px;
+        width: 32px;
+        height: 24px;
         object-fit: fill;
         flex-shrink: 0;
         animation: none !important;
@@ -932,11 +932,14 @@ DISASTERS_HUB_TEMPLATE = '''
         mask: none !important;
         -webkit-mask: none !important;
         image-rendering: auto !important;
+        will-change: auto !important;
+        backface-visibility: visible !important;
+        perspective: none !important;
     }
     
     .country-flag-small {
-        width: 48px;
-        height: 36px;
+        width: 32px;
+        height: 24px;
         object-fit: fill;
         display: block;
         animation: none !important;
@@ -950,12 +953,16 @@ DISASTERS_HUB_TEMPLATE = '''
         mask: none !important;
         -webkit-mask: none !important;
         image-rendering: auto !important;
+        will-change: auto !important;
+        backface-visibility: visible !important;
+        perspective: none !important;
     }
     
     img.country-flag,
-    img.country-flag-small {
-        width: 48px !important;
-        height: 36px !important;
+    img.country-flag-small,
+    img[src*="/api/flags/"] {
+        width: 32px !important;
+        height: 24px !important;
         object-fit: fill !important;
         border-radius: 0 !important;
         filter: none !important;
@@ -968,6 +975,23 @@ DISASTERS_HUB_TEMPLATE = '''
         image-rendering: auto !important;
         -webkit-image-rendering: auto !important;
         image-rendering: crisp-edges !important;
+        will-change: auto !important;
+        backface-visibility: visible !important;
+        perspective: none !important;
+        -webkit-transform: none !important;
+        -moz-transform: none !important;
+        -ms-transform: none !important;
+        -o-transform: none !important;
+    }
+    
+    /* Prevent any hover effects on flags */
+    img.country-flag:hover,
+    img.country-flag-small:hover,
+    img[src*="/api/flags/"]:hover {
+        transform: none !important;
+        animation: none !important;
+        transition: none !important;
+        filter: none !important;
     }
     
     .disaster-card-title {
@@ -1156,7 +1180,7 @@ DISASTERS_HUB_TEMPLATE = '''
                         <img src="/api/flags/{{ flag_info.flag_code }}" 
                              alt="{{ flag_info.country }} flag" 
                              class="country-flag-small"
-                             style="width: 48px; height: 36px; object-fit: fill; display: block; animation: none !important; transform: none !important; transition: none !important; border-radius: 0 !important; filter: none !important; border: none !important; box-shadow: none !important;"
+                             style="width: 32px; height: 24px; object-fit: fill; display: block; animation: none !important; transform: none !important; transition: none !important; border-radius: 0 !important; filter: none !important; border: none !important; box-shadow: none !important; will-change: auto !important; backface-visibility: visible !important; perspective: none !important; -webkit-transform: none !important;"
                              onerror="this.src='/api/flags/xx';">
                         {% endfor %}
                     </div>
