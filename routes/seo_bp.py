@@ -435,23 +435,61 @@ def disasters_hub():
         # Get active disaster prayers (prioritizes grouped prayers)
         disaster_prayers = service.get_active_disaster_prayers()
         
-        # Group by disaster type
-        disasters_by_type = {}
+        # Normalize disaster types function (matches disaster_prayer_service normalization)
+        def normalize_disaster_type_for_display(disaster_type: str) -> str:
+            """Normalize disaster type to standard format for grouping"""
+            disaster_type = disaster_type.lower().strip()
+            type_mapping = {
+                'hurricane': 'typhoon',
+                'cyclone': 'typhoon',
+                'storm': 'typhoon',  # Normalize storm to typhoon (same weather system type)
+                'flooding': 'flood',
+                'wildfire': 'fire',
+                'volcanic_eruption': 'volcano',
+                'pandemic': 'epidemic',
+                'war': 'conflict',
+                'refugee_crisis': 'conflict',
+                'mass shooting': 'mass_shooting',
+                'gun violence': 'mass_shooting'
+            }
+            return type_mapping.get(disaster_type, disaster_type)
+        
+        # First pass: Collect all entries by normalized type
+        entries_by_normalized_type = {}
         for prayer_data in disaster_prayers:
             # Check if it's a grouped prayer
             if prayer_data.get('is_grouped') or prayer_data.get('affected_countries'):
                 disaster_type = prayer_data.get('disaster_type', '')
-                disaster_type_normalized = disaster_type.lower().replace(' ', '_').replace('-', '_')
+                # Normalize the type for grouping (storm -> typhoon, etc.)
+                disaster_type_normalized = normalize_disaster_type_for_display(disaster_type).replace(' ', '_').replace('-', '_')
                 
-                # Use the most recent prayer for each type
-                if disaster_type_normalized not in disasters_by_type:
-                    disasters_by_type[disaster_type_normalized] = prayer_data
-                else:
-                    # Keep the most recent one
-                    existing_date = datetime.fromisoformat(disasters_by_type[disaster_type_normalized].get('created_at', '2000-01-01'))
-                    new_date = datetime.fromisoformat(prayer_data.get('created_at', '2000-01-01'))
-                    if new_date > existing_date:
-                        disasters_by_type[disaster_type_normalized] = prayer_data
+                if disaster_type_normalized not in entries_by_normalized_type:
+                    entries_by_normalized_type[disaster_type_normalized] = []
+                entries_by_normalized_type[disaster_type_normalized].append(prayer_data)
+        
+        # Second pass: Merge countries from all entries of the same normalized type, keep most recent
+        disasters_by_type = {}
+        for disaster_type_normalized, entries in entries_by_normalized_type.items():
+            if len(entries) == 1:
+                # Only one entry, use it as-is
+                disasters_by_type[disaster_type_normalized] = entries[0]
+            else:
+                # Multiple entries - merge countries and keep most recent
+                logger.info(f"Merging {len(entries)} entries for normalized type {disaster_type_normalized}")
+                
+                # Find the most recent entry
+                most_recent_entry = max(entries, key=lambda x: datetime.fromisoformat(x.get('created_at', '2000-01-01')))
+                
+                # Merge all countries from all entries
+                all_countries = set()
+                for entry in entries:
+                    all_countries.update(entry.get('affected_countries', []))
+                
+                # Update the most recent entry with merged countries
+                most_recent_entry['affected_countries'] = list(all_countries)
+                disasters_by_type[disaster_type_normalized] = most_recent_entry
+                
+                logger.info(f"Merged {len(entries)} entries for {disaster_type_normalized}: {len(all_countries)} total countries")
         
         # Transform to display format
         grouped_disasters = []
@@ -566,11 +604,30 @@ def disaster_prayer_page(disaster_type):
         disaster_prayer = None
         disaster_data = None
         
+        # Normalize disaster type function (matches disaster_prayer_service normalization)
+        def normalize_disaster_type_for_display(disaster_type: str) -> str:
+            """Normalize disaster type to standard format for matching"""
+            disaster_type = disaster_type.lower().strip()
+            type_mapping = {
+                'hurricane': 'typhoon',
+                'cyclone': 'typhoon',
+                'storm': 'typhoon',  # Normalize storm to typhoon (same weather system type)
+                'flooding': 'flood',
+                'wildfire': 'fire',
+                'volcanic_eruption': 'volcano',
+                'pandemic': 'epidemic',
+                'war': 'conflict',
+                'refugee_crisis': 'conflict',
+                'mass shooting': 'mass_shooting',
+                'gun violence': 'mass_shooting'
+            }
+            return type_mapping.get(disaster_type, disaster_type)
+        
         active_prayers = service.get_active_disaster_prayers()
         for prayer_data in active_prayers:
             # Check if it's a grouped prayer for this type
             if prayer_data.get('is_grouped') or prayer_data.get('affected_countries'):
-                prayer_disaster_type = prayer_data.get('disaster_type', '').lower().replace(' ', '_').replace('-', '_')
+                prayer_disaster_type = normalize_disaster_type_for_display(prayer_data.get('disaster_type', '')).replace(' ', '_').replace('-', '_')
                 
                 if prayer_disaster_type == disaster_type_normalized:
                     disaster_prayer = prayer_data.get('prayer', '')

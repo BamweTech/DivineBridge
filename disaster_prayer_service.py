@@ -335,6 +335,7 @@ REMEMBER:
         type_mapping = {
             'hurricane': 'typhoon',
             'cyclone': 'typhoon',
+            'storm': 'typhoon',  # Normalize storm to typhoon (same weather system type)
             'flooding': 'flood',
             'wildfire': 'fire',
             'volcanic_eruption': 'volcano',
@@ -519,7 +520,7 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
         Save grouped disaster prayer by type with all affected countries
         
         Args:
-            disaster_type: Type of disaster (normalized)
+            disaster_type: Type of disaster (should already be normalized, but we'll ensure it)
             info: Comprehensive information dictionary
             result: Dictionary with 'summary' and 'prayer' keys
             
@@ -527,6 +528,9 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
             True if saved successfully
         """
         try:
+            # Ensure disaster_type is normalized (storm -> typhoon, etc.)
+            disaster_type = self._normalize_disaster_type(disaster_type)
+            
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             prayer_id = f"{disaster_type}_grouped_{timestamp}"
             
@@ -821,21 +825,47 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
         current_year = datetime.now().year
         previous_year = current_year - 1
         
-        # Check for previous year in text
+        import re
+        
+        # Check for previous year in text with various patterns
         if str(previous_year) in text:
-            # Check if it's in a date context (not just a number)
-            import re
             # Look for date patterns like "December 14, 2024" or "2024-12-14"
             date_patterns = [
                 rf'\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{{1,2}},\s+{previous_year}\b',
                 rf'\b{previous_year}-\d{{2}}-\d{{2}}\b',
                 rf'\b{previous_year}/\d{{2}}/\d{{2}}\b',
                 rf'\b\d{{1,2}}/\d{{1,2}}/{previous_year}\b',
+                rf'\bsince\s+{previous_year}\b',
+                rf'\bin\s+{previous_year}\b',
+                rf'\bfrom\s+{previous_year}\b',
+                rf'\bstarting\s+in\s+{previous_year}\b',
+                rf'\bbegan\s+in\s+{previous_year}\b',
+                rf'\bstarted\s+in\s+{previous_year}\b',
             ]
             
             for pattern in date_patterns:
                 if re.search(pattern, text, re.IGNORECASE):
                     return True
+        
+        # Also check for years older than previous year (2023, 2022, etc.)
+        for year in range(2020, previous_year):
+            year_str = str(year)
+            if year_str in text:
+                # Check for context indicating it's a date
+                year_patterns = [
+                    rf'\bsince\s+{year_str}\b',
+                    rf'\bin\s+{year_str}\b',
+                    rf'\bfrom\s+{year_str}\b',
+                    rf'\bstarting\s+in\s+{year_str}\b',
+                    rf'\bbegan\s+in\s+{year_str}\b',
+                    rf'\bstarted\s+in\s+{year_str}\b',
+                    rf'\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{{1,2}},\s+{year_str}\b',
+                    rf'\b{year_str}-\d{{2}}-\d{{2}}\b',
+                ]
+                
+                for pattern in year_patterns:
+                    if re.search(pattern, text, re.IGNORECASE):
+                        return True
         
         return False
     
