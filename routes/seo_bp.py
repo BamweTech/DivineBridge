@@ -314,7 +314,7 @@ def sitemap():
             ('/', '1.0', 'daily'),  # Home/Prayer Room
             ('/home', '0.8', 'weekly'),  # Original home
             ('/prayers', '1.0', 'daily'),  # Prayer Room
-            ('/disasters', '0.9', 'daily'),  # Disasters hub (SEO discovery page)
+            ('/globalprayerwatch', '0.9', 'daily'),  # Global Prayer Watch hub (SEO discovery page)
             ('/about', '0.7', 'monthly'),
             ('/contact', '0.6', 'monthly'),
             ('/faq', '0.6', 'monthly'),
@@ -422,7 +422,7 @@ def generate_hourly_disaster_prayers():
         }), 500
 
 
-@seo_bp.route('/disasters')
+@seo_bp.route('/globalprayerwatch')
 def disasters_hub():
     """Hub page showing all current disasters grouped by type from hourly breaking news monitoring"""
     try:
@@ -586,7 +586,7 @@ def proxy_flag(country_code):
     return Response(transparent_png, mimetype='image/png', headers={'Cache-Control': 'no-cache'})
 
 
-@seo_bp.route('/prayers/watchtower/<disaster_type>')
+@seo_bp.route('/globalprayerwatch/<disaster_type>')
 def disaster_prayer_page(disaster_type):
     """SEO-optimized landing page for grouped disaster prayers by type"""
     try:
@@ -688,110 +688,917 @@ def disaster_prayer_page(disaster_type):
         return jsonify({'error': 'Page not found'}), 404
 
 
-# Disaster page template with SEO optimization
+# Disaster page template - Prayer-first, participation-focused
 DISASTER_PAGE_TEMPLATE = '''
 {% extends "base.html" %}
 
-{% block title %}Prayer for People Affected by {{ disaster_type }}{% if location %} in {{ location }}{% endif %} | Divine Bridge{% endblock %}
+{% block title %}Prayer for {{ disaster_type }} - Join in Prayer for Affected Communities{% if affected_countries %} in {{ affected_countries|join(', ') }}{% endif %} | Global Prayer Watch{% endblock %}
 
-{% block og_title %}Join Us in Prayer for People Affected by {{ disaster_type }}{% if location %} in {{ location }}{% endif %}{% endblock %}
-{% block og_description %}Unite with thousands of believers praying for those affected by {{ disaster_type }}{% if location %} in {{ location }}{% endif %}. Submit prayer requests and find hope.{% endblock %}
+{% block meta_description %}Join believers worldwide in prayer for communities affected by {{ disaster_type }}{% if affected_countries %} in {{ affected_countries|join(', ') }}{% endif %}. This prayer has been crafted specifically for their situation. Stand together in faith and intercession.{% endblock %}
+
+{% block meta_keywords %}prayer for {{ disaster_type }}, {{ disaster_type }} prayer, disaster prayer, prayer for affected communities{% if affected_countries %}, prayer for {{ affected_countries|join(', ') }}{% endif %}, global prayer watch, Christian disaster prayer{% endblock %}
+
+{% block og_title %}Prayer for {{ disaster_type }} - Join in Prayer for Affected Communities{% endblock %}
+{% block og_description %}Join believers worldwide lifting up communities affected by {{ disaster_type }}{% if affected_countries %} in {{ affected_countries|join(', ') }}{% endif %}. Stand together in prayer and intercession.{% endblock %}
 
 {% block extra_css %}
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+
+    :root {
+        --primary-blue: #0f56ff;
+        --primary-blue-light: #4a90e2;
+        --primary-blue-dark: #1f3c88;
+        --text-primary: #0a1629;
+        --text-secondary: #64748b;
+        --text-muted: #94a3b8;
+        --surface-white: rgba(255, 255, 255, 0.95);
+        --surface-glass: rgba(255, 255, 255, 0.8);
+        --shadow-light: rgba(0, 0, 0, 0.04);
+        --shadow-medium: rgba(0, 0, 0, 0.08);
+        --shadow-heavy: rgba(0, 0, 0, 0.12);
+        --border-light: rgba(15, 86, 255, 0.1);
+        --border-medium: rgba(15, 86, 255, 0.2);
+        --gradient-primary: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-light) 100%);
+        --gradient-surface: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.95) 100%);
+        --animation-timing: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        line-height: 1.6;
+        color: var(--text-primary);
+    }
+
+    .disaster-prayer-page {
+        min-height: calc(100vh - 200px);
+        padding: 4rem 2rem 6rem;
+        background:
+            radial-gradient(circle at 30% 70%, rgba(15, 86, 255, 0.03) 0%, transparent 50%),
+            radial-gradient(circle at 70% 30%, rgba(74, 144, 226, 0.03) 0%, transparent 50%),
+            linear-gradient(135deg, #fafbfc 0%, #ffffff 50%, #f1f5f9 100%);
+        position: relative;
+        overflow-x: hidden;
+    }
+
+    .disaster-prayer-page::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 100%;
+        background:
+            url("data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%230f56ff' fill-opacity='0.015'%3E%3Ccircle cx='10' cy='10' r='1.5'/%3E%3Ccircle cx='40' cy='10' r='1.5'/%3E%3Ccircle cx='70' cy='10' r='1.5'/%3E%3Ccircle cx='10' cy='40' r='1.5'/%3E%3Ccircle cx='40' cy='40' r='1.5'/%3E%3Ccircle cx='70' cy='40' r='1.5'/%3E%3Ccircle cx='10' cy='70' r='1.5'/%3E%3Ccircle cx='40' cy='70' r='1.5'/%3E%3Ccircle cx='70' cy='70' r='1.5'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") repeat;
+        pointer-events: none;
+        animation: floatBackground 20s ease-in-out infinite;
+    }
+
+    @keyframes floatBackground {
+        0%, 100% { transform: translate(0, 0); }
+        25% { transform: translate(-10px, -10px); }
+        50% { transform: translate(10px, -20px); }
+        75% { transform: translate(-5px, 10px); }
+    }
+    
+    .breadcrumb {
+        font-size: 0.9rem;
+        color: #64748b;
+        margin-bottom: 2rem;
+        text-align: left;
+        max-width: 1200px;
+        margin-left: auto;
+        margin-right: auto;
+        padding: 0 1rem;
+        font-weight: 500;
+    }
+    
+    .breadcrumb a {
+        color: #0f56ff;
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+    
+    .breadcrumb a:hover {
+        text-decoration: underline;
+        color: #1f3c88;
+    }
+    
     .disaster-hero {
-        background: linear-gradient(to bottom, #f8f8f8 0%, #e8e8e8 100%);
+        background: var(--surface-white);
         color: #333;
-        padding: 4rem 2rem;
+        padding: 5rem 4rem;
         text-align: center;
-        margin-bottom: 3rem;
+        margin-bottom: 5rem;
+        max-width: 1200px;
+        margin-left: auto;
+        margin-right: auto;
+        border-radius: 40px;
+        box-shadow:
+            0 32px 80px var(--shadow-medium),
+            0 16px 32px var(--shadow-light),
+            inset 0 1px 0 rgba(255, 255, 255, 0.5);
+        border: 1px solid var(--border-light);
+        position: relative;
+        overflow: hidden;
+        backdrop-filter: blur(20px);
+        animation: heroSlideUp 1.2s var(--animation-timing);
+    }
+
+    .disaster-hero::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: var(--gradient-primary);
+        background-size: 200% 100%;
+        animation: shimmer 4s ease-in-out infinite;
+    }
+
+    .disaster-hero::after {
+        content: '';
+        position: absolute;
+        top: -30%;
+        left: -30%;
+        width: 160%;
+        height: 160%;
+        background: radial-gradient(circle, rgba(15, 86, 255, 0.02) 0%, transparent 70%);
+        animation: heroPulse 8s ease-in-out infinite;
+        pointer-events: none;
+    }
+
+    @keyframes heroSlideUp {
+        from {
+            opacity: 0;
+            transform: translateY(40px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes heroPulse {
+        0%, 100% { transform: scale(1); opacity: 0.3; }
+        50% { transform: scale(1.05); opacity: 0.6; }
     }
     
     .disaster-hero h1 {
-        font-size: 2.5rem;
-        margin-bottom: 1rem;
-        font-weight: 700;
+        font-size: clamp(2.5rem, 5vw, 4rem);
+        margin-bottom: 1.5rem;
+        font-weight: 900;
+        color: var(--text-primary);
+        letter-spacing: -0.03em;
+        line-height: 1.1;
+        background: linear-gradient(135deg, var(--text-primary) 0%, var(--primary-blue-dark) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        position: relative;
+        z-index: 2;
     }
-    
-    .disaster-hero p {
-        font-size: 1.2rem;
-        opacity: 0.9;
-        max-width: 800px;
+
+    .hero-subtitle {
+        font-size: clamp(1.25rem, 2.5vw, 1.5rem);
+        color: var(--text-secondary);
+        line-height: 1.7;
+        max-width: 900px;
         margin: 0 auto;
+        font-weight: 500;
+        position: relative;
+        z-index: 2;
     }
     
     .prayer-content {
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 2rem;
+        max-width: 1000px;
+        margin: 0 auto 5rem;
+        padding: 0 1.5rem;
+        position: relative;
+        z-index: 2;
     }
-    
-    .prayer-card {
-        background: white;
-        border-radius: 16px;
-        padding: 2rem;
-        margin-bottom: 2rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    
-    .prayer-date {
-        color: #0f56ff;
-        font-weight: 600;
-        margin-bottom: 1rem;
-    }
-    
-    .prayer-text {
-        line-height: 1.8;
-        color: #333;
-        white-space: pre-wrap;
-    }
-    
-    .cta-section {
-        background: #f5f5f5;
-        padding: 3rem 2rem;
+
+    .affected-communities {
+        background: linear-gradient(135deg, 
+            rgba(255, 255, 255, 0.98) 0%, 
+            rgba(248, 250, 252, 0.95) 100%);
+        border-radius: 36px;
+        padding: 0;
+        margin-bottom: 4rem;
+        box-shadow:
+            0 24px 64px rgba(0, 0, 0, 0.08),
+            0 12px 32px rgba(0, 0, 0, 0.06),
+            0 4px 16px rgba(15, 86, 255, 0.04),
+            inset 0 1px 0 rgba(255, 255, 255, 0.9);
         text-align: center;
-        margin-top: 3rem;
-        border-radius: 16px;
+        border: none;
+        position: relative;
+        overflow: hidden;
+        animation: contentSlideUp 1.4s var(--animation-timing);
+        isolation: isolate;
     }
-    
-    .cta-button {
-        display: inline-block;
-        background: #0f56ff;
-        color: white;
-        padding: 1rem 2rem;
-        border-radius: 12px;
-        text-decoration: none;
-        font-weight: 600;
-        margin: 0.5rem;
-        transition: transform 0.3s ease;
+
+    .affected-communities::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 6px;
+        background: var(--gradient-primary);
+        background-size: 200% 100%;
+        animation: shimmerFlow 4s ease-in-out infinite;
+        z-index: 3;
     }
-    
-    .cta-button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(15, 86, 255, 0.4);
+
+    .affected-communities::after {
+        content: '';
+        position: absolute;
+        top: -40%;
+        left: -40%;
+        width: 180%;
+        height: 180%;
+        background: radial-gradient(circle, 
+            rgba(15, 86, 255, 0.04) 0%, 
+            rgba(74, 144, 226, 0.02) 30%,
+            transparent 70%);
+        animation: subtleRotate 20s linear infinite;
+        pointer-events: none;
     }
-    
-    @media (max-width: 768px) {
-        .disaster-hero h1 {
-            font-size: 1.8rem;
+
+    @keyframes contentSlideUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
         }
-        .disaster-hero p {
-            font-size: 1rem;
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes subtleRotate {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    .communities-title {
+        font-size: clamp(1.875rem, 3vw, 2.5rem);
+        font-weight: 900;
+        color: var(--text-primary);
+        margin-bottom: 0;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        position: relative;
+        z-index: 2;
+        padding: 3.5rem 3rem 2rem;
+        background: linear-gradient(180deg, 
+            rgba(255, 255, 255, 0.95) 0%, 
+            rgba(248, 250, 252, 0.5) 100%);
+    }
+
+    .communities-title::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 80px;
+        height: 4px;
+        background: var(--gradient-primary);
+        border-radius: 2px;
+    }
+
+    .country-flags-section {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        padding: 2rem 2.5rem;
+        background: linear-gradient(135deg, 
+            rgba(248, 250, 252, 0.8) 0%, 
+            rgba(241, 245, 249, 0.6) 100%);
+        border-radius: 24px;
+        border: 1px solid rgba(15, 86, 255, 0.1);
+        box-shadow: 
+            0 8px 20px rgba(0, 0, 0, 0.04),
+            inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(10px);
+        position: relative;
+        z-index: 2;
+        margin-left: 3rem;
+        margin-right: 3rem;
+    }
+
+    .situation-summary {
+        color: #475569;
+        font-style: italic;
+        font-size: 1.1875rem;
+        line-height: 1.8;
+        margin: 0;
+        padding: 2.5rem 3rem 3.5rem;
+        font-weight: 400;
+        position: relative;
+        z-index: 2;
+        background: linear-gradient(180deg, 
+            rgba(255, 255, 255, 0.5) 0%, 
+            rgba(255, 255, 255, 0.95) 100%);
+        border-top: 1px solid rgba(15, 86, 255, 0.08);
+    }
+
+    .situation-summary::before {
+        content: '';
+        position: absolute;
+        top: -1px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60%;
+        height: 1px;
+        background: linear-gradient(90deg, 
+            transparent 0%,
+            rgba(15, 86, 255, 0.3) 50%,
+            transparent 100%);
+    }
+
+    .prayer-section {
+        background: linear-gradient(135deg, 
+            rgba(255, 255, 255, 0.98) 0%, 
+            rgba(255, 255, 255, 1) 100%);
+        border-radius: 40px;
+        padding: 0;
+        margin-bottom: 4rem;
+        box-shadow:
+            0 32px 80px rgba(0, 0, 0, 0.08),
+            0 16px 40px rgba(0, 0, 0, 0.06),
+            0 8px 20px rgba(15, 86, 255, 0.04),
+            inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        border: none;
+        position: relative;
+        overflow: hidden;
+        animation: contentSlideUp 1.6s var(--animation-timing);
+        isolation: isolate;
+    }
+
+    .prayer-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 6px;
+        background: var(--gradient-primary);
+        background-size: 200% 100%;
+        animation: shimmerFlow 5s ease-in-out infinite;
+        z-index: 3;
+    }
+
+    .prayer-section::after {
+        content: '';
+        position: absolute;
+        top: -35%;
+        left: -35%;
+        width: 170%;
+        height: 170%;
+        background: radial-gradient(circle, 
+            rgba(15, 86, 255, 0.03) 0%, 
+            rgba(74, 144, 226, 0.015) 30%,
+            transparent 70%);
+        animation: subtleRotate 25s linear infinite reverse;
+        pointer-events: none;
+    }
+
+    .prayer-title {
+        font-size: clamp(1.875rem, 3vw, 2.75rem);
+        font-weight: 900;
+        color: var(--text-primary);
+        margin-bottom: 0;
+        text-align: center;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        position: relative;
+        z-index: 2;
+        padding: 4rem 4rem 3rem;
+        background: linear-gradient(180deg, 
+            rgba(255, 255, 255, 0.95) 0%, 
+            rgba(248, 250, 252, 0.5) 100%);
+    }
+
+    .prayer-title::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 100px;
+        height: 4px;
+        background: var(--gradient-primary);
+        border-radius: 2px;
+    }
+
+    .prayer-text {
+        line-height: 2.2;
+        color: #1e293b;
+        white-space: pre-wrap;
+        font-size: 1.25rem;
+        text-align: left;
+        font-weight: 400;
+        position: relative;
+        z-index: 2;
+        font-family: 'Inter', sans-serif;
+        padding: 0 4rem 4rem;
+        background: linear-gradient(180deg, 
+            rgba(255, 255, 255, 0.5) 0%, 
+            rgba(255, 255, 255, 0.98) 100%);
+    }
+
+    .prayer-text::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 4rem;
+        right: 4rem;
+        height: 1px;
+        background: linear-gradient(90deg, 
+            transparent 0%,
+            rgba(15, 86, 255, 0.2) 50%,
+            transparent 100%);
+    }
+
+    .prayer-participation {
+        background: linear-gradient(135deg, 
+            rgba(255, 255, 255, 0.98) 0%, 
+            rgba(248, 250, 252, 0.95) 100%);
+        border-radius: 36px;
+        padding: 0;
+        text-align: center;
+        margin-top: 4rem;
+        border: none;
+        box-shadow:
+            0 24px 64px rgba(0, 0, 0, 0.08),
+            0 12px 32px rgba(0, 0, 0, 0.06),
+            0 4px 16px rgba(15, 86, 255, 0.04),
+            inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        position: relative;
+        overflow: hidden;
+        animation: contentSlideUp 1.8s var(--animation-timing);
+        isolation: isolate;
+    }
+
+    .prayer-participation::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 6px;
+        background: var(--gradient-primary);
+        background-size: 200% 100%;
+        animation: shimmerFlow 4s ease-in-out infinite;
+        z-index: 3;
+    }
+
+    .prayer-participation::after {
+        content: '';
+        position: absolute;
+        top: -30%;
+        left: -30%;
+        width: 160%;
+        height: 160%;
+        background: radial-gradient(circle, 
+            rgba(15, 86, 255, 0.05) 0%, 
+            rgba(74, 144, 226, 0.025) 30%,
+            transparent 70%);
+        animation: subtleRotate 15s linear infinite;
+        pointer-events: none;
+    }
+
+    .participation-text {
+        font-size: 1.3125rem;
+        color: #475569;
+        line-height: 1.75;
+        margin-bottom: 3rem;
+        font-weight: 500;
+        position: relative;
+        z-index: 2;
+        padding: 3.5rem 3rem 0;
+        background: linear-gradient(180deg, 
+            rgba(255, 255, 255, 0.95) 0%, 
+            rgba(248, 250, 252, 0.5) 100%);
+    }
+
+    .prayer-resources {
+        max-width: 1200px;
+        margin: 5rem auto 0;
+        padding: 5rem 4rem;
+        background: var(--gradient-surface);
+        border-radius: 40px;
+        border: 1px solid var(--border-light);
+        text-align: center;
+        box-shadow:
+            0 32px 80px var(--shadow-medium),
+            0 16px 32px var(--shadow-light);
+        position: relative;
+        overflow: hidden;
+        animation: contentSlideUp 2s var(--animation-timing);
+    }
+
+    .prayer-resources::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(15, 86, 255, 0.02) 0%, transparent 70%);
+        animation: rotate 25s linear infinite;
+        pointer-events: none;
+    }
+    
+    .resources-title {
+        font-size: clamp(2rem, 4vw, 2.875rem);
+        font-weight: 900;
+        color: var(--text-primary);
+        margin-bottom: 0;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        position: relative;
+        z-index: 2;
+        padding: 5rem 4rem 2.5rem;
+        background: linear-gradient(180deg, 
+            rgba(255, 255, 255, 0.95) 0%, 
+            rgba(248, 250, 252, 0.5) 100%);
+    }
+
+    .resources-title::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 100px;
+        height: 4px;
+        background: var(--gradient-primary);
+        border-radius: 2px;
+    }
+
+    .resources-intro {
+        font-size: 1.3125rem;
+        color: var(--text-secondary);
+        line-height: 1.75;
+        margin-bottom: 0;
+        max-width: 900px;
+        margin-left: auto;
+        margin-right: auto;
+        font-weight: 400;
+        position: relative;
+        z-index: 2;
+        padding: 2.5rem 4rem 4rem;
+        background: linear-gradient(180deg, 
+            rgba(255, 255, 255, 0.5) 0%, 
+            rgba(255, 255, 255, 0.98) 100%);
+        border-top: 1px solid rgba(15, 86, 255, 0.08);
+    }
+
+    .resources-intro::before {
+        content: '';
+        position: absolute;
+        top: -1px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60%;
+        height: 1px;
+        background: linear-gradient(90deg, 
+            transparent 0%,
+            rgba(15, 86, 255, 0.3) 50%,
+            transparent 100%);
+    }
+    
+    /* Flag tooltip styling for disaster page */
+    .flag-tooltip-wrapper {
+        position: relative;
+        display: inline-block;
+    }
+    
+    .flag-tooltip {
+        visibility: hidden;
+        opacity: 0;
+        background-color: #1a1a1a;
+        color: #ffffff;
+        text-align: center;
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        white-space: nowrap;
+        position: absolute;
+        z-index: 1000;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        margin-bottom: 8px;
+        pointer-events: none;
+        transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+    
+    .flag-tooltip::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border-width: 5px;
+        border-style: solid;
+        border-color: #1a1a1a transparent transparent transparent;
+    }
+    
+    .flag-tooltip-wrapper:hover .flag-tooltip {
+        visibility: visible;
+        opacity: 1;
+    }
+    
+    .resource-links {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 1.5rem;
+        margin-top: 3.5rem;
+    }
+
+    .resource-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1.25rem 2.5rem;
+        background: var(--surface-white);
+        color: var(--primary-blue);
+        text-decoration: none;
+        border-radius: 16px;
+        font-weight: 600;
+        font-size: 1rem;
+        border: 2px solid var(--border-medium);
+        transition: all 0.3s var(--animation-timing);
+        backdrop-filter: blur(12px);
+        box-shadow: 0 4px 16px var(--shadow-light);
+        position: relative;
+        overflow: hidden;
+        min-width: 200px;
+        justify-content: center;
+    }
+
+    .link-icon {
+        font-size: 1.25rem;
+        position: relative;
+        z-index: 2;
+    }
+
+    .link-text {
+        position: relative;
+        z-index: 2;
+    }
+
+    .resource-link::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(15, 86, 255, 0.1), transparent);
+        transition: left 0.4s ease;
+    }
+
+    .resource-link:hover::before {
+        left: 100%;
+    }
+
+    .resource-link:hover {
+        background: var(--gradient-primary);
+        color: white;
+        border-color: var(--primary-blue);
+        transform: translateY(-3px);
+        box-shadow: 0 8px 24px rgba(15, 86, 255, 0.3);
+    }
+    
+    @media (max-width: 1024px) {
+        .prayer-content {
+            max-width: 900px;
+        }
+
+        .disaster-hero {
+            padding: 4rem 3rem;
+            margin-bottom: 4rem;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .disaster-prayer-page {
+            padding: 3rem 1.5rem 5rem;
+        }
+
+        .disaster-hero {
+            padding: 3.5rem 2.5rem;
+            margin-bottom: 4rem;
+            border-radius: 28px;
+        }
+
+        .disaster-hero h1 {
+            font-size: clamp(2rem, 7vw, 2.75rem);
+        }
+
+        .hero-subtitle {
+            font-size: clamp(1.125rem, 3vw, 1.375rem);
+        }
+
+        .prayer-content {
+            padding: 0 1rem;
+        }
+
+        .affected-communities {
+            padding: 2.5rem 2rem;
+            margin-bottom: 3rem;
+            border-radius: 24px;
+        }
+
+        .prayer-section {
+            padding: 3.5rem 2.5rem;
+            margin-bottom: 3rem;
+            border-radius: 24px;
+        }
+
+        .prayer-participation {
+            padding: 2.5rem 2rem;
+            margin-top: 3rem;
+            border-radius: 20px;
+        }
+
+        .prayer-resources {
+            padding: 3.5rem 2.5rem;
+            margin-top: 4rem;
+            border-radius: 28px;
+        }
+
+        .resource-links {
+            grid-template-columns: 1fr;
+            padding: 0 2rem 3rem;
+        }
+
+        .resource-link {
+            width: 100%;
+            padding: 1.75rem 1.5rem;
+            min-height: 120px;
+        }
+
+        .communities-title {
+            font-size: clamp(1.5rem, 4vw, 1.875rem);
+        }
+
+        .prayer-title {
+            font-size: clamp(1.375rem, 4vw, 1.75rem);
+        }
+
+        .prayer-text {
+            font-size: 1.125rem;
+            line-height: 2;
+        }
+
+        .resources-title {
+            font-size: clamp(1.75rem, 5vw, 2.25rem);
+        }
+    }
+
+    @media (max-width: 480px) {
+        .disaster-prayer-page {
+            padding: 2.5rem 1rem 4rem;
+        }
+
+        .disaster-hero {
+            padding: 3rem 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .disaster-hero h1 {
+            font-size: clamp(1.875rem, 8vw, 2.5rem);
+            margin-bottom: 1.25rem;
+        }
+
+        .hero-subtitle {
+            font-size: clamp(1rem, 4vw, 1.25rem);
+        }
+
+        .prayer-section {
+            padding: 0;
+        }
+
+        .prayer-title {
+            padding: 3rem 1.5rem 2rem;
+        }
+
+        .prayer-text {
+            padding: 0 1.5rem 3rem;
+        }
+
+        .affected-communities {
+            padding: 0;
+        }
+
+        .communities-title {
+            padding: 2.5rem 1.5rem 1.5rem;
+        }
+
+        .country-flags-section {
+            margin-left: 1.5rem;
+            margin-right: 1.5rem;
+            padding: 1.5rem 1.5rem;
+        }
+
+        .situation-summary {
+            padding: 2rem 1.5rem 2.5rem;
+        }
+
+        .prayer-participation {
+            padding: 0;
+        }
+
+        .participation-text {
+            padding: 2.5rem 1.5rem 0;
+        }
+
+        .participation-cta-wrapper {
+            padding: 0 1.5rem 2.5rem !important;
+        }
+
+        .prayer-resources {
+            padding: 0;
+        }
+
+        .resources-title {
+            padding: 3rem 1.5rem 2rem;
+        }
+
+        .resources-intro {
+            padding: 2rem 1.5rem 3rem;
+        }
+
+        .resource-links {
+            padding: 0 1.5rem 3rem;
+        }
+
+        .prayer-text {
+            font-size: 1.0625rem;
+        }
+    }
+
+    /* Enhanced focus states for accessibility */
+    .prayer-cta-primary:focus,
+    .resource-link:focus {
+        outline: 3px solid var(--primary-blue);
+        outline-offset: 3px;
+    }
+
+    /* Reduced motion support */
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+        }
+    }
+
+    /* High contrast mode support */
+    @media (prefers-contrast: high) {
+        :root {
+            --text-primary: #000000;
+            --text-secondary: #333333;
+            --border-light: rgba(0, 0, 0, 0.2);
+            --border-medium: rgba(0, 0, 0, 0.3);
         }
     }
 </style>
-
 <!-- JSON-LD Structured Data for SEO -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "Prayer for People Affected by {{ disaster_type }} in {{ location }}",
-  "description": "Join believers worldwide praying for those affected by {{ disaster_type }} in {{ location }}. Daily prayers, Bible verses, and spiritual support.",
+  "headline": "Prayer for Communities Affected by {{ disaster_type }}{% if affected_countries %} in {{ affected_countries|join(', ') }}{% endif %}",
+  "description": "Join believers worldwide in prayer for communities affected by {{ disaster_type }}{% if affected_countries %} in {{ affected_countries|join(', ') }}{% endif %}. This prayer has been crafted specifically for their situation.",
   "datePublished": "{{ today }}",
+  "dateModified": "{{ today }}",
   "author": {
     "@type": "Organization",
-    "name": "Divine Bridge"
+    "name": "Divine Bridge",
+    "url": "{{ request.url_root }}"
   },
   "publisher": {
     "@type": "Organization",
@@ -801,170 +1608,906 @@ DISASTER_PAGE_TEMPLATE = '''
       "url": "{{ request.url_root }}static/images/LogowithName.svg"
     }
   },
-  "keywords": "prayer for {{ disaster_type }}, {{ location }} prayer, Christian disaster relief, prayer request {{ location }}, {{ disaster_type }} victims prayer"
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "{{ request.url }}"
+  },
+  "keywords": "prayer for {{ disaster_type }}, {{ disaster_type }} prayer, disaster prayer, prayer for affected communities{% if affected_countries %}, prayer for {{ affected_countries|join(', ') }}{% endif %}, global prayer watch",
+  "articleSection": "Global Prayer Watch",
+  "inLanguage": "en-US"
 }
 </script>
 {% endblock %}
 
 {% block content %}
-<!-- Disaster Prayer Landing Page -->
-<div class="disaster-hero">
-    <h1>🙏 Prayer for People Affected by {{ disaster_type }}{% if location %} in {{ location }}{% endif %}</h1>
-    <p>Join thousands of believers worldwide lifting up those affected by {{ disaster_type }}{% if location %} in {{ location }}{% endif %}. You are not alone in prayer.</p>
-</div>
+<main class="disaster-prayer-page" role="main">
+    <header class="disaster-hero">
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+            <a href="/">Home</a>
+            <span aria-hidden="true"> › </span>
+            <a href="/globalprayerwatch">Global Prayer Watch</a>
+            <span aria-hidden="true"> › </span>
+            <span>{{ disaster_type }}</span>
+        </nav>
+        <h1>Prayer for {{ disaster_type }}</h1>
+        <p class="hero-subtitle">Join believers worldwide in lifting up communities affected by {{ disaster_type }}{% if affected_countries %} in {{ affected_countries|join(', ') }}{% endif %}. This prayer has been crafted specifically for their situation, that we might intercede with understanding and compassion.</p>
+    </header>
 
-<div class="prayer-content">
-    <div class="prayer-card">
-        {% if location %}
-        <h2 style="color: #0f56ff; margin-bottom: 1.5rem; font-size: 1.5rem;">A Prayer for People Affected by {{ disaster_type }} in {{ location }}</h2>
-        {% else %}
-        <h2 style="color: #0f56ff; margin-bottom: 1.5rem; font-size: 1.5rem;">A Prayer for People Affected by {{ disaster_type }}</h2>
+    <article class="prayer-content" itemscope itemtype="https://schema.org/Article">
         {% if affected_countries %}
-        <div style="margin-bottom: 1.5rem; text-align: center;">
-            <p style="color: #666; margin-bottom: 0.5rem;">Affected Countries:</p>
-            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-bottom: 1rem;">
+        <div class="affected-communities" aria-label="Affected communities">
+            <h2 class="communities-title">Communities We're Praying For</h2>
+            <div class="country-flags-section">
                 {% for flag_info in country_flags %}
-                <img src="/api/flags/{{ flag_info.flag_code }}" 
-                     alt="{{ flag_info.country }} flag" 
-                     style="width: 32px; height: 24px; object-fit: fill; display: block; animation: none !important; transform: none !important; transition: none !important; border-radius: 0 !important; filter: none !important; border: none !important; box-shadow: none !important; will-change: auto !important; backface-visibility: visible !important; perspective: none !important; -webkit-transform: none !important;"
-                     onerror="this.src='/api/flags/xx';">
+                <div class="flag-tooltip-wrapper">
+                    <img src="/api/flags/{{ flag_info.flag_code }}" 
+                         alt="{{ flag_info.country }} flag" 
+                         title="{{ flag_info.country }}"
+                         data-country="{{ flag_info.country }}"
+                         style="width: 32px; height: 24px; object-fit: fill; display: block; animation: none !important; transform: none !important; transition: none !important; border-radius: 0 !important; filter: none !important; border: none !important; box-shadow: none !important; will-change: auto !important; backface-visibility: visible !important; perspective: none !important; -webkit-transform: none !important; cursor: pointer;"
+                         onerror="this.src='/api/flags/xx';">
+                    <span class="flag-tooltip">{{ flag_info.country }}</span>
+                </div>
                 {% endfor %}
             </div>
             {% if summary %}
-            <p style="color: #666; font-style: italic; font-size: 0.95rem;">{{ summary }}</p>
+            <p class="situation-summary">{{ summary }}</p>
             {% endif %}
         </div>
         {% endif %}
-        {% endif %}
-        <div class="prayer-text">{{ disaster_prayer }}</div>
-    </div>
+        
+        <section class="prayer-section" itemprop="articleBody">
+            <h2 class="prayer-title">A Prayer for Affected Communities</h2>
+            <div class="prayer-text" itemprop="text">{{ disaster_prayer }}</div>
+        </section>
+        
+        <div class="prayer-participation">
+            <p class="participation-text">You can join others in this prayer right now. As we lift up these communities together, we trust in God's faithfulness and care.</p>
+            <div class="participation-cta-wrapper" style="padding: 0 3rem 3.5rem; position: relative; z-index: 2;">
+                <a href="/prayers" class="prayer-cta-primary">Continue in Prayer Together</a>
+            </div>
+        </div>
+    </article>
     
-    <div style="text-align: center; margin: 2rem 0; padding: 1.5rem; background: rgba(15, 86, 255, 0.05); border-radius: 12px;">
-        <p style="margin-bottom: 0.5rem; font-weight: 600; color: #0f56ff;">🌍 Join Our Global Prayer Community</p>
-        <p style="color: #666; font-size: 0.95rem;">See today's comprehensive prayer covering disasters worldwide</p>
-        <a href="/prayers" style="display: inline-block; margin-top: 1rem; color: #0f56ff; text-decoration: none; font-weight: 600;">View Daily Global Prayer →</a>
-    </div>
-    
-    <div class="cta-section">
-        <h2 style="margin-bottom: 1.5rem;">How You Can Help</h2>
-        <p style="margin-bottom: 2rem; max-width: 600px; margin-left: auto; margin-right: auto;">
-            Whether you're affected by {{ disaster_type }}{% if location %} in {{ location }}{% endif %} or want to support those who are, we're here for you.
-        </p>
-        <a href="/prayers" class="cta-button">Request Prayer</a>
-        <a href="/prayers" class="cta-button">Join Prayer Room</a>
-        <a href="/home#organizations" class="cta-button">Find Relief Organizations</a>
-    </div>
-    
-</div>
+    <aside class="prayer-resources" aria-label="Additional prayer resources">
+        <h2 class="resources-title">Continue in Prayer</h2>
+        <p class="resources-intro">Prayer is a gift we share as the body of Christ. Whether you're seeking prayer or want to join others in intercession, we're here to walk alongside you.</p>
+        <nav class="resource-links" aria-label="Prayer resources">
+            <a href="/globalprayerwatch" class="resource-link">
+                <span class="link-icon">🌍</span>
+                <span class="link-text">View All Prayer Needs</span>
+            </a>
+            <a href="/prayers" class="resource-link">
+                <span class="link-icon">🙏</span>
+                <span class="link-text">Daily Global Prayer</span>
+            </a>
+            <a href="/prayers" class="resource-link">
+                <span class="link-icon">💒</span>
+                <span class="link-text">Join Prayer Room</span>
+            </a>
+            <a href="/home#organizations" class="resource-link">
+                <span class="link-icon">🤝</span>
+                <span class="link-text">Find Relief Organizations</span>
+            </a>
+        </nav>
+    </aside>
+</main>
 {% endblock %}
 '''
 
-# Disasters hub template with glassmorphic design
+# Disasters hub template - Ultra-modern, beautiful design
 DISASTERS_HUB_TEMPLATE = '''
 {% extends "base.html" %}
 
-{% block title %}Current Disasters & Crisis Prayer Support | Divine Bridge{% endblock %}
+{% block title %}Global Prayer Watch - Join in Prayer for Affected Communities Worldwide | Divine Bridge{% endblock %}
 
-{% block meta_description %}Find prayers for current disasters worldwide. Dedicated prayer pages for floods, earthquakes, conflicts, and humanitarian crises. Join our global prayer community.{% endblock %}
+{% block meta_description %}Join believers worldwide in prayer for communities affected by recent disasters. Find specific prayers for floods, earthquakes, conflicts, and humanitarian crises. Stand together in prayer with our global prayer watch community.{% endblock %}
 
-{% block og_title %}Join us in prayer for affected communities by recent events - Divine Bridge{% endblock %}
-{% block og_description %}Discover prayer support for current disasters and crises worldwide. Each disaster has a dedicated prayer page with specific prayers for affected communities.{% endblock %}
+{% block meta_keywords %}global prayer watch, disaster prayer, prayer for affected communities, disaster prayer support, Christian disaster relief prayer, prayer for natural disasters, prayer for humanitarian crises, global prayer community{% endblock %}
+
+{% block og_title %}Global Prayer Watch - Stand Together in Prayer for Affected Communities{% endblock %}
+{% block og_description %}Join believers worldwide lifting up communities affected by recent disasters. Find specific prayers, stand together in faith, and participate in our global prayer watch.{% endblock %}
 
 {% block extra_css %}
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+
+    :root {
+        --primary-blue: #0f56ff;
+        --primary-blue-light: #4a90e2;
+        --primary-blue-dark: #1f3c88;
+        --text-primary: #0a1629;
+        --text-secondary: #64748b;
+        --text-muted: #94a3b8;
+        --surface-white: rgba(255, 255, 255, 0.95);
+        --surface-glass: rgba(255, 255, 255, 0.8);
+        --shadow-light: rgba(0, 0, 0, 0.04);
+        --shadow-medium: rgba(0, 0, 0, 0.08);
+        --shadow-heavy: rgba(0, 0, 0, 0.12);
+        --border-light: rgba(15, 86, 255, 0.1);
+        --border-medium: rgba(15, 86, 255, 0.2);
+        --gradient-primary: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-light) 100%);
+        --gradient-surface: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.95) 100%);
+        --animation-timing: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        line-height: 1.6;
+        color: var(--text-primary);
+    }
+
     .disasters-page {
         min-height: calc(100vh - 200px);
-        padding: 6rem 2rem 4rem;
-        background: linear-gradient(to bottom, #ffffff 0%, #f5f5f5 50%, #e8e8e8 100%);
+        padding: 6rem 2rem 8rem;
+        background:
+            radial-gradient(circle at 20% 50%, rgba(15, 86, 255, 0.03) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(74, 144, 226, 0.03) 0%, transparent 50%),
+            linear-gradient(135deg, #fafbfc 0%, #ffffff 50%, #f1f5f9 100%);
         position: relative;
+        overflow-x: hidden;
     }
-    
+
     .disasters-page::before {
         content: '';
         position: absolute;
         top: 0;
         left: 0;
         right: 0;
-        bottom: 0;
-        background: rgba(255, 255, 255, 0.5);
-        backdrop-filter: blur(5px);
+        height: 100%;
+        background:
+            url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%230f56ff' fill-opacity='0.02'%3E%3Ccircle cx='7' cy='7' r='1'/%3E%3Ccircle cx='27' cy='7' r='1'/%3E%3Ccircle cx='47' cy='7' r='1'/%3E%3Ccircle cx='7' cy='27' r='1'/%3E%3Ccircle cx='27' cy='27' r='1'/%3E%3Ccircle cx='47' cy='27' r='1'/%3E%3Ccircle cx='7' cy='47' r='1'/%3E%3Ccircle cx='27' cy='47' r='1'/%3E%3Ccircle cx='47' cy='47' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") repeat;
+        pointer-events: none;
     }
-    
+
     .disasters-container {
-        max-width: 1400px;
+        max-width: 1440px;
         margin: 0 auto;
         position: relative;
-        z-index: 1;
+        z-index: 2;
     }
-    
+
     .page-header {
         text-align: center;
-        margin-bottom: 4rem;
-        background: rgba(255, 255, 255, 0.15);
-        backdrop-filter: blur(20px);
-        border-radius: 24px;
-        padding: 3rem 2rem;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    }
-    
-    .page-title {
-        font-size: 3rem;
-        color: #1a1a1a;
-        margin-bottom: 0.5rem;
-        font-weight: 700;
-    }
-    
-    .page-subtitle {
-        font-size: 1.5rem;
-        color: #4a4a4a;
-        font-weight: 600;
-        margin-top: 0.5rem;
-        margin-bottom: 2rem;
-        line-height: 1.4;
-    }
-    
-    .disasters-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-        gap: 2rem;
-        margin-top: 3rem;
-    }
-    
-    .disaster-card {
-        background: #ffffff;
-        border-radius: 24px;
-        padding: 2rem;
-        border: 1px solid #e0e0e0;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        margin-bottom: 6rem;
+        background: var(--surface-white);
+        backdrop-filter: blur(24px);
+        border-radius: 36px;
+        padding: 5rem 4rem;
+        border: 1px solid var(--border-light);
+        box-shadow:
+            0 32px 80px var(--shadow-medium),
+            0 16px 32px var(--shadow-light),
+            inset 0 1px 0 rgba(255, 255, 255, 0.5);
         position: relative;
         overflow: hidden;
+        animation: slideUp 1s var(--animation-timing);
     }
-    
-    .disaster-card::before {
+
+    .page-header::before {
         content: '';
         position: absolute;
         top: 0;
         left: 0;
         right: 0;
         height: 4px;
-        background: #c0c0c0;
-        opacity: 0.8;
+        background: var(--gradient-primary);
+        background-size: 200% 100%;
+        animation: shimmer 4s ease-in-out infinite;
     }
-    
+
+    .page-header::after {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(15, 86, 255, 0.02) 0%, transparent 70%);
+        animation: pulse 6s ease-in-out infinite;
+        pointer-events: none;
+    }
+
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes shimmer {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+    }
+
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); opacity: 0.5; }
+        50% { transform: scale(1.05); opacity: 0.8; }
+    }
+
+    .page-title {
+        font-size: clamp(3rem, 6vw, 4.5rem);
+        font-weight: 900;
+        margin-bottom: 1rem;
+        letter-spacing: -0.04em;
+        line-height: 1.1;
+        background: linear-gradient(135deg, var(--text-primary) 0%, var(--primary-blue-dark) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        animation: fadeInUp 1.2s var(--animation-timing);
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .page-subtitle {
+        font-size: clamp(1.375rem, 3vw, 2rem);
+        font-weight: 500;
+        color: var(--text-secondary);
+        margin-top: 0.75rem;
+        margin-bottom: 2.5rem;
+        line-height: 1.6;
+        letter-spacing: -0.01em;
+        animation: fadeInUp 1.4s var(--animation-timing);
+        max-width: 800px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .prayer-intro {
+        margin-top: 3.5rem;
+        padding: 3rem;
+        background: var(--surface-glass);
+        border-radius: 28px;
+        border: 1px solid var(--border-light);
+        box-shadow:
+            0 16px 40px var(--shadow-light),
+            inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(20px);
+        position: relative;
+        animation: slideUp 1.6s var(--animation-timing);
+    }
+
+    .prayer-intro::before {
+        content: '';
+        position: absolute;
+        top: -1px;
+        left: -1px;
+        right: -1px;
+        bottom: -1px;
+        background: linear-gradient(135deg, rgba(15, 86, 255, 0.1) 0%, rgba(74, 144, 226, 0.05) 100%);
+        border-radius: 28px;
+        z-index: -1;
+    }
+
+    .intro-text {
+        font-size: 1.25rem;
+        font-weight: 400;
+        color: #475569;
+        line-height: 1.8;
+        margin-bottom: 2.5rem;
+        text-align: left;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .prayer-verse {
+        margin: 0;
+        padding: 2.5rem 3rem;
+        background: linear-gradient(135deg, rgba(15, 86, 255, 0.03) 0%, rgba(74, 144, 226, 0.06) 100%);
+        border-left: 5px solid var(--primary-blue);
+        border-radius: 20px;
+        font-style: italic;
+        position: relative;
+        box-shadow: 0 8px 24px var(--shadow-light);
+    }
+
+    .prayer-verse::before {
+        content: '"';
+        position: absolute;
+        top: -10px;
+        left: 20px;
+        font-size: 4rem;
+        color: rgba(15, 86, 255, 0.1);
+        font-family: 'Georgia', serif;
+    }
+
+    .verse-text {
+        font-size: 1.25rem;
+        font-weight: 500;
+        color: var(--text-primary);
+        margin-bottom: 1rem;
+        line-height: 1.7;
+        position: relative;
+        z-index: 2;
+    }
+
+    .verse-citation {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+        font-style: normal;
+        display: block;
+        text-align: right;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .section-title {
+        font-size: clamp(2rem, 4vw, 3rem);
+        font-weight: 800;
+        color: var(--text-primary);
+        margin-bottom: 1.5rem;
+        text-align: center;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        position: relative;
+    }
+
+    .section-title::after {
+        content: '';
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60px;
+        height: 3px;
+        background: var(--gradient-primary);
+        border-radius: 2px;
+    }
+
+    .section-intro {
+        font-size: 1.25rem;
+        font-weight: 400;
+        color: var(--text-secondary);
+        line-height: 1.7;
+        margin-bottom: 4rem;
+        text-align: center;
+        max-width: 900px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .prayer-opportunities {
+        margin-top: 5rem;
+    }
+
+    .prayer-cta-primary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--gradient-primary);
+        color: white;
+        padding: 1.25rem 3rem;
+        border-radius: 20px;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 1.25rem;
+        transition: all 0.4s var(--animation-timing);
+        border: none;
+        width: 100%;
+        text-align: center;
+        box-shadow:
+            0 8px 24px rgba(15, 86, 255, 0.4),
+            0 4px 12px rgba(15, 86, 255, 0.3);
+        position: relative;
+        overflow: hidden;
+        font-family: 'Inter', sans-serif;
+        letter-spacing: 0.5px;
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+    .prayer-cta-primary::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+        transition: left 0.6s ease;
+    }
+
+    .prayer-cta-primary:hover::before {
+        left: 100%;
+    }
+
+    .prayer-cta-primary:hover {
+        background: linear-gradient(135deg, var(--primary-blue-dark) 0%, var(--primary-blue) 100%);
+        transform: translateY(-4px) scale(1.02);
+        box-shadow:
+            0 16px 40px rgba(15, 86, 255, 0.5),
+            0 8px 20px rgba(15, 86, 255, 0.4);
+    }
+
+    .prayer-cta-primary:active {
+        transform: translateY(-2px) scale(1.01);
+    }
+
+    @keyframes pulse {
+        0%, 100% { box-shadow: 0 8px 24px rgba(15, 86, 255, 0.4), 0 4px 12px rgba(15, 86, 255, 0.3); }
+        50% { box-shadow: 0 12px 32px rgba(15, 86, 255, 0.5), 0 6px 16px rgba(15, 86, 255, 0.4); }
+    }
+
+    .prayer-resources {
+        margin-top: 6rem;
+        padding: 0;
+        background: linear-gradient(135deg, 
+            rgba(255, 255, 255, 0.98) 0%, 
+            rgba(248, 250, 252, 0.95) 100%);
+        border-radius: 40px;
+        border: none;
+        text-align: center;
+        box-shadow:
+            0 32px 80px rgba(0, 0, 0, 0.08),
+            0 16px 40px rgba(0, 0, 0, 0.06),
+            0 8px 20px rgba(15, 86, 255, 0.04),
+            inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        position: relative;
+        overflow: hidden;
+        isolation: isolate;
+    }
+
+    .prayer-resources::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 6px;
+        background: var(--gradient-primary);
+        background-size: 200% 100%;
+        animation: shimmerFlow 5s ease-in-out infinite;
+        z-index: 3;
+    }
+
+    .prayer-resources::after {
+        content: '';
+        position: absolute;
+        top: -45%;
+        left: -45%;
+        width: 190%;
+        height: 190%;
+        background: radial-gradient(circle, 
+            rgba(15, 86, 255, 0.03) 0%, 
+            rgba(74, 144, 226, 0.015) 30%,
+            transparent 70%);
+        animation: rotate 25s linear infinite;
+        pointer-events: none;
+    }
+
+    @keyframes rotate {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    .resource-links {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.75rem;
+        margin-top: 0;
+        padding: 0 4rem 5rem;
+        position: relative;
+        z-index: 2;
+    }
+
+    .resource-link {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.875rem;
+        padding: 2rem 2rem;
+        background: linear-gradient(135deg, 
+            rgba(255, 255, 255, 0.95) 0%, 
+            rgba(248, 250, 252, 0.9) 100%);
+        color: var(--primary-blue);
+        text-decoration: none;
+        border-radius: 24px;
+        font-weight: 700;
+        font-size: 1.0625rem;
+        border: 2px solid var(--border-medium);
+        transition: all 0.4s var(--animation-timing);
+        backdrop-filter: blur(16px);
+        box-shadow: 
+            0 8px 24px rgba(0, 0, 0, 0.06),
+            0 4px 12px rgba(15, 86, 255, 0.04),
+            inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        position: relative;
+        overflow: hidden;
+        font-family: 'Inter', sans-serif;
+        min-height: 140px;
+    }
+
+    .resource-link::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--gradient-primary);
+        opacity: 0;
+        transition: opacity 0.4s ease;
+        z-index: 1;
+    }
+
+    .resource-link::after {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, 
+            rgba(255, 255, 255, 0.3) 0%, 
+            transparent 70%);
+        opacity: 0;
+        transition: opacity 0.4s ease;
+        z-index: 2;
+    }
+
+    .resource-link:hover::before {
+        opacity: 1;
+    }
+
+    .resource-link:hover::after {
+        opacity: 1;
+    }
+
+    .link-icon {
+        font-size: 2rem;
+        position: relative;
+        z-index: 3;
+        transition: transform 0.4s ease;
+    }
+
+    .link-text {
+        position: relative;
+        z-index: 3;
+        transition: color 0.4s ease;
+    }
+
+    .resource-link:hover .link-icon {
+        transform: scale(1.15) rotate(5deg);
+    }
+
+    .resource-link:hover {
+        color: white;
+        border-color: var(--primary-blue);
+        transform: translateY(-6px) scale(1.02);
+        box-shadow: 
+            0 16px 40px rgba(15, 86, 255, 0.3),
+            0 8px 20px rgba(15, 86, 255, 0.2);
+    }
+
+    .resource-link:hover .link-text {
+        color: white;
+    }
+
+    .empty-message {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+        color: var(--text-primary);
+        animation: fadeInUp 1.8s var(--animation-timing);
+    }
+
+    .empty-cta {
+        color: var(--text-secondary);
+        font-size: 1.125rem;
+    }
+
+    .empty-cta a {
+        color: var(--primary-blue);
+        font-weight: 700;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        border-bottom: 2px solid transparent;
+        padding-bottom: 2px;
+    }
+
+    .empty-cta a:hover {
+        border-bottom-color: var(--primary-blue);
+        color: var(--primary-blue-dark);
+    }
+
+    .disasters-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+        gap: 2.5rem;
+        margin-top: 4rem;
+    }
+
+    .disaster-card {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 1) 100%);
+        border-radius: 32px;
+        padding: 0;
+        border: none;
+        box-shadow:
+            0 20px 60px rgba(0, 0, 0, 0.08),
+            0 8px 24px rgba(0, 0, 0, 0.06),
+            0 4px 12px rgba(15, 86, 255, 0.04),
+            inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        transition: all 0.6s var(--animation-timing);
+        position: relative;
+        overflow: hidden;
+        backdrop-filter: blur(20px);
+        animation: cardSlideUp 0.8s var(--animation-timing) backwards;
+        animation-delay: calc(var(--card-index, 0) * 0.1s);
+        isolation: isolate;
+    }
+
+    @keyframes cardSlideUp {
+        from {
+            opacity: 0;
+            transform: translateY(40px) scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    /* Card top accent bar with gradient */
+    .disaster-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 6px;
+        background: linear-gradient(90deg, 
+            var(--primary-blue) 0%, 
+            var(--primary-blue-light) 25%,
+            var(--primary-blue) 50%,
+            var(--primary-blue-light) 75%,
+            var(--primary-blue) 100%);
+        background-size: 300% 100%;
+        animation: shimmerFlow 4s ease-in-out infinite;
+        animation-delay: calc(var(--card-index, 0) * 0.2s);
+        z-index: 3;
+    }
+
+    @keyframes shimmerFlow {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+    }
+
+    /* Animated gradient overlay on hover */
+    .disaster-card::after {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, 
+            rgba(15, 86, 255, 0.08) 0%, 
+            rgba(74, 144, 226, 0.04) 30%,
+            transparent 70%);
+        opacity: 0;
+        transition: opacity 0.6s ease, transform 0.6s ease;
+        pointer-events: none;
+        border-radius: 50%;
+        transform: scale(0.5);
+    }
+
+    .disaster-card:hover::after {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    /* Card content wrapper */
+    .disaster-card > * {
+        position: relative;
+        z-index: 2;
+    }
+
     .disaster-card:hover {
-        transform: translateY(-8px) scale(1.02);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-        border-color: #c0c0c0;
+        transform: translateY(-16px) scale(1.015);
+        box-shadow:
+            0 32px 80px rgba(0, 0, 0, 0.12),
+            0 16px 40px rgba(0, 0, 0, 0.08),
+            0 8px 20px rgba(15, 86, 255, 0.1),
+            inset 0 1px 0 rgba(255, 255, 255, 0.95);
     }
-    
-    .disaster-card.severe::before {
-        background: #dc2626;
-    }
-    
+
+    .disaster-card.severe::before,
     .disaster-card.catastrophic::before {
-        background: #dc2626;
+        background: linear-gradient(90deg, 
+            #ef4444 0%, 
+            #dc2626 25%,
+            #ef4444 50%,
+            #dc2626 75%,
+            #ef4444 100%);
+        background-size: 300% 100%;
+        height: 6px;
+    }
+
+    .disaster-card-header-grouped {
+        text-align: center;
+        padding: 3rem 2.5rem 2rem;
+        background: linear-gradient(180deg, 
+            rgba(255, 255, 255, 0.95) 0%, 
+            rgba(248, 250, 252, 0.5) 100%);
+        position: relative;
+        margin-bottom: 0;
+    }
+
+    .disaster-card-header-grouped::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 80%;
+        height: 1px;
+        background: linear-gradient(90deg, 
+            transparent 0%,
+            rgba(15, 86, 255, 0.2) 50%,
+            transparent 100%);
+    }
+
+    .disaster-type-title {
+        font-size: clamp(1.75rem, 3vw, 2.25rem);
+        font-weight: 900;
+        color: var(--text-primary);
+        margin-bottom: 1.5rem;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        position: relative;
+        display: inline-block;
+        transition: all 0.4s ease;
+    }
+
+    .disaster-type-title::after {
+        content: '';
+        position: absolute;
+        bottom: -8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 0;
+        height: 3px;
+        background: var(--gradient-primary);
+        border-radius: 2px;
+        transition: width 0.4s ease;
+    }
+
+    .disaster-card:hover .disaster-type-title::after {
+        width: 60%;
+    }
+
+    .disaster-card:hover .disaster-type-title {
+        background: linear-gradient(135deg, var(--text-primary) 0%, var(--primary-blue-dark) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        transform: scale(1.02);
+    }
+
+    .country-flags-group {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.875rem;
+        margin-bottom: 1.5rem;
+        padding: 1.25rem 1.5rem;
+        background: linear-gradient(135deg, 
+            rgba(248, 250, 252, 0.8) 0%, 
+            rgba(241, 245, 249, 0.6) 100%);
+        border-radius: 20px;
+        border: 1px solid rgba(15, 86, 255, 0.08);
+        box-shadow: 
+            0 4px 12px rgba(0, 0, 0, 0.04),
+            inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(8px);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .country-flags-group::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, 
+            transparent, 
+            rgba(15, 86, 255, 0.05), 
+            transparent);
+        transition: left 0.6s ease;
+    }
+
+    .disaster-card:hover .country-flags-group::before {
+        left: 100%;
+    }
+
+    .disaster-news-summary {
+        font-size: 1.0625rem;
+        font-weight: 400;
+        color: #475569;
+        line-height: 1.75;
+        margin: 0;
+        padding: 2.5rem 2.5rem;
+        background: linear-gradient(135deg, 
+            rgba(248, 250, 252, 0.6) 0%, 
+            rgba(241, 245, 249, 0.4) 100%);
+        border-radius: 0;
+        border-left: 5px solid var(--primary-blue);
+        border-right: 5px solid transparent;
+        text-align: left;
+        position: relative;
+        transition: all 0.4s ease;
+    }
+
+    .disaster-news-summary::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 5px;
+        height: 100%;
+        background: var(--gradient-primary);
+        border-radius: 0 3px 3px 0;
+        transition: width 0.4s ease;
+    }
+
+    .disaster-card:hover .disaster-news-summary::before {
+        width: 8px;
+    }
+
+    .disaster-card:hover .disaster-news-summary {
+        background: linear-gradient(135deg, 
+            rgba(248, 250, 252, 0.8) 0%, 
+            rgba(241, 245, 249, 0.6) 100%);
+        padding-left: 2.75rem;
+    }
+
+    .disaster-card-footer {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 0;
+        padding: 2.5rem 2.5rem 3rem;
+        border-top: 1px solid rgba(15, 86, 255, 0.08);
+        background: linear-gradient(180deg, 
+            rgba(255, 255, 255, 0.5) 0%, 
+            rgba(255, 255, 255, 0.95) 100%);
+        position: relative;
+    }
+
+    .disaster-card-footer::before {
+        content: '';
+        position: absolute;
+        top: -1px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60%;
+        height: 1px;
+        background: linear-gradient(90deg, 
+            transparent 0%,
+            rgba(15, 86, 255, 0.3) 50%,
+            transparent 100%);
     }
     
     .disaster-card-header {
@@ -1052,6 +2595,50 @@ DISASTERS_HUB_TEMPLATE = '''
         filter: none !important;
     }
     
+    /* Flag tooltip styling */
+    .flag-tooltip-wrapper {
+        position: relative;
+        display: inline-block;
+    }
+    
+    .flag-tooltip {
+        visibility: hidden;
+        opacity: 0;
+        background-color: #1a1a1a;
+        color: #ffffff;
+        text-align: center;
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        white-space: nowrap;
+        position: absolute;
+        z-index: 1000;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        margin-bottom: 8px;
+        pointer-events: none;
+        transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+    
+    .flag-tooltip::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border-width: 5px;
+        border-style: solid;
+        border-color: #1a1a1a transparent transparent transparent;
+    }
+    
+    .flag-tooltip-wrapper:hover .flag-tooltip {
+        visibility: visible;
+        opacity: 1;
+    }
+    
     .disaster-card-title {
         flex: 1;
     }
@@ -1105,24 +2692,6 @@ DISASTERS_HUB_TEMPLATE = '''
         margin-left: auto;
     }
     
-    .disaster-link {
-        display: inline-flex;
-        align-items: center;
-        background: #0f56ff;
-        color: white;
-        padding: 0.875rem 1.75rem;
-        border-radius: 12px;
-        text-decoration: none;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        border: 1px solid #0f56ff;
-    }
-    
-    .disaster-link:hover {
-        background: #1f3c88;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(15, 86, 255, 0.3);
-    }
     
     .empty-state {
         text-align: center;
@@ -1188,14 +2757,52 @@ DISASTERS_HUB_TEMPLATE = '''
         box-shadow: 0 8px 16px rgba(15, 86, 255, 0.3);
     }
     
+    .empty-state {
+        text-align: center;
+        padding: 5rem 2rem;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.98) 100%);
+        border-radius: 32px;
+        border: 1px solid rgba(15, 86, 255, 0.1);
+        color: #1e293b;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.06);
+    }
+    
+    .empty-state p {
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+        color: #475569;
+        font-weight: 500;
+    }
+    
+    .empty-state a {
+        color: #0f56ff;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s ease;
+    }
+    
+    .empty-state a:hover {
+        text-decoration: underline;
+        color: #1f3c88;
+    }
+    
     @media (max-width: 768px) {
         .disasters-grid {
             grid-template-columns: 1fr;
             gap: 1.5rem;
         }
         
-        .page-title {
-            font-size: 2rem;
+        .page-header {
+            padding: 2.5rem 1.5rem;
+            margin-bottom: 3rem;
+        }
+        
+        .prayer-intro {
+            padding: 1.5rem;
+        }
+        
+        .disaster-card {
+            padding: 2rem 1.5rem;
         }
         
         .disaster-card-header {
@@ -1204,69 +2811,179 @@ DISASTERS_HUB_TEMPLATE = '''
         }
         
         .disasters-page {
-            padding: 4rem 1rem 2rem;
+            padding: 3rem 1rem 4rem;
+        }
+        
+        .prayer-resources {
+            padding: 2.5rem 1.5rem;
+        }
+        
+        .resource-links {
+            grid-template-columns: 1fr;
+            padding: 0 1.5rem 3rem;
+        }
+        
+        .resource-link {
+            width: 100%;
+            padding: 1.75rem 1.5rem;
+            min-height: 120px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .page-title {
+            font-size: 2rem;
+        }
+        
+        .page-subtitle {
+            font-size: 1.125rem;
+        }
+        
+        .section-title {
+            font-size: 1.5rem;
         }
     }
 </style>
+<!-- JSON-LD Structured Data for SEO -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "name": "Global Prayer Watch",
+  "description": "Join believers worldwide in prayer for communities affected by recent disasters. Stand together in prayer with our global prayer watch community.",
+  "url": "{{ request.url }}",
+  "mainEntity": {
+    "@type": "ItemList",
+    "itemListElement": [
+      {% for disaster in disasters %}
+      {
+        "@type": "ListItem",
+        "position": {{ loop.index }},
+        "item": {
+          "@type": "WebPage",
+          "name": "Prayer for {{ disaster.type_display }}",
+          "url": "{{ request.url_root }}globalprayerwatch/{{ disaster.url_slug }}",
+          "description": "Prayer for communities affected by {{ disaster.type_display }} in {{ disaster.affected_countries|join(', ') }}"
+        }
+      }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ]
+  },
+  "breadcrumb": {
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Home",
+        "item": "{{ request.url_root }}"
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Global Prayer Watch",
+        "item": "{{ request.url }}"
+      }
+    ]
+  }
+}
+</script>
 {% endblock %}
 
 {% block content %}
-<div class="disasters-page">
+<main class="disasters-page" role="main">
     <div class="disasters-container">
-        <div class="page-header">
+        <header class="page-header">
             <h1 class="page-title">Global Prayer Watch</h1>
-            <h2 class="page-subtitle" style="font-size: 1.5rem; font-weight: 600; color: #4a4a4a; margin-top: 0.5rem; margin-bottom: 2rem;">Stand Together in Prayer</h2>
-            <div class="prayer-verse" style="margin-top: 2rem; padding: 1.5rem; background: #ffffff; border-radius: 16px; border: 1px solid #e0e0e0; text-align: center; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
-                <p style="font-size: 1.1rem; font-style: italic; margin-bottom: 0.5rem; color: #1a1a1a;">
-                    "Do not be anxious about anything, but in every situation, by prayer and petition, with thanksgiving, present your requests to God."
-                </p>
-                <p style="font-size: 0.9rem; color: #666;">
-                    — Philippians 4:6
-                </p>
+            <p class="page-subtitle">Stand Together in Prayer</p>
+            <div class="prayer-intro">
+                <p class="intro-text">In times of crisis, we come together as one body in Christ, lifting up our brothers and sisters around the world. Here you'll find specific prayers for communities currently facing hardship, that we might intercede with compassion and hope.</p>
+                <blockquote class="prayer-verse" cite="https://www.biblegateway.com/passage/?search=Philippians+4%3A6&version=NIV">
+                    <p class="verse-text">"Do not be anxious about anything, but in every situation, by prayer and petition, with thanksgiving, present your requests to God."</p>
+                    <cite class="verse-citation">— Philippians 4:6</cite>
+                </blockquote>
             </div>
-        </div>
+        </header>
         
         {% if disasters %}
-        <div class="disasters-grid">
-            {% for disaster in disasters %}
-            <div class="disaster-card {{ disaster.severity }}">
-                <div class="disaster-card-header-grouped" style="text-align: center; margin-bottom: 1.5rem;">
-                    <h2 class="disaster-type-title" style="font-size: 1.8rem; font-weight: 700; color: #1a1a1a; margin-bottom: 1rem;">
-                        {{ disaster.type_display }}
-                    </h2>
-                    <div class="country-flags-group" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-bottom: 1rem;">
-                        {% for flag_info in disaster.country_flags %}
-                        <img src="/api/flags/{{ flag_info.flag_code }}" 
-                             alt="{{ flag_info.country }} flag" 
-                             class="country-flag-small"
-                             style="width: 32px; height: 24px; object-fit: fill; display: block; animation: none !important; transform: none !important; transition: none !important; border-radius: 0 !important; filter: none !important; border: none !important; box-shadow: none !important; will-change: auto !important; backface-visibility: visible !important; perspective: none !important; -webkit-transform: none !important;"
-                             onerror="this.src='/api/flags/xx';">
-                        {% endfor %}
+        <section class="prayer-opportunities" aria-label="Current prayer opportunities">
+            <header class="section-header">
+                <h2 class="section-title">Communities Needing Our Prayers</h2>
+                <p class="section-intro">Join us in lifting up these affected communities. Each prayer is crafted specifically for their situation, that we might intercede with understanding and compassion.</p>
+            </header>
+
+            <div class="disasters-grid" role="list">
+                {% for disaster in disasters %}
+                <article class="disaster-card {{ disaster.severity }}" itemscope itemtype="https://schema.org/Event" role="listitem" style="--card-index: {{ loop.index0 }}">
+                    <header class="disaster-card-header-grouped">
+                        <h3 class="disaster-type-title" itemprop="name">{{ disaster.type_display }}</h3>
+                        <div class="country-flags-group" aria-label="Affected countries">
+                            {% for flag_info in disaster.country_flags %}
+                            <div class="flag-tooltip-wrapper">
+                                <img src="/api/flags/{{ flag_info.flag_code }}"
+                                     alt="{{ flag_info.country }} flag"
+                                     class="country-flag-small"
+                                     title="{{ flag_info.country }}"
+                                     data-country="{{ flag_info.country }}"
+                                     style="width: 32px; height: 24px; object-fit: fill; display: block; animation: none !important; transform: none !important; transition: none !important; border-radius: 0 !important; filter: none !important; border: none !important; box-shadow: none !important; will-change: auto !important; backface-visibility: visible !important; perspective: none !important; -webkit-transform: none !important; cursor: pointer;"
+                                     onerror="this.src='/api/flags/xx';">
+                                <span class="flag-tooltip">{{ flag_info.country }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </header>
+
+                    {% if disaster.summary %}
+                    <div class="disaster-news-summary" itemprop="description">
+                        {{ disaster.summary }}
                     </div>
-                </div>
-                
-                {% if disaster.summary %}
-                <div class="disaster-news-summary" style="text-align: center;">
-                    {{ disaster.summary }}
-                </div>
-                {% endif %}
-                
-                <div class="disaster-card-footer" style="justify-content: center;">
-                    <a href="/prayers/watchtower/{{ disaster.url_slug }}" class="disaster-link">
-                        Let Pray
-                    </a>
-                </div>
+                    {% endif %}
+
+                    <footer class="disaster-card-footer">
+                        <a href="/globalprayerwatch/{{ disaster.url_slug }}" class="prayer-cta-primary" aria-label="Join in prayer for {{ disaster.type_display }}">
+                            <span class="cta-text">Join in Prayer</span>
+                            <svg class="cta-arrow" width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M8.5 13.5L13.5 8.5M13.5 8.5H10.1667M13.5 8.5V11.8333" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </a>
+                    </footer>
+                </article>
+                {% endfor %}
             </div>
-            {% endfor %}
-        </div>
+        </section>
         {% else %}
-        <div class="empty-state">
-            <p style="font-size: 1.2rem; margin-bottom: 1rem;">🙏 Praise God - No breaking disasters in recent hours</p>
-            <p>Visit our <a href="/prayers">Prayer Room</a> for today's global prayer.</p>
-        </div>
+        <section class="empty-state" aria-label="No current prayer needs" role="status">
+            <div class="empty-content">
+                <div class="empty-icon">🙏</div>
+                <h2 class="empty-title">Praise God</h2>
+                <p class="empty-message">No breaking disasters requiring immediate prayer in recent hours.</p>
+                <p class="empty-cta">Continue in prayer with our <a href="/prayers">daily global prayer</a> covering ongoing needs worldwide.</p>
+            </div>
+        </section>
         {% endif %}
+        
+        <section class="prayer-resources" aria-label="Additional prayer resources">
+            <header class="section-header">
+                <h2 class="section-title">Continue in Prayer Together</h2>
+                <p class="section-intro">Prayer is a gift we share as the body of Christ. Whether you're seeking prayer or want to join others in intercession, we're here to walk alongside you.</p>
+            </header>
+            <nav class="resource-links" aria-label="Prayer resources">
+                <a href="/prayers" class="resource-link">
+                    <span class="link-icon">🙏</span>
+                    <span class="link-text">Daily Global Prayer</span>
+                </a>
+                <a href="/prayers" class="resource-link">
+                    <span class="link-icon">👥</span>
+                    <span class="link-text">Join Prayer Room</span>
+                </a>
+                <a href="/home#organizations" class="resource-link">
+                    <span class="link-icon">🤝</span>
+                    <span class="link-text">Find Relief Organizations</span>
+                </a>
+            </nav>
+        </section>
     </div>
-</div>
+</main>
 {% endblock %}
 '''
 

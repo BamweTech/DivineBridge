@@ -381,7 +381,7 @@ PRAYER REQUIREMENTS:
 - Start with "Heavenly Father," (not "Dear Heavenly Father")
 - ⚠️ CRITICAL: Start with PRAISE - acknowledge God's goodness, faithfulness, sovereignty, love, or power before making any requests
 - Examples of praise: "we praise you for your unfailing love", "we thank you for your faithfulness", "we worship you as the sovereign Lord", "we acknowledge your goodness"
-- Length: 120-180 words (detailed and specific)
+- Length: 60-100 words (concise and focused)
 - Reference the SPECIFIC situation described in the news summary above - mention specific details like the location, what happened, the impact
 - Mention {location_str} and {disaster_type} specifically by name
 - Address the specific needs based on THIS breaking news event:
@@ -1108,7 +1108,7 @@ COMPREHENSIVE SUMMARY:
 PRAYER REQUIREMENTS:
 - Start with "Heavenly Father," (not "Dear Heavenly Father")
 - ⚠️ CRITICAL: Start with PRAISE - acknowledge God's goodness, faithfulness, sovereignty, love, or power before making any requests
-- Length: 150-200 words (detailed and comprehensive)
+- Length: 80-120 words (concise and focused)
 - Mention ALL affected countries/regions specifically by name: {countries_str}
 - Reference the SPECIFIC situations described in the news summaries above
 - Address the needs of:
