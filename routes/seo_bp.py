@@ -911,16 +911,17 @@ DISASTERS_HUB_TEMPLATE = '''
     .page-title {
         font-size: 3rem;
         color: #1a1a1a;
-        margin-bottom: 1rem;
+        margin-bottom: 0.5rem;
         font-weight: 700;
     }
     
     .page-subtitle {
-        font-size: 1.2rem;
+        font-size: 1.5rem;
         color: #4a4a4a;
-        max-width: 800px;
-        margin: 0 auto;
-        line-height: 1.6;
+        font-weight: 600;
+        margin-top: 0.5rem;
+        margin-bottom: 2rem;
+        line-height: 1.4;
     }
     
     .disasters-grid {
@@ -1213,7 +1214,8 @@ DISASTERS_HUB_TEMPLATE = '''
 <div class="disasters-page">
     <div class="disasters-container">
         <div class="page-header">
-            <h1 class="page-title">Join us in prayer, for the affected communities by recent events</h1>
+            <h1 class="page-title">Global Prayer Watch</h1>
+            <h2 class="page-subtitle" style="font-size: 1.5rem; font-weight: 600; color: #4a4a4a; margin-top: 0.5rem; margin-bottom: 2rem;">Stand Together in Prayer</h2>
             <div class="prayer-verse" style="margin-top: 2rem; padding: 1.5rem; background: #ffffff; border-radius: 16px; border: 1px solid #e0e0e0; text-align: center; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
                 <p style="font-size: 1.1rem; font-style: italic; margin-bottom: 0.5rem; color: #1a1a1a;">
                     "Do not be anxious about anything, but in every situation, by prayer and petition, with thanksgiving, present your requests to God."
