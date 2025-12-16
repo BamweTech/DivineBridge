@@ -127,25 +127,52 @@ For each BREAKING disaster found, return a JSON array with this EXACT structure:
   }}
 ]
 
+CRITICAL REQUIREMENTS FOR TIMESTAMPS:
+- ⚠️ MANDATORY: Every disaster MUST have an accurate timestamp showing when it occurred
+- ⚠️ TIMESTAMP FORMAT: Use ISO 8601 format: YYYY-MM-DDTHH:MM:SSZ (e.g., "2025-12-16T14:30:00Z")
+- ⚠️ DATE VALIDATION: The timestamp year MUST be 2025 (current year)
+- ⚠️ DATE VALIDATION: The timestamp date MUST be within the last 7 days (December 9-16, 2025)
+- ⚠️ STRICTLY EXCLUDE:
+  * Disasters with timestamps from 2024 or earlier (last year)
+  * Disasters with timestamps older than 7 days
+  * Disasters with timestamps in the future
+  * Disasters without timestamps
+  * Disasters where the timestamp year is not 2025
+- ⚠️ VERIFY TIMESTAMP: Before including a disaster, verify:
+  1. The timestamp year is 2025
+  2. The timestamp date is December 9-16, 2025 (last 7 days)
+  3. The timestamp is in correct ISO format
+  4. The timestamp makes sense (not in future, not too old)
+
 CRITICAL REQUIREMENTS:
-- STRICTLY EXCLUDE disasters that occurred more than 24 hours ago
-- STRICTLY EXCLUDE disasters from last year, last month, or last week
+- STRICTLY EXCLUDE disasters that occurred more than 7 days ago
+- STRICTLY EXCLUDE disasters from last year (2024 or earlier), last month, or last week
 - ONLY INCLUDE disasters if they meet ALL of these criteria:
-  * Occurred in the last 12-24 hours (check the timestamp/date carefully)
-  * Have a timestamp showing TODAY or YESTERDAY's date
+  * Occurred in the last 7 days (December 9-16, 2025)
+  * Have a VALID timestamp showing the disaster occurred in 2025
+  * Have a timestamp date within the last 7 days
   * Are breaking news or have updates from TODAY
 - Be specific with country names (full names, not abbreviations like 'US' - use 'United States')
 - Include specific details from the news in the summary (what happened, where, impact)
-- Include accurate timestamp showing when the disaster occurred (must be within last 24 hours)
-- Verify the date/timestamp before including - if a disaster occurred last year, DO NOT include it
-- Only return empty array [] if NO disasters are found in the past 24 hours
+- Include accurate timestamp in ISO format: YYYY-MM-DDTHH:MM:SSZ (e.g., "2025-12-16T14:30:00Z")
+- Verify the date/timestamp before including - if a disaster occurred last year (2024), DO NOT include it
+- If you cannot determine an accurate timestamp within the last 7 days, DO NOT include the disaster
+- Only return empty array [] if NO disasters are found in the past 7 days
 - Return ONLY valid JSON array, no explanations, no markdown, no code blocks
 - Verify information from multiple sources when possible
 - Focus on verified, reliable news sources
 - When in doubt about timing, EXCLUDE the disaster rather than include old news
 
-Return ONLY the JSON array, nothing else. Example format:
-[{{"type":"earthquake","country":"Japan","location":"Tokyo","severity":"severe","casualties":150,"news_summary":"A magnitude 7.2 earthquake struck Tokyo at 2:30 PM local time, causing widespread damage to buildings and infrastructure. Emergency services are responding to multiple collapsed structures. At least 150 people are reported injured.","news_source":"Reuters","timestamp":"2025-01-15T14:30:00Z"}}]"""
+Return ONLY the JSON array, nothing else. 
+
+EXAMPLE FORMAT (note: timestamp must be within last 7 days, year must be 2025):
+[{{"type":"earthquake","country":"Japan","location":"Tokyo","severity":"severe","casualties":150,"news_summary":"A magnitude 7.2 earthquake struck Tokyo at 2:30 PM local time, causing widespread damage to buildings and infrastructure. Emergency services are responding to multiple collapsed structures. At least 150 people are reported injured.","news_source":"Reuters","timestamp":"2025-12-16T14:30:00Z"}}]
+
+REMEMBER: 
+- Timestamp year MUST be 2025
+- Timestamp date MUST be December 9-16, 2025 (last 7 days)
+- If disaster occurred in 2024 or earlier, DO NOT include it
+- If you cannot verify the timestamp is recent (within last 7 days), DO NOT include the disaster"""
 
             response = self.client.query(prompt)
             
@@ -227,14 +254,57 @@ Return ONLY the JSON array, nothing else. Example format:
             
             # Validate and normalize disasters
             validated_disasters = []
+            now = datetime.now()
+            max_age = timedelta(days=7)  # Only accept disasters from last week
+            
             for disaster in disasters:
                 if isinstance(disaster, dict) and disaster.get('country') and disaster.get('type'):
+                    # Check timestamp - CRITICAL: reject old disasters
+                    timestamp_str = disaster.get('timestamp', '')
+                    if timestamp_str:
+                        disaster_time = None
+                        try:
+                            # Try ISO format first
+                            disaster_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                            # Remove timezone for comparison
+                            if disaster_time.tzinfo:
+                                disaster_time = disaster_time.replace(tzinfo=None)
+                        except:
+                            try:
+                                # Try common formats
+                                for fmt in ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                                    try:
+                                        disaster_time = datetime.strptime(timestamp_str[:19], fmt)
+                                        break
+                                    except:
+                                        continue
+                            except:
+                                pass
+                        
+                        if disaster_time:
+                            # Check if disaster is within last week
+                            age = now - disaster_time
+                            if age > max_age:
+                                logger.warning(f"Rejected old disaster: {disaster.get('type')} in {disaster.get('country')} - occurred {age.days} days ago (timestamp: {timestamp_str})")
+                                continue
+                            elif age.days < 0:
+                                # Future timestamp - invalid
+                                logger.warning(f"Rejected future disaster: {disaster.get('type')} in {disaster.get('country')} - timestamp is in future: {timestamp_str}")
+                                continue
+                        else:
+                            # Could not parse timestamp - check if it contains year
+                            current_year = datetime.now().year
+                            if str(current_year - 1) in timestamp_str or str(current_year - 2) in timestamp_str:
+                                logger.warning(f"Rejected disaster with old year in timestamp: {disaster.get('type')} in {disaster.get('country')} - timestamp: {timestamp_str}")
+                                continue
+                    
                     # Normalize disaster type
                     disaster['type'] = self._normalize_disaster_type(disaster.get('type', ''))
                     # Ensure country is properly formatted
                     disaster['country'] = disaster['country'].strip()
                     validated_disasters.append(disaster)
             
+            logger.info(f"Validated {len(validated_disasters)} disasters (rejected {len(disasters) - len(validated_disasters)} old/invalid disasters)")
             return validated_disasters
             
         except json.JSONDecodeError as e:
@@ -538,7 +608,28 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                                 try:
                                     created_at = datetime.fromisoformat(created_at_str)
                                     if (now - created_at) <= max_disaster_age:
-                                        grouped_prayers.append(prayer_data)
+                                        # Also check if summary/comprehensive_summary contains old dates
+                                        summary = prayer_data.get('summary', '')
+                                        comprehensive_summary = prayer_data.get('comprehensive_summary', '')
+                                        all_summaries = prayer_data.get('all_news_summaries', [])
+                                        
+                                        has_old_date = False
+                                        if summary and self._has_old_date_in_text(summary):
+                                            has_old_date = True
+                                        elif comprehensive_summary and self._has_old_date_in_text(comprehensive_summary):
+                                            has_old_date = True
+                                        else:
+                                            for news_summary in all_summaries:
+                                                if news_summary and self._has_old_date_in_text(news_summary):
+                                                    has_old_date = True
+                                                    break
+                                        
+                                        if has_old_date:
+                                            logger.warning(f"Filtered out grouped prayer with old date in content: {blob.name}")
+                                            blob.delete()
+                                            logger.info(f"Deleted grouped disaster prayer with old date: {blob.name}")
+                                        else:
+                                            grouped_prayers.append(prayer_data)
                                     else:
                                         logger.info(f"Filtered out old grouped prayer: {blob.name} (created {now - created_at} ago)")
                                         # Delete old prayer
@@ -714,6 +805,40 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
         
         return False
     
+    def _has_old_date_in_text(self, text: str) -> bool:
+        """
+        Check if text contains references to old dates (previous years)
+        
+        Args:
+            text: Text to check
+            
+        Returns:
+            True if old date found, False otherwise
+        """
+        if not text:
+            return False
+        
+        current_year = datetime.now().year
+        previous_year = current_year - 1
+        
+        # Check for previous year in text
+        if str(previous_year) in text:
+            # Check if it's in a date context (not just a number)
+            import re
+            # Look for date patterns like "December 14, 2024" or "2024-12-14"
+            date_patterns = [
+                rf'\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{{1,2}},\s+{previous_year}\b',
+                rf'\b{previous_year}-\d{{2}}-\d{{2}}\b',
+                rf'\b{previous_year}/\d{{2}}/\d{{2}}\b',
+                rf'\b\d{{1,2}}/\d{{1,2}}/{previous_year}\b',
+            ]
+            
+            for pattern in date_patterns:
+                if re.search(pattern, text, re.IGNORECASE):
+                    return True
+        
+        return False
+    
     def _collect_disaster_info_by_type(self, disaster_type: str, disasters: List[Dict]) -> Dict:
         """
         Collect comprehensive information about all affected countries for a disaster type
@@ -730,6 +855,7 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
             current_time = datetime.now().strftime("%B %d, %Y %H:%M UTC")
             
             # Build list of affected countries/regions with details
+            # Filter out disasters with old dates in their news summaries
             affected_areas = []
             for disaster in disasters:
                 country = disaster.get('country', '')
@@ -739,6 +865,11 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                 severity = disaster.get('severity', 'moderate')
                 news_source = disaster.get('news_source', '')
                 timestamp = disaster.get('timestamp', '')
+                
+                # Check if news summary contains old dates
+                if self._has_old_date_in_text(news_summary):
+                    logger.warning(f"Rejected disaster with old date in summary: {disaster_type} in {country} - summary contains previous year")
+                    continue
                 
                 area_info = {
                     'country': country,
@@ -750,6 +881,10 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                     'timestamp': timestamp
                 }
                 affected_areas.append(area_info)
+            
+            if not affected_areas:
+                logger.warning(f"No valid recent disasters found for {disaster_type} after filtering old dates")
+                return None
             
             # Query 1: Collect comprehensive info about this disaster type
             areas_list = "\n".join([
@@ -1013,6 +1148,74 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
                     'prayers_generated': 0
                 }
             
+            # Additional validation: filter out any disasters with old timestamps
+            now = datetime.now()
+            max_age = timedelta(days=7)
+            current_year = datetime.now().year
+            original_count = len(disasters)
+            validated_disasters = []
+            
+            for disaster in disasters:
+                timestamp_str = disaster.get('timestamp', '')
+                if not timestamp_str:
+                    logger.warning(f"Disaster without timestamp rejected: {disaster.get('type')} in {disaster.get('country')}")
+                    continue
+                
+                # Check if timestamp contains old year
+                if str(current_year - 1) in timestamp_str or str(current_year - 2) in timestamp_str:
+                    logger.warning(f"Disaster with old year rejected: {disaster.get('type')} in {disaster.get('country')} - timestamp: {timestamp_str}")
+                    continue
+                
+                # Parse and validate timestamp
+                disaster_time = None
+                try:
+                    disaster_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                    if disaster_time.tzinfo:
+                        disaster_time = disaster_time.replace(tzinfo=None)
+                except:
+                    try:
+                        for fmt in ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                            try:
+                                disaster_time = datetime.strptime(timestamp_str[:19], fmt)
+                                break
+                            except:
+                                continue
+                    except:
+                        pass
+                
+                if disaster_time:
+                    # Check year
+                    if disaster_time.year != current_year:
+                        logger.warning(f"Disaster from wrong year rejected: {disaster.get('type')} in {disaster.get('country')} - year: {disaster_time.year}, timestamp: {timestamp_str}")
+                        continue
+                    
+                    # Check age
+                    age = now - disaster_time
+                    if age > max_age:
+                        logger.warning(f"Disaster too old rejected: {disaster.get('type')} in {disaster.get('country')} - {age.days} days old, timestamp: {timestamp_str}")
+                        continue
+                    elif age.days < 0:
+                        logger.warning(f"Disaster with future timestamp rejected: {disaster.get('type')} in {disaster.get('country')} - timestamp: {timestamp_str}")
+                        continue
+                else:
+                    # Could not parse timestamp - reject if contains old year
+                    if str(current_year - 1) in timestamp_str:
+                        logger.warning(f"Disaster with unparseable old timestamp rejected: {disaster.get('type')} in {disaster.get('country')} - timestamp: {timestamp_str}")
+                        continue
+                
+                validated_disasters.append(disaster)
+            
+            disasters = validated_disasters
+            logger.info(f"After timestamp validation: {len(disasters)} disasters remaining (rejected {original_count - len(disasters)} with invalid/old timestamps)")
+            
+            if not disasters:
+                logger.info("No valid recent disasters found after timestamp validation")
+                return {
+                    'success': True,
+                    'disasters_found': 0,
+                    'prayers_generated': 0
+                }
+            
             # Group disasters by type
             disasters_by_type = {}
             for disaster in disasters:
@@ -1031,6 +1234,11 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
                     
                     # Step 1: Collect comprehensive info
                     info = self._collect_disaster_info_by_type(disaster_type, type_disasters)
+                    
+                    # Skip if no valid disasters after filtering
+                    if info is None:
+                        logger.info(f"Skipping {disaster_type} - no valid recent disasters after filtering")
+                        continue
                     
                     # Step 2: Merge with existing info
                     merged_info = self._merge_with_existing_info(disaster_type, info)
