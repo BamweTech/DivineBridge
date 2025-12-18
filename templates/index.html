@@ -1091,7 +1091,7 @@
                 overflow-x: hidden;
             ">
                 {% if daily_prayer and daily_prayer.content %}
-                    {{ daily_prayer.content|e|replace('\n\n', '<br><br>')|replace('\n', '<br>')|safe }}
+                    {{ daily_prayer.content|safe }}
                 {% else %}
                     Loading today's prayer...
                 {% endif %}

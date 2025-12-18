@@ -740,8 +740,16 @@ def index():
             except:
                 prayer_date = datetime.now()
             
+            # Format content: escape HTML, then convert newlines to <br> tags
+            import html
+            content = daily_prayer.get('content', '')
+            # Escape HTML entities first
+            content_escaped = html.escape(content)
+            # Convert double newlines to paragraph breaks, single newlines to line breaks
+            content_formatted = content_escaped.replace('\n\n', '<br><br>').replace('\n', '<br>')
+            
             prayer_data = {
-                'content': daily_prayer.get('content', ''),
+                'content': content_formatted,
                 'date': prayer_date.strftime('%A, %B %d, %Y'),
                 'date_iso': daily_prayer.get('date', today)
             }
