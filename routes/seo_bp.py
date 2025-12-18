@@ -309,17 +309,19 @@ def sitemap():
         xml_content = ['<?xml version="1.0" encoding="UTF-8"?>']
         xml_content.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
         
-        # Static pages
+        # Static pages - Public pages only (exclude auth/profile pages)
         static_pages = [
-            ('/', '1.0', 'daily'),  # Home/Prayer Room
-            ('/home', '0.8', 'weekly'),  # Original home
-            ('/prayers', '1.0', 'daily'),  # Prayer Room
+            ('/', '1.0', 'daily'),  # Home page
+            ('/home', '0.9', 'daily'),  # Main home page with daily content
+            ('/prayers', '1.0', 'daily'),  # Prayer Room - main feature
+            ('/prayer-room', '0.9', 'daily'),  # Live Prayer Room directory
+            ('/daily-prayer', '0.95', 'daily'),  # Daily prayer dedicated page
             ('/globalprayerwatch', '0.9', 'daily'),  # Global Prayer Watch hub (SEO discovery page)
-            ('/about', '0.7', 'monthly'),
-            ('/contact', '0.6', 'monthly'),
-            ('/faq', '0.6', 'monthly'),
-            ('/privacy-policy', '0.3', 'yearly'),
-            ('/terms-of-service', '0.3', 'yearly'),
+            ('/about', '0.7', 'monthly'),  # About page
+            ('/contact', '0.6', 'monthly'),  # Contact page
+            ('/faq', '0.6', 'monthly'),  # FAQ page
+            ('/privacy-policy', '0.3', 'yearly'),  # Privacy policy
+            ('/terms-of-service', '0.3', 'yearly'),  # Terms of service
         ]
         
         for path, priority, changefreq in static_pages:
@@ -349,18 +351,21 @@ def sitemap():
                     xml_content.append('  </url>')
                     
                     # If prayer has disaster metadata, create disaster-specific URLs
+                    # Note: Using /globalprayerwatch/{type}/{location} format to match actual route
                     if isinstance(prayer, dict) and 'metadata' in prayer:
                         metadata = prayer['metadata']
                         disasters = metadata.get('disasters', [])
                         
                         for disaster in disasters:
                             if disaster.get('type') and disaster.get('locations'):
-                                disaster_type = disaster['type'].lower().replace(' ', '-')
+                                disaster_type = disaster['type'].lower().replace(' ', '-').replace('_', '-')
                                 for location in disaster['locations'][:3]:  # Max 3 locations per disaster
                                     location_slug = location.lower().replace(' ', '-').replace(',', '')
+                                    # Format: /globalprayerwatch/{disaster_type}/{location}
+                                    url_slug = f"{disaster_type}/{location_slug}"
                                     
                                     xml_content.append('  <url>')
-                                    xml_content.append(f'    <loc>{base_url}/prayers/disaster/{disaster_type}/{location_slug}</loc>')
+                                    xml_content.append(f'    <loc>{base_url}/globalprayerwatch/{url_slug}</loc>')
                                     xml_content.append('    <changefreq>weekly</changefreq>')
                                     xml_content.append('    <priority>0.95</priority>')  # High priority for current events
                                     xml_content.append(f'    <lastmod>{date_str}</lastmod>')
