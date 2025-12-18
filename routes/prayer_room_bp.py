@@ -2071,17 +2071,42 @@ def cancel_scheduled_room(scheduled_room_id):
             logging.info(f"Canceling recurring parent session {scheduled_room_id}")
             
             # Find all future instances linked to this parent
+            # Query by parent_recurring_id only, then filter by status and scheduled_time in Python
+            # This avoids needing any composite index
             now = datetime.now(timezone.utc)
-            future_instances = db.collection('scheduled_rooms')\
+            all_instances = db.collection('scheduled_rooms')\
                 .where('parent_recurring_id', '==', scheduled_room_id)\
-                .where('scheduled_time', '>', now)\
-                .where('status', '==', 'scheduled')\
                 .stream()
             
             instances_canceled = 0
-            for instance_doc in future_instances:
-                instance_doc.reference.delete()
-                instances_canceled += 1
+            for instance_doc in all_instances:
+                instance_data = instance_doc.to_dict()
+                
+                # Filter by status in Python
+                if instance_data.get('status') != 'scheduled':
+                    continue
+                
+                instance_time = instance_data.get('scheduled_time')
+                
+                # Handle Firestore timestamp conversion
+                if instance_time:
+                    # Convert Firestore Timestamp to datetime if needed
+                    if hasattr(instance_time, 'timestamp') and callable(getattr(instance_time, 'timestamp', None)):
+                        # Firestore Timestamp object
+                        instance_time = datetime.fromtimestamp(instance_time.timestamp(), tz=timezone.utc)
+                    elif isinstance(instance_time, datetime):
+                        # Already a datetime object
+                        if instance_time.tzinfo is None:
+                            instance_time = instance_time.replace(tzinfo=timezone.utc)
+                    else:
+                        # Skip if we can't convert
+                        logging.warning(f"Could not convert scheduled_time for instance {instance_doc.id}: {type(instance_time)}")
+                        continue
+                    
+                    # Only delete future instances
+                    if instance_time > now:
+                        instance_doc.reference.delete()
+                        instances_canceled += 1
             
             # Mark the parent as cancelled (don't delete, so we can track it)
             scheduled_room_ref.update({
@@ -2129,18 +2154,42 @@ def cancel_scheduled_room(scheduled_room_id):
                 else:
                     current_is_future = False
                 
-                # Query for all future instances (this may or may not include the current instance)
-                future_instances_query = db.collection('scheduled_rooms')\
+                # Query for all instances by parent_recurring_id only, then filter by status and scheduled_time in Python
+                # This avoids needing any composite index
+                all_instances_query = db.collection('scheduled_rooms')\
                     .where('parent_recurring_id', '==', parent_recurring_id)\
-                    .where('scheduled_time', '>', now)\
-                    .where('status', '==', 'scheduled')\
                     .stream()
                 
                 instances_canceled = 0
                 instance_ids_to_delete = []
-                for instance_doc in future_instances_query:
-                    instance_ids_to_delete.append(instance_doc.id)
-                    instances_canceled += 1
+                for instance_doc in all_instances_query:
+                    instance_data = instance_doc.to_dict()
+                    
+                    # Filter by status in Python
+                    if instance_data.get('status') != 'scheduled':
+                        continue
+                    
+                    instance_time = instance_data.get('scheduled_time')
+                    
+                    # Handle Firestore timestamp conversion
+                    if instance_time:
+                        # Convert Firestore Timestamp to datetime if needed
+                        if hasattr(instance_time, 'timestamp') and callable(getattr(instance_time, 'timestamp', None)):
+                            # Firestore Timestamp object
+                            instance_time = datetime.fromtimestamp(instance_time.timestamp(), tz=timezone.utc)
+                        elif isinstance(instance_time, datetime):
+                            # Already a datetime object
+                            if instance_time.tzinfo is None:
+                                instance_time = instance_time.replace(tzinfo=timezone.utc)
+                        else:
+                            # Skip if we can't convert
+                            logging.warning(f"Could not convert scheduled_time for instance {instance_doc.id}: {type(instance_time)}")
+                            continue
+                        
+                        # Only include future instances
+                        if instance_time > now:
+                            instance_ids_to_delete.append(instance_doc.id)
+                            instances_canceled += 1
                 
                 # Delete all future instances
                 for instance_id in instance_ids_to_delete:
