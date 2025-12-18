@@ -2287,7 +2287,7 @@ DISASTERS_HUB_TEMPLATE = '''
             inset 0 1px 0 rgba(255, 255, 255, 0.9);
         transition: all 0.6s var(--animation-timing);
         position: relative;
-        overflow: hidden;
+        overflow: visible;
         backdrop-filter: blur(20px);
         animation: cardSlideUp 0.8s var(--animation-timing) backwards;
         animation-delay: calc(var(--card-index, 0) * 0.1s);
@@ -2389,6 +2389,7 @@ DISASTERS_HUB_TEMPLATE = '''
             rgba(248, 250, 252, 0.5) 100%);
         position: relative;
         margin-bottom: 0;
+        overflow: visible;
     }
 
     .disaster-card-header-grouped::after {
@@ -2448,7 +2449,7 @@ DISASTERS_HUB_TEMPLATE = '''
         justify-content: center;
         gap: 0.875rem;
         margin-bottom: 1.5rem;
-        padding: 1.25rem 1.5rem;
+        padding: 2rem 1.5rem 1.25rem;
         background: linear-gradient(135deg, 
             rgba(248, 250, 252, 0.8) 0%, 
             rgba(241, 245, 249, 0.6) 100%);
@@ -2459,7 +2460,7 @@ DISASTERS_HUB_TEMPLATE = '''
             inset 0 1px 0 rgba(255, 255, 255, 0.8);
         backdrop-filter: blur(8px);
         position: relative;
-        overflow: hidden;
+        overflow: visible;
     }
 
     .country-flags-group::before {
@@ -2637,6 +2638,7 @@ DISASTERS_HUB_TEMPLATE = '''
     .flag-tooltip-wrapper {
         position: relative;
         display: inline-block;
+        z-index: 10;
     }
     
     .flag-tooltip {
@@ -2645,20 +2647,19 @@ DISASTERS_HUB_TEMPLATE = '''
         background-color: #1a1a1a;
         color: #ffffff;
         text-align: center;
-        padding: 0.4rem 0.8rem;
+        padding: 0.5rem 0.9rem;
         border-radius: 6px;
         font-size: 0.85rem;
         font-weight: 500;
         white-space: nowrap;
         position: absolute;
-        z-index: 1000;
-        bottom: 100%;
+        z-index: 10000;
+        bottom: calc(100% + 10px);
         left: 50%;
         transform: translateX(-50%);
-        margin-bottom: 8px;
         pointer-events: none;
         transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
     
     .flag-tooltip::after {
