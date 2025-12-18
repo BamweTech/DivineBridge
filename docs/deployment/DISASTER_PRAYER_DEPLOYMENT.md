@@ -77,7 +77,7 @@ gcloud run services add-iam-policy-binding divinebridge \
 
 ---
 
-## Step 3: Create Cloud Scheduler Job for Hourly Disaster Monitoring
+## Step 3: Create Cloud Scheduler Job for Disaster Monitoring (Every 4 Hours)
 
 ```bash
 # Get Cloud Run URL
@@ -85,23 +85,23 @@ CLOUD_RUN_URL=$(gcloud run services describe divinebridge \
   --region us-central1 \
   --format="value(status.url)")
 
-# Create hourly scheduler job
+# Create scheduler job (runs every 4 hours)
 gcloud scheduler jobs create http disaster-prayer-hourly \
   --location=us-central1 \
-  --schedule="0 * * * *" \
+  --schedule="0 */4 * * *" \
   --time-zone="UTC" \
   --uri="${CLOUD_RUN_URL}/api/disasters/generate-hourly" \
   --http-method=POST \
   --oidc-service-account-email=prayer-scheduler@divinebridge.iam.gserviceaccount.com \
   --oidc-token-audience="${CLOUD_RUN_URL}" \
-  --description="Hourly breaking news search and disaster prayer generation"
+  --description="Every 4 hours breaking news search and disaster prayer generation"
 
 # Verify the job was created
 gcloud scheduler jobs describe disaster-prayer-hourly --location=us-central1
 ```
 
 **Schedule Details:**
-- **Cron:** `0 * * * *` (Every hour at minute 0)
+- **Cron:** `0 */4 * * *` (Every 4 hours at minute 0 - runs at 00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC)
 - **Timezone:** UTC
 - **Endpoint:** `/api/disasters/generate-hourly`
 - **Method:** POST

@@ -57,16 +57,16 @@ A new service that:
 
 ## Cloud Scheduler Setup
 
-To enable hourly disaster monitoring, create a Cloud Scheduler job:
+To enable disaster monitoring every 4 hours, create a Cloud Scheduler job:
 
 ```bash
 # Get your Cloud Run URL
 CLOUD_RUN_URL=$(gcloud run services describe divinebridge --region=us-central1 --format="value(status.url)")
 
-# Create hourly scheduler job
+# Create scheduler job (runs every 4 hours)
 gcloud scheduler jobs create http disaster-prayer-hourly \
     --location=us-central1 \
-    --schedule="0 * * * *" \
+    --schedule="0 */4 * * *" \
     --time-zone="UTC" \
     --uri="${CLOUD_RUN_URL}/api/disasters/generate-hourly" \
     --http-method=POST \
@@ -74,7 +74,7 @@ gcloud scheduler jobs create http disaster-prayer-hourly \
     --oidc-token-audience="${CLOUD_RUN_URL}"
 ```
 
-**Schedule:** `0 * * * *` (Every hour at minute 0)
+**Schedule:** `0 */4 * * *` (Every 4 hours at minute 0 - runs at 00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC)
 
 **Note:** Uses the same service account as daily prayer generation (`prayer-scheduler@divinebridge.iam.gserviceaccount.com`)
 

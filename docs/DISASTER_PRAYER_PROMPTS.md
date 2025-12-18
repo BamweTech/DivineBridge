@@ -165,7 +165,7 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
 
 ## How It Works
 
-1. **Hourly Trigger:** Cloud Scheduler calls `/api/disasters/generate-hourly` every hour
+1. **Scheduled Trigger:** Cloud Scheduler calls `/api/disasters/generate-hourly` every 4 hours (at 00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC)
 2. **Breaking News Search:** Service searches for disasters in last 3-6 hours using specific queries
 3. **Deduplication:** Checks if same disaster already has prayer within 24 hours
 4. **Customized Prayer:** Generates prayer referencing specific news details

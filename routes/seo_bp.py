@@ -632,16 +632,45 @@ def disaster_prayer_page(disaster_type):
             return type_mapping.get(disaster_type, disaster_type)
         
         active_prayers = service.get_active_disaster_prayers()
+        
+        # Collect all matching entries for this disaster type (same logic as hub page)
+        matching_entries = []
         for prayer_data in active_prayers:
             # Check if it's a grouped prayer for this type
             if prayer_data.get('is_grouped') or prayer_data.get('affected_countries'):
                 prayer_disaster_type = normalize_disaster_type_for_display(prayer_data.get('disaster_type', '')).replace(' ', '_').replace('-', '_')
                 
                 if prayer_disaster_type == disaster_type_normalized:
-                    disaster_prayer = prayer_data.get('prayer', '')
-                    disaster_data = prayer_data
-                    logger.info(f"Found grouped disaster prayer for {disaster_type}")
-                    break
+                    matching_entries.append(prayer_data)
+        
+        # Merge countries from all matching entries (same logic as hub page)
+        if matching_entries:
+            if len(matching_entries) == 1:
+                # Only one entry, use it as-is
+                disaster_data = matching_entries[0]
+                disaster_prayer = disaster_data.get('prayer', '')
+                logger.info(f"Found single grouped disaster prayer for {disaster_type}")
+            else:
+                # Multiple entries - merge countries and keep most recent
+                logger.info(f"Merging {len(matching_entries)} entries for {disaster_type}")
+                
+                # Find the most recent entry
+                most_recent_entry = max(matching_entries, key=lambda x: datetime.fromisoformat(x.get('created_at', '2000-01-01')))
+                
+                # Merge all countries from all entries
+                all_countries = set()
+                for entry in matching_entries:
+                    all_countries.update(entry.get('affected_countries', []))
+                
+                # Update the most recent entry with merged countries
+                most_recent_entry['affected_countries'] = list(all_countries)
+                disaster_data = most_recent_entry
+                disaster_prayer = disaster_data.get('prayer', '')
+                
+                logger.info(f"Merged {len(matching_entries)} entries for {disaster_type}: {len(all_countries)} total countries")
+        else:
+            disaster_data = None
+            disaster_prayer = None
         
         # If not found, try old cache system (backward compatibility)
         if not disaster_prayer:
@@ -909,7 +938,7 @@ DISASTER_PAGE_TEMPLATE = '''
         text-align: center;
         border: none;
         position: relative;
-        overflow: hidden;
+        overflow: visible;
         animation: contentSlideUp 1.4s var(--animation-timing);
         isolation: isolate;
     }
@@ -991,7 +1020,7 @@ DISASTER_PAGE_TEMPLATE = '''
         justify-content: center;
         gap: 1rem;
         margin-bottom: 2rem;
-        padding: 2rem 2.5rem;
+        padding: 3rem 2.5rem 2rem;
         background: linear-gradient(135deg, 
             rgba(248, 250, 252, 0.8) 0%, 
             rgba(241, 245, 249, 0.6) 100%);
@@ -1005,6 +1034,7 @@ DISASTER_PAGE_TEMPLATE = '''
         z-index: 2;
         margin-left: 3rem;
         margin-right: 3rem;
+        overflow: visible;
     }
 
     .situation-summary {
@@ -1294,6 +1324,7 @@ DISASTER_PAGE_TEMPLATE = '''
     .flag-tooltip-wrapper {
         position: relative;
         display: inline-block;
+        z-index: 10;
     }
     
     .flag-tooltip {
@@ -1302,20 +1333,19 @@ DISASTER_PAGE_TEMPLATE = '''
         background-color: #1a1a1a;
         color: #ffffff;
         text-align: center;
-        padding: 0.4rem 0.8rem;
+        padding: 0.5rem 0.9rem;
         border-radius: 6px;
         font-size: 0.85rem;
         font-weight: 500;
         white-space: nowrap;
         position: absolute;
-        z-index: 1000;
-        bottom: 100%;
+        z-index: 10000;
+        bottom: calc(100% + 10px);
         left: 50%;
         transform: translateX(-50%);
-        margin-bottom: 8px;
         pointer-events: none;
         transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
     
     .flag-tooltip::after {
@@ -1526,7 +1556,7 @@ DISASTER_PAGE_TEMPLATE = '''
         .country-flags-section {
             margin-left: 1.5rem;
             margin-right: 1.5rem;
-            padding: 1.5rem 1.5rem;
+            padding: 2.5rem 1.5rem 1.5rem;
         }
 
         .situation-summary {

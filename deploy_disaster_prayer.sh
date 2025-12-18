@@ -76,25 +76,25 @@ if gcloud scheduler jobs describe disaster-prayer-hourly --location=us-central1 
   echo -e "${YELLOW}Job exists, updating...${NC}"
   gcloud scheduler jobs update http disaster-prayer-hourly \
     --location=us-central1 \
-    --schedule="0 * * * *" \
+    --schedule="0 */4 * * *" \
     --time-zone="UTC" \
     --uri="${CLOUD_RUN_URL}/api/disasters/generate-hourly" \
     --http-method=POST \
     --oidc-service-account-email=prayer-scheduler@divinebridge.iam.gserviceaccount.com \
     --oidc-token-audience="${CLOUD_RUN_URL}" \
-    --description="Hourly breaking news search and disaster prayer generation"
+    --description="Every 4 hours breaking news search and disaster prayer generation"
   echo -e "${GREEN}✓ Scheduler job updated${NC}"
 else
   echo -e "${YELLOW}Creating new scheduler job...${NC}"
   gcloud scheduler jobs create http disaster-prayer-hourly \
     --location=us-central1 \
-    --schedule="0 * * * *" \
+    --schedule="0 */4 * * *" \
     --time-zone="UTC" \
     --uri="${CLOUD_RUN_URL}/api/disasters/generate-hourly" \
     --http-method=POST \
     --oidc-service-account-email=prayer-scheduler@divinebridge.iam.gserviceaccount.com \
     --oidc-token-audience="${CLOUD_RUN_URL}" \
-    --description="Hourly breaking news search and disaster prayer generation"
+    --description="Every 4 hours breaking news search and disaster prayer generation"
   echo -e "${GREEN}✓ Scheduler job created${NC}"
 fi
 echo ""
