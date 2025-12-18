@@ -725,6 +725,198 @@
                 display: none;
             }
         }
+
+        /* ------------------------------------------------------------
+           Shared UI: Toast + Login Gate Modal (replaces alert/confirm)
+        ------------------------------------------------------------ */
+        .toast-container {
+            position: fixed;
+            right: 16px;
+            bottom: 16px;
+            z-index: 10050;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: calc(100vw - 32px);
+            max-width: 420px;
+            pointer-events: none;
+        }
+
+        .toast {
+            pointer-events: auto;
+            background: rgba(17, 24, 39, 0.92);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 14px;
+            padding: 12px 14px;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            line-height: 1.4;
+            animation: toastIn 180ms ease-out;
+        }
+
+        @keyframes toastIn {
+            from { transform: translateY(10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .toast .toast-title {
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .toast .toast-close {
+            margin-left: auto;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.8);
+            cursor: pointer;
+            padding: 0;
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .toast .toast-close:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: white;
+        }
+
+        .login-gate {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 10040;
+            background: rgba(0, 0, 0, 0.55);
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .login-gate.active {
+            display: flex;
+        }
+
+        .login-gate-card {
+            width: 100%;
+            max-width: 520px;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 18px;
+            padding: 1.5rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(31, 60, 136, 0.12);
+        }
+
+        .login-gate-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .login-gate-title {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.35rem;
+            line-height: 1.25;
+            color: var(--black);
+        }
+
+        .login-gate-message {
+            color: var(--gray);
+            margin: 0 0 1.25rem 0;
+            line-height: 1.6;
+        }
+
+        .login-gate-actions {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .login-gate-close {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            color: var(--gray);
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .login-gate-close:hover {
+            background: rgba(0, 0, 0, 0.06);
+            color: var(--black);
+        }
+
+        /* Daily email opt-in modal */
+        .email-optin {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 10045;
+            background: rgba(0, 0, 0, 0.55);
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .email-optin.active {
+            display: flex;
+        }
+
+        .email-optin-card {
+            width: 100%;
+            max-width: 560px;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 18px;
+            padding: 1.5rem;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(31, 60, 136, 0.12);
+        }
+
+        .email-optin-title {
+            margin: 0 0 0.5rem 0;
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.35rem;
+            line-height: 1.25;
+            color: var(--black);
+        }
+
+        .email-optin-message {
+            margin: 0 0 1.25rem 0;
+            color: var(--gray);
+            line-height: 1.6;
+        }
+
+        .email-optin-actions {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .toast { animation: none; }
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
@@ -846,6 +1038,9 @@
                     if (typeof updateAboutPage === 'function') {
                         updateAboutPage(cachedUser);
                     }
+                    if (typeof updatePrayersPage === 'function') {
+                        updatePrayersPage(cachedUser);
+                    }
                 }
                 
                 // Listen for auth state changes
@@ -862,6 +1057,9 @@
                     }
                     if (typeof updateAboutPage === 'function') {
                         updateAboutPage(user);
+                    }
+                    if (typeof updatePrayersPage === 'function') {
+                        updatePrayersPage(user);
                     }
                 });
                 
@@ -1082,8 +1280,243 @@
                 }
             });
         }
+
+        /* ------------------------------------------------------------
+           Shared UI helpers: Toast + Login Gate
+        ------------------------------------------------------------ */
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text == null ? '' : String(text);
+            return div.innerHTML;
+        }
+
+        function ensureToastContainer() {
+            let container = document.getElementById('toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toast-container';
+                container.className = 'toast-container';
+                document.body.appendChild(container);
+            }
+            return container;
+        }
+
+        function showToast({ type = 'info', title = '', message = '', timeout = 2600 } = {}) {
+            const container = ensureToastContainer();
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+
+            const safeTitle = title ? String(title) : '';
+            const safeMessage = message ? String(message) : '';
+
+            const computedTitle =
+                safeTitle ||
+                (type === 'success' ? 'Success' :
+                 type === 'error' ? 'Something went wrong' :
+                 type === 'warning' ? 'Heads up' : 'Info');
+
+            toast.innerHTML = `
+                <div>
+                    <div class="toast-title">${escapeHtml(computedTitle)}</div>
+                    <div>${escapeHtml(safeMessage)}</div>
+                </div>
+                <button class="toast-close" aria-label="Dismiss notification" type="button">×</button>
+            `;
+
+            const closeBtn = toast.querySelector('.toast-close');
+            closeBtn.addEventListener('click', () => toast.remove());
+
+            container.appendChild(toast);
+
+            if (timeout && timeout > 0) {
+                setTimeout(() => {
+                    if (toast && toast.parentElement) toast.remove();
+                }, timeout);
+            }
+        }
+
+        function openLoginGate({ title, message, redirect, primaryText = 'Sign in', secondaryText = 'Create account' } = {}) {
+            const modal = document.getElementById('login-gate');
+            if (!modal) return;
+
+            const titleEl = document.getElementById('login-gate-title');
+            const messageEl = document.getElementById('login-gate-message');
+            const signInBtn = document.getElementById('login-gate-signin');
+            const signUpBtn = document.getElementById('login-gate-signup');
+
+            const currentPath = window.location.pathname + window.location.search + window.location.hash;
+            const redirectTarget = redirect || currentPath;
+
+            titleEl.textContent = title || 'Sign in to continue';
+            messageEl.textContent = message || 'Create an account or sign in to unlock this action.';
+            signInBtn.textContent = primaryText;
+            signUpBtn.textContent = secondaryText;
+
+            signInBtn.onclick = () => {
+                window.location.href = `/login?redirect=${encodeURIComponent(redirectTarget)}`;
+            };
+            signUpBtn.onclick = () => {
+                window.location.href = `/signup?redirect=${encodeURIComponent(redirectTarget)}`;
+            };
+
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+            signInBtn.focus();
+        }
+
+        function closeLoginGate() {
+            const modal = document.getElementById('login-gate');
+            if (!modal) return;
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        // Close login gate on background click
+        document.addEventListener('click', (e) => {
+            const modal = document.getElementById('login-gate');
+            if (!modal || !modal.classList.contains('active')) return;
+            if (e.target === modal) closeLoginGate();
+        });
+
+        // Close login gate on Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            const modal = document.getElementById('login-gate');
+            if (modal && modal.classList.contains('active')) closeLoginGate();
+        });
+
+        // Firebase ID token helper (safe to define globally)
+        if (typeof window.getFirebaseIdToken !== 'function') {
+            window.getFirebaseIdToken = async function getFirebaseIdToken() {
+                if (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) {
+                    try {
+                        return await firebase.auth().currentUser.getIdToken();
+                    } catch (e) {
+                        return null;
+                    }
+                }
+                return null;
+            };
+        }
+
+        // Daily email opt-in flow (call after a “win” moment)
+        async function maybePromptDailyEmailOptIn({ reason = 'win' } = {}) {
+            if (!currentUser) return;
+            const userId = currentUser.uid;
+            const key = `daily_email_optin_prompted_${userId}`;
+            if (localStorage.getItem(key) === 'true') return;
+
+            // Check current subscription status from backend
+            try {
+                const token = await window.getFirebaseIdToken();
+                const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+                const resp = await fetch('/api/email/subscription-status', { headers });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data.subscribed) {
+                        localStorage.setItem(key, 'true');
+                        return;
+                    }
+                }
+            } catch (e) {
+                // If status check fails, don't block UX
+            }
+
+            const modal = document.getElementById('email-optin');
+            if (!modal) return;
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+
+            const acceptBtn = document.getElementById('email-optin-accept');
+            const declineBtn = document.getElementById('email-optin-decline');
+            const closeBtn = document.getElementById('email-optin-close');
+
+            const close = () => {
+                modal.classList.remove('active');
+                modal.setAttribute('aria-hidden', 'true');
+            };
+
+            const accept = async () => {
+                try {
+                    const token = await window.getFirebaseIdToken();
+                    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+                    const resp = await fetch('/api/email/subscribe-daily', { method: 'POST', headers });
+                    if (resp.ok) {
+                        showToast({ type: 'success', title: 'Subscribed', message: 'You’ll receive the daily prayer by email.' });
+                        localStorage.setItem(key, 'true');
+                        close();
+                        return;
+                    }
+                } catch (e) {}
+                showToast({ type: 'error', title: 'Could not subscribe', message: 'Please try again later.' });
+                close();
+            };
+
+            const decline = () => {
+                localStorage.setItem(key, 'true');
+                close();
+            };
+
+            acceptBtn.onclick = accept;
+            declineBtn.onclick = decline;
+            closeBtn.onclick = decline;
+            acceptBtn.focus();
+        }
+
+        function closeEmailOptIn() {
+            const modal = document.getElementById('email-optin');
+            if (!modal) return;
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        // Close email opt-in on background click
+        document.addEventListener('click', (e) => {
+            const modal = document.getElementById('email-optin');
+            if (!modal || !modal.classList.contains('active')) return;
+            if (e.target === modal) closeEmailOptIn();
+        });
+
+        // Close email opt-in on Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            const modal = document.getElementById('email-optin');
+            if (modal && modal.classList.contains('active')) closeEmailOptIn();
+        });
     </script>
     {% block extra_js %}{% endblock %}
+
+    <!-- Shared UI: Login Gate Modal -->
+    <div id="login-gate" class="login-gate" role="dialog" aria-modal="true" aria-hidden="true" aria-label="Sign in required">
+        <div class="login-gate-card">
+            <div class="login-gate-header">
+                <h3 id="login-gate-title" class="login-gate-title">Sign in to continue</h3>
+                <button class="login-gate-close" type="button" aria-label="Close" onclick="closeLoginGate()">×</button>
+            </div>
+            <p id="login-gate-message" class="login-gate-message">Create an account or sign in to unlock this action.</p>
+            <div class="login-gate-actions">
+                <button id="login-gate-signin" class="btn btn-secondary" type="button">Sign in</button>
+                <button id="login-gate-signup" class="btn btn-primary" type="button">Create account</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shared UI: Daily Email Opt-in Modal -->
+    <div id="email-optin" class="email-optin" role="dialog" aria-modal="true" aria-hidden="true" aria-label="Daily prayer email opt-in">
+        <div class="email-optin-card">
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;">
+                <h3 class="email-optin-title">Want the daily prayer by email?</h3>
+                <button id="email-optin-close" class="login-gate-close" type="button" aria-label="Close">×</button>
+            </div>
+            <p class="email-optin-message">
+                We can send you the daily verse and global prayer so you can return with a clear focus each day.
+            </p>
+            <div class="email-optin-actions">
+                <button id="email-optin-decline" class="btn btn-secondary" type="button">Not now</button>
+                <button id="email-optin-accept" class="btn btn-primary" type="button">Yes, email me daily</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Mobile Bottom Navigation (Shows only on mobile) -->
     <nav class="mobile-nav">

@@ -759,10 +759,51 @@ def verify_email():
     """Serve the verify email page"""
     return render_template('verify_email.html')
 
-@app.route('/unsubscribe')
+@app.route('/unsubscribe', methods=['GET', 'POST'])
 def unsubscribe():
-    """Serve the unsubscribe page"""
-    return render_template('unsubscribe.html')
+    """
+    Unsubscribe from Divine Bridge daily prayer emails.
+
+    Supports:
+    - GET /unsubscribe?email=... (prefill form)
+    - POST /unsubscribe (form submit)
+
+    Note: This endpoint is used by email unsubscribe links, so it must work without auth.
+    """
+    from config import get_config
+    cfg = get_config()
+    sender_email = getattr(cfg, 'SENDER_EMAIL', None) or app.config.get('SENDER_EMAIL', 'blessings@divinebridge.io')
+
+    if request.method == 'GET':
+        email = request.args.get('email', '').strip()
+        return render_template('unsubscribe.html', email=email, sender_email=sender_email)
+
+    # POST: process unsubscribe
+    email = (request.form.get('email') or '').strip()
+    if not email or '@' not in email:
+        return render_template('unsubscribe.html', email=email, sender_email=sender_email, error='Please enter a valid email address.')
+
+    try:
+        # Update Firestore subscription flag (best-effort)
+        from firebase_admin import firestore
+        db = firestore.client()
+
+        users_ref = db.collection('users')
+        matches = users_ref.where('email', '==', email).stream()
+        updated = 0
+        for doc in matches:
+            doc.reference.set({
+                'email_subscribed': False,
+                'email_unsubscribed_at': datetime.utcnow().isoformat()
+            }, merge=True)
+            updated += 1
+
+        logger.info(f"Unsubscribe request processed for {email}. Updated users: {updated}")
+    except Exception as e:
+        # Do not leak errors to user; unsubscribe should appear successful
+        logger.error(f"Error processing unsubscribe for {email}: {e}")
+
+    return render_template('unsubscribe_confirmation.html', sender_email=sender_email)
 
 @app.route('/_ah/health')
 def health_check():

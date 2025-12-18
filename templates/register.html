@@ -331,6 +331,14 @@
 <script>
     let isSubmitting = false;
 
+    function getSafeRedirectPath(defaultPath = '/prayers') {
+        const params = new URLSearchParams(window.location.search);
+        const qpRedirect = params.get('redirect');
+        const candidate = (qpRedirect || defaultPath).trim();
+        if (!candidate.startsWith('/')) return defaultPath;
+        return candidate;
+    }
+
     // Show password requirements when user focuses on password field
     document.getElementById('password').addEventListener('focus', function() {
         document.getElementById('password-requirements').style.display = 'block';
@@ -457,7 +465,7 @@
             if (response.ok) {
                 showSuccess('Account created successfully! Redirecting...');
                 setTimeout(() => {
-                    window.location.href = '/prayers';
+                    window.location.href = getSafeRedirectPath('/prayers');
                 }, 1000);
             } else {
                 const data = await response.json();
@@ -516,7 +524,7 @@
             if (response.ok) {
                 showSuccess('Account created successfully! Redirecting...');
                 setTimeout(() => {
-                    window.location.href = '/prayers';
+                    window.location.href = getSafeRedirectPath('/prayers');
                 }, 1000);
             } else {
                 const data = await response.json();

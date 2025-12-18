@@ -8,6 +8,83 @@ import logging
 email_bp = Blueprint('email', __name__)
 logger = logging.getLogger(__name__)
 
+def _get_firestore_client():
+    """Get Firestore client (lazy import to keep startup stable)."""
+    from firebase_admin import firestore
+    return firestore.client()
+
+def _require_user():
+    """Return (user_dict, response_tuple_or_None)."""
+    try:
+        from auth_helpers import get_user_from_session
+        user = get_user_from_session()
+        if not user or not user.get('user_id'):
+            return None, (jsonify({'error': 'Authentication required'}), 401)
+        return user, None
+    except Exception as e:
+        logger.error(f"Error reading authenticated user: {e}")
+        return None, (jsonify({'error': 'Authentication unavailable'}), 503)
+
+
+@email_bp.route('/subscription-status', methods=['GET'])
+def subscription_status():
+    """Return the current user's daily email subscription status."""
+    user, err = _require_user()
+    if err:
+        return err
+
+    try:
+        db = _get_firestore_client()
+        user_id = user['user_id']
+        doc = db.collection('users').document(user_id).get()
+        subscribed = False
+        if doc.exists:
+            subscribed = bool(doc.to_dict().get('email_subscribed', False))
+        return jsonify({'subscribed': subscribed}), 200
+    except Exception as e:
+        logger.error(f"Error getting subscription status: {e}")
+        return jsonify({'error': 'Failed to get subscription status'}), 500
+
+
+@email_bp.route('/subscribe-daily', methods=['POST'])
+def subscribe_daily():
+    """Opt the current user into daily prayer+verse emails."""
+    user, err = _require_user()
+    if err:
+        return err
+
+    try:
+        db = _get_firestore_client()
+        user_id = user['user_id']
+        db.collection('users').document(user_id).set({
+            'email_subscribed': True,
+            'email_subscribed_at': datetime.utcnow().isoformat()
+        }, merge=True)
+        return jsonify({'message': 'Subscribed', 'subscribed': True}), 200
+    except Exception as e:
+        logger.error(f"Error subscribing user to daily emails: {e}")
+        return jsonify({'error': 'Failed to subscribe'}), 500
+
+
+@email_bp.route('/unsubscribe-daily', methods=['POST'])
+def unsubscribe_daily():
+    """Opt the current user out of daily prayer+verse emails."""
+    user, err = _require_user()
+    if err:
+        return err
+
+    try:
+        db = _get_firestore_client()
+        user_id = user['user_id']
+        db.collection('users').document(user_id).set({
+            'email_subscribed': False,
+            'email_unsubscribed_at': datetime.utcnow().isoformat()
+        }, merge=True)
+        return jsonify({'message': 'Unsubscribed', 'subscribed': False}), 200
+    except Exception as e:
+        logger.error(f"Error unsubscribing user from daily emails: {e}")
+        return jsonify({'error': 'Failed to unsubscribe'}), 500
+
 
 @email_bp.route('/send-daily-emails', methods=['POST'])
 def send_daily_emails():
@@ -16,8 +93,7 @@ def send_daily_emails():
     Triggered by Cloud Scheduler every Monday at 6 AM ET
     """
     try:
-        from firebase_admin import firestore
-        db = firestore.client()
+        db = _get_firestore_client()
         from email_service_v2 import get_email_service
         from verse_cache import verse_cache
         

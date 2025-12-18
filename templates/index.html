@@ -730,6 +730,23 @@
         100% { background-position: -200% 0; }
     }
 
+    /* Reduced motion support */
+    @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        .hero-button,
+        .preview-card,
+        .org-card,
+        .cta-button {
+            transition: none !important;
+        }
+        .hero-button:hover,
+        .preview-card:hover,
+        .org-card:hover,
+        .cta-button:hover {
+            transform: none !important;
+        }
+    }
+
     @media (max-width: 768px) {
         .hero-section {
             padding: 6rem 1rem 3rem;
@@ -907,11 +924,11 @@
 {% block content %}
 <section class="hero-section" id="hero-section">
     <h1 class="hero-title" id="hero-title">Welcome to Divine Bridge</h1>
-    <p class="hero-subtitle">Connect with believers worldwide through the power of prayer</p>
+    <p class="hero-subtitle" id="hero-subtitle">Connect with believers worldwide through the power of prayer</p>
     <div class="hero-buttons" id="hero-buttons">
         <!-- Buttons will be populated dynamically based on auth state -->
-        <a href="/signup" class="hero-button primary-button">Get Started</a>
-        <a href="/about" class="hero-button secondary-button">Learn More</a>
+        <a href="/prayers" class="hero-button primary-button">Pray for someone now</a>
+        <a href="/signup" class="hero-button secondary-button">Create account</a>
     </div>
 </section>
 
@@ -928,7 +945,7 @@
                 align-items: center;
                 justify-content: center;
                 transition: transform 0.2s ease;
-            " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'" title="Download as Image">
+            " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'" title="Download as Image" aria-label="Download daily verse as an image">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                     <polyline points="7 10 12 15 17 10"></polyline>
@@ -1012,7 +1029,7 @@
                     align-items: center;
                     justify-content: center;
                     transition: transform 0.2s ease;
-                " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'" title="Download as Image">
+                " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'" title="Download as Image" aria-label="Download today's global prayer as an image">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                         <polyline points="7 10 12 15 17 10"></polyline>
@@ -1187,12 +1204,12 @@
 </section>
 
 <section class="cta-section" id="cta-section">
-    <h2 class="cta-title">Join Our Community Today</h2>
-    <p class="cta-text">
+    <h2 class="cta-title" id="cta-title">Join Our Community Today</h2>
+    <p class="cta-text" id="cta-text">
         Experience the power of collective prayer and spiritual growth with believers from around the world. 
         Start your journey with Divine Bridge today.
     </p>
-    <a href="/signup" class="cta-button">Sign Up Now</a>
+    <a href="/signup" class="cta-button" id="cta-button">Sign Up Now</a>
 </section>
 {% endblock %}
 
@@ -1203,27 +1220,50 @@
         const heroSection = document.getElementById('hero-section');
         const heroButtons = document.getElementById('hero-buttons');
         const heroTitle = document.getElementById('hero-title');
+        const heroSubtitle = document.getElementById('hero-subtitle');
         const ctaSection = document.getElementById('cta-section');
+        const ctaTitle = document.getElementById('cta-title');
+        const ctaText = document.getElementById('cta-text');
+        const ctaButton = document.getElementById('cta-button');
         const verseSection = document.getElementById('daily-verse-section');
         
         if (user) {
-            // User is logged in - Hide hero section and move verse to top
             const displayName = user.displayName || user.email.split('@')[0];
             
-            // Hide hero section completely
             if (heroSection) {
-                heroSection.style.display = 'none';
+                heroSection.style.display = 'block';
             }
             
-            // Move verse section to the very top
-            if (verseSection) {
-                verseSection.style.marginTop = '0';
-                verseSection.style.paddingTop = '6rem'; // Account for fixed header
+            // Returning-user hero copy + quick actions
+            if (heroTitle) {
+                heroTitle.textContent = `Welcome back, ${displayName}`;
+            }
+            if (heroSubtitle) {
+                heroSubtitle.textContent = 'Continue today’s prayer, visit the Prayer Room, and encourage the community.';
+            }
+            if (heroButtons) {
+                heroButtons.innerHTML = `
+                    <a href="/prayers" class="hero-button primary-button">Continue in Prayer Room</a>
+                    <a href="/daily-prayer" class="hero-button secondary-button">Read Today’s Prayer</a>
+                    <a href="/prayer-room" class="hero-button secondary-button">Join Live Prayer</a>
+                `;
             }
             
-            // Hide CTA section
+            // Keep CTA section visible, but make it “returning” oriented
             if (ctaSection) {
-                ctaSection.style.display = 'none';
+                ctaSection.style.display = 'block';
+                if (ctaTitle) ctaTitle.textContent = 'Keep the momentum going';
+                if (ctaText) ctaText.textContent = 'Support someone today by praying through requests, or share a testimony to encourage others.';
+                if (ctaButton) {
+                    ctaButton.textContent = 'Visit Prayer Room';
+                    ctaButton.href = '/prayers';
+                }
+            }
+
+            // Reset verse section styling (don’t jump layout)
+            if (verseSection) {
+                verseSection.style.marginTop = '';
+                verseSection.style.paddingTop = '4rem';
             }
         } else {
             // User is not logged in - Show hero section
@@ -1237,13 +1277,21 @@
                 verseSection.style.paddingTop = '4rem';
             }
             
-            heroTitle.textContent = 'Welcome to Divine Bridge';
+            if (heroTitle) heroTitle.textContent = 'Welcome to Divine Bridge';
+            if (heroSubtitle) heroSubtitle.textContent = 'Connect with believers worldwide through the power of prayer';
             heroButtons.innerHTML = `
-                <a href="/signup" class="hero-button primary-button">Get Started</a>
-                <a href="/login" class="hero-button secondary-button">Sign In</a>
+                <a href="/prayers" class="hero-button primary-button">Pray for someone now</a>
+                <a href="/signup" class="hero-button secondary-button">Create account</a>
+                <a href="/login" class="hero-button secondary-button">Sign in</a>
             `;
             if (ctaSection) {
                 ctaSection.style.display = 'block';
+                if (ctaTitle) ctaTitle.textContent = 'Join Our Community Today';
+                if (ctaText) ctaText.textContent = 'Create a free account to track the prayers you’ve offered, share requests, and encourage others with testimonies.';
+                if (ctaButton) {
+                    ctaButton.textContent = 'Create free account';
+                    ctaButton.href = '/signup';
+                }
             }
         }
     }
@@ -1670,9 +1718,11 @@
     
     function promptLogin(action) {
         const currentPath = window.location.pathname;
-        if (confirm(`Please sign in to ${action}. Would you like to sign in now?`)) {
-            window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
-        }
+        openLoginGate({
+            title: 'Sign in to continue',
+            message: `Please sign in to ${action}.`,
+            redirect: currentPath
+        });
     }
     
     async function toggleLikeHome() {
@@ -1715,11 +1765,11 @@
                 }
             } else {
                 const error = await response.json();
-                alert(error.error || 'Failed to update like');
+                showToast({ type: 'error', title: 'Could not update like', message: error.error || 'Please try again.' });
             }
         } catch (error) {
             console.error('Error toggling like:', error);
-            alert('Failed to update like. Please try again.');
+            showToast({ type: 'error', title: 'Could not update like', message: 'Please try again.' });
         }
     }
     
@@ -1809,14 +1859,18 @@
         
         const commentText = document.getElementById('comment-text-home').value.trim();
         if (!commentText) {
-            alert('Please enter a comment');
+            showToast({ type: 'warning', title: 'Comment is empty', message: 'Please enter a comment.' });
             return;
         }
         
         try {
             const token = await getFirebaseIdToken();
             if (!token) {
-                alert('Please log in to comment');
+                openLoginGate({
+                    title: 'Sign in to comment',
+                    message: 'Create an account or sign in to comment on today’s prayer.',
+                    redirect: window.location.pathname
+                });
                 return;
             }
             
@@ -1840,12 +1894,12 @@
                 if (response.status === 401) {
                     promptLogin('comment on prayers');
                 } else {
-                    alert(error.error || 'Failed to post comment');
+                    showToast({ type: 'error', title: 'Could not post comment', message: error.error || 'Please try again.' });
                 }
             }
         } catch (error) {
             console.error('Error submitting comment:', error);
-            alert('Failed to post comment. Please try again.');
+            showToast({ type: 'error', title: 'Could not post comment', message: 'Please try again.' });
         }
     }
     
@@ -1911,17 +1965,17 @@
             } else {
                 // Fallback: Copy to clipboard
                 await navigator.clipboard.writeText(shareUrl);
-                alert('Link copied to clipboard!');
+                showToast({ type: 'success', title: 'Copied', message: 'Link copied to clipboard.' });
             }
         } catch (error) {
             if (error.name !== 'AbortError') {
                 // Fallback: Copy to clipboard
                 try {
                     await navigator.clipboard.writeText(shareUrl);
-                    alert('Link copied to clipboard!');
+                    showToast({ type: 'success', title: 'Copied', message: 'Link copied to clipboard.' });
                 } catch (clipboardError) {
                     // Final fallback: show URL
-                    prompt('Copy this link:', shareUrl);
+                    showToast({ type: 'info', title: 'Share link', message: shareUrl, timeout: 6000 });
                 }
             }
         }
@@ -2034,12 +2088,12 @@
                 if (response.status === 401) {
                     promptLogin('like verses');
                 } else {
-                    alert(error.error || 'Failed to update like');
+                    showToast({ type: 'error', title: 'Could not update like', message: error.error || 'Please try again.' });
                 }
             }
         } catch (error) {
             console.error('Error toggling verse like:', error);
-            alert('Failed to update like. Please try again.');
+            showToast({ type: 'error', title: 'Could not update like', message: 'Please try again.' });
         }
     }
     
@@ -2107,17 +2161,17 @@
             } else {
                 // Fallback: Copy to clipboard
                 await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
-                alert('Verse copied to clipboard!');
+                showToast({ type: 'success', title: 'Copied', message: 'Verse copied to clipboard.' });
             }
         } catch (error) {
             if (error.name !== 'AbortError') {
                 // Fallback: Copy to clipboard
                 try {
                     await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`);
-                    alert('Verse copied to clipboard!');
+                    showToast({ type: 'success', title: 'Copied', message: 'Verse copied to clipboard.' });
                 } catch (clipboardError) {
                     // Final fallback: show text
-                    prompt('Copy this verse:', `${shareText}\n\n${shareUrl}`);
+                    showToast({ type: 'info', title: 'Share verse', message: `${shareText}\n\n${shareUrl}`, timeout: 8000 });
                 }
             }
         }

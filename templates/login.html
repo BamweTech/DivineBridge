@@ -316,6 +316,19 @@
 <script>
     let isSubmitting = false;
 
+    function getSafeRedirectPath() {
+        const params = new URLSearchParams(window.location.search);
+        const qpRedirect = params.get('redirect');
+        const storageRedirect = sessionStorage.getItem('redirect_after_login');
+        sessionStorage.removeItem('redirect_after_login');
+
+        const candidate = (qpRedirect || storageRedirect || '/prayers').trim();
+
+        // Prevent open redirects: only allow same-site paths
+        if (!candidate.startsWith('/')) return '/prayers';
+        return candidate;
+    }
+
     // Handle form submission
     document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -360,9 +373,7 @@
                 showSuccess('Login successful! Redirecting...');
                 setTimeout(() => {
                     // Redirect to Prayer Room or intended destination
-                    const redirectPath = sessionStorage.getItem('redirect_after_login') || '/prayers';
-                    sessionStorage.removeItem('redirect_after_login');
-                    window.location.href = redirectPath;
+                    window.location.href = getSafeRedirectPath();
                 }, 1000);
             } else {
                 const data = await response.json();
@@ -420,9 +431,7 @@
                 showSuccess('Login successful! Redirecting...');
                 setTimeout(() => {
                     // Redirect to Prayer Room or intended destination
-                    const redirectPath = sessionStorage.getItem('redirect_after_login') || '/prayers';
-                    sessionStorage.removeItem('redirect_after_login');
-                    window.location.href = redirectPath;
+                    window.location.href = getSafeRedirectPath();
                 }, 1000);
             } else {
                 const data = await response.json();

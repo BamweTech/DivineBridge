@@ -4,6 +4,56 @@
 
 {% block extra_css %}
 <style>
+    /* Guest banner (shown when logged out) */
+    .guest-banner {
+        max-width: 1200px;
+        margin: 1.5rem auto 0;
+        padding: 1rem 1.25rem;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(14px);
+        border: 1px solid rgba(31, 60, 136, 0.12);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .guest-banner strong {
+        color: var(--blue);
+    }
+
+    .guest-banner-actions {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .guest-banner a {
+        text-decoration: none;
+    }
+
+    /* Reduced motion: disable door overlay + heavy animations */
+    @media (prefers-reduced-motion: reduce) {
+        .door-overlay {
+            display: none !important;
+        }
+        .prayers-container {
+            animation: none !important;
+            opacity: 1 !important;
+        }
+        .prayer-card,
+        .icon-button,
+        .fab {
+            transition: none !important;
+        }
+        .prayer-card.prayer-request.expanded {
+            animation: none !important;
+        }
+    }
+
     /* Door Opening Animation - PURE CSS */
     .door-overlay {
         position: fixed;
@@ -1205,6 +1255,22 @@
 </div>
 
 <div class="prayers-container" id="prayers-container">
+    <!-- Guest browsing banner (content is readable without login; actions require login) -->
+    <div id="guest-banner" class="guest-banner" role="region" aria-label="Guest browsing notice">
+        <div style="flex: 1; min-width: 240px;">
+            <div style="font-weight: 700; margin-bottom: 0.25rem;">
+                <strong>Browsing as a guest</strong>
+            </div>
+            <div style="color: var(--gray); font-size: 0.95rem; line-height: 1.5;">
+                You can read all prayers. Sign in to request prayer, testify, and track the prayers you’ve offered.
+            </div>
+        </div>
+        <div class="guest-banner-actions">
+            <a class="btn btn-secondary" href="/login?redirect=/prayers">Sign in</a>
+            <a class="btn btn-primary" href="/signup?redirect=/prayers">Create account</a>
+        </div>
+    </div>
+
     <div class="prayer-header">
         <div class="header-content">
             <div style="max-width: 600px;">
@@ -1474,10 +1540,7 @@
     <div id="prayers-list"></div>
 
     <!-- Auth Required Message -->
-    <div id="auth-required" class="empty-state" style="display: none;">
-        <h3>Sign in to view prayers</h3>
-        <p>Please sign in to view and share prayers with our community.</p>
-    </div>
+    <!-- Removed: auth-required gating message. Prayer Room is public-readable by design. -->
 </div>
 
 <!-- Floating Action Button -->
@@ -1649,8 +1712,11 @@
         
         // Check if user is logged in
         if (!currentUser) {
-            alert('Your prayers make a real difference. Sign in to track the lives you\'ve touched in our global community of believers.');
-            window.location.href = '/login';
+            openLoginGate({
+                title: 'Sign in to track your prayers',
+                message: 'You can read all prayers as a guest. Sign in to track the prayers you’ve offered and support the community.',
+                redirect: '/prayers'
+            });
             return;
         }
         
@@ -1668,6 +1734,11 @@
                 
                 // Mark this prayer as prayed for by this user (synced to backend)
                 await markPrayerAsPrayedFor(currentUser.uid, prayerId);
+
+                // After a “win” moment, offer daily email opt-in (once per user/device)
+                if (typeof maybePromptDailyEmailOptIn === 'function') {
+                    maybePromptDailyEmailOptIn({ reason: 'prayed' });
+                }
                 
                 // Show success feedback
                 button.textContent = 'Thank You! 🙏';
@@ -1687,7 +1758,7 @@
             }
         } catch (error) {
             console.error('Error recording prayer:', error);
-            alert('Unable to record your prayer. Please try again.');
+            showToast({ type: 'error', title: 'Unable to record', message: 'Please try again in a moment.' });
         }
     }
 
@@ -1730,13 +1801,7 @@
         
         if (remainingCards.length === 0) {
             // All prayers completed!
-            const wantsMore = confirm('🙏 Thank you for praying for all these requests!\n\nWould you like to pray for more people?');
-            
-            if (wantsMore) {
-                await loadMorePrayers(5);
-            } else {
-                showCompletionMessage();
-            }
+            showCompletionMessage();
         }
     }
 
@@ -1803,7 +1868,7 @@
             }
         } catch (error) {
             console.error('Error loading more prayers:', error);
-            alert('Unable to load more prayers. Please try again.');
+            showToast({ type: 'error', title: 'Unable to load more', message: 'Please try again.' });
         }
     }
 
@@ -1963,7 +2028,6 @@
 
     function showPrayersContent() {
         document.getElementById('loading').style.display = 'none';
-        document.getElementById('auth-required').style.display = 'none';
         document.getElementById('prayers-list').style.display = 'grid';
         
         // Always show prayer submission buttons (will prompt for login if needed)
@@ -1972,10 +2036,8 @@
     }
 
     function showAuthRequired() {
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('prayers-list').style.display = 'none';
-        document.getElementById('prayer-fab').style.display = 'none';
-        document.getElementById('auth-required').style.display = 'block';
+        // Prayer Room is public-readable; this function is kept for compatibility but no longer blocks content.
+        showPrayersContent();
     }
 
     async function loadPrayers() {
@@ -2086,7 +2148,7 @@
                         <button class="pray-button" onclick="prayForThis(event, '${prayer.id}')">
                             I Prayed for This
                         </button>
-                        <button class="share-button-icon" onclick="sharePrayerRequest(event, '${prayer.id}', '${escapeHtml(title).replace(/'/g, "\\'")}')">
+                                <button class="share-button-icon" aria-label="Share this prayer request" onclick="sharePrayerRequest(event, '${prayer.id}', '${escapeHtml(title).replace(/'/g, "\\'")}')">
                             ↗
                         </button>
     </div>
@@ -2120,7 +2182,7 @@
                     <div class="prayer-summary">${escapeHtml(summary)}</div>
                     <div class="prayer-full-content" style="display: none; white-space: pre-line; margin-top: 1rem;">${escapeHtml(testimony.content)}</div>
                     <span class="expand-hint">▼</span>
-                    <button class="share-button-icon" style="display: none;" onclick="shareTestimony(event, '${testimony.id}', '${escapeHtml(title).replace(/'/g, "\\'")}', '${categoryLabel}')">
+                    <button class="share-button-icon" aria-label="Share this testimony" style="display: none;" onclick="shareTestimony(event, '${testimony.id}', '${escapeHtml(title).replace(/'/g, "\\'")}', '${categoryLabel}')">
                         ↗
                     </button>
                 </div>
@@ -2176,9 +2238,11 @@
                 // Check if user is logged in
                 if (!currentUser) {
                     console.log('User not logged in, showing prompt');
-                    if (confirm('Please sign in to request prayer. Would you like to sign in now?')) {
-                        window.location.href = '/login?redirect=/prayers';
-                    }
+                    openLoginGate({
+                        title: 'Sign in to request prayer',
+                        message: 'Create an account or sign in to submit a prayer request to the community.',
+                        redirect: '/prayers'
+                    });
                     return;
                 }
                 
@@ -2199,9 +2263,11 @@
                 // Check if user is logged in
                 if (!currentUser) {
                     console.log('User not logged in, showing prompt');
-                    if (confirm('Please sign in to request prayer. Would you like to sign in now?')) {
-                        window.location.href = '/login?redirect=/prayers';
-                    }
+                    openLoginGate({
+                        title: 'Sign in to request prayer',
+                        message: 'Create an account or sign in to submit a prayer request to the community.',
+                        redirect: '/prayers'
+                    });
                     return;
                 }
                 
@@ -2411,9 +2477,11 @@
                 
                 // Check if user is logged in
                 if (!currentUser) {
-                    if (confirm('Please sign in to share your testimony. Would you like to sign in now?')) {
-                        window.location.href = '/login?redirect=/prayers';
-                    }
+                    openLoginGate({
+                        title: 'Sign in to share your testimony',
+                        message: 'Create an account or sign in to share a thanksgiving testimony and encourage others.',
+                        redirect: '/prayers'
+                    });
                     return;
                 }
                 
@@ -2771,5 +2839,12 @@
         console.log('DOM loaded, waiting for Firebase auth...');
         // Modal already initialized above
     });
+
+    // Called by base.html on auth state changes
+    function updatePrayersPage(user) {
+        const banner = document.getElementById('guest-banner');
+        if (!banner) return;
+        banner.style.display = user ? 'none' : 'flex';
+    }
 </script>
 {% endblock %} 

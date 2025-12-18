@@ -132,7 +132,7 @@ def login():
                             'email': user.email,
                             'firstName': first_name,
                             'lastName': last_name,
-                            'email_subscribed': True,  # Subscribe to emails by default
+                            'email_subscribed': False,  # Opt-in after a “win” moment
                             'timezone': 'America/New_York',
                             'createdAt': firestore.SERVER_TIMESTAMP,
                             'emailVerified': user.email_verified,
@@ -309,7 +309,7 @@ def signup():
                     'email': email,
                     'firstName': first_name,
                     'lastName': last_name,
-                    'email_subscribed': True,  # Subscribe to daily emails by default
+                    'email_subscribed': False,  # Opt-in after a “win” moment
                     'timezone': 'America/New_York',  # Default timezone
                     'createdAt': firestore.SERVER_TIMESTAMP,
                     'emailVerified': user.email_verified if hasattr(user, 'email_verified') else False
