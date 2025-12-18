@@ -184,6 +184,18 @@ def create_app():
             if request.is_secure:
                 response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         
+        # Performance: Enable compression (Cloud Run handles this, but ensure it's enabled)
+        # Add caching headers for static content
+        if request.endpoint == 'static' or request.path.startswith('/static/'):
+            # Cache static assets for 1 year (with versioning)
+            response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        elif response.content_type and 'text/html' in response.content_type:
+            # HTML should not be cached aggressively, but allow short cache for faster navigation
+            response.headers['Cache-Control'] = 'public, max-age=60, must-revalidate'
+        elif response.content_type and ('application/json' in response.content_type or 'text/javascript' in response.content_type):
+            # API responses and JS - short cache
+            response.headers['Cache-Control'] = 'public, max-age=300'
+        
         # Content Security Policy
         response.headers['Content-Security-Policy'] = (
             "default-src 'self'; "

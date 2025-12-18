@@ -6,6 +6,12 @@
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <title>{% block title %}Divine Bridge - Global Prayer Community{% endblock %}</title>
     
+    <!-- Resource Hints for Faster Loading -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://www.gstatic.com">
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com">
+    
     <!-- SEO Meta Tags -->
     <meta name="description" content="{% block meta_description %}Divine Bridge connects believers worldwide in daily prayer. Join thousands in global prayer, get today's Bible verse, and unite in faith for those affected by disasters and crises.{% endblock %}">
     <meta name="keywords" content="{% block meta_keywords %}Divine Bridge, divine bridge, Christian prayer, daily devotional, prayer request, Bible verses, global prayer community, disaster prayer, prayer support, spiritual growth{% endblock %}">
@@ -79,35 +85,63 @@
     }
     </script>
     
-    <!-- Google tag (gtag.js) -->
+    <!-- Google Fonts - Load with display=swap for better performance -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet"></noscript>
+    
+    <!-- Firebase SDK - Load asynchronously to avoid blocking render -->
+    <script>
+    // Load Firebase SDK asynchronously after page load for better initial render
+    (function() {
+        window.firebaseLoaded = false;
+        window.firebaseLoadPromise = new Promise(function(resolve) {
+            function loadFirebase() {
+                var scripts = [
+                    'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js',
+                    'https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js',
+                    'https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js'
+                ];
+                
+                var loaded = 0;
+                scripts.forEach(function(src) {
+                    var script = document.createElement('script');
+                    script.src = src;
+                    script.async = true;
+                    script.onload = function() {
+                        loaded++;
+                        if (loaded === scripts.length) {
+                            window.firebaseLoaded = true;
+                            resolve();
+                        }
+                    };
+                    script.onerror = function() {
+                        loaded++;
+                        if (loaded === scripts.length) {
+                            window.firebaseLoaded = true;
+                            resolve(); // Resolve even on error to prevent hanging
+                        }
+                    };
+                    document.head.appendChild(script);
+                });
+            }
+            
+            // Load Firebase after DOMContentLoaded for faster initial render
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', loadFirebase);
+            } else {
+                loadFirebase();
+            }
+        });
+    })();
+    </script>
+    
+    <!-- Google Analytics - Already async, but move to end of head -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-M61WPJL2E7"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-
       gtag('config', 'G-M61WPJL2E7');
-    </script>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-    
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-    
-    <!-- Firebase Loading Verification -->
-    <script>
-    // Verify Firebase modules are loaded
-    window.addEventListener('load', function() {
-        console.log('Firebase modules check:');
-        if (typeof firebase !== 'undefined') {
-            console.log('Firebase SDK loaded:', Object.keys(firebase));
-            console.log('Firestore available:', typeof firebase.firestore);
-        } else {
-            console.error('Firebase SDK not loaded');
-        }
-    });
     </script>
     
     {% block extra_head %}{% endblock %}
@@ -1016,10 +1050,27 @@
         // Initialize Firebase
         async function initializeFirebase() {
             try {
+                // Wait for Firebase SDK to load if it hasn't already
+                if (!window.firebaseLoaded) {
+                    await window.firebaseLoadPromise;
+                }
+                
+                // Double-check Firebase is available
+                if (typeof firebase === 'undefined') {
+                    console.error('Firebase SDK failed to load');
+                    return;
+                }
+                
                 const response = await fetch('/api/auth/firebase-config');
                 firebaseConfig = await response.json();
                 
-                firebase.initializeApp(firebaseConfig);
+                // Check if Firebase is already initialized
+                try {
+                    firebase.app();
+                } catch (e) {
+                    // Firebase not initialized, initialize it
+                    firebase.initializeApp(firebaseConfig);
+                }
                 
                 // Enable auth state persistence (keeps user logged in across page loads)
                 await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
