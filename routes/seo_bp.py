@@ -351,21 +351,24 @@ def sitemap():
                     xml_content.append('  </url>')
                     
                     # If prayer has disaster metadata, create disaster-specific URLs
-                    # Note: Using /globalprayerwatch/{type}/{location} format to match actual route
+                    # Note: Using /globalprayerwatch/{type} format (no location) to match actual route
                     if isinstance(prayer, dict) and 'metadata' in prayer:
                         metadata = prayer['metadata']
                         disasters = metadata.get('disasters', [])
                         
+                        # Track disaster types we've already added (deduplicate by type)
+                        added_disaster_types = set()
+                        
                         for disaster in disasters:
-                            if disaster.get('type') and disaster.get('locations'):
+                            if disaster.get('type'):
                                 disaster_type = disaster['type'].lower().replace(' ', '-').replace('_', '-')
-                                for location in disaster['locations'][:3]:  # Max 3 locations per disaster
-                                    location_slug = location.lower().replace(' ', '-').replace(',', '')
-                                    # Format: /globalprayerwatch/{disaster_type}/{location}
-                                    url_slug = f"{disaster_type}/{location_slug}"
+                                
+                                # Only add each disaster type once (deduplicate)
+                                if disaster_type not in added_disaster_types:
+                                    added_disaster_types.add(disaster_type)
                                     
                                     xml_content.append('  <url>')
-                                    xml_content.append(f'    <loc>{base_url}/globalprayerwatch/{url_slug}</loc>')
+                                    xml_content.append(f'    <loc>{base_url}/globalprayerwatch/{disaster_type}</loc>')
                                     xml_content.append('    <changefreq>weekly</changefreq>')
                                     xml_content.append('    <priority>0.95</priority>')  # High priority for current events
                                     xml_content.append(f'    <lastmod>{date_str}</lastmod>')
