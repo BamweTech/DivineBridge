@@ -953,6 +953,10 @@
                 </svg>
             </button>
         </div>
+        {% if verse %}
+        <p class="verse-text" style="display: block;">{{ verse.verse }}</p>
+        <p class="verse-reference" style="display: block;"><span>{{ verse.reference }}</span></p>
+        {% else %}
         <div id="verse-skeleton" style="display: flex; flex-direction: column; gap: 1rem;">
             <div class="verse-skeleton" style="height: 24px; width: 90%;"></div>
             <div class="verse-skeleton" style="height: 24px; width: 95%;"></div>
@@ -961,6 +965,7 @@
         </div>
         <p class="verse-text" style="display: none;">Loading verse...</p>
         <p class="verse-reference" style="display: none;"><span class="verse-loading">Loading...</span></p>
+        {% endif %}
     </div>
     
     <!-- Daily Verse Interactions (visible to all, requires login to interact) -->
@@ -1038,9 +1043,15 @@
                 </button>
             </div>
         </div>
+        {% if daily_prayer %}
+        <p style="text-align: center; color: #555; margin-bottom: 2rem; font-size: 1.1rem; font-weight: 500;" id="daily-prayer-date-home">
+            {{ daily_prayer.date }}
+        </p>
+        {% else %}
         <p style="text-align: center; color: #555; margin-bottom: 2rem; font-size: 1.1rem; font-weight: 500;" id="daily-prayer-date-home">
             Loading...
         </p>
+        {% endif %}
         
         <!-- Prayer Content with Buffer -->
         <div class="prayer-card-glass" style="
@@ -1079,7 +1090,11 @@
                 overflow-y: auto;
                 overflow-x: hidden;
             ">
-                Loading today's prayer...
+                {% if daily_prayer and daily_prayer.content %}
+                    {{ daily_prayer.content|e|replace('\n\n', '<br><br>')|replace('\n', '<br>')|safe }}
+                {% else %}
+                    Loading today's prayer...
+                {% endif %}
             </div>
         </div>
         
@@ -1388,12 +1403,21 @@
         return `${year}-${month}-${day}`;
     }
 
-    // Load daily prayer on home page
+    // Load daily prayer on home page (fallback if server-side rendering failed)
     async function loadDailyPrayerHome() {
         const contentEl = document.getElementById('daily-prayer-content-home');
         const dateEl = document.getElementById('daily-prayer-date-home');
         
         if (!contentEl || !dateEl) return;
+        
+        // Skip if content is already rendered server-side (not "Loading...")
+        const currentContent = contentEl.textContent.trim();
+        if (currentContent && currentContent !== 'Loading today\'s prayer...') {
+            // Content already rendered, just load interactions
+            const clientDate = getClientLocalDate();
+            loadDailyPrayerInteractionsHome(clientDate);
+            return;
+        }
         
         try {
             // Send client's local date to get the right prayer
@@ -1455,8 +1479,7 @@
                     day: 'numeric'
                 });
                 
-                // Load interactions if user is logged in
-                const clientDate = getClientLocalDate();
+                // Load interactions
                 loadDailyPrayerInteractionsHome(clientDate);
             } else {
                 contentEl.textContent = 'No daily prayer available for today. Please check back later.';
@@ -1493,70 +1516,44 @@
         observer.observe(prayerContainer);
     }
 
-    // Load daily verse when page loads
+    // Load interactions when page loads (content is already server-rendered)
     document.addEventListener('DOMContentLoaded', async () => {
-        // Load daily prayer
-        loadDailyPrayerHome();
-        
         // Initialize prayer section animation
         initPrayerSectionAnimation();
         
         // Load organizations
         loadOrganizations();
 
-        try {
-            // Send client's local date for timezone-aware verse
-            const clientDate = getClientLocalDate();
-            console.log('Loading verse for client date:', clientDate);
-            
-            const response = await fetch(`/api/today-verse?client_date=${clientDate}`);
-            if (response.ok) {
-                const data = await response.json();
-                
-                // Hide skeleton, show verse
-                document.getElementById('verse-skeleton').style.display = 'none';
-                document.querySelector('.verse-text').style.display = 'block';
-                document.querySelector('.verse-reference').style.display = 'block';
-                
-                if (data.data) {
-                    const verse = data.data;
-                    document.querySelector('.verse-text').textContent = verse.verse;
-                    document.querySelector('.verse-reference span').textContent = verse.reference;
-                    
-                    // Load verse interactions
-                    loadDailyVerseInteractions(clientDate);
-                } else {
-                    document.querySelector('.verse-text').textContent = 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.';
-                    document.querySelector('.verse-reference span').textContent = 'John 3:16';
-                    
-                    // Load verse interactions even for fallback verse
-                    loadDailyVerseInteractions(clientDate);
-                }
-            } else {
-                // Hide skeleton, show fallback
-                document.getElementById('verse-skeleton').style.display = 'none';
-                document.querySelector('.verse-text').style.display = 'block';
-                document.querySelector('.verse-reference').style.display = 'block';
-                document.querySelector('.verse-text').textContent = 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.';
-                document.querySelector('.verse-reference span').textContent = 'John 3:16';
-                
-                // Load verse interactions even for fallback verse
-                const clientDate = getClientLocalDate();
-                loadDailyVerseInteractions(clientDate);
-            }
-        } catch (error) {
-            console.error('Error loading daily verse:', error);
-            // Hide skeleton, show fallback
-            document.getElementById('verse-skeleton').style.display = 'none';
-            document.querySelector('.verse-text').style.display = 'block';
-            document.querySelector('.verse-reference').style.display = 'block';
-            document.querySelector('.verse-text').textContent = 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.';
-            document.querySelector('.verse-reference span').textContent = 'John 3:16';
-            
-            // Load verse interactions even on error
-            const clientDate = getClientLocalDate();
-            loadDailyVerseInteractions(clientDate);
+        // Get date for interactions (use server-provided date or client date)
+        const serverDate = '{{ today_date|default("") }}';
+        const clientDate = serverDate || getClientLocalDate();
+        
+        // Hide skeleton if it exists (fallback case)
+        const verseSkeleton = document.getElementById('verse-skeleton');
+        if (verseSkeleton) {
+            verseSkeleton.style.display = 'none';
         }
+        
+        // Ensure verse is visible (already rendered server-side)
+        const verseText = document.querySelector('.verse-text');
+        const verseRef = document.querySelector('.verse-reference');
+        if (verseText && verseText.style.display === 'none') {
+            verseText.style.display = 'block';
+        }
+        if (verseRef && verseRef.style.display === 'none') {
+            verseRef.style.display = 'block';
+        }
+        
+        // Load verse interactions (likes, shares)
+        loadDailyVerseInteractions(clientDate);
+        
+        // Load prayer interactions if prayer is rendered server-side
+        {% if daily_prayer %}
+        loadDailyPrayerInteractionsHome(clientDate);
+        {% else %}
+        // Fallback: try to load prayer client-side if server-side failed
+        loadDailyPrayerHome();
+        {% endif %}
     });
 
     // Download verse as image (mobile-friendly with Share API)

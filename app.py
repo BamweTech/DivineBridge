@@ -668,15 +668,100 @@ def create_app():
 # Create the Flask application
 app = create_app()
 
+# Simple cache for daily prayer (resets daily)
+_daily_prayer_cache = {}
+_daily_prayer_cache_date = None
+
+def get_daily_prayer_for_date(date_str):
+    """Get daily prayer for a specific date with caching"""
+    global _daily_prayer_cache, _daily_prayer_cache_date
+    
+    # Reset cache if date changed
+    if _daily_prayer_cache_date != date_str:
+        _daily_prayer_cache = {}
+        _daily_prayer_cache_date = date_str
+    
+    # Check cache
+    if date_str in _daily_prayer_cache:
+        return _daily_prayer_cache[date_str]
+    
+    # Fetch prayer from storage
+    try:
+        prayers = app.storage_handler.get_prayers(limit=20)
+        valid_prayers = [p for p in prayers if isinstance(p, dict)]
+        
+        # Find daily prayer (source='generated' and no title) for this date
+        daily_prayer = None
+        for prayer in valid_prayers:
+            is_daily_prayer = prayer.get('source') == 'generated' and not prayer.get('title')
+            if is_daily_prayer and prayer.get('date') == date_str:
+                # Remove citations and normalize content
+                if 'content' in prayer and prayer['content']:
+                    import re
+                    prayer['content'] = re.sub(r'\[\d+\]', '', prayer['content'])
+                    prayer['content'] = re.sub(r'[ \t]+', ' ', prayer['content'])
+                    prayer['content'] = prayer['content'].strip()
+                daily_prayer = prayer
+                break
+        
+        # Cache the result (even if None)
+        _daily_prayer_cache[date_str] = daily_prayer
+        return daily_prayer
+    except Exception as e:
+        logger.error(f"Error fetching daily prayer: {e}")
+        return None
+
 @app.route('/')
 def index():
-    """Serve the home page as main landing page"""
-    return render_template('index.html')
+    """Serve the home page as main landing page with server-side rendered verse and prayer"""
+    try:
+        # Get today's date (server timezone - will be adjusted client-side if needed)
+        today = datetime.now().strftime('%Y-%m-%d')
+        day_of_year = datetime.now().timetuple().tm_yday
+        
+        # Get verse (cached)
+        verse = app.verse_cache.get_today_verse(day_of_year=day_of_year)
+        
+        # Get daily prayer (cached)
+        daily_prayer = get_daily_prayer_for_date(today)
+        
+        # Format verse for template
+        verse_data = verse if verse else {
+            'verse': 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.',
+            'reference': 'John 3:16'
+        }
+        
+        # Format prayer for template
+        prayer_data = None
+        if daily_prayer and daily_prayer.get('content'):
+            # Format date for display
+            try:
+                prayer_date = datetime.strptime(daily_prayer.get('date', today), '%Y-%m-%d')
+            except:
+                prayer_date = datetime.now()
+            
+            prayer_data = {
+                'content': daily_prayer.get('content', ''),
+                'date': prayer_date.strftime('%A, %B %d, %Y'),
+                'date_iso': daily_prayer.get('date', today)
+            }
+        
+        return render_template('index.html', 
+                             verse=verse_data, 
+                             daily_prayer=prayer_data,
+                             today_date=today)
+    except Exception as e:
+        logger.error(f"Error rendering home page: {e}")
+        # Fallback to basic render if there's an error
+        return render_template('index.html', 
+                             verse={'verse': 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.', 'reference': 'John 3:16'},
+                             daily_prayer=None,
+                             today_date=datetime.now().strftime('%Y-%m-%d'))
 
 @app.route('/home')
 def home():
     """Serve the home page (alias for /)"""
-    return render_template('index.html')
+    return index()
 
 @app.route('/api/og-image')
 def og_image():
