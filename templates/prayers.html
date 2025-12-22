@@ -291,6 +291,120 @@
         box-shadow: 0 6px 20px rgba(245, 197, 66, 0.4);
     }
 
+    /* Live Prayer Button - Special animated styling (only when active) */
+    .icon-button.live-prayer-button.active,
+    .icon-button[href="/prayer-room"].active {
+        position: relative !important;
+        background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%) !important;
+        background-color: #ff4444 !important;
+        color: white !important;
+        border: 2px solid #ff6666 !important;
+        overflow: hidden !important;
+        box-shadow: 0 0 20px rgba(255, 68, 68, 0.5),
+                    0 0 40px rgba(255, 68, 68, 0.3),
+                    0 0 60px rgba(255, 68, 68, 0.2) !important;
+        animation: livePulse 2s ease-in-out infinite !important;
+    }
+
+    .icon-button.live-prayer-button.active::before,
+    .icon-button[href="/prayer-room"].active::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+        animation: liveRotate 3s linear infinite;
+        pointer-events: none;
+    }
+
+    .icon-button.live-prayer-button.active::after,
+    .icon-button[href="/prayer-room"].active::after {
+        content: '●';
+        position: absolute;
+        top: 8px;
+        right: 12px;
+        font-size: 0.7rem;
+        color: #fff;
+        animation: liveBlink 1s ease-in-out infinite;
+        z-index: 2;
+    }
+
+    .icon-button.live-prayer-button.active .button-label,
+    .icon-button[href="/prayer-room"].active .button-label {
+        animation: liveZoom 1.5s ease-in-out infinite;
+        position: relative;
+        z-index: 1;
+    }
+
+    .icon-button.live-prayer-button.active:hover,
+    .icon-button[href="/prayer-room"].active:hover {
+        background: linear-gradient(135deg, #ff5555 0%, #dd1111 100%) !important;
+        transform: translateY(-3px) scale(1.05) !important;
+        box-shadow: 0 0 40px rgba(255, 68, 68, 0.8),
+                    0 0 80px rgba(255, 68, 68, 0.6),
+                    0 0 120px rgba(255, 68, 68, 0.4) !important;
+    }
+
+    @keyframes livePulse {
+        0%, 100% {
+            box-shadow: 0 0 20px rgba(255, 68, 68, 0.5),
+                        0 0 40px rgba(255, 68, 68, 0.3),
+                        0 0 60px rgba(255, 68, 68, 0.2);
+            transform: scale(1);
+        }
+        50% {
+            box-shadow: 0 0 30px rgba(255, 68, 68, 0.7),
+                        0 0 60px rgba(255, 68, 68, 0.5),
+                        0 0 90px rgba(255, 68, 68, 0.3);
+            transform: scale(1.02);
+        }
+    }
+
+    @keyframes liveRotate {
+        0% {
+            transform: rotate(0deg);
+        }
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    @keyframes liveBlink {
+        0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+        50% {
+            opacity: 0.3;
+            transform: scale(0.8);
+        }
+    }
+
+    @keyframes liveZoom {
+        0%, 100% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.05);
+        }
+    }
+
+    /* Respect reduced motion preference */
+    @media (prefers-reduced-motion: reduce) {
+        .icon-button.live-prayer-button.active,
+        .icon-button[href="/prayer-room"].active,
+        .icon-button.live-prayer-button.active::before,
+        .icon-button[href="/prayer-room"].active::before,
+        .icon-button.live-prayer-button.active::after,
+        .icon-button[href="/prayer-room"].active::after,
+        .icon-button.live-prayer-button.active .button-label,
+        .icon-button[href="/prayer-room"].active .button-label {
+            animation: none !important;
+        }
+    }
+
     .icon-button:active {
         transform: translateY(-1px);
     }
@@ -373,10 +487,12 @@
             white-space: nowrap;
         }
         
-        /* Live Prayer button specific mobile styles */
-        .icon-button[href="/prayer-room"] {
-            background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%) !important;
+        /* Live Prayer button specific mobile styles (only when active) */
+        .icon-button[href="/prayer-room"].active,
+        .icon-button.live-prayer-button.active {
+            background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%) !important;
             color: white !important;
+            border-color: #ff6666 !important;
         }
 
         .button-label {
@@ -1293,19 +1409,19 @@
                 <a href="/globalprayerwatch" class="icon-button" title="Global Prayer Watch" style="text-decoration: none;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
                         <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-                        <path d="M2 12h20"></path>
                     </svg>
                     <span class="button-label">Global Watch</span>
                 </a>
-                <a href="/prayer-room" class="icon-button" title="Join Live Prayer Room" style="text-decoration: none; background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%); color: white;">
+                <a href="/prayer-room" class="icon-button live-prayer-button" id="live-prayer-btn" title="Join Live Prayer Room" style="text-decoration: none;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
                         <line x1="12" y1="19" x2="12" y2="23"></line>
                         <line x1="8" y1="23" x2="16" y2="23"></line>
                     </svg>
-                    <span class="button-label">Live Prayer</span>
+                    <span class="button-label">LIVE prayer</span>
                 </a>
                 <button id="add-prayer-btn" class="icon-button" title="Request Prayer">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2854,5 +2970,84 @@
         if (!banner) return;
         banner.style.display = user ? 'none' : 'flex';
     }
+
+    // Check for active public prayer sessions and update button styling
+    async function checkActivePublicSessions() {
+        try {
+            const response = await fetch('/api/prayer-room/rooms');
+            if (!response.ok) {
+                console.error('Failed to fetch active rooms');
+                return false;
+            }
+            
+            const data = await response.json();
+            const rooms = data.rooms || [];
+            
+            // Check if there are any active public rooms
+            const hasActivePublicSession = rooms.some(room => 
+                room.is_active === true && room.room_privacy === 'public'
+            );
+            
+            // Update button styling based on active sessions
+            const liveBtn = document.getElementById('live-prayer-btn') || 
+                           document.querySelector('a[href="/prayer-room"].live-prayer-button');
+            
+            if (liveBtn) {
+                if (hasActivePublicSession) {
+                    liveBtn.classList.add('active');
+                    console.log('✅ Active public session found - enabling LIVE styling');
+                } else {
+                    liveBtn.classList.remove('active');
+                    console.log('ℹ️ No active public sessions - using normal styling');
+                }
+            }
+            
+            return hasActivePublicSession;
+        } catch (error) {
+            console.error('Error checking active sessions:', error);
+            return false;
+        }
+    }
+
+    // Poll for active sessions every 30 seconds (event-driven updates)
+    let sessionCheckInterval = null;
+    
+    function startSessionPolling() {
+        // Check immediately
+        checkActivePublicSessions();
+        
+        // Then poll every 30 seconds
+        if (sessionCheckInterval) {
+            clearInterval(sessionCheckInterval);
+        }
+        
+        sessionCheckInterval = setInterval(() => {
+            checkActivePublicSessions();
+        }, 30000); // 30 seconds
+    }
+
+    function stopSessionPolling() {
+        if (sessionCheckInterval) {
+            clearInterval(sessionCheckInterval);
+            sessionCheckInterval = null;
+        }
+    }
+
+    // Initialize session checking when page loads
+    document.addEventListener('DOMContentLoaded', () => {
+        checkFirstVisit();
+        // Start checking for active sessions
+        startSessionPolling();
+        console.log('DOM loaded, waiting for Firebase auth...');
+    });
+
+    // Clean up polling when page is hidden
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            stopSessionPolling();
+        } else {
+            startSessionPolling();
+        }
+    });
 </script>
 {% endblock %} 

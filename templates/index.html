@@ -55,20 +55,33 @@
         transform: translateY(-2px);
     }
 
-    /* Live Prayer Button - Special animated styling */
-    .live-prayer-button {
-        position: relative;
-        background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%) !important;
-        color: var(--white) !important;
-        border: 2px solid #ff6666 !important;
-        overflow: hidden;
-        box-shadow: 0 0 20px rgba(255, 68, 68, 0.5),
-                    0 0 40px rgba(255, 68, 68, 0.3),
-                    0 0 60px rgba(255, 68, 68, 0.2);
-        animation: livePulse 2s ease-in-out infinite;
+    /* Override hover for live prayer button */
+    .hero-button.live-prayer-button:hover {
+        transform: translateY(-2px) scale(1.05) !important;
     }
 
-    .live-prayer-button::before {
+    /* Live Prayer Button - Special animated styling (only when active) */
+    a.hero-button.live-prayer-button.active,
+    a.live-prayer-button.active,
+    .hero-button.live-prayer-button.active,
+    .live-prayer-button.active,
+    a[href="/prayer-room"].hero-button.active,
+    a[href="/prayer-room"].live-prayer-button.active {
+        position: relative !important;
+        background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%) !important;
+        background-color: #ff4444 !important;
+        color: white !important;
+        border: 2px solid #ff6666 !important;
+        overflow: hidden !important;
+        box-shadow: 0 0 20px rgba(255, 68, 68, 0.5),
+                    0 0 40px rgba(255, 68, 68, 0.3),
+                    0 0 60px rgba(255, 68, 68, 0.2) !important;
+        animation: livePulse 2s ease-in-out infinite !important;
+        transition: none !important;
+    }
+
+    .hero-button.live-prayer-button.active::before,
+    .live-prayer-button.active::before {
         content: '';
         position: absolute;
         top: -50%;
@@ -80,7 +93,8 @@
         pointer-events: none;
     }
 
-    .live-prayer-button::after {
+    .hero-button.live-prayer-button.active::after,
+    .live-prayer-button.active::after {
         content: '●';
         position: absolute;
         top: 8px;
@@ -88,13 +102,17 @@
         font-size: 0.7rem;
         color: #fff;
         animation: liveBlink 1s ease-in-out infinite;
+        z-index: 2;
     }
 
-    .live-prayer-button span {
+    .hero-button.live-prayer-button.active span,
+    .live-prayer-button.active span {
         display: inline-block;
         animation: liveZoom 1.5s ease-in-out infinite;
         position: relative;
         z-index: 1;
+        white-space: nowrap;
+        font-weight: 600;
     }
 
     @keyframes livePulse {
@@ -141,7 +159,8 @@
         }
     }
 
-    .live-prayer-button:hover {
+    .hero-button.live-prayer-button.active:hover,
+    .live-prayer-button.active:hover {
         transform: translateY(-2px) scale(1.05) !important;
         box-shadow: 0 0 40px rgba(255, 68, 68, 0.8),
                     0 0 80px rgba(255, 68, 68, 0.6),
@@ -150,10 +169,14 @@
 
     /* Respect reduced motion preference */
     @media (prefers-reduced-motion: reduce) {
-        .live-prayer-button,
-        .live-prayer-button::before,
-        .live-prayer-button::after,
-        .live-prayer-button span {
+        .hero-button.live-prayer-button.active,
+        .live-prayer-button.active,
+        .hero-button.live-prayer-button.active::before,
+        .live-prayer-button.active::before,
+        .hero-button.live-prayer-button.active::after,
+        .live-prayer-button.active::after,
+        .hero-button.live-prayer-button.active span,
+        .live-prayer-button.active span {
             animation: none !important;
         }
     }
@@ -1365,8 +1388,11 @@
                 heroButtons.innerHTML = `
                     <a href="/prayers" class="hero-button primary-button">Continue in Prayer Room</a>
                     <a href="/daily-prayer" class="hero-button secondary-button">Read Today’s Prayer</a>
-                    <a href="/prayer-room" class="hero-button live-prayer-button"><span>Join Live Prayer</span></a>
+                    <a href="/prayer-room" class="hero-button live-prayer-button" id="live-prayer-btn-home">LIVE prayer</a>
                 `;
+                
+                // Check for active sessions and update button styling
+                checkActivePublicSessionsHome();
             }
             
             // Keep CTA section visible, but make it “returning” oriented
@@ -1621,6 +1647,68 @@
         observer.observe(prayerContainer);
     }
 
+    // Check for active public prayer sessions and update button styling (home page)
+    async function checkActivePublicSessionsHome() {
+        try {
+            const response = await fetch('/api/prayer-room/rooms');
+            if (!response.ok) {
+                console.error('Failed to fetch active rooms');
+                return false;
+            }
+            
+            const data = await response.json();
+            const rooms = data.rooms || [];
+            
+            // Check if there are any active public rooms
+            const hasActivePublicSession = rooms.some(room => 
+                room.is_active === true && room.room_privacy === 'public'
+            );
+            
+            // Update button styling based on active sessions
+            const liveBtn = document.getElementById('live-prayer-btn-home') || 
+                           document.querySelector('a[href="/prayer-room"].live-prayer-button');
+            
+            if (liveBtn) {
+                if (hasActivePublicSession) {
+                    liveBtn.classList.add('active');
+                    console.log('✅ Active public session found - enabling LIVE styling');
+                } else {
+                    liveBtn.classList.remove('active');
+                    console.log('ℹ️ No active public sessions - using normal styling');
+                }
+            }
+            
+            return hasActivePublicSession;
+        } catch (error) {
+            console.error('Error checking active sessions:', error);
+            return false;
+        }
+    }
+
+    // Poll for active sessions every 30 seconds (event-driven updates) - home page
+    let sessionCheckIntervalHome = null;
+    
+    function startSessionPollingHome() {
+        // Check immediately
+        checkActivePublicSessionsHome();
+        
+        // Then poll every 30 seconds
+        if (sessionCheckIntervalHome) {
+            clearInterval(sessionCheckIntervalHome);
+        }
+        
+        sessionCheckIntervalHome = setInterval(() => {
+            checkActivePublicSessionsHome();
+        }, 30000); // 30 seconds
+    }
+
+    function stopSessionPollingHome() {
+        if (sessionCheckIntervalHome) {
+            clearInterval(sessionCheckIntervalHome);
+            sessionCheckIntervalHome = null;
+        }
+    }
+
     // Load interactions when page loads (content is already server-rendered)
     document.addEventListener('DOMContentLoaded', async () => {
         // Initialize prayer section animation
@@ -1659,6 +1747,18 @@
         // Fallback: try to load prayer client-side if server-side failed
         loadDailyPrayerHome();
         {% endif %}
+        
+        // Start checking for active sessions
+        startSessionPollingHome();
+    });
+
+    // Clean up polling when page is hidden
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            stopSessionPollingHome();
+        } else {
+            startSessionPollingHome();
+        }
     });
 
     // Download verse as image (mobile-friendly with Share API)
