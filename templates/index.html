@@ -51,12 +51,19 @@
         border: 2px solid var(--white);
     }
 
+    /* Live prayer button matches secondary button when not active */
+    .hero-button.live-prayer-button:not(.active) {
+        background: transparent;
+        color: var(--white);
+        border: 2px solid var(--white);
+    }
+
     .hero-button:hover {
         transform: translateY(-2px);
     }
 
-    /* Override hover for live prayer button */
-    .hero-button.live-prayer-button:hover {
+    /* Override hover for live prayer button when active */
+    .hero-button.live-prayer-button.active:hover {
         transform: translateY(-2px) scale(1.05) !important;
     }
 
