@@ -401,6 +401,56 @@ def sitemap():
         return jsonify({'error': 'Failed to generate sitemap'}), 500
 
 
+@seo_bp.route('/api/disasters/organizations', methods=['GET'])
+def get_disaster_organizations():
+    """API endpoint to fetch organizations for a disaster type and affected countries"""
+    try:
+        from flask import current_app
+        from nonprofit_service import get_nonprofit_service
+        
+        disaster_type = request.args.get('type', '')
+        countries = request.args.get('countries', '')
+        
+        if not disaster_type or not countries:
+            return jsonify({'error': 'Missing required parameters: type and countries'}), 400
+        
+        # Parse countries (comma-separated)
+        affected_countries = [c.strip() for c in countries.split(',') if c.strip()]
+        
+        if not affected_countries:
+            return jsonify({'error': 'No valid countries provided'}), 400
+        
+        # Get nonprofit service
+        nonprofit_service = get_nonprofit_service()
+        
+        # Create disaster dict for organization lookup
+        disaster_dict = {
+            'type': disaster_type.lower(),
+            'locations': affected_countries,
+            'details': ''
+        }
+        
+        # Use first country as primary location for organization search
+        primary_location = affected_countries[0]
+        logger.info(f"Fetching organizations for {disaster_type} in {primary_location}")
+        
+        disaster_orgs = nonprofit_service._get_disaster_organizations(disaster_dict)
+        # Limit to 3 organizations
+        organizations = disaster_orgs[:3] if disaster_orgs else []
+        
+        logger.info(f"Found {len(organizations)} organizations for {disaster_type}")
+        
+        return jsonify({
+            'organizations': organizations,
+            'disaster_type': disaster_type,
+            'countries': affected_countries
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error fetching organizations for disaster: {e}", exc_info=True)
+        return jsonify({'error': 'Failed to fetch organizations'}), 500
+
+
 @seo_bp.route('/api/disasters/generate-hourly', methods=['POST'])
 @verify_cloud_scheduler()
 def generate_hourly_disaster_prayers():
@@ -720,31 +770,9 @@ def disaster_prayer_page(disaster_type):
                         'flag_code': flag_code
                     })
         
-        # Get organizations actively helping in affected communities
-        organizations = []
-        if affected_countries and disaster_data:
-            try:
-                from nonprofit_service import get_nonprofit_service
-                nonprofit_service = get_nonprofit_service()
-                
-                # Create disaster dict for organization lookup
-                disaster_dict = {
-                    'type': disaster_data.get('disaster_type', disaster_display.lower()),
-                    'locations': affected_countries,
-                    'details': summary
-                }
-                
-                # Use first country as primary location for organization search
-                primary_location = affected_countries[0] if affected_countries else None
-                if primary_location:
-                    logger.info(f"Fetching organizations for {disaster_dict['type']} in {primary_location}")
-                    disaster_orgs = nonprofit_service._get_disaster_organizations(disaster_dict)
-                    # Limit to 3 organizations
-                    organizations = disaster_orgs[:3] if disaster_orgs else []
-                    logger.info(f"Found {len(organizations)} organizations for {disaster_dict['type']}")
-            except Exception as e:
-                logger.error(f"Error fetching organizations for disaster page: {e}", exc_info=True)
-                organizations = []
+        # Organizations will be loaded asynchronously via JavaScript to avoid blocking page load
+        # Pass disaster info for async loading
+        disaster_type_for_orgs = disaster_data.get('disaster_type', disaster_display.lower()) if disaster_data else disaster_display.lower()
         
         today = datetime.now()
         
@@ -757,7 +785,7 @@ def disaster_prayer_page(disaster_type):
                                     country_flags=country_flags,
                                     affected_countries=affected_countries,
                                     summary=summary,
-                                    organizations=organizations,
+                                    disaster_type_for_orgs=disaster_type_for_orgs,
                                     today=today.strftime('%B %d, %Y'))
         
     except Exception as e:
@@ -1299,6 +1327,37 @@ DISASTER_PAGE_TEMPLATE = '''
         background: linear-gradient(180deg, 
             rgba(255, 255, 255, 0.5) 0%, 
             rgba(255, 255, 255, 0.98) 100%);
+    }
+
+    .organizations-loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 4rem;
+        color: var(--text-secondary);
+        position: relative;
+        z-index: 2;
+    }
+
+    .loading-spinner {
+        width: 48px;
+        height: 48px;
+        border: 4px solid rgba(15, 86, 255, 0.1);
+        border-top-color: var(--primary-blue);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 1rem;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .organizations-loading p {
+        font-size: 1rem;
+        font-weight: 500;
+        color: var(--text-secondary);
     }
 
     .organizations-grid {
@@ -2000,35 +2059,15 @@ DISASTER_PAGE_TEMPLATE = '''
             <div class="prayer-text" itemprop="text">{{ disaster_prayer }}</div>
         </section>
         
-        {% if organizations %}
-        <section class="organizations-section" aria-label="Organizations helping affected communities">
+        {% if affected_countries %}
+        <section class="organizations-section" id="organizations-section" aria-label="Organizations helping affected communities" style="display: none;">
             <h2 class="organizations-title">Organizations Actively Helping</h2>
             <p class="organizations-intro">These organizations are actively providing aid and support to the affected communities. Consider supporting their work through prayer and giving.</p>
-            <div class="organizations-grid">
-                {% for org in organizations %}
-                <div class="organization-card">
-                    {% if org.logo_url %}
-                    <div class="org-logo-wrapper">
-                        <img src="{{ org.logo_url }}" alt="{{ org.name }} logo" class="org-logo" onerror="this.style.display='none';">
-                    </div>
-                    {% endif %}
-                    <div class="org-content">
-                        <h3 class="org-name">{{ org.name }}</h3>
-                        {% if org.description %}
-                        <p class="org-description">{{ org.description }}</p>
-                        {% endif %}
-                        <div class="org-actions">
-                            {% if org.website %}
-                            <a href="{{ org.website }}" target="_blank" rel="noopener noreferrer" class="org-link org-website">Visit Website</a>
-                            {% endif %}
-                            {% if org.donation_url %}
-                            <a href="{{ org.donation_url }}" target="_blank" rel="noopener noreferrer" class="org-link org-donate">Donate</a>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
+            <div class="organizations-loading" id="organizations-loading">
+                <div class="loading-spinner"></div>
+                <p>Finding organizations...</p>
             </div>
+            <div class="organizations-grid" id="organizations-grid" style="display: none;"></div>
         </section>
         {% endif %}
         
@@ -2063,6 +2102,109 @@ DISASTER_PAGE_TEMPLATE = '''
         </nav>
     </aside>
 </main>
+
+<script>
+// Load organizations asynchronously after page load
+(function() {
+    {% if affected_countries and disaster_type_for_orgs %}
+    const disasterType = '{{ disaster_type_for_orgs }}';
+    const countries = {{ affected_countries|tojson }};
+    
+    // Wait for page to be fully loaded
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadOrganizations);
+    } else {
+        loadOrganizations();
+    }
+    
+    function loadOrganizations() {
+        const section = document.getElementById('organizations-section');
+        const loading = document.getElementById('organizations-loading');
+        const grid = document.getElementById('organizations-grid');
+        
+        if (!section || !loading || !grid) return;
+        
+        // Show section and loading state
+        section.style.display = 'block';
+        
+        // Build API URL
+        const countriesParam = countries.join(',');
+        const apiUrl = `/api/disasters/organizations?type=${encodeURIComponent(disasterType)}&countries=${encodeURIComponent(countriesParam)}`;
+        
+        // Fetch organizations
+        fetch(apiUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to fetch organizations');
+                }
+                return response.json();
+            })
+            .then(data => {
+                const orgs = data.organizations || [];
+                
+                if (orgs.length === 0) {
+                    // Hide section if no organizations found
+                    section.style.display = 'none';
+                    return;
+                }
+                
+                // Hide loading, show grid
+                loading.style.display = 'none';
+                grid.style.display = 'grid';
+                
+                // Render organizations
+                grid.innerHTML = orgs.map(org => {
+                    let logoHtml = '';
+                    if (org.logo_url) {
+                        logoHtml = `
+                            <div class="org-logo-wrapper">
+                                <img src="${escapeHtml(org.logo_url)}" alt="${escapeHtml(org.name)} logo" class="org-logo" onerror="this.style.display='none';">
+                            </div>
+                        `;
+                    }
+                    
+                    let websiteLink = '';
+                    if (org.website) {
+                        websiteLink = `<a href="${escapeHtml(org.website)}" target="_blank" rel="noopener noreferrer" class="org-link org-website">Visit Website</a>`;
+                    }
+                    
+                    let donateLink = '';
+                    if (org.donation_url) {
+                        donateLink = `<a href="${escapeHtml(org.donation_url)}" target="_blank" rel="noopener noreferrer" class="org-link org-donate">Donate</a>`;
+                    }
+                    
+                    const description = org.description ? `<p class="org-description">${escapeHtml(org.description)}</p>` : '';
+                    
+                    return `
+                        <div class="organization-card">
+                            ${logoHtml}
+                            <div class="org-content">
+                                <h3 class="org-name">${escapeHtml(org.name)}</h3>
+                                ${description}
+                                <div class="org-actions">
+                                    ${websiteLink}
+                                    ${donateLink}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            })
+            .catch(error => {
+                console.error('Error loading organizations:', error);
+                // Hide section on error
+                section.style.display = 'none';
+            });
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    {% endif %}
+})();
+</script>
 {% endblock %}
 '''
 
