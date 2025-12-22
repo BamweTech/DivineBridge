@@ -431,6 +431,9 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
             # Clean the response
             import re
             prayer = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL).strip()
+            # Remove citation markers from prayer
+            prayer = re.sub(r'\[\d+\]', '', prayer).strip()
+            prayer = re.sub(r'\s+', ' ', prayer).strip()
             
             # Ensure it starts correctly
             if not prayer.startswith("Heavenly Father"):
@@ -975,6 +978,12 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                 news_source = disaster.get('news_source', '')
                 timestamp = disaster.get('timestamp', '')
                 
+                # Remove citation markers like [1], [2], [3], etc. from news summary
+                if news_summary:
+                    news_summary = re.sub(r'\[\d+\]', '', news_summary).strip()
+                    # Clean up any double spaces left after removing citations
+                    news_summary = re.sub(r'\s+', ' ', news_summary).strip()
+                
                 # Check if news summary contains old dates
                 if self._has_old_date_in_text(news_summary):
                     logger.warning(f"Rejected disaster with old date in summary: {disaster_type} in {country} - summary contains previous year")
@@ -1036,6 +1045,12 @@ Return ONLY valid JSON, no explanations."""
             json_match = re.search(r'\{.*\}', cleaned_response, re.DOTALL)
             if json_match:
                 info = json.loads(json_match.group())
+                
+                # Remove citation markers from comprehensive_summary if present
+                if 'comprehensive_summary' in info and info['comprehensive_summary']:
+                    info['comprehensive_summary'] = re.sub(r'\[\d+\]', '', info['comprehensive_summary']).strip()
+                    info['comprehensive_summary'] = re.sub(r'\s+', ' ', info['comprehensive_summary']).strip()
+                
                 info['all_news_summaries'] = [area['news_summary'] for area in affected_areas]
                 info['all_areas'] = affected_areas
                 return info
@@ -1171,6 +1186,10 @@ Return ONLY the summary text (2-3 sentences), no explanations, no JSON."""
             
             summary_response = self.client.query(summary_prompt)
             summary = re.sub(r'<think>.*?</think>', '', summary_response, flags=re.DOTALL | re.IGNORECASE).strip()
+            # Remove citation markers like [1], [2], [3], etc.
+            summary = re.sub(r'\[\d+\]', '', summary).strip()
+            # Clean up any double spaces left after removing citations
+            summary = re.sub(r'\s+', ' ', summary).strip()
             
             # Query 3: Generate prayer
             prayer_prompt = f"""You are a compassionate prayer leader writing a customized prayer for those affected by {disaster_type} in multiple countries/regions.
@@ -1213,6 +1232,9 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
             
             prayer_response = self.client.query(prayer_prompt)
             prayer = re.sub(r'<think>.*?</think>', '', prayer_response, flags=re.DOTALL | re.IGNORECASE).strip()
+            # Remove citation markers from prayer
+            prayer = re.sub(r'\[\d+\]', '', prayer).strip()
+            prayer = re.sub(r'\s+', ' ', prayer).strip()
             
             # Ensure proper formatting
             if not prayer.startswith("Heavenly Father"):
@@ -1221,7 +1243,7 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
             if not prayer.endswith("Amen!") and not prayer.endswith("Amen"):
                 if "In Jesus-Christ's name" not in prayer:
                     prayer = prayer.rstrip('.') + ". In Jesus-Christ's name we pray. Amen!"
-            
+
             return {
                 'summary': summary,
                 'prayer': prayer
