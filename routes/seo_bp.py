@@ -5,10 +5,22 @@ from flask import Blueprint, request, make_response, jsonify, render_template_st
 from datetime import datetime, timedelta
 import logging
 import requests
+import re
 from auth_decorators import verify_cloud_scheduler
 
 seo_bp = Blueprint('seo', __name__)
 logger = logging.getLogger(__name__)
+
+
+def _clean_citation_markers(text: str) -> str:
+    """Remove citation markers like [1][2] from text"""
+    if not text:
+        return text
+    # Remove citation markers [1], [2], etc.
+    cleaned = re.sub(r'\[\d+\]', '', text)
+    # Clean up multiple spaces
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    return cleaned
 
 
 def get_country_flag_code(country_name: str) -> str:
@@ -523,7 +535,7 @@ def disasters_hub():
                 'type_display': prayer_data.get('disaster_type_display', disaster_type.replace('_', ' ').replace('-', ' ').title()),
                 'affected_countries': affected_countries,
                 'country_flags': country_flags,
-                'summary': prayer_data.get('summary', ''),
+                'summary': _clean_citation_markers(prayer_data.get('summary', '')),
                 'severity': prayer_data.get('overall_severity', 'moderate'),
                 'created_at': prayer_data.get('created_at', ''),
                 'url_slug': url_slug,
@@ -648,7 +660,7 @@ def disaster_prayer_page(disaster_type):
             if len(matching_entries) == 1:
                 # Only one entry, use it as-is
                 disaster_data = matching_entries[0]
-                disaster_prayer = disaster_data.get('prayer', '')
+                disaster_prayer = _clean_citation_markers(disaster_data.get('prayer', ''))
                 logger.info(f"Found single grouped disaster prayer for {disaster_type}")
             else:
                 # Multiple entries - merge countries and keep most recent
@@ -665,7 +677,7 @@ def disaster_prayer_page(disaster_type):
                 # Update the most recent entry with merged countries
                 most_recent_entry['affected_countries'] = list(all_countries)
                 disaster_data = most_recent_entry
-                disaster_prayer = disaster_data.get('prayer', '')
+                disaster_prayer = _clean_citation_markers(disaster_data.get('prayer', ''))
                 
                 logger.info(f"Merged {len(matching_entries)} entries for {disaster_type}: {len(all_countries)} total countries")
         else:
@@ -683,7 +695,7 @@ def disaster_prayer_page(disaster_type):
                 cache_time = dt.fromisoformat(cached_data.get('timestamp', '2020-01-01'))
                 
                 if (datetime.now() - cache_time).total_seconds() < 86400:
-                    disaster_prayer = cached_data['prayer']
+                    disaster_prayer = _clean_citation_markers(cached_data.get('prayer', ''))
                     logger.info(f"Using cached disaster prayer for {disaster_type}")
             except:
                 pass
@@ -691,6 +703,7 @@ def disaster_prayer_page(disaster_type):
         # If still no prayer, generate fallback
         if not disaster_prayer:
             disaster_prayer = _generate_disaster_prayer(disaster_display, "affected regions")
+            disaster_prayer = _clean_citation_markers(disaster_prayer)
         
         # Get country flags for all affected countries
         country_flags = []
@@ -698,7 +711,7 @@ def disaster_prayer_page(disaster_type):
         summary = ''
         if disaster_data:
             affected_countries = disaster_data.get('affected_countries', [])
-            summary = disaster_data.get('summary', '')
+            summary = _clean_citation_markers(disaster_data.get('summary', ''))
             for country in affected_countries:
                 flag_code = get_country_flag_code(country)
                 if flag_code:
