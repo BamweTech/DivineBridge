@@ -612,12 +612,15 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                                 try:
                                     created_at = datetime.fromisoformat(created_at_str)
                                     if (now - created_at) <= max_disaster_age:
-                                        # Also check if summary/comprehensive_summary contains old dates
+                                        # Check if summary/comprehensive_summary contains old dates
                                         summary = prayer_data.get('summary', '')
                                         comprehensive_summary = prayer_data.get('comprehensive_summary', '')
                                         all_summaries = prayer_data.get('all_news_summaries', [])
+                                        all_areas = prayer_data.get('all_areas', [])
                                         
                                         has_old_date = False
+                                        
+                                        # Check text content for old dates (previous years or old months)
                                         if summary and self._has_old_date_in_text(summary):
                                             has_old_date = True
                                         elif comprehensive_summary and self._has_old_date_in_text(comprehensive_summary):
@@ -627,6 +630,40 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                                                 if news_summary and self._has_old_date_in_text(news_summary):
                                                     has_old_date = True
                                                     break
+                                        
+                                        # Also check actual disaster timestamps from all_areas
+                                        if not has_old_date and all_areas:
+                                            for area in all_areas:
+                                                if isinstance(area, dict):
+                                                    area_timestamp = area.get('timestamp', '')
+                                                    if area_timestamp:
+                                                        try:
+                                                            # Try to parse timestamp
+                                                            disaster_time = None
+                                                            try:
+                                                                disaster_time = datetime.fromisoformat(area_timestamp.replace('Z', '+00:00'))
+                                                                if disaster_time.tzinfo:
+                                                                    disaster_time = disaster_time.replace(tzinfo=None)
+                                                            except:
+                                                                try:
+                                                                    for fmt in ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
+                                                                        try:
+                                                                            disaster_time = datetime.strptime(area_timestamp[:19], fmt)
+                                                                            break
+                                                                        except:
+                                                                            continue
+                                                                except:
+                                                                    pass
+                                                            
+                                                            if disaster_time:
+                                                                # Check if disaster is older than 7 days
+                                                                age = now - disaster_time
+                                                                if age > max_disaster_age or disaster_time.year != now.year:
+                                                                    has_old_date = True
+                                                                    logger.warning(f"Found old disaster timestamp in grouped prayer: {area_timestamp} ({age.days} days old)")
+                                                                    break
+                                                        except Exception as e:
+                                                            logger.debug(f"Could not parse timestamp {area_timestamp} in grouped prayer: {e}")
                                         
                                         if has_old_date:
                                             logger.warning(f"Filtered out grouped prayer with old date in content: {blob.name}")
@@ -811,7 +848,7 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
     
     def _has_old_date_in_text(self, text: str) -> bool:
         """
-        Check if text contains references to old dates (previous years)
+        Check if text contains references to old dates (previous years or old months within current year)
         
         Args:
             text: Text to check
@@ -824,6 +861,9 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
         
         current_year = datetime.now().year
         previous_year = current_year - 1
+        now = datetime.now()
+        max_age = timedelta(days=7)
+        cutoff_date = now - max_age
         
         import re
         
@@ -866,6 +906,45 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                 for pattern in year_patterns:
                     if re.search(pattern, text, re.IGNORECASE):
                         return True
+        
+        # Check for dates within current year that are older than 7 days
+        # Pattern: "January 15, 2025" or "2025-01-15" etc.
+        current_year_str = str(current_year)
+        if current_year_str in text:
+            # Match dates like "January 15, 2025" or "2025-01-15"
+            month_names = ['January', 'February', 'March', 'April', 'May', 'June', 
+                          'July', 'August', 'September', 'October', 'November', 'December']
+            
+            # Check for "Month Day, Year" format
+            for month_idx, month_name in enumerate(month_names, 1):
+                pattern = rf'\b{month_name}\s+(\d{{1,2}}),\s+{current_year_str}\b'
+                matches = re.finditer(pattern, text, re.IGNORECASE)
+                for match in matches:
+                    try:
+                        day = int(match.group(1))
+                        # Create date object for this date
+                        date_obj = datetime(current_year, month_idx, day)
+                        # Check if this date is older than 7 days
+                        if date_obj < cutoff_date:
+                            logger.debug(f"Found old date in text: {month_name} {day}, {current_year_str} ({now - date_obj} ago)")
+                            return True
+                    except (ValueError, TypeError):
+                        continue
+            
+            # Check for ISO format dates "2025-01-15" or "2025-01-15T..."
+            iso_pattern = rf'\b{current_year_str}-(\d{{2}})-(\d{{2}})(?:T|\b)'
+            matches = re.finditer(iso_pattern, text)
+            for match in matches:
+                try:
+                    month = int(match.group(1))
+                    day = int(match.group(2))
+                    date_obj = datetime(current_year, month, day)
+                    # Check if this date is older than 7 days
+                    if date_obj < cutoff_date:
+                        logger.debug(f"Found old ISO date in text: {current_year_str}-{match.group(1)}-{match.group(2)} ({now - date_obj} ago)")
+                        return True
+                except (ValueError, TypeError):
+                    continue
         
         return False
     
