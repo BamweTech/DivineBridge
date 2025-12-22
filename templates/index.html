@@ -1244,6 +1244,8 @@
         
         if (user) {
             const displayName = user.displayName || user.email.split('@')[0];
+            // Extract first name only (split by space and take first part)
+            const firstName = displayName.split(' ')[0];
             
             if (heroSection) {
                 heroSection.style.display = 'block';
@@ -1251,7 +1253,7 @@
             
             // Returning-user hero copy + quick actions
             if (heroTitle) {
-                heroTitle.textContent = `Welcome back, ${displayName}`;
+                heroTitle.textContent = `Welcome back, ${firstName}`;
             }
             if (heroSubtitle) {
                 heroSubtitle.textContent = 'Continue today’s prayer, visit the Prayer Room, and encourage the community.';
