@@ -55,6 +55,109 @@
         transform: translateY(-2px);
     }
 
+    /* Live Prayer Button - Special animated styling */
+    .live-prayer-button {
+        position: relative;
+        background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%) !important;
+        color: var(--white) !important;
+        border: 2px solid #ff6666 !important;
+        overflow: hidden;
+        box-shadow: 0 0 20px rgba(255, 68, 68, 0.5),
+                    0 0 40px rgba(255, 68, 68, 0.3),
+                    0 0 60px rgba(255, 68, 68, 0.2);
+        animation: livePulse 2s ease-in-out infinite;
+    }
+
+    .live-prayer-button::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+        animation: liveRotate 3s linear infinite;
+        pointer-events: none;
+    }
+
+    .live-prayer-button::after {
+        content: '●';
+        position: absolute;
+        top: 8px;
+        right: 12px;
+        font-size: 0.7rem;
+        color: #fff;
+        animation: liveBlink 1s ease-in-out infinite;
+    }
+
+    .live-prayer-button span {
+        display: inline-block;
+        animation: liveZoom 1.5s ease-in-out infinite;
+        position: relative;
+        z-index: 1;
+    }
+
+    @keyframes livePulse {
+        0%, 100% {
+            box-shadow: 0 0 20px rgba(255, 68, 68, 0.5),
+                        0 0 40px rgba(255, 68, 68, 0.3),
+                        0 0 60px rgba(255, 68, 68, 0.2);
+            transform: scale(1);
+        }
+        50% {
+            box-shadow: 0 0 30px rgba(255, 68, 68, 0.7),
+                        0 0 60px rgba(255, 68, 68, 0.5),
+                        0 0 90px rgba(255, 68, 68, 0.3);
+            transform: scale(1.02);
+        }
+    }
+
+    @keyframes liveRotate {
+        0% {
+            transform: rotate(0deg);
+        }
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    @keyframes liveBlink {
+        0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+        50% {
+            opacity: 0.3;
+            transform: scale(0.8);
+        }
+    }
+
+    @keyframes liveZoom {
+        0%, 100% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.05);
+        }
+    }
+
+    .live-prayer-button:hover {
+        transform: translateY(-2px) scale(1.05) !important;
+        box-shadow: 0 0 40px rgba(255, 68, 68, 0.8),
+                    0 0 80px rgba(255, 68, 68, 0.6),
+                    0 0 120px rgba(255, 68, 68, 0.4) !important;
+    }
+
+    /* Respect reduced motion preference */
+    @media (prefers-reduced-motion: reduce) {
+        .live-prayer-button,
+        .live-prayer-button::before,
+        .live-prayer-button::after,
+        .live-prayer-button span {
+            animation: none !important;
+        }
+    }
+
     .features-section {
         padding: 4rem 2rem;
         background: var(--white);
@@ -1262,7 +1365,7 @@
                 heroButtons.innerHTML = `
                     <a href="/prayers" class="hero-button primary-button">Continue in Prayer Room</a>
                     <a href="/daily-prayer" class="hero-button secondary-button">Read Today’s Prayer</a>
-                    <a href="/prayer-room" class="hero-button secondary-button">Join Live Prayer</a>
+                    <a href="/prayer-room" class="hero-button live-prayer-button"><span>Join Live Prayer</span></a>
                 `;
             }
             
