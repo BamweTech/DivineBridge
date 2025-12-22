@@ -720,6 +720,32 @@ def disaster_prayer_page(disaster_type):
                         'flag_code': flag_code
                     })
         
+        # Get organizations actively helping in affected communities
+        organizations = []
+        if affected_countries and disaster_data:
+            try:
+                from nonprofit_service import get_nonprofit_service
+                nonprofit_service = get_nonprofit_service()
+                
+                # Create disaster dict for organization lookup
+                disaster_dict = {
+                    'type': disaster_data.get('disaster_type', disaster_display.lower()),
+                    'locations': affected_countries,
+                    'details': summary
+                }
+                
+                # Use first country as primary location for organization search
+                primary_location = affected_countries[0] if affected_countries else None
+                if primary_location:
+                    logger.info(f"Fetching organizations for {disaster_dict['type']} in {primary_location}")
+                    disaster_orgs = nonprofit_service._get_disaster_organizations(disaster_dict)
+                    # Limit to 3 organizations
+                    organizations = disaster_orgs[:3] if disaster_orgs else []
+                    logger.info(f"Found {len(organizations)} organizations for {disaster_dict['type']}")
+            except Exception as e:
+                logger.error(f"Error fetching organizations for disaster page: {e}", exc_info=True)
+                organizations = []
+        
         today = datetime.now()
         
         return render_template_string(DISASTER_PAGE_TEMPLATE,
@@ -731,6 +757,7 @@ def disaster_prayer_page(disaster_type):
                                     country_flags=country_flags,
                                     affected_countries=affected_countries,
                                     summary=summary,
+                                    organizations=organizations,
                                     today=today.strftime('%B %d, %Y'))
         
     except Exception as e:
@@ -1184,6 +1211,231 @@ DISASTER_PAGE_TEMPLATE = '''
             transparent 100%);
     }
 
+    .organizations-section {
+        background: linear-gradient(135deg, 
+            rgba(255, 255, 255, 0.98) 0%, 
+            rgba(248, 250, 252, 0.95) 100%);
+        border-radius: 40px;
+        padding: 0;
+        margin-bottom: 4rem;
+        box-shadow:
+            0 32px 80px rgba(0, 0, 0, 0.08),
+            0 16px 40px rgba(0, 0, 0, 0.06),
+            0 8px 20px rgba(15, 86, 255, 0.04),
+            inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        border: none;
+        position: relative;
+        overflow: hidden;
+        animation: contentSlideUp 1.7s var(--animation-timing);
+        isolation: isolate;
+    }
+
+    .organizations-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 6px;
+        background: var(--gradient-primary);
+        background-size: 200% 100%;
+        animation: shimmerFlow 5s ease-in-out infinite;
+        z-index: 3;
+    }
+
+    .organizations-section::after {
+        content: '';
+        position: absolute;
+        top: -35%;
+        left: -35%;
+        width: 170%;
+        height: 170%;
+        background: radial-gradient(circle, 
+            rgba(15, 86, 255, 0.03) 0%, 
+            rgba(74, 144, 226, 0.015) 30%,
+            transparent 70%);
+        animation: subtleRotate 25s linear infinite;
+        pointer-events: none;
+    }
+
+    .organizations-title {
+        font-size: clamp(1.875rem, 3vw, 2.75rem);
+        font-weight: 900;
+        color: var(--text-primary);
+        margin-bottom: 0;
+        text-align: center;
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        position: relative;
+        z-index: 2;
+        padding: 4rem 4rem 1.5rem;
+        background: linear-gradient(180deg, 
+            rgba(255, 255, 255, 0.95) 0%, 
+            rgba(248, 250, 252, 0.5) 100%);
+    }
+
+    .organizations-title::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 100px;
+        height: 4px;
+        background: var(--gradient-primary);
+        border-radius: 2px;
+    }
+
+    .organizations-intro {
+        font-size: 1.1875rem;
+        color: var(--text-secondary);
+        line-height: 1.75;
+        text-align: center;
+        margin: 0;
+        padding: 0 4rem 3rem;
+        font-weight: 400;
+        position: relative;
+        z-index: 2;
+        background: linear-gradient(180deg, 
+            rgba(255, 255, 255, 0.5) 0%, 
+            rgba(255, 255, 255, 0.98) 100%);
+    }
+
+    .organizations-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+        padding: 0 4rem 4rem;
+        position: relative;
+        z-index: 2;
+    }
+
+    .organization-card {
+        background: linear-gradient(135deg, 
+            rgba(255, 255, 255, 0.95) 0%, 
+            rgba(248, 250, 252, 0.9) 100%);
+        border-radius: 24px;
+        padding: 2.5rem;
+        border: 2px solid var(--border-light);
+        box-shadow: 
+            0 8px 24px rgba(0, 0, 0, 0.06),
+            0 4px 12px rgba(15, 86, 255, 0.04),
+            inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        transition: all 0.4s var(--animation-timing);
+        position: relative;
+        overflow: hidden;
+        backdrop-filter: blur(16px);
+    }
+
+    .organization-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, 
+            transparent, 
+            rgba(15, 86, 255, 0.05), 
+            transparent);
+        transition: left 0.6s ease;
+    }
+
+    .organization-card:hover::before {
+        left: 100%;
+    }
+
+    .organization-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 
+            0 16px 40px rgba(0, 0, 0, 0.1),
+            0 8px 20px rgba(15, 86, 255, 0.08),
+            inset 0 1px 0 rgba(255, 255, 255, 0.95);
+        border-color: var(--border-medium);
+    }
+
+    .org-logo-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        height: 80px;
+    }
+
+    .org-logo {
+        max-width: 120px;
+        max-height: 80px;
+        object-fit: contain;
+        border-radius: 8px;
+    }
+
+    .org-content {
+        text-align: center;
+    }
+
+    .org-name {
+        font-size: 1.375rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 1rem;
+        line-height: 1.3;
+    }
+
+    .org-description {
+        font-size: 1rem;
+        color: var(--text-secondary);
+        line-height: 1.6;
+        margin-bottom: 1.5rem;
+        min-height: 3.2em;
+    }
+
+    .org-actions {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .org-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.75rem 1.5rem;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 0.9375rem;
+        text-decoration: none;
+        transition: all 0.3s var(--animation-timing);
+        border: 2px solid var(--border-medium);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .org-website {
+        background: var(--surface-white);
+        color: var(--primary-blue);
+    }
+
+    .org-donate {
+        background: var(--gradient-primary);
+        color: white;
+        border-color: var(--primary-blue);
+    }
+
+    .org-link:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(15, 86, 255, 0.3);
+    }
+
+    .org-website:hover {
+        background: rgba(15, 86, 255, 0.05);
+        border-color: var(--primary-blue);
+    }
+
+    .org-donate:hover {
+        background: linear-gradient(135deg, var(--primary-blue-dark) 0%, var(--primary-blue) 100%);
+    }
+
     .prayer-participation {
         background: linear-gradient(135deg, 
             rgba(255, 255, 255, 0.98) 0%, 
@@ -1558,6 +1810,42 @@ DISASTER_PAGE_TEMPLATE = '''
             padding: 0 1.5rem 3rem;
         }
 
+        .organizations-section {
+            padding: 0;
+            margin-bottom: 3rem;
+        }
+
+        .organizations-title {
+            padding: 3rem 1.5rem 1.25rem;
+        }
+
+        .organizations-intro {
+            padding: 0 1.5rem 2rem;
+            font-size: 1rem;
+        }
+
+        .organizations-grid {
+            padding: 0 1.5rem 3rem;
+            gap: 1.25rem;
+        }
+
+        .organization-card {
+            padding: 1.75rem;
+        }
+
+        .org-name {
+            font-size: 1.25rem;
+        }
+
+        .org-description {
+            font-size: 0.9375rem;
+        }
+
+        .org-link {
+            padding: 0.625rem 1.25rem;
+            font-size: 0.875rem;
+        }
+
         .affected-communities {
             padding: 0;
         }
@@ -1711,6 +1999,38 @@ DISASTER_PAGE_TEMPLATE = '''
             <h2 class="prayer-title">A Prayer for Affected Communities</h2>
             <div class="prayer-text" itemprop="text">{{ disaster_prayer }}</div>
         </section>
+        
+        {% if organizations %}
+        <section class="organizations-section" aria-label="Organizations helping affected communities">
+            <h2 class="organizations-title">Organizations Actively Helping</h2>
+            <p class="organizations-intro">These organizations are actively providing aid and support to the affected communities. Consider supporting their work through prayer and giving.</p>
+            <div class="organizations-grid">
+                {% for org in organizations %}
+                <div class="organization-card">
+                    {% if org.logo_url %}
+                    <div class="org-logo-wrapper">
+                        <img src="{{ org.logo_url }}" alt="{{ org.name }} logo" class="org-logo" onerror="this.style.display='none';">
+                    </div>
+                    {% endif %}
+                    <div class="org-content">
+                        <h3 class="org-name">{{ org.name }}</h3>
+                        {% if org.description %}
+                        <p class="org-description">{{ org.description }}</p>
+                        {% endif %}
+                        <div class="org-actions">
+                            {% if org.website %}
+                            <a href="{{ org.website }}" target="_blank" rel="noopener noreferrer" class="org-link org-website">Visit Website</a>
+                            {% endif %}
+                            {% if org.donation_url %}
+                            <a href="{{ org.donation_url }}" target="_blank" rel="noopener noreferrer" class="org-link org-donate">Donate</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
         
         <div class="prayer-participation">
             <p class="participation-text">You can join others in this prayer right now. As we lift up these communities together, we trust in God's faithfulness and care.</p>
