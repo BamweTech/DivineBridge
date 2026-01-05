@@ -93,18 +93,10 @@ class EnhancedEmailService:
             msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
             msg_alternative.attach(MIMEText(html_body, 'html', 'utf-8'))
             
-            # Attach logo as embedded image (use gold version for Christmas season)
+            # Attach logo as embedded image
             try:
                 import os
-                # Use gold logo for Christmas season (December)
-                current_month = datetime.now().month
-                if current_month == 12:  # December - Christmas season
-                    logo_path = os.path.join(os.path.dirname(__file__), 'assets', 'logos', 'LogoOnly1_gold.png')
-                    # Fallback to regular logo if gold version doesn't exist
-                    if not os.path.exists(logo_path):
-                        logo_path = os.path.join(os.path.dirname(__file__), 'assets', 'logos', 'LogoOnly1.png')
-                else:
-                    logo_path = os.path.join(os.path.dirname(__file__), 'assets', 'logos', 'LogoOnly1.png')
+                logo_path = os.path.join(os.path.dirname(__file__), 'assets', 'logos', 'LogoOnly1.png')
                 
                 with open(logo_path, 'rb') as img:
                     from email.mime.image import MIMEImage
@@ -168,10 +160,7 @@ To unsubscribe: https://divinebridge.io/unsubscribe?email={recipient_email}
 """
     
     def _create_html_body(self, first_name, date_str, verse_data, prayer_data, recipient_email):
-        """Create HTML email with subtle Christmas theme - gold and white only"""
-        # Create SVG tree pattern for background (faded gold) - simplified for email compatibility
-        tree_svg = """data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='200'%3E%3Cg opacity='0.06'%3E%3Cpath d='M75 10 L60 50 L90 50 Z' fill='%23FFD700'/%3E%3Cpath d='M75 45 L50 90 L100 90 Z' fill='%23FFD700'/%3E%3Cpath d='M75 85 L40 140 L110 140 Z' fill='%23FFD700'/%3E%3Crect x='72' y='140' width='6' height='25' fill='%23FFD700'/%3E%3C/g%3E%3C/svg%3E"""
-        
+        """Create modern HTML email with clean design"""
         return f"""
 <!DOCTYPE html>
 <html>
@@ -220,82 +209,78 @@ To unsubscribe: https://divinebridge.io/unsubscribe?email={recipient_email}
         }}
     </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: #ffffff; min-height: 100vh;">
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%); min-height: 100vh;">
     
     <!-- Email Container -->
-    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background: #ffffff; padding: 40px 20px;">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%); padding: 40px 20px;">
         <tr>
             <td align="center">
                 
                 <!-- Main Content Card -->
-                <table cellpadding="0" cellspacing="0" border="0" width="600" class="email-container" style="max-width: 600px; background: #ffffff; border-radius: 24px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08); overflow: hidden; border: 1px solid rgba(255, 215, 0, 0.2);">
+                <table cellpadding="0" cellspacing="0" border="0" width="600" class="email-container" style="max-width: 600px; background: #ffffff; border-radius: 20px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); overflow: hidden;">
                     
                     <!-- Header with Logo -->
                     <tr>
-                        <td style="background: #ffffff; padding: 40px 30px 30px; text-align: center; position: relative; background-image: url('{tree_svg}'); background-repeat: repeat; background-position: center; background-size: 200px 300px;">
+                        <td style="background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%); padding: 45px 30px 35px; text-align: center;">
                             <table width="100%" cellpadding="0" cellspacing="0" border="0" class="header-logo-table">
                                 <tr>
                                     <td class="logo-cell" align="center" style="text-align: center; width: 100%;">
-                                        <img src="cid:logo_image" alt="Divine Bridge" class="logo-img" width="60" height="60" style="display: block; margin: 0 auto 8px auto; border: 0; text-align: center;" />
+                                        <img src="cid:logo_image" alt="Divine Bridge" class="logo-img" width="70" height="70" style="display: block; margin: 0 auto 12px auto; border: 0; text-align: center;" />
                                     </td>
                                 </tr>
                             </table>
-                            <div class="header-tagline" style="color: #B8860B; font-size: 14px; font-weight: 600; letter-spacing: 1px; text-align: center; margin-top: 8px;">CHRISTMAS BLESSINGS</div>
-                            <div class="header-tagline" style="color: #666; font-size: 11px; font-weight: 500; letter-spacing: 0.5px; text-align: center; margin-top: 6px;">UNITING HEARTS IN GLOBAL PRAYER</div>
-                            
-                            <!-- Subtle gold border -->
-                            <div style="margin-top: 20px; height: 1px; background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.3), transparent);"></div>
+                            <div class="header-tagline" style="color: #ffffff; font-size: 13px; font-weight: 600; letter-spacing: 1.5px; text-align: center; margin-top: 8px; text-transform: uppercase;">UNITING HEARTS IN GLOBAL PRAYER</div>
                         </td>
                     </tr>
                     
                     <!-- Greeting -->
                     <tr>
-                        <td class="content-padding" style="padding: 30px 30px 20px; background: #ffffff;">
-                            <p style="font-size: 18px; color: #333; margin: 0 0 10px 0; font-weight: 600;">Dear {first_name},</p>
-                            <p style="font-size: 15px; color: #666; margin: 0; line-height: 1.6;">May this Christmas season be filled with God's grace, peace, and abundant blessings. Here are your daily blessings:</p>
+                        <td class="content-padding" style="padding: 35px 35px 25px; background: #ffffff;">
+                            <p style="font-size: 20px; color: #1e1e1e; margin: 0 0 12px 0; font-weight: 600;">Dear {first_name},</p>
+                            <p style="font-size: 16px; color: #666; margin: 0; line-height: 1.7;">May this day be filled with God's grace and peace. Here are your daily blessings:</p>
                         </td>
                     </tr>
                     
                     <!-- Verse Section -->
                     <tr>
-                        <td class="content-padding" style="padding: 0 30px 30px; background: #ffffff;">
-                            <div class="verse-card" style="background: #ffffff; border-radius: 12px; padding: 25px; border-left: 3px solid rgba(255, 215, 0, 0.4); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); position: relative;">
-                                <div style="color: rgba(184, 134, 11, 0.7); font-size: 11px; font-weight: 600; letter-spacing: 1px; margin-bottom: 12px; text-align: center; text-transform: uppercase;">TODAY'S VERSE</div>
-                                <div style="color: #B8860B; font-size: 16px; font-weight: 600; margin-bottom: 15px; text-align: center;">{verse_data.get('reference', '')}</div>
-                                <div style="color: #333; font-size: 17px; line-height: 1.8; font-style: italic; text-align: center; padding: 0 10px;">"{verse_data.get('text', '')}"</div>
+                        <td class="content-padding" style="padding: 0 35px 30px; background: #ffffff;">
+                            <div class="verse-card" style="background: linear-gradient(135deg, rgba(15, 86, 255, 0.06) 0%, rgba(31, 60, 136, 0.03) 100%); border-radius: 16px; padding: 30px; border-left: 4px solid #0f56ff; box-shadow: 0 4px 12px rgba(15, 86, 255, 0.08);">
+                                <div style="color: #0f56ff; font-size: 11px; font-weight: 700; letter-spacing: 1.2px; margin-bottom: 15px; text-align: center; text-transform: uppercase;">Today's Verse</div>
+                                <div style="color: #1f3c88; font-size: 18px; font-weight: 700; margin-bottom: 18px; text-align: center;">{verse_data.get('reference', '')}</div>
+                                <div style="color: #333; font-size: 18px; line-height: 1.9; font-style: italic; text-align: center; padding: 0 10px;">"{verse_data.get('text', '')}"</div>
                             </div>
                         </td>
                     </tr>
                     
-                    <!-- Subtle Divider -->
+                    <!-- Divider -->
                     <tr>
-                        <td style="padding: 0 30px; background: #ffffff;">
-                            <div style="text-align: center; margin: 20px 0;">
-                                <div style="display: inline-block; height: 1px; width: 80px; background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.3), transparent);"></div>
+                        <td style="padding: 0 35px; background: #ffffff;">
+                            <div style="text-align: center; margin: 25px 0;">
+                                <div style="display: inline-block; height: 2px; width: 100px; background: linear-gradient(90deg, transparent, #0f56ff, transparent);"></div>
                             </div>
                         </td>
                     </tr>
                     
                     <!-- Prayer Section -->
                     <tr>
-                        <td class="content-padding" style="padding: 30px; background: #ffffff;">
-                            <div class="prayer-card" style="background: #ffffff; border-radius: 12px; padding: 25px; border-top: 3px solid rgba(255, 215, 0, 0.4); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); position: relative;">
-                                <div style="color: rgba(184, 134, 11, 0.7); font-size: 11px; font-weight: 600; letter-spacing: 1px; margin-bottom: 15px; text-align: center; text-transform: uppercase;">TODAY'S GLOBAL PRAYER</div>
-                                <div style="color: #333; font-size: 16px; line-height: 1.8; white-space: pre-line; padding: 0 5px;">{prayer_data.get('content', '')}</div>
+                        <td class="content-padding" style="padding: 30px 35px; background: #ffffff;">
+                            <div class="prayer-card" style="background: linear-gradient(135deg, rgba(15, 86, 255, 0.04) 0%, rgba(255, 255, 255, 1) 100%); border-radius: 16px; padding: 30px; border-top: 4px solid #0f56ff; box-shadow: 0 4px 12px rgba(15, 86, 255, 0.06);">
+                                <div style="color: #0f56ff; font-size: 11px; font-weight: 700; letter-spacing: 1.2px; margin-bottom: 18px; text-align: center; text-transform: uppercase;">Today's Global Prayer</div>
+                                <div style="color: #333; font-size: 16px; line-height: 1.9; white-space: pre-line; padding: 0 5px;">{prayer_data.get('content', '')}</div>
                             </div>
                         </td>
                     </tr>
                     
                     <!-- CTA Section -->
                     <tr>
-                        <td class="content-padding" style="padding: 0 30px 30px; background: #ffffff;">
-                            <div style="background: #ffffff; border-radius: 12px; padding: 25px; text-align: center; border: 1px solid rgba(255, 215, 0, 0.2);">
-                                <p style="color: #333; font-size: 16px; font-weight: 600; margin: 0 0 10px 0;">Join Our Global Prayer Community</p>
-                                <p class="cta-text" style="color: #666; font-size: 14px; margin: 0 0 20px 0; line-height: 1.6;">Join thousands of believers in a unified mission of faith, hope, and spiritual growth this Christmas season.</p>
+                        <td class="content-padding" style="padding: 0 35px 35px; background: #ffffff;">
+                            <div style="background: linear-gradient(135deg, rgba(15, 86, 255, 0.05) 0%, rgba(31, 60, 136, 0.02) 100%); border-radius: 14px; padding: 28px; text-align: center; border: 1px solid rgba(15, 86, 255, 0.1);">
+                                <p style="color: #1e1e1e; font-size: 17px; font-weight: 600; margin: 0 0 12px 0;">Join Our Global Prayer Community</p>
+                                <p class="cta-text" style="color: #666; font-size: 14px; margin: 0 0 24px 0; line-height: 1.7;">Join thousands of believers in a unified mission of faith, hope, and spiritual growth.</p>
                                 <table cellpadding="0" cellspacing="0" border="0" width="100%">
                                     <tr>
                                         <td align="center">
-                                            <a href="https://divinebridge.io/prayers" style="display: inline-block; background: rgba(255, 215, 0, 0.15); color: #B8860B; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin: 5px; border: 1px solid rgba(255, 215, 0, 0.3);">Request a Prayer</a>
+                                            <a href="https://divinebridge.io/prayers" style="display: inline-block; background: linear-gradient(135deg, #0f56ff 0%, #1f3c88 100%); color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 15px; margin: 5px; box-shadow: 0 4px 12px rgba(15, 86, 255, 0.3);">Request a Prayer</a>
                                         </td>
                                     </tr>
                                 </table>
@@ -305,18 +290,18 @@ To unsubscribe: https://divinebridge.io/unsubscribe?email={recipient_email}
                     
                     <!-- Footer -->
                     <tr>
-                        <td style="background: #ffffff; padding: 25px 30px; border-top: 1px solid rgba(255, 215, 0, 0.15);">
-                            <p style="font-size: 15px; color: #333; margin: 0; font-weight: 500;">Christmas Blessings,</p>
-                            <p style="font-size: 14px; color: #666; margin: 5px 0 0 0;"><span style="color: #B8860B; font-weight: 600;">The Divine Bridge Team</span></p>
+                        <td style="background: #f8f9fa; padding: 28px 35px; border-top: 1px solid #e0e0e0;">
+                            <p style="font-size: 15px; color: #333; margin: 0; font-weight: 500;">Blessings,</p>
+                            <p style="font-size: 14px; color: #666; margin: 6px 0 0 0;"><span style="color: #0f56ff; font-weight: 600;">The Divine Bridge Team</span></p>
                         </td>
                     </tr>
                     
                     <!-- Unsubscribe -->
                     <tr>
-                        <td style="background: #ffffff; padding: 0 30px 30px;">
+                        <td style="background: #f8f9fa; padding: 0 35px 30px;">
                             <p style="font-size: 12px; color: #999; text-align: center; margin: 0;">
-                                <a href="https://divinebridge.io/unsubscribe?email={recipient_email}" style="color: #B8860B; text-decoration: underline;">Unsubscribe</a> | 
-                                <a href="https://divinebridge.io/privacy-policy" style="color: #B8860B; text-decoration: underline;">Privacy Policy</a>
+                                <a href="https://divinebridge.io/unsubscribe?email={recipient_email}" style="color: #0f56ff; text-decoration: underline;">Unsubscribe</a> | 
+                                <a href="https://divinebridge.io/privacy-policy" style="color: #0f56ff; text-decoration: underline;">Privacy Policy</a>
                             </p>
                         </td>
                     </tr>
@@ -324,14 +309,14 @@ To unsubscribe: https://divinebridge.io/unsubscribe?email={recipient_email}
                 </table>
                 
                 <!-- Footer Logo -->
-                <table cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; margin-top: 20px;">
+                <table cellpadding="0" cellspacing="0" border="0" width="600" style="max-width: 600px; margin-top: 25px;">
                     <tr>
                         <td align="center">
                             <p style="color: #999; font-size: 12px; margin: 10px 0;">
                                 © 2025 Divine Bridge. All rights reserved.
                             </p>
                             <p style="color: #999; font-size: 11px; margin: 5px 0;">
-                                <a href="https://divinebridge.io" style="color: #B8860B; text-decoration: none;">divinebridge.io</a>
+                                <a href="https://divinebridge.io" style="color: #0f56ff; text-decoration: none; font-weight: 500;">divinebridge.io</a>
                             </p>
                         </td>
                     </tr>

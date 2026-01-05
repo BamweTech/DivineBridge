@@ -1177,8 +1177,8 @@
             </div>
         </div>
         {% if daily_prayer %}
-        <p style="text-align: center; color: #555; margin-bottom: 2rem; font-size: 1.1rem; font-weight: 500;" id="daily-prayer-date-home">
-            {{ daily_prayer.date }}
+        <p style="text-align: center; color: #555; margin-bottom: 2rem; font-size: 1.1rem; font-weight: 500;" id="daily-prayer-date-home" data-date-iso="{{ daily_prayer.date_iso }}">
+            Loading date...
         </p>
         {% else %}
         <p style="text-align: center; color: #555; margin-bottom: 2rem; font-size: 1.1rem; font-weight: 500;" id="daily-prayer-date-home">
@@ -1716,6 +1716,45 @@
         }
     }
 
+    // Function to update date display to use local timezone
+    function updateDateDisplay() {
+        const dateEl = document.getElementById('daily-prayer-date-home');
+        if (!dateEl) return;
+        
+        // Check if we have a date ISO attribute (server-rendered)
+        const dateIso = dateEl.getAttribute('data-date-iso');
+        if (dateIso) {
+            // Parse the ISO date and format it in user's local timezone
+            try {
+                const date = new Date(dateIso + 'T12:00:00'); // Use noon to avoid timezone issues
+                dateEl.textContent = date.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            } catch (e) {
+                // Fallback to current local date
+                const date = new Date();
+                dateEl.textContent = date.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            }
+        } else {
+            // No ISO date, use current local date
+            const date = new Date();
+            dateEl.textContent = date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+    }
+
     // Load interactions when page loads (content is already server-rendered)
     document.addEventListener('DOMContentLoaded', async () => {
         // Initialize prayer section animation
@@ -1723,6 +1762,9 @@
         
         // Load organizations
         loadOrganizations();
+
+        // Update date display to use local timezone
+        updateDateDisplay();
 
         // Get date for interactions (use server-provided date or client date)
         const serverDate = '{{ today_date|default("") }}';

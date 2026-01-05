@@ -685,7 +685,8 @@ _daily_prayer_cache = {}
 _daily_prayer_cache_date = None
 
 def get_daily_prayer_for_date(date_str):
-    """Get daily prayer for a specific date with caching"""
+    """Get daily prayer for a specific date with caching.
+    If prayer doesn't exist and it's today's date, attempt to generate it."""
     global _daily_prayer_cache, _daily_prayer_cache_date
     
     # Reset cache if date changed
@@ -697,30 +698,51 @@ def get_daily_prayer_for_date(date_str):
     if date_str in _daily_prayer_cache:
         return _daily_prayer_cache[date_str]
     
-    # Fetch prayer from storage
+    # Fetch prayer from storage using get_prayer for specific date lookup
     try:
-        prayers = app.storage_handler.get_prayers(limit=20)
-        valid_prayers = [p for p in prayers if isinstance(p, dict)]
+        # Use get_prayer(date) to directly fetch prayer for the specific date
+        # This is more efficient and reliable than searching through recent prayers
+        daily_prayer = app.storage_handler.get_prayer(date_str)
         
-        # Find daily prayer (source='generated' and no title) for this date
-        daily_prayer = None
-        for prayer in valid_prayers:
-            is_daily_prayer = prayer.get('source') == 'generated' and not prayer.get('title')
-            if is_daily_prayer and prayer.get('date') == date_str:
+        # If no prayer found and it's today's date, try to generate one
+        if not daily_prayer:
+            today = datetime.now().strftime('%Y-%m-%d')
+            if date_str == today:
+                logger.info(f"No prayer found for today ({date_str}), attempting to generate one...")
+                try:
+                    # Generate prayer using the app's prayer generator
+                    new_prayer = app.prayer_generator.generate_prayer()
+                    if new_prayer:
+                        logger.info(f"Successfully generated prayer for {date_str}")
+                        daily_prayer = new_prayer
+                    else:
+                        logger.error(f"Failed to generate prayer for {date_str}")
+                except Exception as gen_error:
+                    logger.error(f"Error generating prayer for {date_str}: {gen_error}", exc_info=True)
+            else:
+                logger.info(f"No prayer found in storage for date: {date_str} (not today, won't auto-generate)")
+        
+        if daily_prayer:
+            # Verify it's a daily prayer (source='generated' and no title)
+            is_daily_prayer = daily_prayer.get('source') == 'generated' and not daily_prayer.get('title')
+            
+            if is_daily_prayer:
                 # Remove citations and normalize content
-                if 'content' in prayer and prayer['content']:
+                if 'content' in daily_prayer and daily_prayer['content']:
                     import re
-                    prayer['content'] = re.sub(r'\[\d+\]', '', prayer['content'])
-                    prayer['content'] = re.sub(r'[ \t]+', ' ', prayer['content'])
-                    prayer['content'] = prayer['content'].strip()
-                daily_prayer = prayer
-                break
+                    daily_prayer['content'] = re.sub(r'\[\d+\]', '', daily_prayer['content'])
+                    daily_prayer['content'] = re.sub(r'[ \t]+', ' ', daily_prayer['content'])
+                    daily_prayer['content'] = daily_prayer['content'].strip()
+            else:
+                # Not a daily prayer, return None
+                logger.warning(f"Prayer found for {date_str} but it's not a daily prayer (source={daily_prayer.get('source')}, title={daily_prayer.get('title')})")
+                daily_prayer = None
         
         # Cache the result (even if None)
         _daily_prayer_cache[date_str] = daily_prayer
         return daily_prayer
     except Exception as e:
-        logger.error(f"Error fetching daily prayer: {e}")
+        logger.error(f"Error fetching daily prayer for {date_str}: {e}", exc_info=True)
         return None
 
 @app.route('/')
@@ -762,7 +784,7 @@ def index():
             
             prayer_data = {
                 'content': content_formatted,
-                'date': prayer_date.strftime('%A, %B %d, %Y'),
+                'date': daily_prayer.get('date', today),  # Pass ISO date, let client format with local timezone
                 'date_iso': daily_prayer.get('date', today)
             }
         
