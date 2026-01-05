@@ -110,7 +110,17 @@ def get_organizations():
         primary_disasters = extractor.get_primary_disasters({'disasters': prayer_disasters}, limit=2)
         
         if primary_disasters:
-            logger.info(f"Found {len(primary_disasters)} primary disasters for organization matching: {[d.get('type') + ' in ' + ', '.join(d.get('locations', [])) for d in primary_disasters]}")
+            # Safely format disaster info for logging
+            disaster_info = []
+            for d in primary_disasters:
+                disaster_type = d.get('type', 'unknown')
+                locations = d.get('locations', [])
+                # Ensure locations is a list
+                if not isinstance(locations, list):
+                    locations = []
+                location_str = ', '.join(locations) if locations else 'unknown location'
+                disaster_info.append(f"{disaster_type} in {location_str}")
+            logger.info(f"Found {len(primary_disasters)} primary disasters for organization matching: {disaster_info}")
         else:
             logger.warning(f"No primary disasters found. Total disasters in prayer: {len(prayer_disasters)}")
             if prayer_disasters:
@@ -148,7 +158,33 @@ def get_organizations():
     except Exception as e:
         logger.error(f"Error getting organizations: {e}")
         logger.exception("Full traceback:")
-        return jsonify({'error': 'Failed to get organizations'}), 500
+        
+        # Try to return fallback organizations instead of failing completely
+        try:
+            from nonprofit_service import get_nonprofit_service
+            fallback_service = get_nonprofit_service()
+            fallback_orgs = fallback_service._get_fallback_organizations()
+            import random
+            today = datetime.now().strftime('%Y-%m-%d')
+            random.seed(today)
+            selected_fallback = random.sample(fallback_orgs, min(6, len(fallback_orgs)))
+            
+            logger.info(f"Returning {len(selected_fallback)} fallback organizations due to error")
+            return jsonify({
+                'organizations': selected_fallback,
+                'user_location': {
+                    'city': 'Global',
+                    'country': 'Global',
+                    'detection_method': 'fallback'
+                },
+                'disaster_context': {
+                    'disasters': [],
+                    'prayer_date': today
+                }
+            }), 200
+        except Exception as fallback_error:
+            logger.error(f"Even fallback organizations failed: {fallback_error}")
+            return jsonify({'error': 'Failed to get organizations'}), 500
 
 
 @nonprofit_bp.route('/location', methods=['POST'])
