@@ -1780,23 +1780,11 @@
         // Load verse interactions (likes, shares)
         loadDailyVerseInteractions(clientDate);
         
-        // Always reload prayer client-side to ensure correct timezone
-        // Server-side prayer might be from wrong timezone, so fetch with client's local date
-        {% if daily_prayer %}
-        // Server rendered prayer exists, but verify it's for the correct date
-        const serverPrayerDate = '{{ daily_prayer.date_iso|default("") }}';
-        if (serverPrayerDate !== clientDate) {
-            // Server prayer is for wrong date (timezone mismatch), reload client-side
-            console.log(`Server prayer date (${serverPrayerDate}) doesn't match client date (${clientDate}), reloading...`);
-            loadDailyPrayerHome();
-        } else {
-            // Dates match, just load interactions
-            loadDailyPrayerInteractionsHome(clientDate);
-        }
-        {% else %}
-        // Fallback: try to load prayer client-side if server-side failed
+        // Always load prayer client-side to ensure correct timezone
+        // Server-side prayer uses server timezone (UTC), which may be wrong for user's local timezone
+        // This ensures users always see the prayer for their local date
+        console.log(`Loading prayer for client's local date: ${clientDate}`);
         loadDailyPrayerHome();
-        {% endif %}
         
         // Start checking for active sessions
         startSessionPollingHome();
