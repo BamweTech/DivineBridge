@@ -1548,14 +1548,9 @@
         
         if (!contentEl || !dateEl) return;
         
-        // Skip if content is already rendered server-side (not "Loading...")
-        const currentContent = contentEl.textContent.trim();
-        if (currentContent && currentContent !== 'Loading today\'s prayer...') {
-            // Content already rendered, just load interactions
-            const clientDate = getClientLocalDate();
-            loadDailyPrayerInteractionsHome(clientDate);
-            return;
-        }
+        // Always reload to ensure we have the correct prayer for client's local date
+        // Server-side rendering uses server timezone (UTC), which may be wrong for user's local timezone
+        // So we always fetch client-side using the client's local date
         
         try {
             // Send client's local date to get the right prayer
@@ -1789,9 +1784,19 @@
         // Load verse interactions (likes, shares)
         loadDailyVerseInteractions(clientDate);
         
-        // Load prayer interactions if prayer is rendered server-side
+        // Always reload prayer client-side to ensure correct timezone
+        // Server-side prayer might be from wrong timezone, so fetch with client's local date
         {% if daily_prayer %}
-        loadDailyPrayerInteractionsHome(clientDate);
+        // Server rendered prayer exists, but verify it's for the correct date
+        const serverPrayerDate = '{{ daily_prayer.date_iso|default("") }}';
+        if (serverPrayerDate !== clientDate) {
+            // Server prayer is for wrong date (timezone mismatch), reload client-side
+            console.log(`Server prayer date (${serverPrayerDate}) doesn't match client date (${clientDate}), reloading...`);
+            loadDailyPrayerHome();
+        } else {
+            // Dates match, just load interactions
+            loadDailyPrayerInteractionsHome(clientDate);
+        }
         {% else %}
         // Fallback: try to load prayer client-side if server-side failed
         loadDailyPrayerHome();

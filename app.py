@@ -749,14 +749,33 @@ def get_daily_prayer_for_date(date_str):
 def index():
     """Serve the home page as main landing page with server-side rendered verse and prayer"""
     try:
-        # Get today's date (server timezone - will be adjusted client-side if needed)
-        today = datetime.now().strftime('%Y-%m-%d')
-        day_of_year = datetime.now().timetuple().tm_yday
+        # Get client's local date from query parameter if provided (for timezone accuracy)
+        # Otherwise use server date as fallback
+        client_date = request.args.get('client_date')
+        if client_date:
+            try:
+                # Validate date format
+                datetime.strptime(client_date, '%Y-%m-%d')
+                today = client_date
+                # Calculate day of year from client date
+                client_datetime = datetime.strptime(client_date, '%Y-%m-%d')
+                day_of_year = client_datetime.timetuple().tm_yday
+                logger.info(f"Using client's local date: {today} (day of year: {day_of_year})")
+            except ValueError:
+                # Invalid date format, fall back to server date
+                today = datetime.now().strftime('%Y-%m-%d')
+                day_of_year = datetime.now().timetuple().tm_yday
+                logger.warning(f"Invalid client_date format: {client_date}, using server date: {today}")
+        else:
+            # No client date provided, use server date (will be corrected client-side)
+            today = datetime.now().strftime('%Y-%m-%d')
+            day_of_year = datetime.now().timetuple().tm_yday
+            logger.info(f"No client_date provided, using server date: {today}")
         
-        # Get verse (cached)
+        # Get verse (cached) - use client's day of year if provided
         verse = app.verse_cache.get_today_verse(day_of_year=day_of_year)
         
-        # Get daily prayer (cached)
+        # Get daily prayer (cached) - use client's local date if provided
         daily_prayer = get_daily_prayer_for_date(today)
         
         # Format verse for template
