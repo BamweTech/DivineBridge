@@ -3869,8 +3869,38 @@ class PrayerRoomService {
                     
                     if (!hasAudio) {
                         console.log(`[WebRTC] Adding audio track to existing peer ${participantId}`);
-                        this.localStream.getAudioTracks().forEach(track => {
-                            peer.addTrack(track, this.localStream);
+                        // CRITICAL FIX: SimplePeer doesn't have addTrack method
+                        // Must use the underlying RTCPeerConnection's addTrack method
+                        const audioTracks = this.localStream.getAudioTracks();
+                        audioTracks.forEach(track => {
+                            try {
+                                // Use the underlying RTCPeerConnection to add the track
+                                const sender = peer._pc.addTrack(track, this.localStream);
+                                console.log(`✅ [WebRTC] Added audio track to peer ${participantId}, sender:`, sender);
+                                
+                                // If connection is already established, we need to renegotiate
+                                if (peer._pc.signalingState === 'stable') {
+                                    console.log(`🔄 [WebRTC] Connection stable, creating offer to renegotiate for ${participantId}`);
+                                    peer._pc.createOffer().then(offer => {
+                                        return peer._pc.setLocalDescription(offer);
+                                    }).then(() => {
+                                        // Signal will be sent via SimplePeer's 'signal' event handler
+                                        // We need to manually trigger it by calling peer.signal() with the offer
+                                        const offerSdp = peer._pc.localDescription;
+                                        if (offerSdp) {
+                                            peer.signal({
+                                                type: offerSdp.type,
+                                                sdp: offerSdp.sdp
+                                            });
+                                            console.log(`📡 [WebRTC] Offer created and signaled for renegotiation with ${participantId}`);
+                                        }
+                                    }).catch(error => {
+                                        console.error(`❌ [WebRTC] Error renegotiating with ${participantId}:`, error);
+                                    });
+                                }
+                            } catch (error) {
+                                console.error(`❌ [WebRTC] Error adding track to peer ${participantId}:`, error);
+                            }
                         });
                     } else {
                         console.log(`[WebRTC] Peer ${participantId} already has audio track`);
