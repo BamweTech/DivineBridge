@@ -891,7 +891,7 @@ class PrayerRoomService {
             if (!this.participantPollingInterval) {
                 this.participantPollingInterval = setInterval(() => {
                     this.loadParticipants();
-                }, 1000); // Poll every 1 second for real-time updates
+                }, 500); // Poll every 500ms for faster updates
             }
             
         } catch (error) {
@@ -907,7 +907,7 @@ class PrayerRoomService {
                 // If initial load failed, set up polling anyway so we can retry
                 this.participantPollingInterval = setInterval(() => {
                     this.loadParticipants();
-                }, 3000);
+                }, 2000);
             }
         }
     }
@@ -1333,6 +1333,16 @@ class PrayerRoomService {
         this.updateAudioControls();
         this.updateRoleUI();
         this.updateStageArea(participantList);
+        
+        // Update participant count badge immediately
+        this.updateParticipantBadge(participantList.length);
+    }
+    
+    updateParticipantBadge(count) {
+        const badge = document.getElementById('participantCountBadge');
+        if (badge) {
+            badge.textContent = count;
+        }
     }
     
     getFilteredParticipants(participants = []) {
@@ -3900,14 +3910,23 @@ class PrayerRoomService {
                 // Clean up the old connection
                 this.cleanupPeerConnection(participantId);
                 
-                // Wait a bit for cleanup to complete
-                await new Promise(resolve => setTimeout(resolve, 100));
+                // Wait longer for cleanup to complete and allow remote peer to detect disconnection
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Double-check that the peer was actually removed
+                if (this.peers.has(participantId)) {
+                    console.warn(`[WebRTC] Peer ${participantId} still exists after cleanup, skipping recreation`);
+                    continue;
+                }
                 
                 // Determine if we should initiate (same logic as before)
                 const isInitiator = this.userId < participantId;
                 
                 // Create new connection with stream
                 await this.createPeerConnection(participantId, isInitiator);
+                
+                // Wait a bit for the connection to establish before moving to next
+                await new Promise(resolve => setTimeout(resolve, 200));
                 
                 console.log(`✅ [WebRTC] Successfully recreated peer connection for ${participantId}`);
             } catch (error) {
