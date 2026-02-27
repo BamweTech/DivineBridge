@@ -591,6 +591,9 @@ def get_room_participants(room_id):
         host_id = room_data.get('host_id')
         max_speakers = get_max_speakers(room_data)
 
+        # Filter out inactive participants (is_active defaults to True for backward compatibility)
+        participants = [p for p in participants if p.get('is_active', True)]
+        
         participants, _, participants_changed = normalize_participants(participants, host_id)
         
         # Only update participant name if necessary and user exists
