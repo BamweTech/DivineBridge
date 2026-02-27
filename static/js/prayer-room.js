@@ -1707,7 +1707,9 @@ class PrayerRoomService {
                 console.log('🎤 WebRTC initialized successfully');
                 
                 // Add stream to any existing peer connections that were created before audio was joined
-                this.addStreamToExistingPeers();
+                this.addStreamToExistingPeers().catch(error => {
+                    console.error('❌ Error adding stream to existing peers:', error);
+                });
                 
                 // If there was a pending offer, handle it now that the stream is ready
                 if (this.pendingOffer) {
@@ -3852,14 +3854,18 @@ class PrayerRoomService {
         }
     }
     
-    addStreamToExistingPeers() {
-        // Add the local stream to any existing peer connections that don't have it
+    async addStreamToExistingPeers() {
+        // Recreate peer connections with the stream instead of trying to add tracks
+        // This is more reliable with SimplePeer which handles streams best at creation time
         if (!this.localStream) {
             console.warn('[WebRTC] Cannot add stream to peers: no local stream available');
             return;
         }
         
-        console.log(`[WebRTC] Adding stream to ${this.peers.size} existing peer(s)`);
+        console.log(`[WebRTC] Recreating ${this.peers.size} peer connection(s) with audio stream`);
+        
+        // Collect participant IDs that need to be recreated
+        const participantsToRecreate = [];
         
         this.peers.forEach((peer, participantId) => {
             try {
@@ -3868,48 +3874,46 @@ class PrayerRoomService {
                     const hasAudio = senders.some(sender => sender.track?.kind === 'audio');
                     
                     if (!hasAudio) {
-                        console.log(`[WebRTC] Adding audio track to existing peer ${participantId}`);
-                        // CRITICAL FIX: SimplePeer doesn't have addTrack method
-                        // Must use the underlying RTCPeerConnection's addTrack method
-                        const audioTracks = this.localStream.getAudioTracks();
-                        audioTracks.forEach(track => {
-                            try {
-                                // Use the underlying RTCPeerConnection to add the track
-                                const sender = peer._pc.addTrack(track, this.localStream);
-                                console.log(`✅ [WebRTC] Added audio track to peer ${participantId}, sender:`, sender);
-                                
-                                // If connection is already established, we need to renegotiate
-                                if (peer._pc.signalingState === 'stable') {
-                                    console.log(`🔄 [WebRTC] Connection stable, creating offer to renegotiate for ${participantId}`);
-                                    peer._pc.createOffer().then(offer => {
-                                        return peer._pc.setLocalDescription(offer);
-                                    }).then(() => {
-                                        // Signal will be sent via SimplePeer's 'signal' event handler
-                                        // We need to manually trigger it by calling peer.signal() with the offer
-                                        const offerSdp = peer._pc.localDescription;
-                                        if (offerSdp) {
-                                            peer.signal({
-                                                type: offerSdp.type,
-                                                sdp: offerSdp.sdp
-                                            });
-                                            console.log(`📡 [WebRTC] Offer created and signaled for renegotiation with ${participantId}`);
-                                        }
-                                    }).catch(error => {
-                                        console.error(`❌ [WebRTC] Error renegotiating with ${participantId}:`, error);
-                                    });
-                                }
-                            } catch (error) {
-                                console.error(`❌ [WebRTC] Error adding track to peer ${participantId}:`, error);
-                            }
-                        });
+                        console.log(`[WebRTC] Peer ${participantId} missing audio, will recreate connection`);
+                        participantsToRecreate.push(participantId);
                     } else {
                         console.log(`[WebRTC] Peer ${participantId} already has audio track`);
                     }
+                } else {
+                    // If we can't check senders, assume we need to recreate
+                    console.log(`[WebRTC] Cannot check senders for ${participantId}, will recreate connection`);
+                    participantsToRecreate.push(participantId);
                 }
             } catch (error) {
-                console.error(`[WebRTC] Error adding stream to peer ${participantId}:`, error);
+                console.error(`[WebRTC] Error checking peer ${participantId}:`, error);
+                // On error, recreate to be safe
+                participantsToRecreate.push(participantId);
             }
         });
+        
+        // Recreate connections for participants without audio
+        // Use for...of loop to properly handle async operations
+        for (const participantId of participantsToRecreate) {
+            try {
+                console.log(`🔄 [WebRTC] Recreating peer connection for ${participantId} with audio stream`);
+                
+                // Clean up the old connection
+                this.cleanupPeerConnection(participantId);
+                
+                // Wait a bit for cleanup to complete
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // Determine if we should initiate (same logic as before)
+                const isInitiator = this.userId < participantId;
+                
+                // Create new connection with stream
+                await this.createPeerConnection(participantId, isInitiator);
+                
+                console.log(`✅ [WebRTC] Successfully recreated peer connection for ${participantId}`);
+            } catch (error) {
+                console.error(`❌ [WebRTC] Error recreating peer connection for ${participantId}:`, error);
+            }
+        }
         
         // CRITICAL FIX: Create peer connections with participants who don't have connections yet
         // This handles the case where user joined audio AFTER other participants joined the room
