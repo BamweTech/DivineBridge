@@ -143,9 +143,11 @@ def send_daily_emails():
                 user_data = doc.to_dict()
                 if user_data.get('email') and user_data.get('firstName'):
                     subscribers.append({
+                        'doc_id': doc.id,
                         'email': user_data.get('email'),
                         'firstName': user_data.get('firstName'),
-                        'timezone': user_data.get('timezone', 'America/New_York')
+                        'timezone': user_data.get('timezone', 'America/New_York'),
+                        'last_email_sent_date': user_data.get('last_email_sent_date', '')
                     })
         except Exception as e:
             logger.error(f"Error fetching subscribers from Firebase: {e}")
@@ -157,8 +159,16 @@ def send_daily_emails():
         email_service = get_email_service()
         sent_count = 0
         failed_count = 0
+        skipped_count = 0
         
         for subscriber in subscribers:
+            # Idempotency guard: skip if this subscriber already received today's email.
+            # Protects against Cloud Scheduler retries or accidental double-triggers.
+            if subscriber['last_email_sent_date'] == today_str:
+                logger.info(f"Skipping {subscriber['email']} — already sent today ({today_str})")
+                skipped_count += 1
+                continue
+
             try:
                 success = email_service.send_daily_content(
                     recipient_email=subscriber['email'],
@@ -170,6 +180,14 @@ def send_daily_emails():
                 
                 if success:
                     sent_count += 1
+                    # Record the send date so duplicates are skipped if the job re-runs today
+                    try:
+                        db.collection('users').document(subscriber['doc_id']).set(
+                            {'last_email_sent_date': today_str},
+                            merge=True
+                        )
+                    except Exception as update_err:
+                        logger.warning(f"Could not update last_email_sent_date for {subscriber['email']}: {update_err}")
                 else:
                     failed_count += 1
                     
@@ -177,11 +195,12 @@ def send_daily_emails():
                 logger.error(f"Error sending to {subscriber['email']}: {e}")
                 failed_count += 1
         
-        logger.info(f"Email send job complete: {sent_count} sent, {failed_count} failed")
+        logger.info(f"Email send job complete: {sent_count} sent, {skipped_count} skipped (already sent), {failed_count} failed")
         
         return jsonify({
             'message': 'Daily emails sent',
             'sent': sent_count,
+            'skipped_already_sent': skipped_count,
             'failed': failed_count,
             'total_subscribers': len(subscribers)
         }), 200

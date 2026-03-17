@@ -1891,6 +1891,14 @@ DISASTER_PAGE_TEMPLATE = '''
             font-size: 0.9375rem;
         }
 
+        .organizations-loading {
+            padding: 2.5rem 1.5rem;
+        }
+
+        .organizations-loading p {
+            font-size: 0.9375rem;
+        }
+
         .organizations-grid {
             padding: 0 1.5rem 3rem;
             gap: 1.25rem;

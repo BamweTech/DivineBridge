@@ -316,7 +316,12 @@ def create_combined_task_list(admin_tasks_list, logs_summary, analysis):
     # Add warning-based tasks (lower priority)
     warnings = analysis.get('warnings', [])
     for warning in warnings[:10]:  # Limit to 10 most recent warnings
-        warning_msg = warning.get('message', '')[:200]
+        warning_msg = warning.get('message', '')
+        # Filter out None, empty, or invalid warning messages
+        if not warning_msg or warning_msg == 'None' or warning_msg.lower() == 'none' or len(warning_msg.strip()) == 0:
+            continue
+        
+        warning_msg = warning_msg[:200]
         task_list.append({
             'type': 'warning',
             'priority': 'low',

@@ -105,7 +105,6 @@ def get_organizations():
         logger.debug(f"⏱️ Prayer: {(t3-t2)*1000:.0f}ms")
         
         # Get top 2 disasters for organization matching
-        from disaster_extractor import get_disaster_extractor
         extractor = get_disaster_extractor()
         primary_disasters = extractor.get_primary_disasters({'disasters': prayer_disasters}, limit=2)
         
@@ -161,7 +160,6 @@ def get_organizations():
         
         # Try to return fallback organizations instead of failing completely
         try:
-            from nonprofit_service import get_nonprofit_service
             fallback_service = get_nonprofit_service()
             fallback_orgs = fallback_service._get_fallback_organizations()
             import random

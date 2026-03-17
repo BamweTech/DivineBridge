@@ -192,6 +192,49 @@ gcloud run services add-iam-policy-binding divinebridge \
 
 ---
 
+## Audit Log Format Migration (Action Required by Sep 30, 2026)
+
+Google notified that Cloud Scheduler is migrating to a new GFE-format audit log structure. Enforcement starts **September 30, 2026**.
+
+**Current status:** This project does not parse Cloud Scheduler audit logs, so no code changes are required at this time.
+
+If audit log parsing is added in the future, use the **new payload structure**:
+
+### Authorization Info — New Structure
+```json
+"authorizationInfo": [
+  {
+    "resource": "projects/divinebridge/locations/us-central1/jobs/daily-prayer-generator",
+    "permission": "cloudscheduler.jobs.create",
+    "granted": true,
+    "resourceAttributes": {
+      "service": "cloudscheduler.googleapis.com",
+      "name": "projects/divinebridge/locations/us-central1/jobs/daily-prayer-generator"
+    },
+    "permissionType": "ADMIN_WRITE"
+  }
+]
+```
+
+### Retry Config — New Structure (snake_case with nested duration objects)
+```json
+"retry_config": {
+  "max_backoff_duration": { "seconds": 3600 },
+  "min_backoff_duration": { "seconds": 5 },
+  "max_retry_duration": {},
+  "max_doublings": 5
+}
+```
+
+Key differences from the old format:
+- `resource` field now uses the full resource path instead of an opaque ID
+- `resourceAttributes` object added with `service` and `name` fields
+- Retry config keys use `snake_case` instead of `camelCase`
+- Duration values are nested objects (`{ "seconds": N }`) instead of strings (`"5s"`)
+- `callerIp` will contain a default/placeholder value until the old log format is removed
+
+---
+
 ## Cost Estimate
 
 - Cloud Scheduler: $0.10/month per job (3 free jobs per account)
