@@ -8,7 +8,7 @@ from flask import Blueprint, request, jsonify, g
 from firebase_admin import firestore
 from firebase_auth import get_firestore_client
 from auth_helpers import require_auth
-from perplexity_client import PerplexityClient
+from perplexity_client import get_perplexity_client, set_client_model
 
 logger = logging.getLogger(__name__)
 devotional_bp = Blueprint('devotional', __name__, url_prefix='/api/devotional')
@@ -68,16 +68,12 @@ def generate_devotional():
         return jsonify({'error': 'theme must be 100 characters or fewer'}), 400
 
     uid = g.user_id
-    client = PerplexityClient()
+    set_client_model('sonar-pro')
+    client = get_perplexity_client()
     prompt = _build_devotional_prompt(theme, duration, tradition)
 
     try:
-        response = client.generate(
-            prompt=prompt,
-            model='sonar-pro',
-            max_tokens=8000,
-            temperature=0.7,
-        )
+        response = client.query(prompt)
         import json
         # Strip markdown fences if present
         text = response.strip()
