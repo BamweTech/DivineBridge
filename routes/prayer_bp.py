@@ -866,4 +866,57 @@ def get_daily_prayer_interactions(date):
             'likes': {'count': 0, 'liked': False},
             'comments': {'count': 0},
             'shares': {'count': 0}
-        }), 500 
+        }), 500
+
+
+@prayer_bp.route('/global-watch', methods=['GET'])
+def get_global_watch_prayers():
+    """Return active Global Prayer Watch disaster prayers for the mobile feed.
+    
+    Each entry represents a grouped disaster prayer for a specific event type
+    affecting one or more countries (sourced from DisasterPrayerService).
+    Returns empty list gracefully on any error so the mobile feed degrades safely.
+    """
+    try:
+        from disaster_prayer_service import get_disaster_prayer_service
+        service = get_disaster_prayer_service(current_app.storage_handler)
+        raw_prayers = service.get_active_disaster_prayers()
+
+        result = []
+        for p in raw_prayers:
+            # Only include grouped prayers (the ones shown on globalprayerwatch page).
+            # Individual legacy prayers lack affected_countries.
+            if not p.get('is_grouped') and not p.get('affected_countries'):
+                continue
+            full_prayer = p.get('prayer', '')
+            wall_prayer = p.get('wall_prayer', '')
+
+            # Backward-compat: if older record has no wall_prayer, derive one from the
+            # first two sentences of the full prayer (until the next hourly run regenerates it).
+            if not wall_prayer and full_prayer:
+                import re as _re
+                sentences = _re.findall(r'[^.!?]+[.!?]+', full_prayer)
+                wall_prayer = ' '.join(sentences[:2]).strip()
+
+            result.append({
+                'id': p.get('id', ''),
+                'disaster_type': p.get('disaster_type', ''),
+                'disaster_type_display': (
+                    p.get('disaster_type_display')
+                    or p.get('disaster_type', '').replace('_', ' ').title()
+                ),
+                'affected_countries': p.get('affected_countries', []),
+                'summary': p.get('summary', ''),
+                'wall_prayer': wall_prayer,
+                'created_at': p.get('created_at', ''),
+            })
+
+        # Most recent first
+        result.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+
+        return jsonify({'success': True, 'prayers': result}), 200
+
+    except Exception as e:
+        logger.error(f"Error fetching global watch prayers: {e}")
+        # Return empty gracefully — the mobile feed should still show community prayers
+        return jsonify({'success': True, 'prayers': []}), 200

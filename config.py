@@ -38,10 +38,14 @@ class Config:
         self.validate_config()
         
         # Set CORS configuration
+        # Includes Expo development origins and mobile app bundle ID for EAS builds
         self.CORS_ORIGINS = [
             'https://divinebridge.io',
             'https://www.divinebridge.io',
-            'https://api.divinebridge.io'
+            'https://api.divinebridge.io',
+            # Expo Go / development builds
+            'exp://localhost:8081',
+            'exp://192.168.0.0/24',
         ]
         self.CORS_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
         self.CORS_ALLOW_HEADERS = ['Content-Type', 'Authorization', 'X-Requested-With']

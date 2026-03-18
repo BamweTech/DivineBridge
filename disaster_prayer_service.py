@@ -548,6 +548,8 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                 'total_casualties': info.get('total_casualties'),
                 'summary': result.get('summary', ''),
                 'prayer': result.get('prayer', ''),
+                # Short 1-2 sentence prayer for the mobile Prayer Wall feed
+                'wall_prayer': result.get('wall_prayer', ''),
                 'comprehensive_summary': info.get('comprehensive_summary', ''),
                 'key_details': info.get('key_details', []),
                 'all_news_summaries': info.get('all_news_summaries', []),
@@ -1244,9 +1246,13 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
                 if "In Jesus-Christ's name" not in prayer:
                     prayer = prayer.rstrip('.') + ". In Jesus-Christ's name we pray. Amen!"
 
+            # Query 4: Generate a short wall prayer for the mobile Prayer Wall feed
+            wall_prayer = self._generate_wall_prayer(disaster_type, info, all_summaries)
+
             return {
                 'summary': summary,
-                'prayer': prayer
+                'prayer': prayer,
+                'wall_prayer': wall_prayer,
             }
             
         except Exception as e:
@@ -1255,8 +1261,81 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
             countries_str = ", ".join(info.get('affected_countries', []))
             return {
                 'summary': f"{disaster_type.title()} affecting {countries_str}.",
-                'prayer': self._generate_fallback_prayer({'type': disaster_type, 'country': countries_str})
+                'prayer': self._generate_fallback_prayer({'type': disaster_type, 'country': countries_str}),
+                'wall_prayer': self._fallback_wall_prayer(disaster_type, info.get('affected_countries', [])),
             }
+
+    def _generate_wall_prayer(self, disaster_type: str, info: Dict, all_summaries: str) -> str:
+        """
+        Generate a short, social-media-style prayer post (1-2 sentences) for the mobile Prayer Wall.
+
+        This is NOT the long intercessory prayer — it's a concise, human, community-voice post
+        that calls out the specific event, location, and a short prayerful statement.
+
+        Example output:
+        "Praying for the people of California after a 7.7-magnitude earthquake. May God be
+        close to everyone affected and bring swift rescue and comfort. 🙏"
+        """
+        try:
+            countries_str = ", ".join(info.get('affected_countries', []))
+            # Pull one representative news headline/detail from the summaries for specificity
+            first_area = (info.get('all_areas') or [{}])[0]
+            key_detail = first_area.get('news_summary', '')[:300]  # just enough context
+
+            prompt = f"""You are writing a short prayer post for a Christian prayer social-media wall (like Twitter/Threads).
+
+EVENT: {disaster_type.replace('_', ' ').title()} affecting {countries_str}
+NEWS DETAIL: {key_detail}
+
+TASK: Write a 1-2 sentence prayer post that:
+- Reads like a heartfelt community post, NOT a formal prayer
+- Mentions the specific location(s) and the type of disaster
+- Includes at least one specific detail from the news (e.g., magnitude, casualties, scale)
+- Ends with a prayerful statement of hope or compassion
+- Is warm, natural, and personal (written in community voice: "Praying for...", "Standing with...", "Lifting up...")
+- Can optionally end with a 🙏 or ✝️ emoji (one only)
+- Maximum 2 sentences, maximum 200 characters total
+
+GOOD EXAMPLES:
+"Praying for the people of California after a 7.7-magnitude earthquake. May God be close to everyone affected and bring swift rescue and comfort. 🙏"
+"Standing with the communities in Queensland as Cyclone Narelle approaches. May God's protection cover every family in its path. 🙏"
+"Lifting up the families in Ethiopia after devastating landslides took over 250 lives. May God bring comfort to those grieving today. ✝️"
+
+BAD EXAMPLES (too long, too formal, starts with "Heavenly Father"):
+- "Heavenly Father, we come before you..." (too formal)
+- Anything over 2 sentences
+
+Return ONLY the post text. No quotes, no labels, no explanations."""
+
+            response = self.client.query(prompt)
+            wall_prayer = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL | re.IGNORECASE).strip()
+            wall_prayer = re.sub(r'\[\d+\]', '', wall_prayer).strip()
+            wall_prayer = re.sub(r'^[""]|[""]$', '', wall_prayer).strip()  # strip surrounding quotes
+            wall_prayer = re.sub(r'\s+', ' ', wall_prayer).strip()
+
+            # Safety: truncate if AI went rogue and wrote way too much
+            if len(wall_prayer) > 300:
+                sentences = re.findall(r'[^.!?]+[.!?]+', wall_prayer)
+                wall_prayer = ' '.join(sentences[:2]).strip()
+                if len(wall_prayer) > 300:
+                    wall_prayer = wall_prayer[:300].rsplit(' ', 1)[0] + '…'
+
+            if not wall_prayer:
+                return self._fallback_wall_prayer(disaster_type, info.get('affected_countries', []))
+
+            logger.info(f"Generated wall prayer for {disaster_type}/{countries_str}: {len(wall_prayer)} chars")
+            return wall_prayer
+
+        except Exception as e:
+            logger.warning(f"Wall prayer generation failed for {disaster_type}: {e}")
+            return self._fallback_wall_prayer(disaster_type, info.get('affected_countries', []))
+
+    def _fallback_wall_prayer(self, disaster_type: str, countries: list) -> str:
+        """Simple template fallback for the wall prayer when AI generation fails."""
+        location = ", ".join(countries[:2]) if countries else "those affected"
+        extra = f" and {len(countries) - 2} more" if len(countries) > 2 else ""
+        dtype = disaster_type.replace('_', ' ')
+        return f"Praying for the people of {location}{extra} affected by {dtype}. May God bring comfort and healing to all those impacted. 🙏"
     
     def process_hourly_disasters(self) -> Dict:
         """

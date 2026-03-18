@@ -293,9 +293,11 @@ def create_app():
         from routes.testimony_bp import testimony_bp
         from routes.prayer_room_bp import prayer_room_bp
         from routes.admin_bp import admin_bp
-        
-        # Exempt auth, prayer, verse, email, testimony, prayer room, nonprofit, seo, and admin blueprints from CSRF protection
-        # Auth uses Firebase token auth, Prayer/Email/SEO use Cloud Scheduler verification, Admin uses passcode
+        from routes.devotional_bp import devotional_bp
+        from routes.groups_bp import groups_bp
+
+        # Exempt auth, prayer, verse, email, testimony, prayer room, nonprofit, seo, admin,
+        # devotional, and groups blueprints from CSRF protection (all use Firebase token auth)
         csrf.exempt(auth_bp)
         csrf.exempt(prayer_bp)
         csrf.exempt(verse_bp)
@@ -305,7 +307,9 @@ def create_app():
         csrf.exempt(nonprofit_bp)
         csrf.exempt(seo_bp)
         csrf.exempt(admin_bp)
-        
+        csrf.exempt(devotional_bp)
+        csrf.exempt(groups_bp)
+
         app.register_blueprint(auth_bp, url_prefix='/api/auth')
         app.register_blueprint(prayer_bp, url_prefix='/api/prayer')
         app.register_blueprint(verse_bp, url_prefix='/api')
@@ -315,6 +319,8 @@ def create_app():
         app.register_blueprint(prayer_room_bp, url_prefix='/api/prayer-room')
         app.register_blueprint(admin_bp)  # Admin routes at root level
         app.register_blueprint(seo_bp)  # SEO routes at root level
+        app.register_blueprint(devotional_bp)  # /api/devotional
+        app.register_blueprint(groups_bp)  # /api/groups
         
         # Exempt prayer room polling endpoints from rate limiting
         # These endpoints need high frequency access for WebRTC signaling and chat

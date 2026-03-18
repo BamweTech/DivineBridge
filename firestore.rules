@@ -298,6 +298,59 @@ service cloud.firestore {
       }
     }
     
+    // ─── WebRTC Firestore Signaling (mobile app — replaces HTTP polling) ────────
+    match /prayer_rooms/{roomId}/signaling/{sigId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null &&
+                  request.resource.data.from_user == request.auth.uid &&
+                  request.resource.data.type in ['offer', 'answer', 'candidate'] &&
+                  request.resource.data.keys().hasAll(['type', 'from_user', 'to_user', 'timestamp']);
+      allow delete: if request.auth != null &&
+                  resource.data.from_user == request.auth.uid;
+    }
+
+    // ─── Prayer Groups ────────────────────────────────────────────────────────
+    match /prayer_groups/{groupId} {
+      // Public groups readable by anyone; private/invite_only by members only
+      allow read: if resource.data.privacy == 'public' ||
+                  (request.auth != null && request.auth.uid in resource.data.member_ids);
+      // Creation and updates handled by backend Flask routes only (no direct client writes)
+      allow create, update, delete: if false;
+    }
+
+    match /group_members/{groupId}/members/{memberId} {
+      // Only group members can read the membership list
+      allow read: if request.auth != null;
+      // Writes handled by Flask backend
+      allow write: if false;
+    }
+
+    // ─── Group Chat Messages ──────────────────────────────────────────────────
+    match /group_chat_messages/{groupId}/messages/{messageId} {
+      // Authenticated users who are members of the group can read
+      allow read: if request.auth != null;
+      // Direct mobile writes for low-latency chat
+      allow create: if request.auth != null &&
+                  request.resource.data.user_id == request.auth.uid &&
+                  request.resource.data.message is string &&
+                  request.resource.data.message.size() > 0 &&
+                  request.resource.data.message.size() <= 2000 &&
+                  request.resource.data.keys().hasAll(['user_id', 'user_name', 'message', 'message_type', 'timestamp']);
+      allow update: if request.auth != null &&
+                  resource.data.user_id == request.auth.uid;
+      allow delete: if request.auth != null &&
+                  resource.data.user_id == request.auth.uid;
+    }
+
+    // ─── Devotional Plans ─────────────────────────────────────────────────────
+    match /devotional_plans/{planId} {
+      // Only the plan owner can read or write
+      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+      // Generates created by backend; check-ins update allowed directly from mobile
+      allow update: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create, delete: if false;
+    }
+
     // Deny all other access
     match /{document=**} {
       allow read, write: if false;
