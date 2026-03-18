@@ -1,5 +1,6 @@
 """Shared authentication helpers for handling user sessions across deployments"""
-from flask import request, session
+from functools import wraps
+from flask import request, session, jsonify, g
 from firebase_admin import auth
 import logging
 
@@ -102,4 +103,21 @@ def get_user_from_session():
         'name': user_name,
         'email': user.get('email')
     }
+
+
+def require_auth(f):
+    """Decorator that requires a valid authenticated user.
+
+    On success sets g.user_id and g.user for the route to use.
+    Returns 401 JSON if no valid user is found.
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+        g.user_id = user['user_id']
+        g.user = user
+        return f(*args, **kwargs)
+    return decorated
 
