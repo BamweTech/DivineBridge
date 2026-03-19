@@ -148,7 +148,7 @@ function handleConnection(ws) {
           }
 
           reply({
-            transportId: transport.id,
+            id: transport.id,
             iceParameters: transport.iceParameters,
             iceCandidates: transport.iceCandidates,
             dtlsParameters: transport.dtlsParameters,
