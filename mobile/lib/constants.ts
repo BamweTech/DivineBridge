@@ -1,4 +1,5 @@
 export const API_BASE_URL = 'https://divinebridge.io';
+export const SFU_URL = 'wss://sfu.divinebridge.io/ws';
 
 export const ROOM_MODES = {
   GROUP_CALL: 'group_call',   // ≤8 participants, full audio+video mesh
