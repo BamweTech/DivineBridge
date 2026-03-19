@@ -59,6 +59,13 @@ local_storage_data/
 # Design assets (optional - can be committed if needed)
 # assets/
 
-# Service Account Keys
+# Service Account Keys (exclude credentials JSON, but allow package manifests)
 *.json
-!static/bible_verses.jsonturn-credentials.txt
+!static/bible_verses.json
+!mobile/package.json
+!mobile/package-lock.json
+!mobile/app.json
+!web-client/package.json
+!web-client/package-lock.json
+!media-server/package.json
+!media-server/package-lock.json

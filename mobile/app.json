@@ -1,0 +1,108 @@
+{
+  "expo": {
+    "name": "Divine Bridge",
+    "slug": "divinebridge",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "io.divinebridge.app",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0F1E"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "io.divinebridge.app",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "associatedDomains": ["applinks:divinebridge.io"],
+      "infoPlist": {
+        "NSCameraUsageDescription": "Divine Bridge uses your camera for video prayer sessions.",
+        "NSMicrophoneUsageDescription": "Divine Bridge uses your microphone for audio prayer sessions.",
+        "UIBackgroundModes": ["audio", "voip", "fetch", "remote-notification"]
+      },
+      "config": {
+        "googleSignIn": {
+          "reservedClientId": "com.googleusercontent.apps.853408757178-lenf52a2i54vnmlg56ml13r78eproef0"
+        }
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0F1E"
+      },
+      "package": "io.divinebridge.app",
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "divinebridge.io",
+              "pathPrefix": "/join"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "17.0"
+          },
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "minSdkVersion": 24
+          }
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Divine Bridge uses your camera for video prayer sessions."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#F59E0B",
+          "sounds": []
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "divinebridge"
+      }
+    }
+  }
+}

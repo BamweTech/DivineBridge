@@ -3517,3 +3517,259 @@ DISASTERS_HUB_TEMPLATE = '''
 {% endblock %}
 '''
 
+
+# ─── Group Invite Landing Page ────────────────────────────────────────────────
+
+_INVITE_LANDING_HTML = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Join {{ group_name }} on DivineBridge</title>
+  <meta name="description" content="{{ group_description }}" />
+  <meta property="og:title" content="Join {{ group_name }} on DivineBridge" />
+  <meta property="og:description" content="{{ group_description }}" />
+  <meta property="og:image" content="https://divinebridge.io/static/og-image.png" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --cream: #faf6ef;
+      --cream2: #f4ede0;
+      --gold: #c49a2e;
+      --gold-dim: rgba(196,154,46,0.12);
+      --gold-border: rgba(196,154,46,0.28);
+      --sage: #4a7c5e;
+      --sage-dim: rgba(74,124,94,0.1);
+      --text: #2c2416;
+      --text2: #6b5a3e;
+      --text3: #a0896a;
+      --border: rgba(196,154,46,0.18);
+      --radius: 20px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+      background: var(--cream);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 40px 32px;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 4px 32px rgba(196,154,46,0.08);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 32px;
+    }
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--gold-dim);
+      border: 1px solid var(--gold-border);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+    .brand-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+    .group-icon {
+      width: 72px;
+      height: 72px;
+      background: var(--sage-dim);
+      border: 1px solid rgba(74,124,94,0.22);
+      border-radius: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      margin: 0 auto 20px;
+    }
+    .invite-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text3);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .group-name {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.5px;
+      margin-bottom: 10px;
+      line-height: 1.2;
+    }
+    .group-desc {
+      font-size: 14px;
+      color: var(--text2);
+      line-height: 1.6;
+      margin-bottom: 6px;
+    }
+    .member-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 12px;
+      background: var(--sage-dim);
+      border: 1px solid rgba(74,124,94,0.22);
+      border-radius: 50px;
+      font-size: 12px;
+      color: var(--sage);
+      font-weight: 500;
+      margin-bottom: 28px;
+    }
+    .divider { height: 1px; background: var(--border); margin: 28px 0; }
+    .open-btn {
+      display: block;
+      width: 100%;
+      padding: 16px;
+      background: var(--gold);
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      margin-bottom: 12px;
+      letter-spacing: -0.2px;
+    }
+    .open-btn:hover { opacity: 0.92; }
+    .download-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+    .download-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 13px;
+      background: var(--cream2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .download-btn:hover { background: var(--gold-dim); border-color: var(--gold-border); }
+    .footnote {
+      font-size: 12px;
+      color: var(--text3);
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">
+      <div class="brand-icon">🕊️</div>
+      <span class="brand-name">DivineBridge</span>
+    </div>
+
+    <div class="group-icon">🙏</div>
+    <p class="invite-label">You've been invited</p>
+    <h1 class="group-name">{{ group_name }}</h1>
+    {% if group_description %}
+    <p class="group-desc">{{ group_description }}</p>
+    {% endif %}
+    {% if member_count > 0 %}
+    <div class="member-badge">
+      <span>👥</span>
+      <span>{{ member_count }} {{ "member" if member_count == 1 else "members" }}</span>
+    </div>
+    {% endif %}
+
+    <div class="divider"></div>
+
+    <a href="{{ app_deep_link }}" class="open-btn">Open in DivineBridge</a>
+
+    <div class="download-row">
+      <a href="{{ app_store_url }}" class="download-btn">
+        <span>🍎</span>
+        <span>App Store</span>
+      </a>
+      <a href="{{ play_store_url }}" class="download-btn">
+        <span>▶</span>
+        <span>Google Play</span>
+      </a>
+    </div>
+
+    <p class="footnote">
+      Don't have the app yet? Download DivineBridge for free and join your prayer community.
+    </p>
+  </div>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', function() {
+      var appLink = '{{ app_deep_link }}';
+      if (appLink) {
+        setTimeout(function() {
+          window.location.href = appLink;
+        }, 800);
+      }
+    });
+  </script>
+</body>
+</html>'''
+
+
+@seo_bp.route('/join/<group_id>')
+def group_invite_landing(group_id: str):
+    """Landing page for group invite links, shown when the app is not installed."""
+    from flask import render_template_string as _rts
+    code = request.args.get('code', '')
+
+    group_name = 'Prayer Group'
+    group_description = ''
+    member_count = 0
+
+    try:
+        from firebase_auth import get_firestore_client
+        db = get_firestore_client()
+        snap = db.collection('prayer_groups').document(group_id).get()
+        if snap.exists:
+            g_data = snap.to_dict()
+            group_name = g_data.get('name', 'Prayer Group')
+            group_description = g_data.get('description', '')
+            member_count = g_data.get('member_count', 0)
+    except Exception:
+        pass
+
+    scheme = 'io.divinebridge.app'
+    if code:
+        app_deep_link = f'{scheme}://join/{group_id}?code={code}'
+    else:
+        app_deep_link = f'{scheme}://join/{group_id}'
+
+    return _rts(
+        _INVITE_LANDING_HTML,
+        group_name=group_name,
+        group_description=group_description,
+        member_count=member_count,
+        app_deep_link=app_deep_link,
+        app_store_url='https://apps.apple.com/app/divinebridge/id6504867574',
+        play_store_url='https://play.google.com/store/apps/details?id=io.divinebridge.app',
+    )

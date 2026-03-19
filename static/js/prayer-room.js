@@ -826,8 +826,26 @@ class PrayerRoomService {
             // Update room info
             this.updateRoomInfo(data);
             
-            // Load chat messages
+            // Load chat messages (initial snapshot via REST)
             await this.loadChatMessages();
+
+            // Subscribe to RTDB for real-time chat delivery (low-latency).
+            // RTDB chat listener is initialized after initRTDB() (called above),
+            // which sets up this.rtdb and this.rtdbRefs.chat.
+            this.subscribeRTDBChat();
+
+            // Notify the SFU layer (sfu-client.js) that the room is ready.
+            // The template listener sets window.__sfuClientActive = true immediately,
+            // so any subsequent joinAudio() call will skip the P2P mesh.
+            document.dispatchEvent(new CustomEvent('prayerRoomJoined', {
+                detail: {
+                    roomId:      this.roomId,
+                    userId:      this.userId,
+                    userName:    this.userName,
+                    isSpeaker:   this.participantRole === 'speaker',
+                    firebaseAuth: window.firebaseAuthInstance ?? null,
+                },
+            }));
 
             // Initialize WebRTC signaling even if user hasn't joined audio yet
             this.initializeWebRTC().catch(err => {
@@ -996,6 +1014,54 @@ class PrayerRoomService {
             console.warn('Failed to initialize RTDB, falling back to HTTP:', e);
             this.rtdb = null;
         }
+    }
+
+    subscribeFirestoreChat() {
+        // Single source of truth for chat — mirrors exactly what the mobile app does.
+        // Both platforms listen to the Firestore 'chat_messages' collection so all
+        // messages are visible regardless of which client sent them.
+        if (!firebase.firestore) return;
+        if (!this.chatMessages) this.chatMessages = [];
+
+        const db = firebase.firestore();
+        this._firestoreChatUnsub = db.collection('chat_messages')
+            .where('room_id', '==', this.roomId)
+            .orderBy('timestamp', 'asc')
+            .limitToLast(100)
+            .onSnapshot((snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type !== 'added') return;
+                    const data = change.doc.data();
+                    const ts = data.timestamp;
+                    const msgTimestamp = ts?.toMillis?.()
+                        ?? (typeof ts === 'number' ? ts : Date.now());
+                    const msg = {
+                        id: change.doc.id,
+                        user_id: data.user_id,
+                        user_name: data.user_name,
+                        message: data.message,
+                        timestamp: msgTimestamp,
+                        status: 'sent',
+                    };
+                    // Deduplicate against optimistic messages
+                    const existingIndex = this.chatMessages.findIndex((m) =>
+                        (m.id === msg.id) ||
+                        (m.tempId && m.user_id === msg.user_id &&
+                         Math.abs((typeof m.timestamp === 'number' ? m.timestamp : Date.now()) - msgTimestamp) < 2000 &&
+                         m.message === msg.message)
+                    );
+                    if (existingIndex !== -1) {
+                        this.chatMessages[existingIndex] = {
+                            ...this.chatMessages[existingIndex], ...msg, tempId: undefined,
+                        };
+                    } else {
+                        this.chatMessages.push(msg);
+                    }
+                    this.updateChatDisplay();
+                });
+            }, (err) => {
+                console.warn('[chat] Firestore listener error:', err);
+            });
     }
 
     subscribeRTDBChat() {
@@ -1437,6 +1503,14 @@ class PrayerRoomService {
     
     async joinAudio(retryAttempt = 0, startUnmuted = false) {
         try {
+            // SFU mode: audio/video is handled by sfu-client.js + the mediasoup SFU.
+            // Skip the entire P2P mesh setup when the SFU client is active.
+            if (window.__sfuClientActive) {
+                this.isAudioEnabled = true;
+                this.updateAudioControls();
+                return;
+            }
+
             // Prevent multiple simultaneous join attempts (but allow retries)
             if (this.isRetryingAudio && retryAttempt === 0) {
                 console.log('🎤 Audio join already in progress, skipping...');
@@ -2317,6 +2391,11 @@ class PrayerRoomService {
                 this.signalPollInterval = null;
             }
             
+            // Detach RTDB chat listener
+            if (this.rtdbRefs && this.rtdbRefs.chat) {
+                this.rtdbRefs.chat.off('child_added');
+            }
+
             // Leave room via API
             await fetch(`/api/prayer-room/leave/${this.roomId}`, {
                 method: 'POST',
@@ -2426,32 +2505,9 @@ class PrayerRoomService {
         this.updateChatDisplay();
         
         try {
-            // Prefer RTDB if available
-            if (this.useRTDB && this.rtdb && this.rtdbRefs.chat) {
-                const messageRef = this.rtdbRefs.chat.push({
-                    user_id: user ? user.uid : this.userId,
-                    user_name: this.userName || (user && user.displayName) || 'Anonymous',
-                    message,
-                    timestamp: firebase.database.ServerValue.TIMESTAMP
-                });
-                
-                // Update optimistic message with real ID and status
-                const optimisticIndex = this.chatMessages.findIndex(m => m.tempId === tempId);
-                if (optimisticIndex !== -1) {
-                    this.chatMessages[optimisticIndex] = {
-                        ...this.chatMessages[optimisticIndex],
-                        id: messageRef.key,
-                        status: 'sent',
-                        tempId: undefined
-                    };
-                    this.updateChatDisplay();
-                }
-                
-                console.log('Chat message sent via RTDB');
-                return;
-            }
-            
-            // REST fallback
+            // Flask REST → writes to Firestore (persistence) + RTDB (delivery).
+            // The RTDB child_added listener in subscribeRTDBChat() delivers
+            // the message back in real-time on all clients.
             const response = await fetch(`/api/prayer-room/${this.roomId}/chat`, {
                 method: 'POST',
                 headers: {

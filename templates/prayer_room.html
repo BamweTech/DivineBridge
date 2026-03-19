@@ -36,7 +36,7 @@ window.addEventListener('load', function() {
                 console.log('Firebase initialized successfully');
                 
                 // Initialize Auth
-                firebase.auth();
+                window.firebaseAuthInstance = firebase.auth();
                 console.log('Firebase Auth initialized');
                 
             } catch (error) {
@@ -387,4 +387,39 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <script src="{{ url_for('static', filename='js/prayer-room.js') }}"></script>
+
+<!-- SFU Audio/Video — mediasoup-client (same library as mobile) -->
+<script src="{{ url_for('static', filename='js/sfu-bundle.js') }}"></script>
+<script src="{{ url_for('static', filename='js/sfu-client.js') }}"></script>
+<script>
+    document.addEventListener('prayerRoomJoined', async function(e) {
+        const { roomId, userId, userName, isSpeaker, firebaseAuth } = e.detail;
+        const auth = firebaseAuth || window.firebaseAuthInstance;
+        if (!auth) {
+            console.error('[sfu] Firebase Auth not available — cannot start SFU client');
+            return;
+        }
+        window.__sfuClientActive = true;
+        try {
+            window.__sfuClient = await createSfuClient({
+                roomId, userId, userName, isSpeaker,
+                videoEnabled: false,
+                firebaseAuth: auth,
+            });
+            window.__sfuClient.onActiveSpeakers = function(ids) {
+                window.prayerRoomService?.updateSfuSpeakers?.(ids);
+            };
+            window.__sfuClient.onPeersChanged = function(peers) {
+                window.prayerRoomService?.updateSfuPeers?.(peers);
+            };
+            window.__sfuClient.onModeChanged = function(mode) {
+                window.prayerRoomService?.updateSfuMode?.(mode);
+            };
+            console.log('[sfu] Client ready — audio/video via mediasoup SFU');
+        } catch (err) {
+            console.error('[sfu] Failed to start SFU client:', err);
+            window.__sfuClientActive = false;
+        }
+    });
+</script>
 {% endblock %}

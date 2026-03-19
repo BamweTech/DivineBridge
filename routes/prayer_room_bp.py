@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, session, render_template, current_app
-from firebase_auth import get_firestore_client
+from firebase_auth import get_firestore_client, get_rtdb_client
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from input_validation import validate_data, sanitize_string
@@ -281,6 +281,55 @@ def get_ice_config():
             {'urls': 'stun:stun1.l.google.com:19302'}
         ]
         return jsonify({'iceServers': fallback_servers}), 200
+
+@prayer_room_bp.route('/sfu-token/<room_id>', methods=['POST'])
+def get_sfu_token(room_id):
+    """Issue a Firebase Custom Token for the SFU WebSocket server.
+
+    Why Firebase Custom Token instead of a shared JWT secret:
+      - Firebase rotates signing keys automatically — zero ops overhead
+      - No secret to share, store, or rotate across services
+      - The SFU verifies it directly against Firebase's public JWKS
+      - roomId is embedded as a custom claim so the SFU can enforce room access
+
+    Flow:
+      1. Client calls this endpoint → gets a Firebase custom token
+      2. Client calls Firebase Auth signInWithCustomToken() → gets a Firebase ID token
+      3. Client presents the ID token to the SFU WebSocket on join
+      4. SFU calls firebase_admin.auth().verify_id_token() — no shared secret needed
+    """
+    try:
+        import firebase_admin.auth as fa
+
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+
+        user_id = user['user_id']
+        user_name = user.get('display_name') or user.get('name') or 'Anonymous'
+
+        # Embed roomId + userName as custom claims so the SFU can read them
+        # without a separate DB lookup.
+        custom_token = fa.create_custom_token(
+            user_id,
+            developer_claims={
+                'roomId': room_id,
+                'userName': user_name,
+            }
+        )
+
+        # custom_token is bytes from firebase-admin, decode to string
+        if isinstance(custom_token, bytes):
+            custom_token = custom_token.decode('utf-8')
+
+        sfu_url = os.getenv('SFU_URL', 'ws://localhost:3000/ws')
+
+        return jsonify({'customToken': custom_token, 'sfuUrl': sfu_url})
+
+    except Exception as e:
+        logging.error(f'SFU token error: {e}', exc_info=True)
+        return jsonify({'error': 'Failed to generate SFU token'}), 500
+
 
 @prayer_room_bp.route('/create', methods=['POST'])
 def create_prayer_room():
@@ -1132,7 +1181,24 @@ def send_chat_message(room_id):
         
         message_ref = db.collection('chat_messages').add(chat_data)
         logging.info(f"Chat message added successfully for room {room_id} by user {user_id}")
-        
+
+        # Also write to RTDB for real-time delivery to all connected clients
+        try:
+            rtdb = get_rtdb_client()
+            if rtdb:
+                import time as _time
+                rtdb_data = {
+                    'message_id': chat_data['message_id'],
+                    'room_id': room_id,
+                    'user_id': user_id,
+                    'user_name': user_name,
+                    'message': message,
+                    'timestamp': int(_time.time() * 1000),
+                }
+                rtdb.reference(f'/rooms/{room_id}/chat').push(rtdb_data)
+        except Exception as rtdb_err:
+            logging.warning(f"RTDB chat write failed (non-fatal): {rtdb_err}")
+
         return jsonify({'success': True, 'message_id': chat_data['message_id']}), 200
         
     except KeyError as e:
@@ -1313,346 +1379,6 @@ def end_room(room_id):
     except Exception as e:
         logging.error(f"Error ending room: {str(e)}")
         return jsonify({'error': 'Failed to end room'}), 500
-
-@prayer_room_bp.route('/room/<room_id>/speaking-state', methods=['POST'])
-def update_speaking_state(room_id):
-    """Update user's speaking state in the room"""
-    try:
-        user = get_user_from_session()
-        
-        if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
-        data = request.get_json()
-        is_speaking = data.get('is_speaking', False)
-        
-        db = get_firestore_client()
-        
-        # Get the room document
-        room_ref = db.collection('prayer_rooms').document(room_id)
-        room_doc = room_ref.get()
-        
-        if not room_doc.exists:
-            return jsonify({'error': 'Room not found'}), 404
-        
-        room_data = room_doc.to_dict()
-        participants = room_data.get('participants', [])
-        
-        # Find and update the participant's speaking state
-        participant_found = False
-        for participant in participants:
-            if participant['user_id'] == user['user_id']:
-                participant['is_speaking'] = is_speaking
-                participant['last_activity'] = datetime.utcnow()
-                participant_found = True
-                break
-        
-        # If participant not found, create a new participant entry
-        if not participant_found:
-            # Get the actual user name from the session
-            user_name = user.get('name', user.get('user_name', 'Anonymous'))
-            new_participant = {
-                'user_id': user['user_id'],
-                'user_name': user_name,
-                'joined_at': datetime.utcnow(),
-                'is_muted': False,
-                'is_host': False,
-                'is_speaking': is_speaking,
-                'last_activity': datetime.utcnow(),
-                'role': 'listener',
-                'requested_role': None,
-                'request_timestamp': None
-            }
-            participants.append(new_participant)
-        
-        participants, _, participants_changed = normalize_participants(participants, room_data.get('host_id'))
-
-        # Update the room document with the modified participants
-        update_payload = {
-            'participants': participants,
-            'last_activity': datetime.utcnow()
-        }
-        if participants_changed or room_data.get('max_speakers') is None:
-            update_payload['max_speakers'] = get_max_speakers(room_data)
-
-        room_ref.update(update_payload)
-        
-        # Log speaking state for debugging
-        user_name = user.get('name', user.get('user_name', 'Anonymous'))
-        if is_speaking:
-            logging.info(f"🎤 User {user_name} ({user['user_id']}) is speaking in room {room_id}")
-        else:
-            logging.info(f"🔇 User {user_name} ({user['user_id']}) stopped speaking in room {room_id}")
-        
-        return jsonify({'success': True})
-        
-    except Exception as e:
-        logging.error(f"Error updating speaking state: {str(e)}")
-        return jsonify({'error': 'Failed to update speaking state'}), 500
-
-@prayer_room_bp.route('/room/<room_id>/webrtc-offer', methods=['POST'])
-def send_webrtc_offer(room_id):
-    """Send WebRTC offer to another participant"""
-    try:
-        user = get_user_from_session()
-        
-        if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
-        data = request.get_json()
-        to_user = data.get('to_user')
-        offer = data.get('offer')
-        
-        if not to_user or not offer:
-            return jsonify({'error': 'Missing required fields'}), 400
-        
-        # Validate WebRTC offer data
-        if not isinstance(offer, dict) or 'type' not in offer or 'sdp' not in offer:
-            return jsonify({'error': 'Invalid offer format'}), 400
-        
-        if offer['type'] != 'offer':
-            return jsonify({'error': 'Invalid offer type'}), 400
-        
-        # Validate SDP size and content
-        sdp = offer.get('sdp', '')
-        if len(sdp) > 10000:  # 10KB limit for SDP
-            return jsonify({'error': 'SDP too large'}), 400
-        
-        # Basic SDP validation
-        if not sdp.startswith('v=0') or 'm=' not in sdp:
-            return jsonify({'error': 'Invalid SDP format'}), 400
-        
-        db = get_firestore_client()
-        
-        # Store WebRTC offer
-        offer_ref = db.collection('prayer_rooms').document(room_id)\
-            .collection('webrtc_offers').add({
-            'from_user': user['user_id'],
-            'to_user': to_user,
-            'offer': offer,
-            'timestamp': firestore.SERVER_TIMESTAMP
-        })
-        
-        return jsonify({'success': True})
-        
-    except Exception as e:
-        logging.error(f"Error sending WebRTC offer: {str(e)}")
-        return jsonify({'error': 'Failed to send WebRTC offer'}), 500
-
-@prayer_room_bp.route('/room/<room_id>/webrtc-answer', methods=['POST'])
-def send_webrtc_answer(room_id):
-    """Send WebRTC answer to another participant"""
-    try:
-        user = get_user_from_session()
-        
-        if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
-        data = request.get_json()
-        to_user = data.get('to_user')
-        answer = data.get('answer')
-        
-        if not to_user or not answer:
-            return jsonify({'error': 'Missing required fields'}), 400
-        
-        # Validate WebRTC answer data
-        if not isinstance(answer, dict) or 'type' not in answer or 'sdp' not in answer:
-            return jsonify({'error': 'Invalid answer format'}), 400
-        
-        if answer['type'] != 'answer':
-            return jsonify({'error': 'Invalid answer type'}), 400
-        
-        # Validate SDP size and content
-        sdp = answer.get('sdp', '')
-        if len(sdp) > 10000:  # 10KB limit for SDP
-            return jsonify({'error': 'SDP too large'}), 400
-        
-        # Basic SDP validation
-        if not sdp.startswith('v=0') or 'm=' not in sdp:
-            return jsonify({'error': 'Invalid SDP format'}), 400
-        
-        db = get_firestore_client()
-        
-        # Store WebRTC answer
-        answer_ref = db.collection('prayer_rooms').document(room_id)\
-            .collection('webrtc_answers').add({
-            'from_user': user['user_id'],
-            'to_user': to_user,
-            'answer': answer,
-            'timestamp': firestore.SERVER_TIMESTAMP
-        })
-        
-        return jsonify({'success': True})
-        
-    except Exception as e:
-        logging.error(f"Error sending WebRTC answer: {str(e)}")
-        return jsonify({'error': 'Failed to send WebRTC answer'}), 500
-
-@prayer_room_bp.route('/room/<room_id>/webrtc-offers', methods=['GET'])
-def get_webrtc_offers(room_id):
-    """Get WebRTC offers for a room"""
-    try:
-        user = get_user_from_session()
-        
-        if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
-        db = get_firestore_client()
-        
-        # Get offers for this user (simplified query to avoid composite index requirement)
-        offers_ref = db.collection('prayer_rooms').document(room_id)\
-            .collection('webrtc_offers')\
-            .where('to_user', '==', user['user_id'])\
-            .limit(10)
-        
-        offers = []
-        for doc in offers_ref.stream():
-            offer_data = doc.to_dict()
-            offer_data['id'] = doc.id
-            offers.append(offer_data)
-        
-        # Sort by timestamp descending (most recent first)
-        # Handle Firestore timestamp objects properly
-        def get_timestamp_sort_key(item):
-            timestamp = item.get('timestamp')
-            if hasattr(timestamp, 'timestamp'):
-                return timestamp.timestamp()
-            elif isinstance(timestamp, dict) and '_seconds' in timestamp:
-                return timestamp['_seconds']
-            else:
-                return 0
-        
-        offers.sort(key=get_timestamp_sort_key, reverse=True)
-        
-        return jsonify(offers)
-        
-    except Exception as e:
-        logging.error(f"Error getting WebRTC offers: {str(e)}")
-        return jsonify({'error': 'Failed to get WebRTC offers'}), 500
-
-@prayer_room_bp.route('/room/<room_id>/webrtc-answers', methods=['GET'])
-def get_webrtc_answers(room_id):
-    """Get WebRTC answers for a room"""
-    try:
-        user = get_user_from_session()
-        
-        if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
-        db = get_firestore_client()
-        
-        # Get answers for this user (simplified query to avoid composite index requirement)
-        answers_ref = db.collection('prayer_rooms').document(room_id)\
-            .collection('webrtc_answers')\
-            .where('to_user', '==', user['user_id'])\
-            .limit(10)
-        
-        answers = []
-        for doc in answers_ref.stream():
-            answer_data = doc.to_dict()
-            answer_data['id'] = doc.id
-            answers.append(answer_data)
-        
-        # Sort by timestamp descending (most recent first)
-        # Handle Firestore timestamp objects properly
-        def get_timestamp_sort_key(item):
-            timestamp = item.get('timestamp')
-            if hasattr(timestamp, 'timestamp'):
-                return timestamp.timestamp()
-            elif isinstance(timestamp, dict) and '_seconds' in timestamp:
-                return timestamp['_seconds']
-            else:
-                return 0
-        
-        answers.sort(key=get_timestamp_sort_key, reverse=True)
-        
-        return jsonify(answers)
-        
-    except Exception as e:
-        logging.error(f"Error getting WebRTC answers: {str(e)}")
-        return jsonify({'error': 'Failed to get WebRTC answers'}), 500
-
-@prayer_room_bp.route('/room/<room_id>/webrtc-candidate', methods=['POST'])
-def send_webrtc_candidate(room_id):
-    """Send WebRTC ICE candidate to another participant"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-        
-        # Get authenticated user from session
-        user = get_user_from_session()
-        if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
-        to_user = data.get('to_user')
-        candidate = data.get('candidate')
-        
-        if not to_user or not candidate:
-            return jsonify({'error': 'Missing required fields: to_user and candidate'}), 400
-        
-        db = get_firestore_client()
-        
-        # Store the candidate in Firestore
-        candidate_data = {
-            'from_user': user['user_id'],
-            'to_user': to_user,
-            'candidate': candidate,
-            'timestamp': datetime.utcnow(),
-            'room_id': room_id
-        }
-        
-        db.collection('prayer_rooms').document(room_id)\
-            .collection('webrtc_candidates').add(candidate_data)
-        
-        logging.info(f"WebRTC candidate sent from {user['user_id']} to {to_user} in room {room_id}")
-        
-        return jsonify({'success': True, 'message': 'Candidate sent successfully'}), 200
-        
-    except Exception as e:
-        logging.error(f"Error sending WebRTC candidate: {str(e)}")
-        return jsonify({'error': 'Failed to send candidate'}), 500
-
-@prayer_room_bp.route('/room/<room_id>/webrtc-candidates', methods=['GET'])
-def get_webrtc_candidates(room_id):
-    """Get WebRTC candidates for a room"""
-    try:
-        user = get_user_from_session()
-        
-        if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
-        db = get_firestore_client()
-        
-        # Get candidates for this user
-        candidates_ref = db.collection('prayer_rooms').document(room_id)\
-            .collection('webrtc_candidates')\
-            .where('to_user', '==', user['user_id'])\
-            .limit(10)
-        
-        candidates = []
-        for doc in candidates_ref.stream():
-            candidate_data = doc.to_dict()
-            candidate_data['id'] = doc.id
-            candidates.append(candidate_data)
-        
-        # Sort by timestamp descending (most recent first)
-        def get_timestamp_sort_key(item):
-            timestamp = item.get('timestamp')
-            if hasattr(timestamp, 'timestamp'):
-                return timestamp.timestamp()
-            elif isinstance(timestamp, dict) and '_seconds' in timestamp:
-                return timestamp['_seconds']
-            else:
-                return 0
-        
-        candidates.sort(key=get_timestamp_sort_key, reverse=True)
-        
-        return jsonify(candidates)
-        
-    except Exception as e:
-        logging.error(f"Error getting WebRTC candidates: {str(e)}")
-        return jsonify({'error': 'Failed to get WebRTC candidates'}), 500
 
 # Multi-Device Session Management Endpoints
 @prayer_room_bp.route('/<room_id>/check-session', methods=['POST'])

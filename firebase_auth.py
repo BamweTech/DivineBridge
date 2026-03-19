@@ -1,5 +1,5 @@
 import firebase_admin
-from firebase_admin import credentials, auth, firestore
+from firebase_admin import credentials, auth, firestore, db as rtdb_module
 from flask import current_app
 import logging
 import json
@@ -80,7 +80,8 @@ def initialize_firebase():
                 # Initialize app with explicit options
                 firebase_admin.initialize_app(cred, {
                     'projectId': firebase_project_id,
-                    'storageBucket': f"{firebase_project_id}.appspot.com"
+                    'storageBucket': f"{firebase_project_id}.appspot.com",
+                    'databaseURL': f"https://{firebase_project_id}-default-rtdb.firebaseio.com",
                 })
                 
                 logger.info("Firebase initialized successfully")
@@ -333,4 +334,14 @@ def get_firestore_client():
         return firestore.client()
     except Exception as e:
         logger.error(f"Error getting Firestore client: {e}")
+        return None
+
+def get_rtdb_client():
+    """Get Firebase Realtime Database reference module"""
+    try:
+        if not firebase_admin._apps:
+            initialize_firebase()
+        return rtdb_module
+    except Exception as e:
+        logger.error(f"Error getting RTDB client: {e}")
         return None

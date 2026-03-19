@@ -1,0 +1,16 @@
+{
+  "name": "divinebridge-web-client",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser bundle for mediasoup-client — used by sfu-client.js in the web prayer room.",
+  "scripts": {
+    "build": "esbuild src/index.js --bundle --outfile=../static/js/sfu-bundle.js --global-name=mediasoupClient --platform=browser --target=es2017 --minify",
+    "build:dev": "esbuild src/index.js --bundle --outfile=../static/js/sfu-bundle.js --global-name=mediasoupClient --platform=browser --target=es2017 --sourcemap"
+  },
+  "dependencies": {
+    "mediasoup-client": "^3.18.7"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

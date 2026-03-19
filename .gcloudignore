@@ -60,4 +60,16 @@ temp_*
 .env
 .venv
 ENV/
-*.log 
+*.log
+
+# Mobile app (not needed in Flask container)
+mobile/
+
+# Media server (deployed separately to GCE)
+media-server/
+
+# Misc
+*.DS_Store
+flask_session/
+*.md
+divinebridge-app-v4.html

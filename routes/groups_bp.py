@@ -171,6 +171,61 @@ def join_group(group_id: str):
     return jsonify({'success': True, 'message': f'Joined "{group["name"]}"'}), 200
 
 
+@groups_bp.route('/join-by-code', methods=['POST'])
+@require_auth
+def join_by_code():
+    """Look up a group by invite_code and join it (used when only the code is known)."""
+    data = request.get_json(silent=True) or {}
+    code = (data.get('code') or '').strip().upper()
+
+    if not code:
+        return jsonify({'error': 'Invite code is required'}), 400
+
+    uid = g.user_id
+    db = get_firestore_client()
+
+    # Find the group with this invite code
+    snaps = list(
+        db.collection('prayer_groups')
+        .where('invite_code', '==', code)
+        .limit(1)
+        .stream()
+    )
+    if not snaps:
+        return jsonify({'error': 'Invalid invite code. Please check and try again.'}), 404
+
+    group_doc = snaps[0]
+    group_id = group_doc.id
+    group = group_doc.to_dict()
+
+    if uid in group.get('member_ids', []):
+        return jsonify({'success': True, 'message': 'Already a member', 'group_id': group_id, 'group_name': group.get('name', '')}), 200
+
+    # Fetch display name
+    user_snap = db.collection('users').document(uid).get()
+    display_name = user_snap.to_dict().get('displayName', 'Unknown') if user_snap.exists else 'Unknown'
+
+    ref = db.collection('prayer_groups').document(group_id)
+    ref.update({
+        'member_ids': firestore.ArrayUnion([uid]),
+        'member_count': firestore.Increment(1),
+        'updated_at': firestore.SERVER_TIMESTAMP,
+    })
+    db.collection('group_members').document(group_id).collection('members').document(uid).set({
+        'uid': uid,
+        'display_name': display_name,
+        'role': 'member',
+        'joined_at': firestore.SERVER_TIMESTAMP,
+    })
+
+    return jsonify({
+        'success': True,
+        'message': f'Joined "{group.get("name", "group")}"',
+        'group_id': group_id,
+        'group_name': group.get('name', ''),
+    }), 200
+
+
 @groups_bp.route('/<group_id>/leave', methods=['POST'])
 @require_auth
 def leave_group(group_id: str):
