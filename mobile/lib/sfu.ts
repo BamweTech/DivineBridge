@@ -81,6 +81,9 @@ export class SfuEngine {
   private localStream: any | null = null;
   private currentMode: RoomMode = ROOM_MODES.GROUP_CALL;
 
+  /** newConsumer events that arrived before recvTransport was ready */
+  private pendingConsumers: any[] = [];
+
   private peers = new Map<string, PeerEntry>();
   private activeSpeakers: string[] = [];
 
@@ -147,6 +150,7 @@ export class SfuEngine {
     await this.device.load({
       routerRtpCapabilities: joinResult.routerRtpCapabilities,
     });
+    console.log('[sfu] device loaded, rtpCapabilities keys:', Object.keys(this.device.rtpCapabilities ?? {}));
 
     // 3. Tell the server our RTP capabilities so it can create consumers for us
     await this._request('setRtpCapabilities', {
@@ -335,7 +339,12 @@ export class SfuEngine {
         break;
 
       case 'newConsumer':
-        await this._consumeTrack(data);
+        if (!this.recvTransport) {
+          // recvTransport not ready yet — buffer and process after setup
+          this.pendingConsumers.push(data);
+        } else {
+          await this._consumeTrack(data);
+        }
         break;
 
       case 'consumerClosed': {
@@ -443,6 +452,7 @@ export class SfuEngine {
   private async _setupRecvTransport() {
     const params = await this._request('createTransport', { direction: 'receive' });
 
+    console.log('[sfu] recvTransport params keys:', Object.keys(params ?? {}));
     this.recvTransport = this.device.createRecvTransport(params);
 
     this.recvTransport.on(
@@ -456,6 +466,16 @@ export class SfuEngine {
           .catch(errback);
       }
     );
+
+    // Signal server that recv transport is ready — it will now fan out existing producers.
+    // Also drain any newConsumer events that arrived before this point.
+    await this._request('readyToConsume', {});
+    for (const pending of this.pendingConsumers) {
+      await this._consumeTrack(pending).catch((e) =>
+        console.warn('[sfu] pending consumer error:', e)
+      );
+    }
+    this.pendingConsumers = [];
   }
 
   private async _consumeTrack(data: {

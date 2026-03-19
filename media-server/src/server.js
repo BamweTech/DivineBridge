@@ -143,8 +143,8 @@ function handleConnection(ws) {
             peer.sendTransport = transport;
           } else {
             peer.receiveTransport = transport;
-            // Now subscribe this peer to all existing producers
-            await room.subscribeNewPeerToExistingProducers(peer);
+            // Do NOT subscribe here — wait for the client to signal readyToConsume
+            // so the recvTransport is fully set up before newConsumer events arrive.
           }
 
           reply({
@@ -197,7 +197,15 @@ function handleConnection(ws) {
           break;
         }
 
-        // ── 6. Resume consumer (client ACK after receiving newConsumer) ────────
+        // ── 6. Client signals recv transport is ready — fan out existing producers
+        case 'readyToConsume': {
+          if (!peer || !room) return error('Not joined');
+          await room.subscribeNewPeerToExistingProducers(peer);
+          reply({});
+          break;
+        }
+
+        // ── 7. Resume consumer (client ACK after receiving newConsumer) ────────
         case 'resumeConsumer': {
           if (!peer) return error('Not joined');
           const { consumerId } = data;
@@ -208,7 +216,7 @@ function handleConnection(ws) {
           break;
         }
 
-        // ── 7. Pause / resume own producer (mute/unmute) ──────────────────────
+        // ── 8. Pause / resume own producer (mute/unmute) ──────────────────────
         case 'pauseProducer': {
           if (!peer) return error('Not joined');
           const producer = peer.producers.get(data.producerId);
