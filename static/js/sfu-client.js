@@ -348,6 +348,10 @@ class SfuClient {
         dtlsParameters,
       }).then(callback).catch(errback);
     });
+
+    // Signal server that recv transport is ready so it fans out existing producers.
+    // Mirrors the mobile sfu.ts readyToConsume handshake.
+    await this._request('readyToConsume', {});
   }
 
   async _consumeTrack({ consumerId, producerId, kind, rtpParameters, producerUserId, appData }) {

@@ -829,10 +829,8 @@ class PrayerRoomService {
             // Load chat messages (initial snapshot via REST)
             await this.loadChatMessages();
 
-            // Subscribe to RTDB for real-time chat delivery (low-latency).
-            // RTDB chat listener is initialized after initRTDB() (called above),
-            // which sets up this.rtdb and this.rtdbRefs.chat.
-            this.subscribeRTDBChat();
+            // Note: subscribeRTDBChat() is called inside initRTDB() above —
+            // do NOT call it again here or every message will appear twice.
 
             // Notify the SFU layer (sfu-client.js) that the room is ready.
             // The template listener sets window.__sfuClientActive = true immediately,
