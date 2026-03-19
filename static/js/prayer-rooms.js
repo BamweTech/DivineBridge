@@ -879,10 +879,52 @@ class PrayerRoomsDirectory {
     }
     
     setupRealtimeUpdates() {
-        // Set up periodic refresh of rooms list
-        setInterval(() => {
+        // Use Firestore real-time listener so rooms appear instantly
+        if (typeof firebase !== 'undefined' && typeof firebase.firestore === 'function') {
+            try {
+                const db = firebase.firestore();
+                this._liveRoomsUnsub = db.collection('prayer_rooms')
+                    .where('is_active', '==', true)
+                    .onSnapshot((snapshot) => {
+                        const rooms = [];
+                        snapshot.forEach((doc) => {
+                            const data = doc.data();
+                            const participantCount = Array.isArray(data.participants) ? data.participants.length : 0;
+                            rooms.push({
+                                ...data,
+                                room_id: doc.id,
+                                participant_count: participantCount,
+                                participants: undefined,
+                                created_at: data.created_at && data.created_at.toDate
+                                    ? data.created_at.toDate().toISOString()
+                                    : data.created_at,
+                            });
+                        });
+                        // Sort newest first client-side (avoids composite index requirement)
+                        rooms.sort((a, b) => {
+                            const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+                            const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+                            return tb - ta;
+                        });
+                        this.rooms = rooms;
+                        this.renderRooms();
+                    }, (err) => {
+                        console.warn('[rooms] Firestore snapshot error, falling back to polling:', err);
+                        this._startPolling();
+                    });
+                console.log('[rooms] Real-time Firestore listener attached');
+                return;
+            } catch (e) {
+                console.warn('[rooms] Could not attach Firestore listener, falling back to polling:', e);
+            }
+        }
+        this._startPolling();
+    }
+
+    _startPolling() {
+        this._pollInterval = setInterval(() => {
             this.loadActiveRooms();
-        }, 30000); // Refresh every 30 seconds
+        }, 30000);
     }
 
     hideAllModals() {

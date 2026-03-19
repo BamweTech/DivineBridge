@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/stores/authStore';
 import { THEME_COLORS } from '@/lib/constants';
 import Icon from '@/components/ui/Icon';
+import { useLiveRooms } from '@/hooks/useGroups';
 import type { PrayerRoom, ScheduledSession } from '@/types';
 
 dayjs.extend(relativeTime);
@@ -135,11 +136,8 @@ export default function RoomsScreen() {
   const { user } = useAuthStore();
   const [tab, setTab] = useState<'live' | 'scheduled'>('live');
 
-  const liveRoomsQuery = useQuery({
-    queryKey: ['live-rooms'],
-    queryFn: () => roomApi.list(),
-    refetchInterval: 15000,
-  });
+  // Real-time Firestore listener — no polling delay
+  const { rooms: liveRooms, isLoading: liveLoading } = useLiveRooms();
 
   const scheduledQuery = useQuery({
     queryKey: ['scheduled-sessions'],
@@ -176,7 +174,6 @@ export default function RoomsScreen() {
     }
   }
 
-  const liveRooms: PrayerRoom[] = liveRoomsQuery.data?.rooms ?? [];
   const sessions: ScheduledSession[] = scheduledQuery.data?.sessions ?? [];
 
   return (
@@ -228,14 +225,14 @@ export default function RoomsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={tab === 'live' ? liveRoomsQuery.isFetching : scheduledQuery.isFetching}
-            onRefresh={() => queryClient.invalidateQueries({ queryKey: tab === 'live' ? ['live-rooms'] : ['scheduled-sessions'] })}
+            refreshing={tab === 'live' ? liveLoading : scheduledQuery.isFetching}
+            onRefresh={() => { if (tab !== 'live') queryClient.invalidateQueries({ queryKey: ['scheduled-sessions'] }); }}
             tintColor={THEME_COLORS.gold}
           />
         }
       >
         {tab === 'live' ? (
-          liveRoomsQuery.isLoading ? (
+          liveLoading ? (
             <ActivityIndicator color={THEME_COLORS.gold} style={{ marginTop: 40 }} />
           ) : liveRooms.length === 0 ? (
             <View style={{ alignItems: 'center', paddingTop: 60 }}>

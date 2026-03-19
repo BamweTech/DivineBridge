@@ -13,7 +13,44 @@ import {
 import { db } from '@/lib/firebase';
 import { COLLECTIONS } from '@/lib/constants';
 import { useAuthStore } from '@/stores/authStore';
-import type { PrayerGroup, GroupChatMessage } from '@/types';
+import type { PrayerGroup, GroupChatMessage, PrayerRoom } from '@/types';
+
+// useLiveRooms — real-time Firestore listener for active prayer rooms.
+// Rooms appear instantly when created without polling.
+export function useLiveRooms() {
+  const [rooms, setRooms] = useState<PrayerRoom[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(
+      collection(db, COLLECTIONS.PRAYER_ROOMS),
+      where('is_active', '==', true)
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const data: PrayerRoom[] = snap.docs.map((d) => {
+          const raw = d.data();
+          return {
+            ...raw,
+            room_id: d.id,
+          } as PrayerRoom;
+        });
+        // Sort newest first client-side (avoids composite index requirement)
+        data.sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
+        setRooms(data);
+        setIsLoading(false);
+      },
+      () => {
+        setRooms([]);
+        setIsLoading(false);
+      }
+    );
+    return unsub;
+  }, []);
+
+  return { rooms, isLoading };
+}
 
 // useMyGroups — removes orderBy to avoid composite index requirement.
 // Results are sorted client-side by created_at descending.
