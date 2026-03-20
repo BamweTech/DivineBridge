@@ -298,6 +298,20 @@ export default function RoomScreen() {
         </Pressable>
       </View>
 
+      {/* Hidden RTCViews for audio-only peers — react-native-webrtc needs
+          an RTCView mounted to activate audio playback on iOS/Android.
+          Placed outside the chat/participants toggle so audio stays alive
+          regardless of which tab is active. */}
+      {Array.from(peers.values()).map((peer) => (
+        peer.stream && !peer.isVideoEnabled ? (
+          <RTCView
+            key={`audio-${peer.userId}`}
+            streamURL={peer.stream.toURL()}
+            style={{ width: 0, height: 0, opacity: 0, position: 'absolute' }}
+          />
+        ) : null
+      ))}
+
       {/* Main content */}
       <View style={{ flex: 1 }}>
         {showChat ? (
@@ -349,6 +363,7 @@ export default function RoomScreen() {
         ) : (
           /* Participants / video panel */
           <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+
             {/* Video views (group call mode) */}
             {isGroupCall && (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>

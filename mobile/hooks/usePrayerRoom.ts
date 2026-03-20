@@ -6,23 +6,16 @@ import {
 import { ref, query as rtdbQuery, limitToLast, onChildAdded, off } from 'firebase/database';
 import { db, auth, rtdb } from '@/lib/firebase';
 import { signInWithCustomToken } from 'firebase/auth';
-import { COLLECTIONS, ROOM_MODES } from '@/lib/constants';
+import { COLLECTIONS, ROOM_MODES, SFU_URL } from '@/lib/constants';
 import { SfuEngine } from '@/lib/sfu';
 import type { PeerEntry } from '@/lib/sfu';
 import { roomApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import type { PrayerRoom, ChatMessage, RoomMode, Participant } from '@/types';
 
-// ── Dev override ──────────────────────────────────────────────────────────────
-// When __DEV__ is true (all local/simulator builds), skip the Flask sfuToken
-// call and connect directly to the SFU running on your Mac.
-// The iOS simulator routes `localhost` to the Mac, so no tunnel needed.
-// Set DEV_SFU_URL to undefined to fall through to the real Flask flow.
-// In dev builds, override the SFU address returned by Flask so the simulator
-// and a real device both hit the same production SFU.
-// Auth always goes through Flask → Firebase regardless of this override.
-// Set to undefined to use whatever Flask returns (production default).
-const DEV_SFU_URL = __DEV__ ? 'ws://34.75.185.102:3000/ws' : undefined;
+// Always use the hardcoded SFU_URL constant — Flask's sfuUrl response defaults
+// to localhost when SFU_URL env var is not set on Cloud Run, which would break
+// both simulator and real-device builds. Auth always goes through Flask → Firebase.
 
 export function usePrayerRoom(roomId: string) {
   const { user, profile } = useAuthStore();
@@ -94,10 +87,8 @@ export function usePrayerRoom(roomId: string) {
       //    In dev builds, override the SFU URL so simulator + real device
       //    both hit the same production SFU (auth is always real Firebase).
       const resp = await roomApi.sfuToken(roomId);
-      const sfuUrl = DEV_SFU_URL ?? resp.sfuUrl;
-      if (DEV_SFU_URL) {
-        console.log('[room] DEV — overriding SFU URL to', sfuUrl);
-      }
+      const sfuUrl = SFU_URL;
+      console.log('[room] SFU URL:', sfuUrl);
       await signInWithCustomToken(auth, resp.customToken);
       const token = await auth.currentUser!.getIdToken();
 

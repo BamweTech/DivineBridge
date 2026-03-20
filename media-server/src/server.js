@@ -293,12 +293,21 @@ app.get('/health', (_req, res) => {
     workers: workers.length,
     rooms: rooms.size,
     peers: Array.from(rooms.values()).reduce((n, r) => n + r.peers.size, 0),
+    announcedIp: config.webRtcTransportOptions.listenInfos[0]?.announcedAddress,
   });
 });
 
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
 
 async function main() {
+  // Resolve the public IP for ICE candidates before anything else.
+  // On GCE this auto-detects from the metadata server; locally it stays 127.0.0.1.
+  const announcedIp = await config.resolveAnnouncedIp();
+  for (const info of config.webRtcTransportOptions.listenInfos) {
+    info.announcedAddress = announcedIp;
+  }
+  console.log(`[sfu] Announced IP: ${announcedIp}`);
+
   await createWorkers();
 
   const server = http.createServer(app);

@@ -39,7 +39,9 @@ class Room {
   // ─── Peer Management ─────────────────────────────────────────────────────────
 
   addPeer(peer) {
+    const prevMode = this.getMode();
     this.peers.set(peer.userId, peer);
+    this._checkModeTransition(prevMode);
   }
 
   getPeer(userId) {
@@ -47,6 +49,7 @@ class Room {
   }
 
   removePeer(userId) {
+    const prevMode = this.getMode();
     const peer = this.peers.get(userId);
     if (peer) {
       peer.close();
@@ -54,6 +57,7 @@ class Room {
     }
     // Notify remaining peers
     this.broadcast(userId, { event: 'peerLeft', data: { userId } });
+    this._checkModeTransition(prevMode);
   }
 
   isEmpty() {
@@ -238,6 +242,16 @@ class Room {
 
   getMode() {
     return this.peers.size > 8 ? 'prayer_room' : 'group_call';
+  }
+
+  _checkModeTransition(prevMode) {
+    const newMode = this.getMode();
+    if (newMode !== prevMode) {
+      this.broadcast(null, {
+        event: 'modeChanged',
+        data: { mode: newMode },
+      });
+    }
   }
 
   // ─── Cleanup ──────────────────────────────────────────────────────────────────

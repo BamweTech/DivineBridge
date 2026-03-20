@@ -1502,10 +1502,18 @@ class PrayerRoomService {
     async joinAudio(retryAttempt = 0, startUnmuted = false) {
         try {
             // SFU mode: audio/video is handled by sfu-client.js + the mediasoup SFU.
-            // Skip the entire P2P mesh setup when the SFU client is active.
+            // We still need to resume the AudioContext (browser autoplay policy
+            // requires a user-gesture activation) and ensure any existing SFU
+            // peer audio elements can play.
             if (window.__sfuClientActive) {
                 this.isAudioEnabled = true;
                 this.updateAudioControls();
+                await this.enableAudioPlayback();
+                // Trigger play() on all SFU audio elements created before
+                // this user-gesture activation.
+                document.querySelectorAll('audio[id^="sfu-audio-"]').forEach((el) => {
+                    el.play().catch(() => {});
+                });
                 return;
             }
 
@@ -2353,6 +2361,17 @@ class PrayerRoomService {
             // Reset mute state
             this.muteStateSyncing = false;
             
+            // Tear down SFU client if active
+            if (window.__sfuClient) {
+                window.__sfuClient.destroy();
+                window.__sfuClient = null;
+                window.__sfuClientActive = false;
+            }
+            document.querySelectorAll('audio[id^="sfu-audio-"]').forEach((el) => {
+                el.srcObject = null;
+                el.remove();
+            });
+
             // Stop local stream
             if (this.localStream) {
                 this.localStream.getTracks().forEach(track => track.stop());
@@ -4823,6 +4842,79 @@ Listening for unmute event...`);
             console.error(`🔍 Error validating audio stream from ${source}:`, error);
             return false;
         }
+    }
+
+    // ─── SFU Bridge Methods ─────────────────────────────────────────────────
+    // Called from the template when the mediasoup SFU client receives remote
+    // peer streams.  Creates/removes <audio> elements so remote audio is
+    // actually heard by the user.
+
+    updateSfuPeers(peers) {
+        if (!peers || typeof peers.forEach !== 'function') return;
+
+        const activePeerIds = new Set();
+
+        peers.forEach((peer, peerId) => {
+            if (peerId === this.userId) return;
+            activePeerIds.add(peerId);
+
+            const audioElId = `sfu-audio-${peerId}`;
+            let el = document.getElementById(audioElId);
+
+            if (peer.stream) {
+                const audioTracks = peer.stream.getAudioTracks();
+                if (audioTracks.length === 0) return;
+
+                if (!el) {
+                    el = document.createElement('audio');
+                    el.id = audioElId;
+                    el.autoplay = true;
+                    el.playsInline = true;
+                    el.controls = false;
+                    el.volume = 1.0;
+                    el.muted = false;
+                    document.body.appendChild(el);
+                }
+
+                if (el.srcObject !== peer.stream) {
+                    el.srcObject = peer.stream;
+                    el.play().catch(() => {
+                        console.warn(`[sfu] autoplay blocked for ${peerId} — retrying on interaction`);
+                        const resume = () => {
+                            el.play().catch(() => {});
+                            document.removeEventListener('click', resume);
+                        };
+                        document.addEventListener('click', resume, { once: true });
+                    });
+                }
+
+                el.muted = !!peer.isMuted;
+            }
+        });
+
+        // Remove audio elements for peers that left
+        document.querySelectorAll('audio[id^="sfu-audio-"]').forEach((el) => {
+            const peerId = el.id.replace('sfu-audio-', '');
+            if (!activePeerIds.has(peerId)) {
+                el.srcObject = null;
+                el.remove();
+            }
+        });
+    }
+
+    updateSfuSpeakers(ids) {
+        if (!Array.isArray(ids)) return;
+        // Update speaking indicators in the participants UI
+        document.querySelectorAll('.participant').forEach((el) => {
+            const uid = el.getAttribute('data-user-id');
+            if (uid) {
+                el.classList.toggle('speaking', ids.includes(uid));
+            }
+        });
+    }
+
+    updateSfuMode(mode) {
+        console.log('[sfu] Mode changed to:', mode);
     }
 
     // Method to handle audio autoplay issues (optimized for speed)

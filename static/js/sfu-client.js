@@ -61,6 +61,9 @@ class SfuClient {
     /** consumerId → { userId, kind } */
     this._consumerMeta = new Map();
 
+    /** newConsumer events that arrived before recvTransport was ready */
+    this._pendingConsumers = [];
+
     /** @type {MediaStream | null} */
     this.localStream = null;
 
@@ -250,7 +253,11 @@ class SfuClient {
         break;
 
       case 'newConsumer':
-        await this._consumeTrack(data);
+        if (!this._recvTransport) {
+          this._pendingConsumers.push(data);
+        } else {
+          await this._consumeTrack(data);
+        }
         break;
 
       case 'consumerClosed': {
@@ -352,6 +359,12 @@ class SfuClient {
     // Signal server that recv transport is ready so it fans out existing producers.
     // Mirrors the mobile sfu.ts readyToConsume handshake.
     await this._request('readyToConsume', {});
+
+    // Drain any newConsumer events that arrived before the transport was ready
+    for (const pending of this._pendingConsumers) {
+      await this._consumeTrack(pending).catch(console.error);
+    }
+    this._pendingConsumers = [];
   }
 
   async _consumeTrack({ consumerId, producerId, kind, rtpParameters, producerUserId, appData }) {

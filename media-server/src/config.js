@@ -2,8 +2,52 @@
 
 require('dotenv').config();
 const os = require('os');
+const http = require('http');
 
-module.exports = {
+// ─── Public IP Detection ──────────────────────────────────────────────────────
+// On GCE, fetch the external IP from the metadata server so ICE candidates
+// advertise the correct address.  Falls back to ANNOUNCED_IP env var, then
+// 127.0.0.1 for local development.
+
+function fetchGcePublicIp() {
+  return new Promise((resolve) => {
+    const req = http.get(
+      'http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip',
+      { headers: { 'Metadata-Flavor': 'Google' }, timeout: 2000 },
+      (res) => {
+        let body = '';
+        res.on('data', (c) => { body += c; });
+        res.on('end', () => resolve(body.trim() || null));
+      },
+    );
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+  });
+}
+
+/**
+ * Resolve the public IP to announce in ICE candidates.
+ * Priority: explicit ANNOUNCED_IP env var (if not 127.0.0.1) → GCE metadata → 127.0.0.1
+ */
+async function resolveAnnouncedIp() {
+  const envIp = process.env.ANNOUNCED_IP;
+
+  if (envIp && envIp !== '127.0.0.1') {
+    return envIp;
+  }
+
+  const gceIp = await fetchGcePublicIp();
+  if (gceIp) {
+    console.log(`[config] Auto-detected GCE public IP: ${gceIp}`);
+    return gceIp;
+  }
+
+  return '127.0.0.1';
+}
+
+// ─── Config (announced IP patched at startup by server.js) ────────────────────
+
+const config = {
   // ─── HTTP / WebSocket ────────────────────────────────────────────────────────
   port: parseInt(process.env.PORT ?? '3000', 10),
 
@@ -61,18 +105,18 @@ module.exports = {
     },
   ],
 
-  // ICE / DTLS transport settings
+  // ICE / DTLS transport settings — announcedAddress is patched by resolveAnnouncedIp()
   webRtcTransportOptions: {
     listenInfos: [
       {
         protocol: 'udp',
         ip: '0.0.0.0',
-        announcedAddress: process.env.ANNOUNCED_IP ?? '127.0.0.1',
+        announcedAddress: '127.0.0.1', // placeholder, resolved at startup
       },
       {
         protocol: 'tcp',
         ip: '0.0.0.0',
-        announcedAddress: process.env.ANNOUNCED_IP ?? '127.0.0.1',
+        announcedAddress: '127.0.0.1', // placeholder, resolved at startup
       },
     ],
     initialAvailableOutgoingBitrate: 1_000_000,
@@ -80,4 +124,8 @@ module.exports = {
     maxSctpMessageSize: 262144,
     maxIncomingBitrate: 1_500_000,
   },
+
+  resolveAnnouncedIp,
 };
+
+module.exports = config;
