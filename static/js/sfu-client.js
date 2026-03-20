@@ -334,10 +334,14 @@ class SfuClient {
     });
 
     for (const track of (this.localStream?.getTracks() ?? [])) {
-      if (track.kind === 'audio') {
-        this._audioProducer = await this._sendTransport.produce({ track });
-      } else if (track.kind === 'video') {
-        this._videoProducer = await this._sendTransport.produce({ track });
+      try {
+        if (track.kind === 'audio') {
+          this._audioProducer = await this._sendTransport.produce({ track });
+        } else if (track.kind === 'video') {
+          this._videoProducer = await this._sendTransport.produce({ track });
+        }
+      } catch (err) {
+        console.warn(`[sfu] failed to produce ${track.kind} track:`, err?.message ?? err);
       }
     }
   }

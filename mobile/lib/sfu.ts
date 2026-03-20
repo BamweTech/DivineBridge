@@ -177,8 +177,13 @@ export class SfuEngine {
 
     // 6. Acquire mic and publish (speakers only)
     if (this.isSpeaker) {
-      await this._acquireLocalMedia({ audio: true, video: options.videoEnabled ?? false });
+      const stream = await this._acquireLocalMedia({ audio: true, video: options.videoEnabled ?? false });
+      const tracks = stream?.getTracks?.() ?? [];
+      console.log(`[sfu] local tracks: ${tracks.map((t: any) => `${t.kind}(${t.readyState})`).join(', ') || 'none'}`);
       await this._setupSendTransport();
+      if (!this.audioProducer) {
+        console.warn('[sfu] audio producer was not created — mic may not work (simulator limitation)');
+      }
     }
   }
 
@@ -437,12 +442,19 @@ export class SfuEngine {
       }
     );
 
-    // Produce each local track
+    // Produce each local track — catch per-track errors so a codec failure
+    // (common on the iOS Simulator) doesn't take down the entire session.
     for (const track of (this.localStream?.getTracks?.() ?? [])) {
-      if (track.kind === 'audio') {
-        this.audioProducer = await this.sendTransport.produce({ track });
-      } else if (track.kind === 'video') {
-        this.videoProducer = await this.sendTransport.produce({ track });
+      try {
+        if (track.kind === 'audio') {
+          this.audioProducer = await this.sendTransport.produce({ track });
+          console.log('[sfu] audio producer created');
+        } else if (track.kind === 'video') {
+          this.videoProducer = await this.sendTransport.produce({ track });
+          console.log('[sfu] video producer created');
+        }
+      } catch (err: any) {
+        console.warn(`[sfu] failed to produce ${track.kind} track:`, err?.message ?? err);
       }
     }
   }
