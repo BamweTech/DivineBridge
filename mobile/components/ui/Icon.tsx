@@ -43,6 +43,7 @@ export type IconName =
   | 'calendar'
   | 'plus'
   | 'chevron-r'
+  | 'chevron-d'
   | 'back'
   | 'mic-off'
   | 'mic'
@@ -168,6 +169,10 @@ const Icon: React.FC<IconProps> = ({
 
     'chevron-r': (
       <Polyline {...s} points="9 18 15 12 9 6" />
+    ),
+
+    'chevron-d': (
+      <Polyline {...s} points="6 9 12 15 18 9" />
     ),
 
     back: (

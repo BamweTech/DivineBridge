@@ -63,24 +63,27 @@ async function generate(filename, size, logoColor, bgColor, padding) {
 async function main() {
   if (!existsSync(ASSETS)) await mkdir(ASSETS, { recursive: true });
 
-  // iOS app icon — 1024×1024, brand blue bg, white logo
-  await generate('icon.png', 1024, '#ffffff', '#0f56ff', 0.18);
+  const GOLD = '#b07d20';
+  const CREAM = '#faf6ef';
 
-  // Android adaptive icon foreground — 1024×1024, transparent bg, white logo
-  await generate('adaptive-icon.png', 1024, '#ffffff', null, 0.18);
+  // iOS app icon — 1024×1024, gold bg, white logo
+  await generate('icon.png', 1024, '#ffffff', GOLD, 0.18);
 
-  // Splash screen icon — 512×512, white logo on dark bg
-  await generate('splash-icon.png', 512, '#ffffff', '#0A0F1E', 0.14);
+  // Android adaptive icon foreground — 1024×1024, transparent bg, gold logo
+  await generate('adaptive-icon.png', 1024, GOLD, null, 0.18);
+
+  // Splash screen icon — 512×512, gold logo on cream bg
+  await generate('splash-icon.png', 512, GOLD, CREAM, 0.14);
 
   // Android notification icon — 96×96, white on transparent
   await generate('notification-icon.png', 96, '#ffffff', null, 0.12);
 
-  // Web favicon — 48×48, brand blue bg, white logo
-  await generate('favicon.png', 48, '#ffffff', '#0f56ff', 0.16);
+  // Web favicon — 48×48, gold bg, white logo
+  await generate('favicon.png', 48, '#ffffff', GOLD, 0.16);
 
-  // Android adaptive icon foreground pieces (keep background separate)
+  // Android adaptive icon foreground pieces
   await generate('android-icon-foreground.png', 1024, '#ffffff', null, 0.18);
-  await generate('android-icon-background.png', 1024, '#0f56ff', '#0f56ff', 0.5); // solid bg
+  await generate('android-icon-background.png', 1024, GOLD, GOLD, 0.5);
   await generate('android-icon-monochrome.png', 1024, '#ffffff', null, 0.18);
 
   console.log('\nAll icons generated in mobile/assets/');

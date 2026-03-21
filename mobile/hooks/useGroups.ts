@@ -13,6 +13,7 @@ import {
 import { db } from '@/lib/firebase';
 import { COLLECTIONS } from '@/lib/constants';
 import { useAuthStore } from '@/stores/authStore';
+import { getDisplayName } from '@/lib/userDisplayName';
 import type { PrayerGroup, GroupChatMessage, PrayerRoom } from '@/types';
 
 // useLiveRooms — real-time Firestore listener for active prayer rooms.
@@ -182,13 +183,13 @@ export function useGroupChat(groupId: string) {
   }, [groupId]);
 
   async function sendMessage(text: string, type: GroupChatMessage['message_type'] = 'text') {
-    if (!user || !profile) return;
+    if (!user) return;
     await addDoc(
       collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages'),
       {
         user_id: user.uid,
-        user_name: profile.displayName,
-        user_photo: profile.photoURL ?? null,
+        user_name: getDisplayName(profile, user),
+        user_photo: profile?.photoURL ?? null,
         message: text.trim(),
         message_type: type,
         timestamp: serverTimestamp(),

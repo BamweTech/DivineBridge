@@ -1,4 +1,4 @@
-import React, { useState, useCallback, memo } from 'react';
+import React, { useState, useCallback, memo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -243,14 +243,39 @@ interface GlobalWatchPost {
 
 const FADE_IN_ANIMATION = FadeInDown.duration(350);
 
-const GlobalWatchCard = memo(function GlobalWatchCard({ post }: { post: GlobalWatchPost }) {
+const GlobalWatchCard = memo(function GlobalWatchCard({
+  post,
+  onPray,
+}: {
+  post: GlobalWatchPost;
+  /** Must call API; resolves when tracked, rejects on failure. */
+  onPray: () => Promise<void>;
+}) {
   const [prayed, setPrayed] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
   const countries = post.affected_countries.slice(0, 3);
   const extra = post.affected_countries.length - 3;
 
-  function handlePray() {
-    setPrayed(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  async function handlePray() {
+    if (prayed || busy || !post.id) return;
+    setBusy(true);
+    try {
+      await onPray();
+      setPrayed(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Something went wrong';
+      const isAuth =
+        /unauthorized|401|sign in|authentication/i.test(msg) || msg === 'HTTP 401';
+      Alert.alert(
+        'Could not record prayer',
+        isAuth
+          ? 'Your session may have expired. Try again, or sign out and back in if this keeps happening.'
+          : msg
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -317,9 +342,11 @@ const GlobalWatchCard = memo(function GlobalWatchCard({ post }: { post: GlobalWa
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <Pressable
             onPress={handlePray}
+            disabled={busy || prayed || !post.id}
             style={({ pressed }) => ({
               flexDirection: 'row', alignItems: 'center', gap: 6,
               paddingHorizontal: 14, paddingVertical: 8, borderRadius: 50,
+              opacity: busy ? 0.65 : 1,
               backgroundColor: prayed
                 ? 'rgba(112,64,184,0.16)'
                 : pressed ? 'rgba(112,64,184,0.1)' : 'rgba(112,64,184,0.06)',
@@ -329,7 +356,7 @@ const GlobalWatchCard = memo(function GlobalWatchCard({ post }: { post: GlobalWa
           >
             <Icon name="pray" size={14} color={THEME_COLORS.violet} />
             <Text style={{ color: THEME_COLORS.violet, fontFamily: 'Geist_600SemiBold', fontSize: 13 }}>
-              {prayed ? 'Prayed 🙏' : 'I Prayed'}
+              {busy ? 'Saving…' : prayed ? 'Prayed 🙏' : 'I Prayed'}
             </Text>
           </Pressable>
           <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 11, flex: 1, textAlign: 'right' }}>
@@ -551,11 +578,34 @@ function PrayerWallFeed({ currentUserId, onCompose }: { currentUserId?: string; 
     refetchInterval: 5 * 60_000, // global watch refreshes every 5 min
   });
 
+  const bumpHomePrayMetrics = () => {
+    queryClient.setQueryData(
+      ['home-prayer-metrics'],
+      (old: { wall_pray_last_7_days?: number; wall_pray_streak_days?: number } | undefined) => {
+        if (!old) return old;
+        return {
+          ...old,
+          wall_pray_last_7_days: (old.wall_pray_last_7_days ?? 0) + 1,
+        };
+      }
+    );
+  };
+
   const prayMutation = useMutation({
     mutationFn: (id: string) => prayerRequestApi.pray(id),
     onSuccess: () => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       queryClient.invalidateQueries({ queryKey: ['prayer-wall'] });
+      bumpHomePrayMetrics();
+      queryClient.invalidateQueries({ queryKey: ['home-prayer-metrics'] });
+    },
+  });
+
+  const globalWatchPrayMutation = useMutation({
+    mutationFn: (id: string) => globalWatchApi.pray(id),
+    onSuccess: () => {
+      bumpHomePrayMetrics();
+      queryClient.invalidateQueries({ queryKey: ['home-prayer-metrics'] });
     },
   });
 
@@ -604,7 +654,12 @@ function PrayerWallFeed({ currentUserId, onCompose }: { currentUserId?: string; 
   const renderItem = useCallback(
     ({ item }: { item: FeedItem }) =>
       item.kind === 'global' ? (
-        <GlobalWatchCard post={item.data as GlobalWatchPost} />
+        <GlobalWatchCard
+          post={item.data as GlobalWatchPost}
+          onPray={async () => {
+            await globalWatchPrayMutation.mutateAsync((item.data as GlobalWatchPost).id);
+          }}
+        />
       ) : (
         <PrayerCard
           post={item.data as PrayerPost}
@@ -612,7 +667,7 @@ function PrayerWallFeed({ currentUserId, onCompose }: { currentUserId?: string; 
           onPray={() => prayMutation.mutate((item.data as PrayerPost).id)}
         />
       ),
-    [currentUserId, prayMutation]
+    [currentUserId, prayMutation, globalWatchPrayMutation]
   );
 
   if (isLoading) {
@@ -685,8 +740,21 @@ function PrayerWallFeed({ currentUserId, onCompose }: { currentUserId?: string; 
 export default function GroupsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
   const { user } = useAuthStore();
   const [tab, setTab] = useState<Tab>('mine');
+
+  // Deep link / Activity hub: /(tabs)/groups?tab=prayer-wall
+  useEffect(() => {
+    if (tabParam === 'prayer-wall' || tabParam === 'mine') {
+      setTab(tabParam);
+    }
+  }, [tabParam]);
+
+  function selectTab(next: Tab) {
+    setTab(next);
+    router.setParams({ tab: next });
+  }
   const [showCreate, setShowCreate] = useState(false);
   const [showCompose, setShowCompose] = useState(false);
   const { groups: myGroups, isLoading: myLoading } = useMyGroups();
@@ -752,7 +820,7 @@ export default function GroupsScreen() {
           ] as { key: Tab; label: string }[]).map((t) => (
             <Pressable
               key={t.key}
-              onPress={() => setTab(t.key)}
+              onPress={() => selectTab(t.key)}
               style={{
                 flex: 1, paddingVertical: 8, borderRadius: 10,
                 backgroundColor: tab === t.key ? THEME_COLORS.bg2 : 'transparent',
@@ -800,7 +868,7 @@ export default function GroupsScreen() {
               </Text>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <Button label="Create Group" onPress={() => setShowCreate(true)} />
-                <Button label="Prayer Wall" onPress={() => setTab('prayer-wall')} variant="secondary" />
+                <Button label="Prayer Wall" onPress={() => selectTab('prayer-wall')} variant="secondary" />
               </View>
             </View>
           ) : (

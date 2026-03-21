@@ -4,13 +4,16 @@ import { ROOM_MODES, MESSAGE_TYPES } from '@/lib/constants';
 
 export interface UserProfile {
   uid: string;
-  displayName: string;
+  /** @deprecated Prefer firstName + lastName from server profile; kept for legacy mobile docs */
+  displayName?: string;
+  firstName?: string;
+  lastName?: string;
   email: string;
   photoURL?: string;
   bio?: string;
   phone?: string;
   linkedIn?: string;
-  createdAt: number;
+  createdAt?: number;
   groups?: string[];
 }
 

@@ -1,10 +1,10 @@
 import { auth } from '@/lib/firebase';
 import { API_BASE_URL } from '@/lib/constants';
 
-async function getAuthHeaders(): Promise<HeadersInit> {
+async function getAuthHeaders(forceRefresh = false): Promise<HeadersInit> {
   const user = auth.currentUser;
   if (!user) return { 'Content-Type': 'application/json' };
-  const token = await user.getIdToken();
+  const token = await user.getIdToken(forceRefresh);
   return {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`,
@@ -15,14 +15,36 @@ async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const headers = await getAuthHeaders();
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: { ...headers, ...(options.headers ?? {}) },
-  });
-  const json = await res.json();
+  async function doFetch(forceRefresh: boolean): Promise<Response> {
+    const headers = await getAuthHeaders(forceRefresh);
+    return fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers: { ...headers, ...(options.headers ?? {}) },
+    });
+  }
+
+  let res = await doFetch(false);
+  if (res.status === 401 && auth.currentUser) {
+    res = await doFetch(true);
+  }
+
+  const text = await res.text();
+  let json: Record<string, unknown> = {};
+  if (text) {
+    try {
+      json = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+    }
+  }
   if (!res.ok) {
-    throw new Error(json.error ?? json.message ?? `HTTP ${res.status}`);
+    throw new Error(
+      (typeof json.error === 'string' && json.error) ||
+        (typeof json.message === 'string' && json.message) ||
+        `HTTP ${res.status}`
+    );
   }
   return json as T;
 }
@@ -49,6 +71,13 @@ export const verseApi = {
     request<any>(`/api/today-verse/${date}/like`, { method: 'POST' }),
   unlike: (date: string) =>
     request<any>(`/api/today-verse/${date}/like`, { method: 'DELETE' }),
+  getInteractions: (date: string) =>
+    request<any>(`/api/today-verse/${date}/interactions`),
+  share: (date: string) =>
+    request<any>(`/api/today-verse/${date}/share`, {
+      method: 'POST',
+      body: JSON.stringify({ platform: 'mobile' }),
+    }),
 };
 
 // ─── Prayer Rooms ─────────────────────────────────────────────────────────────
@@ -157,11 +186,22 @@ export const devotionalApi = {
 export const globalWatchApi = {
   /** Returns active disaster prayers from the Global Prayer Watch system. */
   list: () => request<any>('/api/prayer/global-watch'),
+  /** Authenticated: track "I prayed" on a Global Watch card (same metrics as Prayer Wall). */
+  pray: (prayerId: string) =>
+    request<{ message: string; reference: string }>('/api/prayer/global-watch/pray', {
+      method: 'POST',
+      body: JSON.stringify({ prayer_id: prayerId }),
+    }),
 };
 
 // ─── Prayer Requests ─────────────────────────────────────────────────────────
 
 export const prayerRequestApi = {
+  /** Authenticated: Prayer Wall tap metrics for home (rolling 7 days + wall streak). */
+  getHomePrayerMetrics: () =>
+    request<{ wall_pray_last_7_days: number; wall_pray_streak_days: number }>(
+      '/api/prayer/my/home-prayer-metrics'
+    ),
   list: () => request<any>('/api/prayer/prayers'),
   // Backend validates `title` (min 5, max 200) and `content` (min 10, max 2000).
   // We auto-generate `title` from the first 60 chars of the prayer so the UX

@@ -319,6 +319,10 @@ export default function RootLayout() {
             name="group/[id]"
             options={{ animation: 'slide_from_right' }}
           />
+          <Stack.Screen
+            name="activity"
+            options={{ animation: 'slide_from_right' }}
+          />
         </Stack>
 
         {/* Deep link invite modal — shown on top of everything when user is logged in */}

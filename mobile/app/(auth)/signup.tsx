@@ -15,10 +15,12 @@ import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { THEME_COLORS } from '@/lib/constants';
+import { validatePasswordStrength } from '@/lib/passwordStrength';
 import DivineBridgeLogo from '@/components/ui/DivineBridgeLogo';
 
 export default function SignupScreen() {
-  const [displayName, setDisplayName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -28,9 +30,13 @@ export default function SignupScreen() {
 
   function validate(): boolean {
     const e: Record<string, string> = {};
-    if (displayName.trim().length < 2) e.displayName = 'Enter your full name';
+    const fn = firstName.trim();
+    const ln = lastName.trim();
+    if (fn.length < 1) e.firstName = 'Enter your first name';
+    if (ln.length < 1) e.lastName = 'Enter your last name';
     if (!email.includes('@')) e.email = 'Enter a valid email';
-    if (password.length < 8) e.password = 'Password must be at least 8 characters';
+    const pw = validatePasswordStrength(password);
+    if (!pw.valid && pw.message) e.password = pw.message;
     if (password !== confirmPassword) e.confirmPassword = 'Passwords do not match';
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -39,7 +45,7 @@ export default function SignupScreen() {
   async function handleSignup() {
     if (!validate()) return;
     try {
-      await signup(email.trim().toLowerCase(), password, displayName.trim());
+      await signup(email.trim().toLowerCase(), password, firstName.trim(), lastName.trim());
     } catch (err: any) {
       Alert.alert('Sign up failed', err.message);
     }
@@ -110,13 +116,22 @@ export default function SignupScreen() {
 
         <Animated.View entering={FadeInDown.delay(150).duration(600)}>
           <Input
-            label="Full Name"
-            value={displayName}
-            onChangeText={setDisplayName}
-            placeholder="Your name"
+            label="First Name"
+            value={firstName}
+            onChangeText={setFirstName}
+            placeholder="First name"
             autoCapitalize="words"
-            autoComplete="name"
-            error={errors.displayName}
+            autoComplete="given-name"
+            error={errors.firstName}
+          />
+          <Input
+            label="Last Name"
+            value={lastName}
+            onChangeText={setLastName}
+            placeholder="Last name"
+            autoCapitalize="words"
+            autoComplete="family-name"
+            error={errors.lastName}
           />
           <Input
             label="Email"
@@ -132,7 +147,7 @@ export default function SignupScreen() {
             label="Password"
             value={password}
             onChangeText={setPassword}
-            placeholder="Min. 8 characters"
+            placeholder="Upper, lower, number, special"
             isPassword
             autoComplete="new-password"
             error={errors.password}

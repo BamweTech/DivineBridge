@@ -1,6 +1,6 @@
 from google.cloud import storage
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import json
 import random
 from config import get_config
@@ -17,7 +17,7 @@ from google.oauth2 import service_account
 import io
 import tempfile
 import uuid
-from typing import Optional
+from typing import Optional, Tuple, Set
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -531,6 +531,93 @@ class StorageHandler:
         except Exception as e:
             logger.error(f"Error adding user prayed prayer: {e}")
             return False
+
+    def record_wall_pray_event(self, user_id: str, request_id: str) -> bool:
+        """
+        Append a timestamped Prayer Wall "I prayed" event for metrics (weekly count, streak).
+        """
+        try:
+            blob_path = f'user_interactions/{user_id}/wall_pray_events.json'
+            data = self.get_json_from_storage(blob_path) or {'events': []}
+            events = data.get('events', [])
+            now = datetime.now(timezone.utc).isoformat()
+            events.append({'at': now, 'request_id': request_id})
+            if len(events) > 4000:
+                events = events[-4000:]
+            data['events'] = events
+            data['updated_at'] = now
+            return self.save_json_to_storage(blob_path, data)
+        except Exception as e:
+            logger.error(f"Error recording wall pray event for {user_id}: {e}")
+            return False
+
+    def _parse_event_dates(self, user_id: str) -> Tuple[list, Set]:
+        """Load wall pray events; return (raw_events, set of UTC dates with activity)."""
+        try:
+            blob_path = f'user_interactions/{user_id}/wall_pray_events.json'
+            data = self.get_json_from_storage(blob_path) or {}
+            events = data.get('events', [])
+        except Exception as e:
+            logger.error(f"Error loading wall pray events: {e}")
+            return [], set()
+        days: Set = set()
+        for e in events:
+            raw = e.get('at')
+            if not raw:
+                continue
+            try:
+                ts = raw.replace('Z', '+00:00')
+                if ts.endswith('+00:00') or ts.count('+') > 0 or ts.count('-') > 3:
+                    dt = datetime.fromisoformat(ts)
+                else:
+                    dt = datetime.fromisoformat(ts).replace(tzinfo=timezone.utc)
+                days.add(dt.astimezone(timezone.utc).date())
+            except Exception:
+                continue
+        return events, days
+
+    def count_wall_pray_events_last_days(self, user_id: str, days: int) -> int:
+        """Number of Prayer Wall pray taps in the last `days` days (rolling, UTC)."""
+        events, _ = self._parse_event_dates(user_id)
+        if not events:
+            return 0
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        n = 0
+        for e in events:
+            raw = e.get('at')
+            if not raw:
+                continue
+            try:
+                ts = raw.replace('Z', '+00:00')
+                dt = datetime.fromisoformat(ts)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                else:
+                    dt = dt.astimezone(timezone.utc)
+                if dt >= cutoff:
+                    n += 1
+            except Exception:
+                continue
+        return n
+
+    def get_wall_pray_streak_days(self, user_id: str) -> int:
+        """
+        Consecutive calendar days (UTC) with at least one wall pray, anchored from today
+        or yesterday (grace if user hasn't opened the app yet today).
+        """
+        _, days = self._parse_event_dates(user_id)
+        if not days:
+            return 0
+        today = datetime.now(timezone.utc).date()
+        if today not in days and (today - timedelta(days=1)) not in days:
+            return 0
+        anchor = today if today in days else today - timedelta(days=1)
+        streak = 0
+        d = anchor
+        while d in days:
+            streak += 1
+            d -= timedelta(days=1)
+        return streak
     
     def get_user_stats(self, user_id: str) -> dict:
         """

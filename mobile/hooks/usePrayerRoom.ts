@@ -6,11 +6,12 @@ import {
 import { ref, query as rtdbQuery, limitToLast, onChildAdded, off } from 'firebase/database';
 import { db, auth, rtdb } from '@/lib/firebase';
 import { signInWithCustomToken } from 'firebase/auth';
-import { COLLECTIONS, ROOM_MODES, SFU_URL } from '@/lib/constants';
+import { COLLECTIONS, ROOM_MODES, SFU_URL, MESSAGE_TYPES } from '@/lib/constants';
 import { SfuEngine } from '@/lib/sfu';
 import type { PeerEntry } from '@/lib/sfu';
 import { roomApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
+import { getDisplayName } from '@/lib/userDisplayName';
 import type { PrayerRoom, ChatMessage, RoomMode, Participant } from '@/types';
 
 // Always use the hardcoded SFU_URL constant — Flask's sfuUrl response defaults
@@ -64,6 +65,7 @@ export function usePrayerRoom(roomId: string) {
         user_id: val.user_id,
         user_name: val.user_name,
         message: val.message,
+        message_type: val.message_type ?? MESSAGE_TYPES.TEXT,
         timestamp: val.timestamp,
       };
       setMessages((prev) => {
@@ -76,7 +78,7 @@ export function usePrayerRoom(roomId: string) {
 
   // ── Join room ────────────────────────────────────────────────────────────────
   const join = useCallback(async (code?: string) => {
-    if (!user || !profile || !roomId) return;
+    if (!user || !roomId) return;
     try {
       // 1. Join room on Flask backend (updates Firestore participants)
       const result = await roomApi.join(roomId, code);
@@ -96,7 +98,7 @@ export function usePrayerRoom(roomId: string) {
       const engine = new SfuEngine({
         roomId,
         userId: user.uid,
-        userName: profile.displayName,
+        userName: getDisplayName(profile, user),
         isSpeaker,
         sfuUrl,
         token,

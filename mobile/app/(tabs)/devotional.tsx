@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,8 @@ import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/stores/authStore';
 import Icon from '@/components/ui/Icon';
 import type { DevotionalPlan, DevotionalDay } from '@/types';
+import { useSpeechPlayback } from '@/hooks/useSpeechPlayback';
+import { useFocusEffect } from 'expo-router';
 
 const THEMES = [
   'Faith & Trust', 'Healing & Restoration', 'Peace & Stillness',
@@ -90,7 +92,19 @@ function WeekStrip({ plan }: { plan: DevotionalPlan }) {
 
 // ─── Day Card ─────────────────────────────────────────────────────────────────
 
-function DayCard({ day, isToday, onCheckIn }: { day: DevotionalDay; isToday: boolean; onCheckIn: () => void }) {
+function DayCard({
+  day,
+  isToday,
+  onCheckIn,
+  listenLabel,
+  onListen,
+}: {
+  day: DevotionalDay;
+  isToday: boolean;
+  onCheckIn: () => void;
+  listenLabel: string;
+  onListen: () => void;
+}) {
   return (
     <View style={{
       backgroundColor: isToday ? '#f5edd8' : THEME_COLORS.bg2,
@@ -152,6 +166,25 @@ function DayCard({ day, isToday, onCheckIn }: { day: DevotionalDay; isToday: boo
           {day.prayer}
         </Text>
       </View>
+
+      <Pressable
+        onPress={onListen}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          marginTop: 14,
+          paddingVertical: 10,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: THEME_COLORS.goldBorder,
+          backgroundColor: THEME_COLORS.goldDim,
+        }}
+      >
+        <Icon name="audio" size={14} color={THEME_COLORS.gold} />
+        <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 13 }}>{listenLabel}</Text>
+      </Pressable>
 
       {isToday && !day.completed && (
         <Button label="Mark as Complete" onPress={onCheckIn} style={{ marginTop: 16 }} size="sm" />
@@ -282,6 +315,30 @@ export default function DevotionalScreen() {
   const [plan, setPlan] = useState<DevotionalPlan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refresh, setRefresh] = useState(0);
+  const { toggle: speechToggle, stop: stopSpeech, isSpeaking, activeSource } = useSpeechPlayback();
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => stopSpeech();
+    }, [stopSpeech])
+  );
+
+  const handleListenDay = useCallback(
+    (day: DevotionalDay) => {
+      const source = `day-${day.day}`;
+      speechToggle(
+        [
+          `Day ${day.day}. ${day.title}`,
+          day.scripture,
+          `Reference: ${day.scripture_reference}`,
+          day.reflection,
+          day.prayer,
+        ],
+        source
+      );
+    },
+    [speechToggle]
+  );
 
   // Query without orderBy to avoid composite index requirement.
   // We get all the user's plans and pick the most recent one client-side.
@@ -402,6 +459,8 @@ export default function DevotionalScreen() {
                 day={day}
                 isToday={day.day === plan.current_day}
                 onCheckIn={() => handleCheckIn(day.day)}
+                listenLabel={activeSource === `day-${day.day}` && isSpeaking ? 'Stop' : 'Listen'}
+                onListen={() => handleListenDay(day)}
               />
             </Animated.View>
           ))}

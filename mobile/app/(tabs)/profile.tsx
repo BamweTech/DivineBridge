@@ -6,6 +6,7 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { COLLECTIONS, THEME_COLORS } from '@/lib/constants';
 import { useAuthStore } from '@/stores/authStore';
+import { getDisplayName } from '@/lib/userDisplayName';
 import { useMyGroups } from '@/hooks/useGroups';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
@@ -116,14 +117,14 @@ export default function ProfileScreen() {
       <Animated.View entering={FadeInDown.delay(0).duration(400)} style={{ alignItems: 'center', marginBottom: 24 }}>
         <View style={{ position: 'relative', marginBottom: 14 }}>
           <View style={{ width: 80, height: 80, borderRadius: 26, backgroundColor: THEME_COLORS.bg3, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: THEME_COLORS.goldBorder, overflow: 'hidden' }}>
-            <Avatar name={profile?.displayName ?? user?.email ?? 'User'} photoUrl={profile?.photoURL} size={80} />
+            <Avatar name={getDisplayName(profile, user)} photoUrl={profile?.photoURL} size={80} />
           </View>
           <View style={{ position: 'absolute', bottom: -4, right: -4, width: 24, height: 24, borderRadius: 8, backgroundColor: THEME_COLORS.gold, alignItems: 'center', justifyContent: 'center' }}>
             <Icon name="edit" size={10} color="#ffffff" />
           </View>
         </View>
         <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 20 }}>
-          {profile?.displayName ?? 'User'}
+          {getDisplayName(profile, user)}
         </Text>
         <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 4 }}>
           {user?.email}
@@ -150,7 +151,7 @@ export default function ProfileScreen() {
       {/* Account section */}
       <Animated.View entering={FadeInDown.delay(120).duration(400)} style={{ marginBottom: 20 }}>
         <SectionTitle>Account</SectionTitle>
-        <SettingRow iconName="profile" label="Display Name" value={profile?.displayName} />
+        <SettingRow iconName="profile" label="Display Name" value={getDisplayName(profile, user)} />
         <SettingRow iconName="email" label="Email" value={user?.email ?? ''} />
         <SettingRow iconName="globe" label="Phone" value={profile?.phone ?? 'Not set'} onPress={() => {}} />
         <SettingRow iconName="share" label="LinkedIn" value={profile?.linkedIn ?? 'Not set'} onPress={() => {}} />

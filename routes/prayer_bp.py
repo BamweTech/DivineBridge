@@ -399,6 +399,15 @@ def track_prayer_action(request_id):
         
         # Update in storage
         if current_app.storage_handler.update_prayer_request(request_id, prayer_data):
+            # Per-user Prayer Wall metrics (weekly count, streak) when client sends Bearer token
+            try:
+                user = get_user_from_session()
+                uid = user.get('user_id') if user else None
+                if uid:
+                    current_app.storage_handler.record_wall_pray_event(uid, request_id)
+            except Exception as log_err:
+                logger.warning(f"Wall pray event not recorded: {log_err}")
+
             return jsonify({
                 'message': 'Prayer recorded',
                 'prayers': analytics['prayers']
@@ -409,6 +418,27 @@ def track_prayer_action(request_id):
     except Exception as e:
         logger.error(f"Error tracking prayer action: {e}")
         return jsonify({'error': 'Failed to record prayer'}), 500
+
+
+@prayer_bp.route('/my/home-prayer-metrics', methods=['GET'])
+def get_my_home_prayer_metrics():
+    """Authenticated: wall pray count (rolling 7d) + consecutive-day wall streak for home stats."""
+    try:
+        user = get_user_from_session()
+        if not user or not user.get('user_id'):
+            return jsonify({'error': 'Unauthorized'}), 401
+        uid = user['user_id']
+        handler = current_app.storage_handler
+        last_7 = handler.count_wall_pray_events_last_days(uid, 7)
+        wall_streak = handler.get_wall_pray_streak_days(uid)
+        return jsonify({
+            'wall_pray_last_7_days': last_7,
+            'wall_pray_streak_days': wall_streak,
+        }), 200
+    except Exception as e:
+        logger.error(f"Error in home prayer metrics: {e}")
+        return jsonify({'error': 'Failed to load metrics'}), 500
+
 
 @prayer_bp.route('/user/<user_id>/prayed-prayers', methods=['GET'])
 def get_user_prayed_prayers(user_id):
@@ -867,6 +897,30 @@ def get_daily_prayer_interactions(date):
             'comments': {'count': 0},
             'shares': {'count': 0}
         }), 500
+
+
+@prayer_bp.route('/global-watch/pray', methods=['POST'])
+def track_global_watch_pray():
+    """Record authenticated user's Global Prayer Watch \"I prayed\" for home metrics.
+
+    Expects JSON: {\"prayer_id\": \"...\"}. Body avoids URL-encoding issues with ids
+    that contain colons (ISO timestamps) or other reserved characters.
+    """
+    try:
+        data = request.get_json() or {}
+        pid = (data.get('prayer_id') or '').strip()
+        if not pid:
+            return jsonify({'error': 'prayer_id is required'}), 400
+        user = get_user_from_session()
+        if not user or not user.get('user_id'):
+            return jsonify({'error': 'Unauthorized'}), 401
+        uid = user['user_id']
+        ref_id = f'global-watch:{pid}'
+        current_app.storage_handler.record_wall_pray_event(uid, ref_id)
+        return jsonify({'message': 'Prayer recorded', 'reference': ref_id}), 200
+    except Exception as e:
+        logger.error(f"Error recording global watch pray: {e}")
+        return jsonify({'error': 'Failed to record prayer'}), 500
 
 
 @prayer_bp.route('/global-watch', methods=['GET'])
