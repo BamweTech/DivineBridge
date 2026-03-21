@@ -211,19 +211,24 @@ def submit_prayer_request():
     """Submit a prayer request"""
     try:
         data = request.get_json()
-        title = sanitize_string(data.get('title'), max_length=200)
         content = sanitize_string(data.get('content'), max_length=2000)
-        
-        if not title or not content:
-            return jsonify({'error': 'Title and content are required'}), 400
-        
+
+        if not content:
+            return jsonify({'error': 'Content is required'}), 400
+
+        # Server-side label for moderation / storage (clients do not send title)
+        first_line = content.strip().split('\n', 1)[0].strip()
+        title = (first_line[:200] if first_line else '') or 'Prayer request'
+        if len(title) < 5:
+            title = 'Prayer request'
+
         # AI Content Moderation + Summary Generation (combined call)
-        logger.info(f"Moderating and summarizing prayer request: {title}")
+        logger.info("Moderating and summarizing prayer request (content-only)")
         from content_moderator import get_content_moderator
-        
+
         moderator = get_content_moderator()
-        approved, rejection_reason, ai_summary = moderator.moderate_content(title, content, "prayer request")
-        
+        approved, rejection_reason, ai_summary = moderator.moderate_content(title, content, "prayer wall")
+
         # If not approved, return error with reason
         if not approved:
             logger.warning(f"Prayer request rejected: {rejection_reason}")
@@ -232,16 +237,25 @@ def submit_prayer_request():
                 'reason': rejection_reason,
                 'approved': False
             }), 400
-        
-        # Get user_id from request body (sent by frontend)
-        user_id = data.get('user_id', '')
-        
+
+        is_anonymous = bool(data.get('is_anonymous', False))
+        auth_user = get_user_from_session()
+        auth_uid = (auth_user or {}).get('user_id')
+
+        if is_anonymous:
+            user_id = ''
+        elif auth_uid:
+            user_id = auth_uid
+        else:
+            user_id = (data.get('user_id') or '').strip()
+
         # Create prayer request data with AI summary
         prayer_request = {
             'title': title,
             'content': content,
             'summary': ai_summary if ai_summary else content[:120] + '...',
             'user_id': user_id,
+            'is_anonymous': is_anonymous,
             'created_at': datetime.now().isoformat(),
             'date': datetime.now().strftime('%Y-%m-%d'),
             'analytics': {
@@ -281,11 +295,12 @@ def delete_prayer_request(request_id):
         
         if not prayer_data:
             return jsonify({'error': 'Prayer request not found'}), 404
-        
-        # Get user_id from request body
-        data = request.get_json() or {}
-        user_id = data.get('user_id', '')
-        
+
+        auth_user = get_user_from_session()
+        user_id = (auth_user or {}).get('user_id')
+        if not user_id:
+            return jsonify({'error': 'Authentication required'}), 401
+
         # Verify ownership
         if prayer_data.get('user_id') != user_id:
             return jsonify({'error': 'Unauthorized - can only delete your own prayers'}), 403
@@ -315,11 +330,13 @@ def update_prayer_request(request_id):
         
         if not prayer_data:
             return jsonify({'error': 'Prayer request not found'}), 404
-        
-        # Get update data
-        data = request.get_json()
-        user_id = data.get('user_id', '')
-        
+
+        data = request.get_json() or {}
+        auth_user = get_user_from_session()
+        user_id = (auth_user or {}).get('user_id')
+        if not user_id:
+            return jsonify({'error': 'Authentication required'}), 401
+
         # Verify ownership
         if prayer_data.get('user_id') != user_id:
             return jsonify({'error': 'Unauthorized - can only edit your own prayers'}), 403

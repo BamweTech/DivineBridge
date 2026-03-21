@@ -13,19 +13,16 @@ logger = logging.getLogger(__name__)
 # Validation schemas
 SCHEMAS = {
     'prayer_request': {
-        'title': {
-            'type': str,
-            'required': True,
-            'min_length': 5,
-            'max_length': 200,
-            'pattern': r'^[a-zA-Z0-9\s\'\",.-]+$'
-        },
         'content': {
             'type': str,
             'required': True,
             'min_length': 10,
             'max_length': 2000
-        }
+        },
+        'is_anonymous': {
+            'type': bool,
+            'required': False,
+        },
     },
     'email': {
         'email': {

@@ -71,11 +71,6 @@ function GroupCard({ group, onPress }: { group: PrayerGroup; onPress: () => void
               </Text>
             )}
           </View>
-          <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 50, backgroundColor: THEME_COLORS.bg3, borderWidth: 1, borderColor: THEME_COLORS.border }}>
-            <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_500Medium', fontSize: 10 }}>
-              {group.privacy === 'invite_only' ? 'Invite Only' : 'Private'}
-            </Text>
-          </View>
         </View>
         <View style={{ backgroundColor: 'rgba(74,124,94,0.08)', borderWidth: 1, borderColor: 'rgba(74,124,94,0.15)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -96,7 +91,6 @@ function GroupCard({ group, onPress }: { group: PrayerGroup; onPress: () => void
 function CreateGroupModal({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [privacy, setPrivacy] = useState<'private' | 'invite_only'>('private');
   const [isCreating, setIsCreating] = useState(false);
 
   async function handleCreate() {
@@ -106,7 +100,7 @@ function CreateGroupModal({ onClose }: { onClose: () => void }) {
     }
     setIsCreating(true);
     try {
-      await groupApi.create({ name: name.trim(), description: description.trim(), privacy });
+      await groupApi.create({ name: name.trim(), description: description.trim(), privacy: 'private' });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onClose();
     } catch (err: any) {
@@ -139,22 +133,8 @@ function CreateGroupModal({ onClose }: { onClose: () => void }) {
         maxLength={200}
         multiline
         numberOfLines={3}
-        style={{ backgroundColor: THEME_COLORS.bg2, borderRadius: 14, borderWidth: 1, borderColor: THEME_COLORS.border, color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 15, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 16, minHeight: 80, textAlignVertical: 'top' }}
+        style={{ backgroundColor: THEME_COLORS.bg2, borderRadius: 14, borderWidth: 1, borderColor: THEME_COLORS.border, color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 15, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 24, minHeight: 80, textAlignVertical: 'top' }}
       />
-      <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_500Medium', fontSize: 13, marginBottom: 10 }}>Privacy</Text>
-      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 24 }}>
-        {(['private', 'invite_only'] as const).map((p) => (
-          <Pressable
-            key={p}
-            onPress={() => setPrivacy(p)}
-            style={{ flex: 1, padding: 10, borderRadius: 12, borderWidth: 1, borderColor: privacy === p ? THEME_COLORS.gold : THEME_COLORS.border, backgroundColor: privacy === p ? THEME_COLORS.goldDim : THEME_COLORS.bg3, alignItems: 'center' }}
-          >
-            <Text style={{ color: privacy === p ? THEME_COLORS.gold : THEME_COLORS.text2, fontFamily: 'Geist_500Medium', fontSize: 11, textTransform: 'capitalize' }}>
-              {p.replace('_', ' ')}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
       <Button label="Create Group" onPress={handleCreate} isLoading={isCreating} fullWidth />
       <Button label="Cancel" onPress={onClose} variant="ghost" fullWidth style={{ marginTop: 8 }} />
     </View>
@@ -377,8 +357,12 @@ const PrayerCard = memo(function PrayerCard({
   currentUserId?: string;
   onPray: () => void;
 }) {
-  const isMe = !!currentUserId && post.user_id === currentUserId;
-  const isAnon = post.is_anonymous || !post.user_id;
+  const isAnon = Boolean(post.is_anonymous) || !post.user_id;
+  const isMe =
+    !!currentUserId &&
+    !!post.user_id &&
+    post.user_id === currentUserId &&
+    !post.is_anonymous;
   const prayCount = post.analytics?.prayers ?? 0;
 
   return (
@@ -598,6 +582,17 @@ function PrayerWallFeed({ currentUserId, onCompose }: { currentUserId?: string; 
       queryClient.invalidateQueries({ queryKey: ['prayer-wall'] });
       bumpHomePrayMetrics();
       queryClient.invalidateQueries({ queryKey: ['home-prayer-metrics'] });
+    },
+    onError: (e: unknown) => {
+      const msg = e instanceof Error ? e.message : 'Something went wrong';
+      const isAuth =
+        /unauthorized|401|sign in|authentication/i.test(msg) || msg === 'HTTP 401';
+      Alert.alert(
+        'Could not record prayer',
+        isAuth
+          ? 'Your session may have expired. Try again, or sign out and back in if this keeps happening.'
+          : msg
+      );
     },
   });
 

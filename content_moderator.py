@@ -19,13 +19,16 @@ class ContentModerator:
     - Personal information (phone numbers, addresses, emails, full names of minors)
     - Spam or advertisements
     - Hate speech or discrimination based on race, religion, gender, etc.
-    - Harassment or threats
+    - Harassment, threats, insults, slurs, personal attacks, trolling, or profanity used to demean others
     - Sexual or explicit content
     - Violence or self-harm content
     - Illegal activities or encouragement thereof
     - Misinformation or false health claims
     - Copyright infringement
     - Political campaigning or propaganda
+    - Content that is clearly NOT appropriate for a community prayer wall (e.g. random memes/jokes with no prayer intent,
+      unrelated debates, pure chit-chat, link spam, or other off-topic material with no request for prayer, intercession,
+      thanksgiving, or faith-related sharing)
     """
     
     def __init__(self):
@@ -55,9 +58,17 @@ class ContentModerator:
             - summary: AI-generated summary of the content
         """
         try:
+            wall_task = ""
+            if content_type == "prayer wall":
+                wall_task = """
+TASK 1b - PRAYER WALL FIT (only for prayer wall submissions):
+Is this a genuine prayer request, intercession for others, thanksgiving, or faith-related plea suitable for a community prayer wall?
+Reject (approved: false) only if it is clearly not prayer-related or clearly abusive per the guidelines above.
+"""
+
             prompt = f"""You are reviewing a {content_type} submission for a Christian prayer platform.
 
-TITLE: {title}
+TITLE (internal label, may be auto-derived): {title}
 
 CONTENT:
 {content}
@@ -65,7 +76,7 @@ CONTENT:
 TASK 1 - CONTENT MODERATION:
 Review if this content violates ANY of these guidelines:
 {self.CONTENT_GUIDELINES}
-
+{wall_task}
 TASK 2 - GENERATE SUMMARY:
 If content is appropriate, create a brief 1-2 sentence summary.
 
@@ -79,7 +90,8 @@ RESPOND IN THIS EXACT JSON FORMAT:
 
 Guidelines:
 - Be lenient and gracious - only reject clear violations
-- Personal struggles, health issues, and requests for help are ALLOWED
+- Personal struggles, raw emotion, anger directed at God, health issues, and requests for help are ALLOWED
+- Short or simple genuine prayers are ALLOWED
 - General location mentions (city/country) are ALLOWED
 - Specific addresses, phone numbers, emails are NOT ALLOWED
 - Focus on protecting users while allowing genuine prayer/testimony sharing

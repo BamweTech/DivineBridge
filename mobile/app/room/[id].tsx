@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInUp, SlideInDown, useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { RTCView, isWebRTCAvailable } from '@/lib/sfu';
+import { VideoStreamView } from '@/components/room/VideoStreamView';
 import { usePrayerRoom } from '@/hooks/usePrayerRoom';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuthStore } from '@/stores/authStore';
@@ -149,6 +150,7 @@ export default function RoomScreen() {
     messages,
     peers,
     localStream,
+    localVideoRevision,
     isMuted,
     isVideoOn,
     roomMode,
@@ -303,7 +305,7 @@ export default function RoomScreen() {
           Placed outside the chat/participants toggle so audio stays alive
           regardless of which tab is active. */}
       {Array.from(peers.values()).map((peer) => (
-        peer.stream && !peer.isVideoEnabled ? (
+        peer.userId !== user?.uid && peer.stream && !peer.isVideoEnabled ? (
           <RTCView
             key={`audio-${peer.userId}`}
             streamURL={peer.stream.toURL()}
@@ -367,13 +369,28 @@ export default function RoomScreen() {
             {/* Video views (group call mode) */}
             {isGroupCall && (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+                {isSpeaker && isVideoOn ? (
+                  <View
+                    key={`local-${localVideoRevision}`}
+                    style={{ width: '48%', aspectRatio: 3 / 4, borderRadius: 16, overflow: 'hidden', backgroundColor: THEME_COLORS.bg3 }}
+                  >
+                    <VideoStreamView
+                      stream={localStream}
+                      style={{ flex: 1 }}
+                      objectFit="cover"
+                      mirror
+                      label="You"
+                    />
+                  </View>
+                ) : null}
                 {Array.from(peers.values()).map((peer) => (
-                  peer.stream && peer.isVideoEnabled ? (
+                  peer.userId !== user?.uid && peer.stream && peer.isVideoEnabled ? (
                     <View key={peer.userId} style={{ width: '48%', aspectRatio: 3 / 4, borderRadius: 16, overflow: 'hidden', backgroundColor: THEME_COLORS.bg3 }}>
-                      <RTCView
-                        streamURL={peer.stream.toURL()}
+                      <VideoStreamView
+                        stream={peer.stream}
                         style={{ flex: 1 }}
                         objectFit="cover"
+                        label={peer.userName?.split(' ')[0] ?? 'Participant'}
                       />
                     </View>
                   ) : null

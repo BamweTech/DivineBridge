@@ -1097,10 +1097,13 @@
             }
             
             // Delete request
+            const idToken = await user.getIdToken();
             const response = await fetch(`/api/prayer/request/${prayerId}`, {
                 method: 'DELETE',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ user_id: user.uid })
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: 'Bearer ' + idToken,
+                },
             });
             
             if (response.ok) {
@@ -1245,11 +1248,14 @@
             saveBtn.textContent = 'Saving...';
             
             // Update request
+            const idToken = await user.getIdToken();
             const response = await fetch(`/api/prayer/request/${prayerId}`, {
                 method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: 'Bearer ' + idToken,
+                },
                 body: JSON.stringify({
-                    user_id: user.uid,
                     title: title,
                     content: content
                 })

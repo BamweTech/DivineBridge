@@ -1,6 +1,6 @@
 /**
  * Activity hub — entry point from the home notification bell.
- * Routes to Prayer Wall (community / shared-group context) and group chats.
+ * Links to the global Prayer Wall (community feed) and your group chats.
  * Push notification deep links can target these same paths later.
  */
 import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-native';
@@ -64,7 +64,7 @@ export default function ActivityScreen() {
               Activity
             </Text>
             <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 2 }}>
-              Prayer wall & group chats
+              Community prayer wall and your groups
             </Text>
           </View>
         </Animated.View>

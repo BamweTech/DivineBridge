@@ -1685,12 +1685,8 @@
         </div>
         <form id="modal-prayer-form" class="prayer-request-form">
             <div class="form-group">
-                <label for="modal-prayer-title">Title <span class="char-counter" id="prayer-title-counter">0/200</span></label>
-                <input type="text" id="modal-prayer-title" name="title" required placeholder="Enter prayer title" maxlength="200">
-	</div>
-            <div class="form-group">
                 <label for="modal-prayer-content">Prayer Request <span class="char-counter" id="prayer-content-counter">0/2000</span></label>
-                <textarea id="modal-prayer-content" name="content" required placeholder="Share your prayer request..." maxlength="2000"></textarea>
+                <textarea id="modal-prayer-content" name="content" required placeholder="Share your prayer request..." maxlength="2000" rows="6"></textarea>
             </div>
             <button type="submit" class="submit-btn">Request Prayer</button>
         </form>
@@ -2417,26 +2413,8 @@
         });
 
         // Character counters for prayer form
-        const prayerTitleInput = document.getElementById('modal-prayer-title');
         const prayerContentInput = document.getElementById('modal-prayer-content');
-        const prayerTitleCounter = document.getElementById('prayer-title-counter');
         const prayerContentCounter = document.getElementById('prayer-content-counter');
-
-        if (prayerTitleInput && prayerTitleCounter) {
-            prayerTitleInput.addEventListener('input', function() {
-                const length = this.value.length;
-                const max = 200;
-                prayerTitleCounter.textContent = `${length}/${max}`;
-                
-                // Change color based on length
-                prayerTitleCounter.classList.remove('warning', 'danger');
-                if (length > max * 0.9) {
-                    prayerTitleCounter.classList.add('danger');
-                } else if (length > max * 0.7) {
-                    prayerTitleCounter.classList.add('warning');
-                }
-            });
-        }
 
         if (prayerContentInput && prayerContentCounter) {
             prayerContentInput.addEventListener('input', function() {
@@ -2464,11 +2442,10 @@
             }
 
             const formData = new FormData(modalForm);
-            const title = formData.get('title').trim();
             const content = formData.get('content').trim();
 
-            if (!title || !content) {
-                showModalError('Please fill in all fields.');
+            if (!content || content.length < 10) {
+                showModalError('Please write at least 10 characters for your prayer request.');
                 return;
             }
 
@@ -2479,15 +2456,16 @@
             submitBtn.innerHTML = '<span class="spinner"></span>Submitting...';
 
             try {
+                const idToken = await currentUser.getIdToken();
                 const response = await fetch('/api/prayer/request', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        Authorization: 'Bearer ' + idToken,
                     },
                     body: JSON.stringify({
-                        title: title,
                         content: content,
-                        user_id: currentUser.uid
+                        is_anonymous: false
                     })
                 });
 
@@ -2577,9 +2555,7 @@
         modalForm.reset();
         
         // Reset character counters
-        const prayerTitleCounter = document.getElementById('prayer-title-counter');
         const prayerContentCounter = document.getElementById('prayer-content-counter');
-        if (prayerTitleCounter) prayerTitleCounter.textContent = '0/200';
         if (prayerContentCounter) prayerContentCounter.textContent = '0/2000';
     }
 

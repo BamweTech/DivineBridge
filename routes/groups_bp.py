@@ -58,7 +58,7 @@ def create_group():
     data = request.get_json(silent=True) or {}
     name = (data.get('name') or '').strip()
     description = (data.get('description') or '').strip()
-    privacy = data.get('privacy', 'public')
+    privacy = data.get('privacy', 'private')
     uid = g.user_id
 
     if len(name) < 3:
@@ -69,6 +69,8 @@ def create_group():
         return jsonify({'error': f'Description must be {MAX_DESC_LEN} characters or fewer'}), 400
     if privacy not in VALID_PRIVACY:
         return jsonify({'error': f'privacy must be one of {sorted(VALID_PRIVACY)}'}), 400
+    if privacy == 'public':
+        return jsonify({'error': 'Public groups are not available yet. Use private or invite_only.'}), 400
 
     db = get_firestore_client()
 

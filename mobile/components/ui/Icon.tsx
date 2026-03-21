@@ -7,7 +7,7 @@
  *   <Icon name="cross" size={10} color={colors.gold} />
  *
  * All icons are 24×24 viewBox, stroke-based (stroke-width 1.7, round caps/joins).
- * A few icons (sparkle, more, dove) have small filled accent shapes — these use
+ * A few icons (sparkle, dove) have small filled accent shapes — these use
  * the fill prop which defaults to the same color as stroke.
  *
  * Dependencies:
@@ -34,10 +34,13 @@ export type IconName =
   | 'live'
   | 'book'
   | 'profile'
+  | 'user-plus'
   | 'bell'
   | 'cross'
   | 'globe'
   | 'video'
+  | 'maximize'
+  | 'minimize'
   | 'audio'
   | 'share'
   | 'calendar'
@@ -61,7 +64,6 @@ export type IconName =
   | 'edit'
   | 'pray'
   | 'play'
-  | 'more'
   | 'settings'
   | 'anchor'
   | 'seedling'
@@ -151,6 +153,15 @@ const Icon: React.FC<IconProps> = ({
       </G>
     ),
 
+    'user-plus': (
+      <G>
+        <Circle {...s} cx="8.5" cy="7" r="3" />
+        <Path {...s} d="M2.5 19v-.5a4.5 4.5 0 014.5-4.5h1.5a4.5 4.5 0 014.5 4.5v.5" />
+        <Line {...s} x1="17" y1="8" x2="23" y2="8" />
+        <Line {...s} x1="20" y1="5" x2="20" y2="11" />
+      </G>
+    ),
+
     // ── UI Controls ───────────────────────────────────────────────────────────
 
     bell: (
@@ -193,14 +204,6 @@ const Icon: React.FC<IconProps> = ({
         <Line {...s} x1="16" y1="2" x2="16" y2="6" />
         <Line {...s} x1="8" y1="2" x2="8" y2="6" />
         <Line {...s} x1="3" y1="10" x2="21" y2="10" />
-      </G>
-    ),
-
-    more: (
-      <G>
-        <Circle fill={color} stroke="none" cx="5" cy="12" r="1" />
-        <Circle fill={color} stroke="none" cx="12" cy="12" r="1" />
-        <Circle fill={color} stroke="none" cx="19" cy="12" r="1" />
       </G>
     ),
 
@@ -275,6 +278,24 @@ const Icon: React.FC<IconProps> = ({
       <G>
         <Polygon {...s} fill="none" points="23 7 16 12 23 17 23 7" />
         <Rect {...s} x="1" y="5" width="15" height="14" rx="2" />
+      </G>
+    ),
+
+    maximize: (
+      <G>
+        <Polyline {...s} points="4 8 4 4 8 4" />
+        <Polyline {...s} points="16 4 20 4 20 8" />
+        <Polyline {...s} points="4 16 4 20 8 20" />
+        <Polyline {...s} points="20 16 20 20 16 20" />
+      </G>
+    ),
+
+    minimize: (
+      <G>
+        <Polyline {...s} points="8 4 4 4 4 8" />
+        <Polyline {...s} points="16 4 20 4 20 8" />
+        <Polyline {...s} points="4 16 8 20 4 20" />
+        <Polyline {...s} points="20 16 20 20 16 20" />
       </G>
     ),
 

@@ -10,6 +10,7 @@ import {
   Alert,
   Modal,
   Share,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,11 +20,15 @@ import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import dayjs from 'dayjs';
 import { useGroupChat, useGroupDetails } from '@/hooks/useGroups';
+import { usePrayerRoom } from '@/hooks/usePrayerRoom';
+import { roomApi } from '@/services/api';
+import { isWebRTCAvailable } from '@/lib/sfu';
+import { GroupLiveAvPanel } from '@/components/group/GroupLiveAvPanel';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuthStore } from '@/stores/authStore';
 import { THEME_COLORS, MESSAGE_TYPES } from '@/lib/constants';
 import Icon from '@/components/ui/Icon';
-import type { MessageType, PrayerGroup } from '@/types';
+import type { MessageType, PrayerGroup, GroupChatMessage } from '@/types';
 
 const MESSAGE_TYPE_OPTIONS: { type: MessageType; label: string }[] = [
   { type: MESSAGE_TYPES.TEXT, label: 'Message' },
@@ -55,6 +60,50 @@ const TYPE_LABEL_COLORS: Record<MessageType, string> = {
   praise: THEME_COLORS.sage,
   announcement: '#3b82f6',
 };
+
+function GroupChatBubble({ msg, userUid }: { msg: GroupChatMessage; userUid?: string }) {
+  const isMe = msg.user_id === userUid;
+  const isSpecial = msg.message_type !== 'text';
+  const bg = isSpecial ? TYPE_COLORS[msg.message_type] : isMe ? THEME_COLORS.goldDim : THEME_COLORS.bg2;
+  const borderColor = isSpecial ? TYPE_BORDER_COLORS[msg.message_type] : isMe ? THEME_COLORS.goldBorder : THEME_COLORS.border;
+
+  return (
+    <Animated.View
+      entering={FadeInDown.duration(200)}
+      style={{ marginBottom: 12, alignItems: isMe ? 'flex-end' : 'flex-start' }}
+    >
+      {!isMe && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, marginLeft: 4 }}>
+          <Avatar name={msg.user_name} photoUrl={msg.user_photo} size={20} />
+          <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_500Medium', fontSize: 11 }}>{msg.user_name}</Text>
+        </View>
+      )}
+      <View style={{
+        maxWidth: '82%', backgroundColor: bg, borderRadius: 18,
+        borderBottomRightRadius: isMe ? 4 : 18, borderBottomLeftRadius: isMe ? 18 : 4,
+        padding: 12, borderWidth: 1, borderColor,
+      }}>
+        {isSpecial && (
+          <Text style={{ fontSize: 10, marginBottom: 4, color: TYPE_LABEL_COLORS[msg.message_type], fontFamily: 'Geist_600SemiBold', letterSpacing: 0.8, textTransform: 'uppercase' }}>
+            {msg.message_type.replace('_', ' ')}
+          </Text>
+        )}
+        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 22 }}>
+          {msg.message}
+        </Text>
+      </View>
+      <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 10, marginTop: 3, marginHorizontal: 6 }}>
+        {msg.timestamp
+          ? dayjs(
+              typeof msg.timestamp === 'number'
+                ? msg.timestamp
+                : (msg.timestamp as { toMillis?: () => number })?.toMillis?.() ?? Date.now()
+            ).format('h:mm A')
+          : ''}
+      </Text>
+    </Animated.View>
+  );
+}
 
 // ─── InviteSheet ──────────────────────────────────────────────────────────────
 
@@ -209,19 +258,69 @@ export default function GroupScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const scrollRef = useRef<ScrollView>(null);
+  const fsScrollRef = useRef<ScrollView>(null);
 
   const { group } = useGroupDetails(id!);
-  const { messages, isLoading, sendMessage } = useGroupChat(id!);
+  const { messages, sendMessage } = useGroupChat(id!);
   const [text, setText] = useState('');
   const [messageType, setMessageType] = useState<MessageType>('text');
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showInviteSheet, setShowInviteSheet] = useState(false);
+
+  const [liveRoomId, setLiveRoomId] = useState<string | null>(null);
+  const [liveRoomCode, setLiveRoomCode] = useState<string | undefined>(undefined);
+  const pendingJoinRef = useRef(false);
+  const [avFullscreen, setAvFullscreen] = useState(false);
+  const [startingLive, setStartingLive] = useState(false);
+  const [fsChatOpen, setFsChatOpen] = useState(true);
+  const [fsChatText, setFsChatText] = useState('');
+
+  const prayer = usePrayerRoom(liveRoomId ?? '');
+  const joinRef = useRef(prayer.join);
+  joinRef.current = prayer.join;
+
+  const prayerLeaveRef = useRef(prayer.leave);
+  prayerLeaveRef.current = prayer.leave;
+  const liveRoomIdUnmountRef = useRef<string | null>(null);
+  liveRoomIdUnmountRef.current = liveRoomId;
+
+  useEffect(() => {
+    if (!liveRoomId || !pendingJoinRef.current) return;
+    if (prayer.isJoined) {
+      pendingJoinRef.current = false;
+      return;
+    }
+    pendingJoinRef.current = false;
+    joinRef.current(liveRoomCode).catch((e: Error & { message?: string }) => {
+      Alert.alert('Could not join live room', e?.message ?? 'Try again.');
+      setLiveRoomId(null);
+      setLiveRoomCode(undefined);
+    });
+  }, [liveRoomId, prayer.isJoined, liveRoomCode]);
+
+  useEffect(() => {
+    return () => {
+      if (liveRoomIdUnmountRef.current) {
+        prayerLeaveRef.current();
+      }
+    };
+  }, []);
+
+  const participants = prayer.room?.participants ?? [];
+  const currentParticipant = participants.find((p) => p.user_id === user?.uid);
+  const isSpeaker = currentParticipant?.role === 'speaker';
 
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }, [messages.length]);
+
+  useEffect(() => {
+    if (avFullscreen && fsChatOpen && messages.length > 0) {
+      setTimeout(() => fsScrollRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  }, [messages.length, avFullscreen, fsChatOpen]);
 
   async function handleSend() {
     if (!text.trim()) return;
@@ -230,6 +329,51 @@ export default function GroupScreen() {
     setMessageType('text');
     setShowTypePicker(false);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }
+
+  async function handleFsSend() {
+    if (!fsChatText.trim()) return;
+    await sendMessage(fsChatText.trim(), 'text');
+    setFsChatText('');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }
+
+  async function handleStartGroupLive() {
+    if (!user || !id) return;
+    setStartingLive(true);
+    try {
+      const s = await roomApi.ensureGroupSession(id);
+      pendingJoinRef.current = true;
+      setLiveRoomId(s.room_id);
+      setLiveRoomCode(s.room_code ?? undefined);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Unknown error';
+      Alert.alert('Could not start live session', msg);
+    } finally {
+      setStartingLive(false);
+    }
+  }
+
+  function onLiveHeaderPress() {
+    if (!isWebRTCAvailable) {
+      Alert.alert(
+        'Development build required',
+        'Live audio and video need a development build of the app. Expo Go does not include WebRTC.'
+      );
+      return;
+    }
+    if (prayer.isJoined) {
+      setAvFullscreen(true);
+      return;
+    }
+    handleStartGroupLive();
+  }
+
+  async function handleLeaveLive() {
+    await prayer.leave();
+    setLiveRoomId(null);
+    setLiveRoomCode(undefined);
+    setAvFullscreen(false);
   }
 
   return (
@@ -268,19 +412,49 @@ export default function GroupScreen() {
 
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Pressable
-            onPress={() => router.push('/(tabs)/rooms' as any)}
-            style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: THEME_COLORS.sageDim, borderWidth: 1, borderColor: 'rgba(74,124,94,0.2)', alignItems: 'center', justifyContent: 'center' }}
+            onPress={onLiveHeaderPress}
+            disabled={startingLive}
+            accessibilityRole="button"
+            accessibilityLabel={prayer.isJoined ? 'Open live call full screen' : 'Start or join group live prayer'}
+            style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: THEME_COLORS.sageDim, borderWidth: 1, borderColor: 'rgba(74,124,94,0.2)', alignItems: 'center', justifyContent: 'center', opacity: startingLive ? 0.6 : 1 }}
           >
-            <Icon name="live" size={16} color={THEME_COLORS.sage} />
+            {startingLive ? (
+              <ActivityIndicator size="small" color={THEME_COLORS.sage} />
+            ) : (
+              <Icon name="live" size={16} color={THEME_COLORS.sage} />
+            )}
           </Pressable>
           <Pressable
             onPress={() => setShowInviteSheet(true)}
-            style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: THEME_COLORS.bg3, borderWidth: 1, borderColor: THEME_COLORS.border, alignItems: 'center', justifyContent: 'center' }}
+            accessibilityRole="button"
+            accessibilityLabel="Invite members"
+            accessibilityHint="Opens share and invite options for this group"
+            style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: THEME_COLORS.sageDim, borderWidth: 1, borderColor: 'rgba(74,124,94,0.2)', alignItems: 'center', justifyContent: 'center' }}
           >
-            <Icon name="more" size={16} color={THEME_COLORS.text2} />
+            <Icon name="user-plus" size={16} color={THEME_COLORS.sage} />
           </Pressable>
         </View>
       </View>
+
+      {prayer.isJoined && !avFullscreen ? (
+        <GroupLiveAvPanel
+          variant="embedded"
+          peers={prayer.peers}
+          localStream={prayer.localStream}
+          localVideoRevision={prayer.localVideoRevision}
+          isVideoOn={prayer.isVideoOn}
+          isSpeaker={isSpeaker}
+          isMuted={prayer.isMuted}
+          userId={user?.uid}
+          roomMode={prayer.roomMode}
+          modeSwitchToast={prayer.modeSwitchToast}
+          onToggleMute={prayer.toggleMute}
+          onToggleVideo={prayer.toggleVideo}
+          onLeave={handleLeaveLive}
+          onMaximize={() => setAvFullscreen(true)}
+          onMinimize={() => setAvFullscreen(false)}
+        />
+      ) : null}
 
       {/* Messages */}
       <ScrollView
@@ -289,50 +463,9 @@ export default function GroupScreen() {
         contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
         showsVerticalScrollIndicator={false}
       >
-        {messages.map((msg, i) => {
-          const isMe = msg.user_id === user?.uid;
-          const isSpecial = msg.message_type !== 'text';
-          const bg = isSpecial ? TYPE_COLORS[msg.message_type] : isMe ? THEME_COLORS.goldDim : THEME_COLORS.bg2;
-          const borderColor = isSpecial ? TYPE_BORDER_COLORS[msg.message_type] : isMe ? THEME_COLORS.goldBorder : THEME_COLORS.border;
-
-          return (
-            <Animated.View
-              key={msg.message_id}
-              entering={FadeInDown.duration(200)}
-              style={{ marginBottom: 12, alignItems: isMe ? 'flex-end' : 'flex-start' }}
-            >
-              {!isMe && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, marginLeft: 4 }}>
-                  <Avatar name={msg.user_name} photoUrl={msg.user_photo} size={20} />
-                  <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_500Medium', fontSize: 11 }}>{msg.user_name}</Text>
-                </View>
-              )}
-              <View style={{
-                maxWidth: '82%', backgroundColor: bg, borderRadius: 18,
-                borderBottomRightRadius: isMe ? 4 : 18, borderBottomLeftRadius: isMe ? 18 : 4,
-                padding: 12, borderWidth: 1, borderColor,
-              }}>
-                {isSpecial && (
-                  <Text style={{ fontSize: 10, marginBottom: 4, color: TYPE_LABEL_COLORS[msg.message_type], fontFamily: 'Geist_600SemiBold', letterSpacing: 0.8, textTransform: 'uppercase' }}>
-                    {msg.message_type.replace('_', ' ')}
-                  </Text>
-                )}
-                <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 22 }}>
-                  {msg.message}
-                </Text>
-              </View>
-              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 10, marginTop: 3, marginHorizontal: 6 }}>
-                {msg.timestamp
-                  ? dayjs(
-                      typeof msg.timestamp === 'number'
-                        ? msg.timestamp
-                        : (msg.timestamp as any)?.toMillis?.() ?? Date.now()
-                    ).format('h:mm A')
-                  : ''}
-              </Text>
-            </Animated.View>
-          );
-        })}
+        {messages.map((msg) => (
+          <GroupChatBubble key={msg.message_id} msg={msg} userUid={user?.uid} />
+        ))}
       </ScrollView>
 
       {/* Message type picker */}
@@ -358,6 +491,147 @@ export default function GroupScreen() {
       {showInviteSheet && group && (
         <InviteSheet group={group} onClose={() => setShowInviteSheet(false)} />
       )}
+
+      <Modal
+        visible={prayer.isJoined && avFullscreen}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setAvFullscreen(false)}
+      >
+        <KeyboardAvoidingView
+          style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={{
+            paddingTop: insets.top + 8,
+            paddingHorizontal: 16,
+            paddingBottom: 8,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: THEME_COLORS.border,
+          }}>
+            <Pressable
+              onPress={() => setAvFullscreen(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Minimize live call"
+              style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: THEME_COLORS.bg3, borderWidth: 1, borderColor: THEME_COLORS.border, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Icon name="minimize" size={18} color={THEME_COLORS.text2} />
+            </Pressable>
+            <Text style={{ flex: 1, color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16 }} numberOfLines={1}>
+              Live — {group?.name ?? 'Group'}
+            </Text>
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <View style={{ flex: fsChatOpen ? 1 : 1 }}>
+              <GroupLiveAvPanel
+                variant="fullscreen"
+                peers={prayer.peers}
+                localStream={prayer.localStream}
+                localVideoRevision={prayer.localVideoRevision}
+                isVideoOn={prayer.isVideoOn}
+                isSpeaker={isSpeaker}
+                isMuted={prayer.isMuted}
+                userId={user?.uid}
+                roomMode={prayer.roomMode}
+                modeSwitchToast={prayer.modeSwitchToast}
+                onToggleMute={prayer.toggleMute}
+                onToggleVideo={prayer.toggleVideo}
+                onLeave={() => {
+                  handleLeaveLive();
+                }}
+                onMaximize={() => setAvFullscreen(true)}
+                onMinimize={() => setAvFullscreen(false)}
+              />
+            </View>
+
+            <Pressable
+              onPress={() => setFsChatOpen((v) => !v)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                paddingVertical: 10,
+                borderTopWidth: 1,
+                borderTopColor: THEME_COLORS.border,
+                backgroundColor: THEME_COLORS.bg2,
+              }}
+            >
+              <Icon name="chat" size={16} color={THEME_COLORS.gold} />
+              <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_600SemiBold', fontSize: 13 }}>
+                {fsChatOpen ? 'Hide group chat' : 'Show group chat'}
+              </Text>
+              <Icon name={fsChatOpen ? 'chevron-d' : 'chevron-r'} size={14} color={THEME_COLORS.text3} />
+            </Pressable>
+
+            {fsChatOpen ? (
+              <View style={{ flex: 1, borderTopWidth: 1, borderTopColor: THEME_COLORS.border }}>
+                <ScrollView
+                  ref={fsScrollRef}
+                  style={{ flex: 1 }}
+                  contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {messages.map((msg) => (
+                    <GroupChatBubble key={`fs-${msg.message_id}`} msg={msg} userUid={user?.uid} />
+                  ))}
+                </ScrollView>
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  padding: 12,
+                  paddingBottom: insets.bottom + 12,
+                  gap: 8,
+                  borderTopWidth: 1,
+                  borderTopColor: THEME_COLORS.border,
+                  backgroundColor: THEME_COLORS.bg,
+                }}>
+                  <TextInput
+                    value={fsChatText}
+                    onChangeText={setFsChatText}
+                    placeholder="Message the group…"
+                    placeholderTextColor={THEME_COLORS.text3}
+                    style={{
+                      flex: 1,
+                      backgroundColor: THEME_COLORS.bg2,
+                      borderRadius: 20,
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      color: THEME_COLORS.text,
+                      fontFamily: 'Geist_400Regular',
+                      fontSize: 14,
+                      maxHeight: 88,
+                      borderWidth: 1,
+                      borderColor: THEME_COLORS.border,
+                    }}
+                    multiline
+                    returnKeyType="send"
+                    onSubmitEditing={handleFsSend}
+                  />
+                  <Pressable
+                    onPress={handleFsSend}
+                    disabled={!fsChatText.trim()}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: fsChatText.trim() ? THEME_COLORS.gold : THEME_COLORS.bg3,
+                    }}
+                  >
+                    <Icon name="send" size={14} color={fsChatText.trim() ? '#ffffff' : THEME_COLORS.text3} />
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Input bar */}
       <View style={{

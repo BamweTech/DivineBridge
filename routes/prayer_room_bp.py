@@ -130,6 +130,18 @@ def get_max_speakers(room_data):
     configured = max(1, configured)
     return min(configured, MAX_ACTIVE_SPEAKERS)
 
+
+def _is_group_member(db, group_id: str, user_id: str) -> bool:
+    """True if user_id is in prayer_groups/{group_id}.member_ids."""
+    if not group_id or not user_id:
+        return False
+    snap = db.collection('prayer_groups').document(group_id).get()
+    if not snap.exists:
+        return False
+    members = snap.to_dict().get('member_ids') or []
+    return user_id in members
+
+
 # Rate limiting is now handled centrally in app.py
 # Blueprint-level limiter removed to prevent conflicts
 
@@ -411,6 +423,101 @@ def create_prayer_room():
         logging.error(f"Error creating prayer room: {str(e)}")
         return jsonify({'error': 'Failed to create prayer room'}), 500
 
+
+@prayer_room_bp.route('/group-session', methods=['POST'])
+def ensure_group_prayer_session():
+    """Return an active group-bound private room, or create one.
+
+    Members join without a room code (see join_prayer_room group_id bypass).
+    """
+    try:
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+
+        data = request.get_json(silent=True) or {}
+        group_id = data.get('group_id')
+        if not group_id or not isinstance(group_id, str):
+            return jsonify({'error': 'group_id is required'}), 400
+
+        uid = user['user_id']
+        host_name = user.get('user_name') or user.get('display_name') or 'Host'
+        if len(host_name) > 30:
+            return jsonify({'error': 'User name must be 30 characters or less'}), 400
+
+        db = get_firestore_client()
+        if not _is_group_member(db, group_id, uid):
+            return jsonify({'error': 'Not a member of this group'}), 403
+
+        group_snap = db.collection('prayer_groups').document(group_id).get()
+        group = group_snap.to_dict() if group_snap.exists else {}
+        gname = (group.get('name') or 'Group').strip() or 'Group'
+        room_name = data.get('room_name') or f'{gname} — Live'
+        room_name = str(room_name).strip()[:50]
+
+        rooms_query = (
+            db.collection('prayer_rooms')
+            .where('group_id', '==', group_id)
+            .where('is_active', '==', True)
+            .limit(1)
+        )
+        existing = list(rooms_query.stream())
+        if existing:
+            rd = existing[0].to_dict()
+            return jsonify({
+                'success': True,
+                'room_id': rd.get('room_id'),
+                'room_name': rd.get('room_name'),
+                'room_code': rd.get('room_code'),
+                'reused': True,
+            })
+
+        room_id = ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
+        room_code = ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:8]])
+
+        room_data = {
+            'room_id': room_id,
+            'room_name': room_name,
+            'room_privacy': 'private',
+            'room_code': room_code,
+            'group_id': group_id,
+            'host_id': uid,
+            'host_name': host_name,
+            'created_at': datetime.utcnow(),
+            'participants': [{
+                'user_id': uid,
+                'user_name': host_name,
+                'joined_at': datetime.utcnow(),
+                'is_muted': False,
+                'is_host': True,
+                'role': 'speaker',
+                'requested_role': None,
+                'request_timestamp': None
+            }],
+            'is_active': True,
+            'is_locked': False,
+            'settings': {
+                'allow_anonymous': False,
+                'max_participants': 50,
+                'auto_mute_new_participants': False
+            },
+            'max_speakers': MAX_ACTIVE_SPEAKERS
+        }
+
+        db.collection('prayer_rooms').document(room_id).set(room_data)
+
+        return jsonify({
+            'success': True,
+            'room_id': room_id,
+            'room_name': room_name,
+            'room_code': room_code,
+            'reused': False,
+        })
+    except Exception as e:
+        logging.error(f'ensure_group_prayer_session error: {e}', exc_info=True)
+        return jsonify({'error': 'Failed to start group session'}), 500
+
+
 @prayer_room_bp.route('/find-by-code/<room_code>', methods=['GET'])
 def find_room_by_code(room_code):
     """Find a room by its room code"""
@@ -475,7 +582,14 @@ def join_prayer_room(room_id):
         
         # Check room privacy and validate room code for private rooms
         room_privacy = room_data.get('room_privacy', 'public')
-        if room_privacy == 'private':
+        bonded_group_id = room_data.get('group_id')
+        skip_private_code = (
+            room_privacy == 'private'
+            and bonded_group_id
+            and _is_group_member(db, bonded_group_id, user_id)
+        )
+
+        if room_privacy == 'private' and not skip_private_code:
             data = request.get_json(silent=True) or {}
             raw_room_code = data.get('room_code', '')
             

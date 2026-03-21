@@ -36,6 +36,8 @@ export interface PrayerRoom {
   room_id: string;
   room_name: string;
   room_privacy: 'public' | 'private';
+  /** When set, only members of this prayer group can join without a room code. */
+  group_id?: string;
   room_code?: string;
   host_id: string;
   host_name: string;

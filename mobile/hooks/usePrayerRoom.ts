@@ -26,6 +26,8 @@ export function usePrayerRoom(roomId: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [peers, setPeers] = useState<Map<string, PeerEntry>>(new Map());
   const [localStream, setLocalStream] = useState<any>(null);
+  /** Bumps when local tracks change so RTCView can remount after toggling video. */
+  const [localVideoRevision, setLocalVideoRevision] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(false);
   const [roomMode, setRoomMode] = useState<RoomMode>(ROOM_MODES.GROUP_CALL);
@@ -130,6 +132,7 @@ export function usePrayerRoom(roomId: string) {
 
   // ── Leave room ───────────────────────────────────────────────────────────────
   const leave = useCallback(async () => {
+    if (!roomId) return;
     engineRef.current?.destroy();
     engineRef.current = null;
     setIsJoined(false);
@@ -138,19 +141,24 @@ export function usePrayerRoom(roomId: string) {
 
   // ── Mute / Video toggles ─────────────────────────────────────────────────────
   const toggleMute = useCallback(() => {
+    if (!roomId || !engineRef.current) return;
     engineRef.current?.setAudioEnabled(isMuted);
     setIsMuted((v) => !v);
     roomApi.selfMute(roomId, !isMuted).catch(() => null);
   }, [isMuted, roomId]);
 
   const toggleVideo = useCallback(async () => {
+    if (!roomId || !engineRef.current) return;
     const next = !isVideoOn;
     await engineRef.current?.setVideoEnabled(next);
     setIsVideoOn(next);
-  }, [isVideoOn]);
+    setLocalStream(engineRef.current?.getLocalStream() ?? null);
+    setLocalVideoRevision((r) => r + 1);
+  }, [isVideoOn, roomId]);
 
   // ── Chat ─────────────────────────────────────────────────────────────────────
   const sendMessage = useCallback(async (text: string) => {
+    if (!roomId) return;
     await roomApi.sendChat(roomId, text);
   }, [roomId]);
 
@@ -164,6 +172,7 @@ export function usePrayerRoom(roomId: string) {
     messages,
     peers,
     localStream,
+    localVideoRevision,
     isMuted,
     isVideoOn,
     roomMode,

@@ -1,6 +1,14 @@
 import { auth } from '@/lib/firebase';
 import { API_BASE_URL } from '@/lib/constants';
 
+function localClientDateYmd(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 async function getAuthHeaders(forceRefresh = false): Promise<HeadersInit> {
   const user = auth.currentUser;
   if (!user) return { 'Content-Type': 'application/json' };
@@ -40,11 +48,14 @@ async function request<T>(
     }
   }
   if (!res.ok) {
-    throw new Error(
+    let msg =
       (typeof json.error === 'string' && json.error) ||
-        (typeof json.message === 'string' && json.message) ||
-        `HTTP ${res.status}`
-    );
+      (typeof json.message === 'string' && json.message) ||
+      `HTTP ${res.status}`;
+    if (typeof json.reason === 'string' && json.reason.trim()) {
+      msg = msg.includes(json.reason) ? msg : `${msg}\n${json.reason}`;
+    }
+    throw new Error(msg);
   }
   return json as T;
 }
@@ -89,6 +100,12 @@ export const roomApi = {
       method: 'POST',
       body: JSON.stringify({ room_name: name, room_privacy: privacy }),
     }),
+  /** Active or new private room bound to a prayer group (members join without a code). */
+  ensureGroupSession: (groupId: string) =>
+    request<{ success: boolean; room_id: string; room_name: string; room_code?: string | null; reused?: boolean }>(
+      '/api/prayer-room/group-session',
+      { method: 'POST', body: JSON.stringify({ group_id: groupId }) }
+    ),
   join: (roomId: string, code?: string) =>
     request<any>(`/api/prayer-room/join/${roomId}`, {
       method: 'POST',
@@ -202,15 +219,15 @@ export const prayerRequestApi = {
     request<{ wall_pray_last_7_days: number; wall_pray_streak_days: number }>(
       '/api/prayer/my/home-prayer-metrics'
     ),
-  list: () => request<any>('/api/prayer/prayers'),
-  // Backend validates `title` (min 5, max 200) and `content` (min 10, max 2000).
-  // We auto-generate `title` from the first 60 chars of the prayer so the UX
-  // stays single-field (like X / Threads).
+  list: () =>
+    request<any>(
+      `/api/prayer/prayers?client_date=${encodeURIComponent(localClientDateYmd())}`
+    ),
+  /** Backend validates `content` (min 10, max 2000); title is derived server-side. */
   submit: (content: string, isAnonymous?: boolean) =>
     request<any>('/api/prayer/request', {
       method: 'POST',
       body: JSON.stringify({
-        title: content.substring(0, 60).trim() || 'Prayer',
         content,
         is_anonymous: isAnonymous ?? false,
       }),
