@@ -23,7 +23,7 @@ import { useSpeechPlayback } from '@/hooks/useSpeechPlayback';
 import { useAuthStore } from '@/stores/authStore';
 import { THEME_COLORS } from '@/lib/constants';
 import Icon from '@/components/ui/Icon';
-import { useMyGroups } from '@/hooks/useGroups';
+import { useGroupUnread } from '@/contexts/GroupUnreadContext';
 import { useDevotionalStreak } from '@/hooks/useHomeStats';
 import { Avatar } from '@/components/ui/Avatar';
 
@@ -239,7 +239,7 @@ export default function HomeScreen() {
   const { profile, user } = useAuthStore();
   const queryClient = useQueryClient();
   const today = dayjs().format('YYYY-MM-DD');
-  const { groups: myGroups } = useMyGroups();
+  const { groups: myGroups, totalUnread: groupChatUnread, unreadByGroup } = useGroupUnread();
   const { devotionalStreak } = useDevotionalStreak();
 
   const [homeTabActive, setHomeTabActive] = useState(false);
@@ -593,9 +593,10 @@ export default function HomeScreen() {
             {
               icon: 'groups' as const,
               label: 'Groups',
-              hint: 'Your circles',
+              hint: groupChatUnread > 0 ? `${groupChatUnread} new message${groupChatUnread === 1 ? '' : 's'}` : 'Your circles',
               value: myGroups.length.toString(),
               color: THEME_COLORS.sage,
+              showUnreadDot: groupChatUnread > 0,
             },
             {
               icon: 'flame' as const,
@@ -603,6 +604,7 @@ export default function HomeScreen() {
               hint: 'Devotional · Wall',
               value: dayStreakDisplay,
               color: THEME_COLORS.gold,
+              showUnreadDot: false,
             },
             {
               icon: 'pray' as const,
@@ -610,10 +612,28 @@ export default function HomeScreen() {
               hint: 'Wall · 7 days',
               value: prayingWeeklyDisplay,
               color: THEME_COLORS.rose,
+              showUnreadDot: false,
             },
           ].map((s) => (
             <View key={s.label} style={{ flex: 1, backgroundColor: THEME_COLORS.bg2, borderWidth: 1, borderColor: THEME_COLORS.border, borderRadius: 16, padding: 14, alignItems: 'center' }}>
-              <Icon name={s.icon} size={20} color={s.color} style={{ marginBottom: 6 }} />
+              <View style={{ position: 'relative', marginBottom: 6 }}>
+                <Icon name={s.icon} size={20} color={s.color} />
+                {s.showUnreadDot ? (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: -2,
+                      right: -4,
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: THEME_COLORS.rose,
+                      borderWidth: 1.5,
+                      borderColor: THEME_COLORS.bg2,
+                    }}
+                  />
+                ) : null}
+              </View>
               <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 20 }}>{s.value}</Text>
               <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 10, marginTop: 1, textAlign: 'center' }}>{s.label}</Text>
               <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 8, marginTop: 2, opacity: 0.85, textAlign: 'center' }}>{s.hint}</Text>
@@ -627,14 +647,35 @@ export default function HomeScreen() {
         <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, marginBottom: 12 }}>Quick Actions</Text>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           {[
-            { icon: 'live' as const, label: 'Join a Room', sub: 'Live prayer rooms', route: '/(tabs)/rooms' as const },
-            { icon: 'book' as const, label: 'Devotional', sub: 'AI-powered plan', route: '/(tabs)/devotional' as const },
-            { icon: 'groups' as const, label: 'My Groups', sub: 'Prayer circles', route: '/(tabs)/groups' as const },
+            { icon: 'live' as const, label: 'Join a Room', sub: 'Live prayer rooms', route: '/(tabs)/rooms' as const, qaUnread: false },
+            { icon: 'book' as const, label: 'Devotional', sub: 'AI-powered plan', route: '/(tabs)/devotional' as const, qaUnread: false },
+            {
+              icon: 'groups' as const,
+              label: 'My Groups',
+              sub: groupChatUnread > 0 ? `${groupChatUnread} unread chat${groupChatUnread === 1 ? '' : 's'}` : 'Prayer circles',
+              route: '/(tabs)/groups' as const,
+              qaUnread: groupChatUnread > 0,
+            },
           ].map((a) => (
             <Pressable key={a.label} onPress={() => router.push(a.route)} style={{ flex: 1 }}>
               <View style={{ backgroundColor: THEME_COLORS.bg2, borderWidth: 1, borderColor: THEME_COLORS.border, borderRadius: 16, padding: 14, alignItems: 'center' }}>
-                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: THEME_COLORS.bg3, alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: THEME_COLORS.bg3, alignItems: 'center', justifyContent: 'center', marginBottom: 8, position: 'relative' }}>
                   <Icon name={a.icon} size={18} color={THEME_COLORS.gold} />
+                  {a.qaUnread ? (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: 2,
+                        right: 2,
+                        width: 10,
+                        height: 10,
+                        borderRadius: 5,
+                        backgroundColor: THEME_COLORS.rose,
+                        borderWidth: 2,
+                        borderColor: THEME_COLORS.bg3,
+                      }}
+                    />
+                  ) : null}
                 </View>
                 <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 12, textAlign: 'center' }}>{a.label}</Text>
                 <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 10, textAlign: 'center', marginTop: 2 }}>{a.sub}</Text>
@@ -672,7 +713,24 @@ export default function HomeScreen() {
                 onPress={() => router.push(`/group/${g.group_id}` as any)}
                 style={{ backgroundColor: THEME_COLORS.bg2, borderWidth: 1, borderColor: THEME_COLORS.border, borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}
               >
-                <Avatar name={g.name} size={44} />
+                <View style={{ position: 'relative' }}>
+                  <Avatar name={g.name} size={44} />
+                  {unreadByGroup[g.group_id] ? (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        right: 0,
+                        width: 12,
+                        height: 12,
+                        borderRadius: 6,
+                        backgroundColor: THEME_COLORS.rose,
+                        borderWidth: 2,
+                        borderColor: THEME_COLORS.bg2,
+                      }}
+                    />
+                  ) : null}
+                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 15, marginBottom: 2 }}>{g.name}</Text>
                   <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12 }}>

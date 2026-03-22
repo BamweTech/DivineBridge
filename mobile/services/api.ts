@@ -235,3 +235,41 @@ export const prayerRequestApi = {
   pray: (requestId: string) =>
     request<any>(`/api/prayer/request/${requestId}/pray`, { method: 'POST' }),
 };
+
+// ─── Profile (business card fields; same contract as web profile) ────────────
+
+export const profileApi = {
+  getBusinessCard: () =>
+    request<{
+      firstName: string;
+      lastName: string;
+      email: string;
+      phoneNumber: string;
+      linkedin: string;
+      businessCardEnabled: boolean;
+    }>('/api/auth/profile/business-card'),
+  updateBusinessCard: (body: {
+    phoneNumber?: string;
+    linkedin?: string;
+    businessCardEnabled?: boolean;
+  }) =>
+    request<{ message: string }>('/api/auth/profile/business-card', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+};
+
+// ─── Email preferences ───────────────────────────────────────────────────────
+
+export const emailPrefsApi = {
+  subscriptionStatus: () =>
+    request<{ subscribed: boolean }>('/api/email/subscription-status'),
+  subscribeDaily: () =>
+    request<{ subscribed: boolean }>('/api/email/subscribe-daily', {
+      method: 'POST',
+    }),
+  unsubscribeDaily: () =>
+    request<{ subscribed: boolean }>('/api/email/unsubscribe-daily', {
+      method: 'POST',
+    }),
+};

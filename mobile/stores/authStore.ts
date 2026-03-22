@@ -38,6 +38,13 @@ function normalizeProfile(uid: string, data: Record<string, unknown>): UserProfi
     createdNum = (createdAt as { toMillis: () => number }).toMillis();
   }
 
+  const phone =
+    (data.phone as string | undefined) ||
+    (data.phoneNumber as string | undefined);
+  const linkedIn =
+    (data.linkedIn as string | undefined) ||
+    (data.linkedin as string | undefined);
+
   return {
     uid,
     email: (data.email as string) ?? '',
@@ -46,8 +53,11 @@ function normalizeProfile(uid: string, data: Record<string, unknown>): UserProfi
     lastName: data.lastName as string | undefined,
     photoURL: data.photoURL as string | undefined,
     bio: data.bio as string | undefined,
-    phone: data.phone as string | undefined,
-    linkedIn: data.linkedIn as string | undefined,
+    phone,
+    linkedIn,
+    emailSubscribed: Boolean(data.email_subscribed),
+    notifyDailyVerse: Boolean(data.notify_daily_verse),
+    sessionRemindersEnabled: Boolean(data.session_reminders_enabled),
     createdAt: createdNum,
     groups: (data.groups as string[] | undefined) ?? [],
   };

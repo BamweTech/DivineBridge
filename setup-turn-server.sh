@@ -4,6 +4,10 @@
 
 set -e
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+source "$ROOT/scripts/lib/cloudsdk-python.sh"
+
 echo "=========================================="
 echo "Divine Bridge - Free TURN Server Setup"
 echo "=========================================="

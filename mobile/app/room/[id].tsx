@@ -19,7 +19,8 @@ import { VideoStreamView } from '@/components/room/VideoStreamView';
 import { usePrayerRoom } from '@/hooks/usePrayerRoom';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuthStore } from '@/stores/authStore';
-import { THEME_COLORS, ROOM_MODES } from '@/lib/constants';
+import { THEME_COLORS, ROOM_MODES, MESSAGE_TYPES } from '@/lib/constants';
+import { presentPrayerRoomBackgroundNotice } from '@/lib/roomChatNotify';
 import Icon from '@/components/ui/Icon';
 import type { Participant } from '@/types';
 import dayjs from 'dayjs';
@@ -32,12 +33,15 @@ function ControlButton({
   onPress,
   active,
   danger,
+  badgeCount,
 }: {
   iconName: IconName;
   label: string;
   onPress: () => void;
   active?: boolean;
   danger?: boolean;
+  /** Unread indicator (e.g. chat). */
+  badgeCount?: number;
 }) {
   const scale = useSharedValue(1);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -49,35 +53,59 @@ function ControlButton({
       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onPress(); }}
       style={{ alignItems: 'center', gap: 6 }}
     >
-      <Animated.View
-        style={[
-          {
-            width: 52,
-            height: 52,
-            borderRadius: 16,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: danger
-              ? 'rgba(176,90,80,0.08)'
-              : active
-              ? THEME_COLORS.sageDim
-              : THEME_COLORS.bg3,
-            borderWidth: 1,
-            borderColor: danger
-              ? 'rgba(176,90,80,0.2)'
-              : active
-              ? 'rgba(74,124,94,0.3)'
-              : THEME_COLORS.border,
-          },
-          style,
-        ]}
-      >
-        <Icon
-          name={iconName}
-          size={18}
-          color={danger ? THEME_COLORS.rose : active ? THEME_COLORS.sage : THEME_COLORS.text2}
-        />
-      </Animated.View>
+      <View style={{ position: 'relative' }}>
+        <Animated.View
+          style={[
+            {
+              width: 52,
+              height: 52,
+              borderRadius: 16,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: danger
+                ? 'rgba(176,90,80,0.08)'
+                : active
+                ? THEME_COLORS.sageDim
+                : THEME_COLORS.bg3,
+              borderWidth: 1,
+              borderColor: danger
+                ? 'rgba(176,90,80,0.2)'
+                : active
+                ? 'rgba(74,124,94,0.3)'
+                : THEME_COLORS.border,
+            },
+            style,
+          ]}
+        >
+          <Icon
+            name={iconName}
+            size={18}
+            color={danger ? THEME_COLORS.rose : active ? THEME_COLORS.sage : THEME_COLORS.text2}
+          />
+        </Animated.View>
+        {badgeCount != null && badgeCount > 0 ? (
+          <View
+            style={{
+              position: 'absolute',
+              top: -2,
+              right: -2,
+              minWidth: 18,
+              height: 18,
+              borderRadius: 9,
+              paddingHorizontal: 4,
+              backgroundColor: THEME_COLORS.rose,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 2,
+              borderColor: THEME_COLORS.bg,
+            }}
+          >
+            <Text style={{ color: '#fff', fontFamily: 'Geist_700Bold', fontSize: 9 }}>
+              {badgeCount > 9 ? '9+' : badgeCount}
+            </Text>
+          </View>
+        ) : null}
+      </View>
       <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 10 }}>{label}</Text>
     </Pressable>
   );
@@ -138,6 +166,44 @@ function ModeTransitionToast({ message }: { message: string }) {
   );
 }
 
+/** In-room toast for new chat / system lines (web `showToast` + vibrate pattern). */
+function RoomMessageToast({
+  message,
+  variant,
+  top,
+}: {
+  message: string;
+  variant: 'chat' | 'system';
+  top: number;
+}) {
+  const bg =
+    variant === 'system' ? 'rgba(176,90,80,0.95)' : 'rgba(44,36,23,0.92)';
+  return (
+    <Animated.View
+      entering={FadeInUp.duration(280)}
+      style={{
+        position: 'absolute',
+        top,
+        left: 20,
+        right: 20,
+        zIndex: 101,
+        backgroundColor: bg,
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      }}
+    >
+      <Text style={{ color: '#ffffff', fontFamily: 'Geist_600SemiBold', fontSize: 13, textAlign: 'center' }} numberOfLines={4}>
+        {message}
+      </Text>
+    </Animated.View>
+  );
+}
+
 export default function RoomScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -157,16 +223,82 @@ export default function RoomScreen() {
     activeSpeakers,
     modeSwitchToast,
     isJoined,
+    audioOutputRoute,
     join,
     leave,
     toggleMute,
     toggleVideo,
+    toggleAudioOutput,
     sendMessage,
   } = usePrayerRoom(id!);
 
   const [chatText, setChatText] = useState('');
   const [showChat, setShowChat] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+  const [roomToast, setRoomToast] = useState<{ text: string; variant: 'chat' | 'system' } | null>(null);
+  const [chatUnread, setChatUnread] = useState(0);
+  const chatNotifySeeded = useRef(false);
+  const seenChatMessageIds = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    chatNotifySeeded.current = false;
+    seenChatMessageIds.current = new Set();
+    setChatUnread(0);
+  }, [id]);
+
+  useEffect(() => {
+    if (!isJoined) {
+      chatNotifySeeded.current = false;
+      seenChatMessageIds.current = new Set();
+    }
+  }, [isJoined]);
+
+  useEffect(() => {
+    if (showChat) setChatUnread(0);
+  }, [showChat]);
+
+  useEffect(() => {
+    if (!roomToast) return;
+    const t = setTimeout(() => setRoomToast(null), 4200);
+    return () => clearTimeout(t);
+  }, [roomToast]);
+
+  useEffect(() => {
+    if (!isJoined || messages.length === 0) return;
+    if (!chatNotifySeeded.current) {
+      seenChatMessageIds.current = new Set(
+        messages.map((m) => m.message_id).filter((mid): mid is string => Boolean(mid))
+      );
+      chatNotifySeeded.current = true;
+      return;
+    }
+    const newOnes = messages.filter((m) => m.message_id && !seenChatMessageIds.current.has(m.message_id));
+    for (const m of newOnes) {
+      seenChatMessageIds.current.add(m.message_id);
+    }
+    if (newOnes.length === 0) return;
+
+    for (const m of newOnes) {
+      if (m.user_id === user?.uid) continue;
+      const isSystem = m.message_type === MESSAGE_TYPES.SYSTEM_NOTIFICATION;
+      if (isSystem) {
+        setRoomToast({ text: m.message, variant: 'system' });
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        void presentPrayerRoomBackgroundNotice('Prayer room', m.message);
+        if (!showChat) setChatUnread((c) => c + 1);
+        continue;
+      }
+      const preview = m.message.length > 72 ? `${m.message.slice(0, 72)}…` : m.message;
+      if (!showChat) {
+        setRoomToast({ text: `${m.user_name}: ${preview}`, variant: 'chat' });
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        void presentPrayerRoomBackgroundNotice(m.user_name, preview);
+        setChatUnread((c) => c + 1);
+      } else {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+    }
+  }, [messages, isJoined, user?.uid, showChat]);
 
   useEffect(() => {
     if (scrollRef.current && messages.length > 0) {
@@ -265,6 +397,13 @@ export default function RoomScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       {modeSwitchToast && <ModeTransitionToast message={modeSwitchToast} />}
+      {roomToast ? (
+        <RoomMessageToast
+          message={roomToast.text}
+          variant={roomToast.variant}
+          top={modeSwitchToast ? 132 : 80}
+        />
+      ) : null}
 
       {/* Header */}
       <View style={{
@@ -294,9 +433,25 @@ export default function RoomScreen() {
             width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 1,
             backgroundColor: showChat ? THEME_COLORS.goldDim : THEME_COLORS.bg3,
             borderColor: showChat ? THEME_COLORS.goldBorder : THEME_COLORS.border,
+            position: 'relative',
           }}
         >
           <Icon name="chat" size={16} color={showChat ? THEME_COLORS.gold : THEME_COLORS.text2} />
+          {!showChat && chatUnread > 0 ? (
+            <View
+              style={{
+                position: 'absolute',
+                top: 2,
+                right: 2,
+                width: 10,
+                height: 10,
+                borderRadius: 5,
+                backgroundColor: THEME_COLORS.rose,
+                borderWidth: 2,
+                borderColor: THEME_COLORS.bg,
+              }}
+            />
+          ) : null}
         </Pressable>
       </View>
 
@@ -320,7 +475,41 @@ export default function RoomScreen() {
           /* Chat panel */
           <View style={{ flex: 1 }}>
             <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
-              {messages.map((msg, i) => {
+              {messages.map((msg) => {
+                const isSystem = msg.message_type === MESSAGE_TYPES.SYSTEM_NOTIFICATION;
+                if (isSystem) {
+                  return (
+                    <Animated.View
+                      key={msg.message_id}
+                      entering={FadeInDown.duration(200)}
+                      style={{ marginBottom: 12, alignItems: 'center' }}
+                    >
+                      <View
+                        style={{
+                          maxWidth: '92%',
+                          borderRadius: 14,
+                          paddingVertical: 10,
+                          paddingHorizontal: 14,
+                          backgroundColor: 'rgba(176,90,80,0.08)',
+                          borderWidth: 1,
+                          borderColor: 'rgba(176,90,80,0.2)',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: THEME_COLORS.rose,
+                            fontFamily: 'Geist_500Medium',
+                            fontSize: 13,
+                            lineHeight: 19,
+                            textAlign: 'center',
+                          }}
+                        >
+                          {msg.message}
+                        </Text>
+                      </View>
+                    </Animated.View>
+                  );
+                }
                 const isMe = msg.user_id === user?.uid;
                 return (
                   <Animated.View key={msg.message_id} entering={FadeInDown.duration(200)} style={{ marginBottom: 10, alignItems: isMe ? 'flex-end' : 'flex-start' }}>
@@ -437,10 +626,22 @@ export default function RoomScreen() {
         backgroundColor: THEME_COLORS.bg,
       }}>
         <ControlButton iconName={isMuted ? 'mic-off' : 'mic'} label={isMuted ? 'Unmute' : 'Mute'} onPress={toggleMute} active={!isMuted} />
+        <ControlButton
+          iconName={audioOutputRoute === 'speaker' ? 'audio' : 'headphones'}
+          label={audioOutputRoute === 'speaker' ? 'Speaker' : 'Phone'}
+          onPress={() => { void toggleAudioOutput(); }}
+          active={audioOutputRoute === 'speaker'}
+        />
         {isSpeaker && isGroupCall && (
           <ControlButton iconName={isVideoOn ? 'video' : 'video'} label={isVideoOn ? 'Stop Video' : 'Video'} onPress={toggleVideo} active={isVideoOn} />
         )}
-        <ControlButton iconName="chat" label="Chat" onPress={() => setShowChat((v) => !v)} active={showChat} />
+        <ControlButton
+          iconName="chat"
+          label="Chat"
+          onPress={() => setShowChat((v) => !v)}
+          active={showChat}
+          badgeCount={!showChat ? chatUnread : 0}
+        />
         <ControlButton iconName="leave" label="Leave" onPress={handleLeave} danger />
       </View>
     </KeyboardAvoidingView>

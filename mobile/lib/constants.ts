@@ -30,6 +30,8 @@ export const MESSAGE_TYPES = {
   SCRIPTURE: 'scripture',
   PRAISE: 'praise',
   ANNOUNCEMENT: 'announcement',
+  /** Host/system lines in prayer room chat (see web `.system-notification`). */
+  SYSTEM_NOTIFICATION: 'system_notification',
 } as const;
 
 export const DEVOTIONAL_DURATIONS = [7, 14, 30] as const;

@@ -19,7 +19,7 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { useMyGroups } from '@/hooks/useGroups';
+import { useGroupUnread } from '@/contexts/GroupUnreadContext';
 import { groupApi, scheduledApi, prayerRequestApi, globalWatchApi } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
@@ -46,7 +46,7 @@ function timeAgo(dateStr: string): string {
 
 // ─── GroupCard ────────────────────────────────────────────────────────────────
 
-function GroupCard({ group, onPress }: { group: PrayerGroup; onPress: () => void }) {
+function GroupCard({ group, onPress, hasUnread }: { group: PrayerGroup; onPress: () => void; hasUnread?: boolean }) {
   return (
     <Pressable onPress={onPress}>
       <View style={{
@@ -58,8 +58,25 @@ function GroupCard({ group, onPress }: { group: PrayerGroup; onPress: () => void
         marginBottom: 12,
       }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-          <View style={{ width: 42, height: 42, borderRadius: 13, backgroundColor: THEME_COLORS.sageDim, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="groups" size={18} color={THEME_COLORS.sage} />
+          <View style={{ position: 'relative' }}>
+            <View style={{ width: 42, height: 42, borderRadius: 13, backgroundColor: THEME_COLORS.sageDim, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="groups" size={18} color={THEME_COLORS.sage} />
+            </View>
+            {hasUnread ? (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: -2,
+                  right: -2,
+                  width: 12,
+                  height: 12,
+                  borderRadius: 6,
+                  backgroundColor: THEME_COLORS.rose,
+                  borderWidth: 2,
+                  borderColor: '#f0faf3',
+                }}
+              />
+            ) : null}
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15 }}>
@@ -752,7 +769,7 @@ export default function GroupsScreen() {
   }
   const [showCreate, setShowCreate] = useState(false);
   const [showCompose, setShowCompose] = useState(false);
-  const { groups: myGroups, isLoading: myLoading } = useMyGroups();
+  const { groups: myGroups, isLoadingGroups: myLoading, unreadByGroup, totalUnread } = useGroupUnread();
 
   // When Create Group or Compose Prayer modal is open, render it fullscreen
   if (showCreate) {
@@ -822,11 +839,30 @@ export default function GroupsScreen() {
                 alignItems: 'center',
                 borderWidth: tab === t.key ? 1 : 0,
                 borderColor: THEME_COLORS.border,
+                position: 'relative',
               }}
             >
               <Text style={{ color: tab === t.key ? THEME_COLORS.text : THEME_COLORS.text3, fontFamily: tab === t.key ? 'Geist_600SemiBold' : 'Geist_400Regular', fontSize: 13 }}>
                 {t.label}
               </Text>
+              {t.key === 'mine' && totalUnread > 0 ? (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: 4,
+                    right: 10,
+                    minWidth: 16,
+                    height: 16,
+                    paddingHorizontal: 4,
+                    borderRadius: 8,
+                    backgroundColor: THEME_COLORS.rose,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Geist_700Bold' }}>{totalUnread > 9 ? '9+' : totalUnread}</Text>
+                </View>
+              ) : null}
             </Pressable>
           ))}
         </View>
@@ -871,6 +907,7 @@ export default function GroupsScreen() {
               <Animated.View key={group.group_id} entering={FadeInDown.delay(i * 50).duration(400)}>
                 <GroupCard
                   group={group}
+                  hasUnread={unreadByGroup[group.group_id]}
                   onPress={() => router.push(`/group/${group.group_id}`)}
                 />
               </Animated.View>

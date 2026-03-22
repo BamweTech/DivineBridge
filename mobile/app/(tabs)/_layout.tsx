@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { THEME_COLORS } from '@/lib/constants';
 import Icon from '@/components/ui/Icon';
 import type { IconName } from '@/components/ui/Icon';
+import { useGroupUnread } from '@/contexts/GroupUnreadContext';
 
 const TABS: { name: string; label: string; icon: IconName }[] = [
   { name: 'home',       label: 'Home',       icon: 'home' },
@@ -23,10 +24,13 @@ function TabBarIcon({
   icon,
   label,
   focused,
+  badgeCount,
 }: {
   icon: IconName;
   label: string;
   focused: boolean;
+  /** Unread count (e.g. group chat). */
+  badgeCount?: number;
 }) {
   const scale = useSharedValue(focused ? 1.05 : 0.9);
   const pillOpacity = useSharedValue(focused ? 1 : 0);
@@ -63,12 +67,34 @@ function TabBarIcon({
         ]}
       />
       <Animated.View style={[{ position: 'absolute', top: 8 }, iconStyle]}>
-        <Icon
-          name={icon}
-          size={20}
-          color={focused ? THEME_COLORS.gold : THEME_COLORS.text3}
-          strokeWidth={focused ? 2.0 : 1.6}
-        />
+        <View>
+          <Icon
+            name={icon}
+            size={20}
+            color={focused ? THEME_COLORS.gold : THEME_COLORS.text3}
+            strokeWidth={focused ? 2.0 : 1.6}
+          />
+          {badgeCount != null && badgeCount > 0 ? (
+            <View
+              style={{
+                position: 'absolute',
+                top: -4,
+                right: -10,
+                minWidth: 16,
+                height: 16,
+                paddingHorizontal: 4,
+                borderRadius: 8,
+                backgroundColor: THEME_COLORS.rose,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Geist_700Bold' }}>
+                {badgeCount > 9 ? '9+' : badgeCount}
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </Animated.View>
       <Text
         style={{
@@ -88,6 +114,7 @@ function TabBarIcon({
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  const { totalUnread } = useGroupUnread();
 
   return (
     <Tabs
@@ -112,7 +139,12 @@ export default function TabsLayout() {
           name={tab.name}
           options={{
             tabBarIcon: ({ focused }) => (
-              <TabBarIcon icon={tab.icon} label={tab.label} focused={focused} />
+              <TabBarIcon
+                icon={tab.icon}
+                label={tab.label}
+                focused={focused}
+                badgeCount={tab.name === 'groups' ? totalUnread : undefined}
+              />
             ),
           }}
         />

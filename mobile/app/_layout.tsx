@@ -30,6 +30,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '@/stores/authStore';
+import { GroupUnreadProvider } from '@/contexts/GroupUnreadContext';
 import { groupApi } from '@/services/api';
 import { THEME_COLORS } from '@/lib/constants';
 import Icon from '@/components/ui/Icon';
@@ -308,33 +309,35 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
-        <AuthGuard />
-        <StatusBar style="dark" backgroundColor="#faf6ef" />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#faf6ef' } }}>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen
-            name="room/[id]"
-            options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
-          />
-          <Stack.Screen
-            name="group/[id]"
-            options={{ animation: 'slide_from_right' }}
-          />
-          <Stack.Screen
-            name="activity"
-            options={{ animation: 'slide_from_right' }}
-          />
-        </Stack>
+        <GroupUnreadProvider>
+          <AuthGuard />
+          <StatusBar style="dark" backgroundColor="#faf6ef" />
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#faf6ef' } }}>
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen
+              name="room/[id]"
+              options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+            />
+            <Stack.Screen
+              name="group/[id]"
+              options={{ animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+              name="activity"
+              options={{ animation: 'slide_from_right' }}
+            />
+          </Stack>
 
-        {/* Deep link invite modal — shown on top of everything when user is logged in */}
-        {pendingInvite && user && (
-          <JoinGroupModal
-            groupId={pendingInvite.groupId}
-            code={pendingInvite.code}
-            onClose={() => setPendingInvite(null)}
-          />
-        )}
+          {/* Deep link invite modal — shown on top of everything when user is logged in */}
+          {pendingInvite && user && (
+            <JoinGroupModal
+              groupId={pendingInvite.groupId}
+              code={pendingInvite.code}
+              onClose={() => setPendingInvite(null)}
+            />
+          )}
+        </GroupUnreadProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>
   );

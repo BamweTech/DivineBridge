@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,14 +12,15 @@ import {
   Share,
   ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import dayjs from 'dayjs';
-import { useGroupChat, useGroupDetails } from '@/hooks/useGroups';
+import { useGroupChat, useGroupDetails, firestoreTimestampMs } from '@/hooks/useGroups';
+import { useGroupUnread } from '@/contexts/GroupUnreadContext';
 import { usePrayerRoom } from '@/hooks/usePrayerRoom';
 import { roomApi } from '@/services/api';
 import { isWebRTCAvailable } from '@/lib/sfu';
@@ -43,6 +44,7 @@ const TYPE_COLORS: Record<MessageType, string> = {
   scripture: THEME_COLORS.goldDim2,
   praise: THEME_COLORS.sageDim,
   announcement: 'rgba(59,130,246,0.08)',
+  system_notification: 'rgba(176,90,80,0.08)',
 };
 
 const TYPE_BORDER_COLORS: Record<MessageType, string> = {
@@ -51,6 +53,7 @@ const TYPE_BORDER_COLORS: Record<MessageType, string> = {
   scripture: THEME_COLORS.goldBorder,
   praise: 'rgba(74,124,94,0.22)',
   announcement: 'rgba(59,130,246,0.2)',
+  system_notification: 'rgba(176,90,80,0.2)',
 };
 
 const TYPE_LABEL_COLORS: Record<MessageType, string> = {
@@ -59,6 +62,7 @@ const TYPE_LABEL_COLORS: Record<MessageType, string> = {
   scripture: THEME_COLORS.gold,
   praise: THEME_COLORS.sage,
   announcement: '#3b82f6',
+  system_notification: THEME_COLORS.rose,
 };
 
 function GroupChatBubble({ msg, userUid }: { msg: GroupChatMessage; userUid?: string }) {
@@ -262,6 +266,7 @@ export default function GroupScreen() {
 
   const { group } = useGroupDetails(id!);
   const { messages, sendMessage } = useGroupChat(id!);
+  const { markGroupChatRead } = useGroupUnread();
   const [text, setText] = useState('');
   const [messageType, setMessageType] = useState<MessageType>('text');
   const [showTypePicker, setShowTypePicker] = useState(false);
@@ -309,6 +314,15 @@ export default function GroupScreen() {
   const participants = prayer.room?.participants ?? [];
   const currentParticipant = participants.find((p) => p.user_id === user?.uid);
   const isSpeaker = currentParticipant?.role === 'speaker';
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!id) return;
+      const last = messages[messages.length - 1];
+      const ts = last ? firestoreTimestampMs(last.timestamp) : undefined;
+      void markGroupChatRead(id, ts);
+    }, [id, messages, markGroupChatRead])
+  );
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -448,7 +462,9 @@ export default function GroupScreen() {
           userId={user?.uid}
           roomMode={prayer.roomMode}
           modeSwitchToast={prayer.modeSwitchToast}
+          audioOutputRoute={prayer.audioOutputRoute}
           onToggleMute={prayer.toggleMute}
+          onToggleAudioOutput={() => { void prayer.toggleAudioOutput(); }}
           onToggleVideo={prayer.toggleVideo}
           onLeave={handleLeaveLive}
           onMaximize={() => setAvFullscreen(true)}
@@ -538,7 +554,9 @@ export default function GroupScreen() {
                 userId={user?.uid}
                 roomMode={prayer.roomMode}
                 modeSwitchToast={prayer.modeSwitchToast}
+                audioOutputRoute={prayer.audioOutputRoute}
                 onToggleMute={prayer.toggleMute}
+                onToggleAudioOutput={() => { void prayer.toggleAudioOutput(); }}
                 onToggleVideo={prayer.toggleVideo}
                 onLeave={() => {
                   handleLeaveLive();

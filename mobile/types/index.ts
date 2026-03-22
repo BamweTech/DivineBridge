@@ -13,6 +13,12 @@ export interface UserProfile {
   bio?: string;
   phone?: string;
   linkedIn?: string;
+  /** Mirrors Firestore `email_subscribed` (daily email). */
+  emailSubscribed?: boolean;
+  /** Local daily reminder (Firestore + scheduled local notification). */
+  notifyDailyVerse?: boolean;
+  /** Preference for future session reminder push/in-app (Firestore). */
+  sessionRemindersEnabled?: boolean;
   createdAt?: number;
   groups?: string[];
 }

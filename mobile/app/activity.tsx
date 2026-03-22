@@ -10,13 +10,13 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { THEME_COLORS } from '@/lib/constants';
 import Icon from '@/components/ui/Icon';
-import { useMyGroups } from '@/hooks/useGroups';
+import { useGroupUnread } from '@/contexts/GroupUnreadContext';
 import { Avatar } from '@/components/ui/Avatar';
 
 export default function ActivityScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { groups: myGroups, isLoading } = useMyGroups();
+  const { groups: myGroups, isLoadingGroups: isLoading, unreadByGroup } = useGroupUnread();
 
   function goToPrayerWall() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -164,13 +164,30 @@ export default function ActivityScreen() {
                         gap: 12,
                       }}
                     >
-                      <Avatar name={g.name} size={44} />
+                      <View style={{ position: 'relative' }}>
+                        <Avatar name={g.name} size={44} />
+                        {unreadByGroup[g.group_id] ? (
+                          <View
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              right: 0,
+                              width: 12,
+                              height: 12,
+                              borderRadius: 6,
+                              backgroundColor: THEME_COLORS.rose,
+                              borderWidth: 2,
+                              borderColor: THEME_COLORS.bg2,
+                            }}
+                          />
+                        ) : null}
+                      </View>
                       <View style={{ flex: 1 }}>
                         <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 15, marginBottom: 2 }} numberOfLines={1}>
                           {g.name}
                         </Text>
-                        <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12 }}>
-                          Open chat
+                        <Text style={{ color: unreadByGroup[g.group_id] ? THEME_COLORS.rose : THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12 }}>
+                          {unreadByGroup[g.group_id] ? 'New messages' : 'Open chat'}
                         </Text>
                       </View>
                       <Icon name="chevron-r" size={16} color={THEME_COLORS.text3} />

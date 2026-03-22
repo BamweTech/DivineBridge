@@ -110,6 +110,7 @@ Visit `http://localhost:5001`
 Comprehensive documentation is available in the `/docs` directory:
 
 ### For Developers
+- **[Architecture (full stack)](docs/ARCHITECTURE.md)** - Web, mobile, backend, Firebase, SFU, and how features map to code
 - **[Quick Testing Guide](docs/guides/QUICKSTART_TESTING.md)** - Get started in 5 minutes
 - **[Local Storage Guide](docs/guides/LOCAL_STORAGE_GUIDE.md)** - Test safely
 - **[System Review](docs/reports/SYSTEM_REVIEW_REPORT.md)** - Architecture overview

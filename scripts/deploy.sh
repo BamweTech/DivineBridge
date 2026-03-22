@@ -47,10 +47,10 @@ Options:
   --dry-run             Print commands; do not execute
 
 Environment (see scripts/deploy.env.example):
-  GCP_PROJECT, GCP_REGION, CLOUD_RUN_SERVICE, CLOUD_RUN_PORT, CONTAINER_IMAGE, FIREBASE_PROJECT
+  GCP_PROJECT, GCP_REGION, CLOUD_RUN_SERVICE, CLOUD_RUN_PORT, CONTAINER_IMAGE, FIREBASE_PROJECT, CLOUDSDK_PYTHON (optional)
 
 Prerequisites:
-  - gcloud CLI authenticated (gcloud auth login && gcloud config set project \$GCP_PROJECT)
+  - gcloud CLI authenticated (gcloud auth login && gcloud config set project \$GCP_PROJECT); Python 3.10+ on PATH or set CLOUDSDK_PYTHON (avoids SDK 3.9 deprecation warning)
   - firebase-tools via npx (no global install required)
   - Firestore deploy: firebase login, or set FIREBASE_TOKEN (firebase login:ci), or GCP SA with Firebase deploy roles
 EOF
@@ -75,6 +75,10 @@ if [[ -f "$ROOT/scripts/deploy.env" ]]; then
   # shellcheck source=/dev/null
   source "$ROOT/scripts/deploy.env"
 fi
+
+# gcloud SDK requires Python 3.10+ (bundled 3.9 is deprecated)
+# shellcheck source=/dev/null
+source "$ROOT/scripts/lib/cloudsdk-python.sh"
 
 require_cmd() {
   if ! command -v "$1" &>/dev/null; then

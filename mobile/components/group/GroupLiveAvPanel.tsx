@@ -6,6 +6,7 @@ import { THEME_COLORS, ROOM_MODES } from '@/lib/constants';
 import Icon from '@/components/ui/Icon';
 import type { IconName } from '@/components/ui/Icon';
 import type { PeerEntry } from '@/lib/sfu';
+import type { LiveRoomAudioRoute } from '@/lib/liveRoomAudio';
 import type { RoomMode } from '@/types';
 
 type Props = {
@@ -19,7 +20,9 @@ type Props = {
   userId: string | undefined;
   roomMode: RoomMode;
   modeSwitchToast: string | null;
+  audioOutputRoute: LiveRoomAudioRoute;
   onToggleMute: () => void;
+  onToggleAudioOutput: () => void;
   onToggleVideo: () => void;
   onLeave: () => void;
   onMaximize: () => void;
@@ -91,7 +94,9 @@ export function GroupLiveAvPanel({
   userId,
   roomMode,
   modeSwitchToast,
+  audioOutputRoute,
   onToggleMute,
+  onToggleAudioOutput,
   onToggleVideo,
   onLeave,
   onMaximize,
@@ -170,6 +175,12 @@ export function GroupLiveAvPanel({
 
       <View style={styles.controls}>
         <AvControl iconName={isMuted ? 'mic-off' : 'mic'} label={isMuted ? 'Unmute' : 'Mute'} onPress={onToggleMute} active={!isMuted} />
+        <AvControl
+          iconName={audioOutputRoute === 'speaker' ? 'audio' : 'headphones'}
+          label={audioOutputRoute === 'speaker' ? 'Speaker' : 'Phone'}
+          onPress={onToggleAudioOutput}
+          active={audioOutputRoute === 'speaker'}
+        />
         {isSpeaker && isGroupCall ? (
           <AvControl iconName="video" label={isVideoOn ? 'Stop' : 'Video'} onPress={onToggleVideo} active={isVideoOn} />
         ) : null}

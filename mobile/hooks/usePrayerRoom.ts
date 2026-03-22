@@ -3,7 +3,14 @@ import {
   doc,
   onSnapshot,
 } from 'firebase/firestore';
-import { ref, query as rtdbQuery, limitToLast, onChildAdded, off } from 'firebase/database';
+import {
+  ref,
+  query as rtdbQuery,
+  limitToLast,
+  onValue,
+  off,
+  type DataSnapshot,
+} from 'firebase/database';
 import { db, auth, rtdb } from '@/lib/firebase';
 import { signInWithCustomToken } from 'firebase/auth';
 import { COLLECTIONS, ROOM_MODES, SFU_URL, MESSAGE_TYPES } from '@/lib/constants';
@@ -13,6 +20,11 @@ import { roomApi } from '@/services/api';
 import { useAuthStore } from '@/stores/authStore';
 import { getDisplayName } from '@/lib/userDisplayName';
 import type { PrayerRoom, ChatMessage, RoomMode, Participant } from '@/types';
+import {
+  setLiveRoomAudioRoute,
+  resetLiveRoomAudio,
+  type LiveRoomAudioRoute,
+} from '@/lib/liveRoomAudio';
 
 // Always use the hardcoded SFU_URL constant — Flask's sfuUrl response defaults
 // to localhost when SFU_URL env var is not set on Cloud Run, which would break
@@ -36,6 +48,8 @@ export function usePrayerRoom(roomId: string) {
   const [activeSpeakers, setActiveSpeakers] = useState<string[]>([]);
   const [modeSwitchToast, setModeSwitchToast] = useState<string | null>(null);
   const [isJoined, setIsJoined] = useState(false);
+  const [audioOutputRoute, setAudioOutputRouteState] = useState<LiveRoomAudioRoute>('speaker');
+  const audioOutputRouteRef = useRef<LiveRoomAudioRoute>('speaker');
 
   // ── Watch room document ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -55,29 +69,33 @@ export function usePrayerRoom(roomId: string) {
     return unsub;
   }, [roomId]);
 
-  // ── Watch chat messages via RTDB (real-time delivery, low-latency) ──────────
+  // ── Watch chat via RTDB (full snapshot, last 100) — same source as web fast path.
+  //    onValue avoids treating the initial history as N separate “new” events (onChildAdded would).
   useEffect(() => {
     if (!roomId) return;
     setMessages([]);
-    const chatRef = rtdbQuery(ref(rtdb, `/rooms/${roomId}/chat`), limitToLast(100));
-    const handler = onChildAdded(chatRef, (snap) => {
-      const val = snap.val();
-      if (!val) return;
-      const msg: ChatMessage = {
-        message_id: val.message_id ?? snap.key ?? '',
-        room_id: roomId,
-        user_id: val.user_id,
-        user_name: val.user_name,
-        message: val.message,
-        message_type: val.message_type ?? MESSAGE_TYPES.TEXT,
-        timestamp: val.timestamp,
-      };
-      setMessages((prev) => {
-        if (prev.some((m) => m.message_id === msg.message_id)) return prev;
-        return [...prev, msg];
+    const chatPath = ref(rtdb, `/rooms/${roomId}/chat`);
+    const q = rtdbQuery(chatPath, limitToLast(100));
+    const handler = (snap: DataSnapshot) => {
+      const list: ChatMessage[] = [];
+      snap.forEach((child) => {
+        const val = child.val();
+        if (!val) return;
+        list.push({
+          message_id: val.message_id ?? child.key ?? '',
+          room_id: roomId,
+          user_id: val.user_id,
+          user_name: val.user_name,
+          message: val.message,
+          message_type: (val.message_type as ChatMessage['message_type']) ?? MESSAGE_TYPES.TEXT,
+          timestamp: val.timestamp,
+        });
       });
-    });
-    return () => off(chatRef, 'child_added', handler);
+      list.sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0));
+      setMessages(list);
+    };
+    onValue(q, handler);
+    return () => off(q, 'value', handler);
   }, [roomId]);
 
   // ── Join room ────────────────────────────────────────────────────────────────
@@ -126,6 +144,9 @@ export function usePrayerRoom(roomId: string) {
       prevRoomSpeakerRef.current = isSpeaker;
       setLocalStream(engine.getLocalStream());
       setRoomMode(engine.getCurrentMode());
+      audioOutputRouteRef.current = 'speaker';
+      setAudioOutputRouteState('speaker');
+      await setLiveRoomAudioRoute('speaker');
       setIsJoined(true);
     } catch (err) {
       console.error('[room] Failed to join:', err);
@@ -140,6 +161,9 @@ export function usePrayerRoom(roomId: string) {
     engineRef.current = null;
     prevRoomSpeakerRef.current = null;
     setIsJoined(false);
+    audioOutputRouteRef.current = 'speaker';
+    setAudioOutputRouteState('speaker');
+    await resetLiveRoomAudio();
     await roomApi.leave(roomId).catch(() => null);
   }, [roomId]);
 
@@ -155,7 +179,10 @@ export function usePrayerRoom(roomId: string) {
     if (wasSpeaker === null || wasSpeaker === undefined) return;
     const eng = engineRef.current;
     if (isSpeakerNow && !wasSpeaker) {
-      eng.startPublishing({ videoEnabled: false }).catch(() => null);
+      eng
+        .startPublishing({ videoEnabled: false })
+        .then(() => setLiveRoomAudioRoute(audioOutputRouteRef.current))
+        .catch(() => null);
     } else if (!isSpeakerNow && wasSpeaker) {
       eng.stopPublishing().catch(() => null);
     }
@@ -179,6 +206,17 @@ export function usePrayerRoom(roomId: string) {
     setLocalVideoRevision((r) => r + 1);
   }, [isVideoOn, roomId]);
 
+  const setAudioOutputRoute = useCallback(async (route: LiveRoomAudioRoute) => {
+    audioOutputRouteRef.current = route;
+    setAudioOutputRouteState(route);
+    await setLiveRoomAudioRoute(route);
+  }, []);
+
+  const toggleAudioOutput = useCallback(async () => {
+    const next = audioOutputRouteRef.current === 'speaker' ? 'earpiece' : 'speaker';
+    await setAudioOutputRoute(next);
+  }, [setAudioOutputRoute]);
+
   // ── Chat ─────────────────────────────────────────────────────────────────────
   const sendMessage = useCallback(async (text: string) => {
     if (!roomId) return;
@@ -187,7 +225,11 @@ export function usePrayerRoom(roomId: string) {
 
   // ── Cleanup on unmount ───────────────────────────────────────────────────────
   useEffect(() => {
-    return () => { engineRef.current?.destroy(); };
+    return () => {
+      engineRef.current?.destroy();
+      engineRef.current = null;
+      resetLiveRoomAudio().catch(() => null);
+    };
   }, []);
 
   return {
@@ -202,10 +244,13 @@ export function usePrayerRoom(roomId: string) {
     activeSpeakers,
     modeSwitchToast,
     isJoined,
+    audioOutputRoute,
     join,
     leave,
     toggleMute,
     toggleVideo,
+    setAudioOutputRoute,
+    toggleAudioOutput,
     sendMessage,
   };
 }

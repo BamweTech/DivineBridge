@@ -32,6 +32,33 @@ MAX_ACTIVE_SPEAKERS = 20
 VALID_PARTICIPANT_ROLES = {'speaker', 'listener'}
 
 
+def _mirror_chat_message_to_rtdb(
+    room_id: str,
+    message_id: str,
+    user_id: str,
+    user_name: str,
+    message: str,
+    message_type: str = 'text',
+) -> None:
+    """Mirror chat to RTDB for low-latency clients (same path as send_chat_message)."""
+    try:
+        rtdb = get_rtdb_client()
+        if not rtdb:
+            return
+        import time as _time
+        rtdb.reference(f'/rooms/{room_id}/chat').push({
+            'message_id': message_id,
+            'room_id': room_id,
+            'user_id': user_id,
+            'user_name': user_name,
+            'message': message,
+            'timestamp': int(_time.time() * 1000),
+            'message_type': message_type,
+        })
+    except Exception as rtdb_err:
+        logging.warning('RTDB chat mirror failed (non-fatal): %s', rtdb_err)
+
+
 def normalize_participants(participants, host_id):
     """Ensure participants have role/request metadata and host is always a speaker."""
     if not participants:
@@ -709,8 +736,10 @@ def leave_prayer_room(room_id):
             
             # Add notification message to chat
             chat_ref = db.collection('chat_messages')
+            sys_msg_id = str(uuid.uuid4())
             notification_message = {
                 'room_id': room_id,
+                'message_id': sys_msg_id,
                 'user_id': 'system',
                 'user_name': 'System',
                 'message': f"⚠️ {host_name or 'The host'} has left the room. This prayer session will end shortly.",
@@ -718,6 +747,14 @@ def leave_prayer_room(room_id):
                 'message_type': 'system_notification'
             }
             chat_ref.add(notification_message)
+            _mirror_chat_message_to_rtdb(
+                room_id,
+                sys_msg_id,
+                'system',
+                'System',
+                notification_message['message'],
+                'system_notification',
+            )
             
             room_ref.update({
                 'is_active': False,
@@ -1230,8 +1267,10 @@ def remove_participant(room_id):
         
         # Add notification message to chat
         chat_ref = db.collection('chat_messages')
+        sys_msg_id = str(uuid.uuid4())
         notification_message = {
             'room_id': room_id,
+            'message_id': sys_msg_id,
             'user_id': 'system',
             'user_name': 'System',
             'message': f"👋 {participant_to_remove.get('user_name', 'A participant')} has been removed from the room by the host.",
@@ -1239,6 +1278,14 @@ def remove_participant(room_id):
             'message_type': 'system_notification'
         }
         chat_ref.add(notification_message)
+        _mirror_chat_message_to_rtdb(
+            room_id,
+            sys_msg_id,
+            'system',
+            'System',
+            notification_message['message'],
+            'system_notification',
+        )
         
         room_ref.update({
             'participants': participants,
@@ -1300,21 +1347,14 @@ def send_chat_message(room_id):
         logging.info(f"Chat message added successfully for room {room_id} by user {user_id}")
 
         # Also write to RTDB for real-time delivery to all connected clients
-        try:
-            rtdb = get_rtdb_client()
-            if rtdb:
-                import time as _time
-                rtdb_data = {
-                    'message_id': chat_data['message_id'],
-                    'room_id': room_id,
-                    'user_id': user_id,
-                    'user_name': user_name,
-                    'message': message,
-                    'timestamp': int(_time.time() * 1000),
-                }
-                rtdb.reference(f'/rooms/{room_id}/chat').push(rtdb_data)
-        except Exception as rtdb_err:
-            logging.warning(f"RTDB chat write failed (non-fatal): {rtdb_err}")
+        _mirror_chat_message_to_rtdb(
+            room_id,
+            chat_data['message_id'],
+            user_id,
+            user_name,
+            message,
+            'text',
+        )
 
         return jsonify({'success': True, 'message_id': chat_data['message_id']}), 200
         

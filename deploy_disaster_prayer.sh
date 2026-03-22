@@ -6,6 +6,10 @@
 
 set -e  # Exit on error
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+source "$ROOT/scripts/lib/cloudsdk-python.sh"
+
 echo "🚀 Starting Disaster Prayer Redesign Deployment..."
 echo ""
 

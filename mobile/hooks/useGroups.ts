@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   collection,
   query,
@@ -9,6 +9,8 @@ import {
   serverTimestamp,
   limit,
   getDoc,
+  orderBy,
+  setDoc,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { COLLECTIONS } from '@/lib/constants';
@@ -200,4 +202,110 @@ export function useGroupChat(groupId: string) {
   }
 
   return { messages, isLoading, sendMessage };
+}
+
+// ── Group chat unread (latest message vs per-group last read on user doc) ─────
+
+export function firestoreTimestampMs(val: unknown): number {
+  if (typeof val === 'number' && !Number.isNaN(val)) return val;
+  if (val && typeof val === 'object' && 'toMillis' in val && typeof (val as { toMillis: () => number }).toMillis === 'function') {
+    return (val as { toMillis: () => number }).toMillis();
+  }
+  return 0;
+}
+
+/** Subscribes to `users/{uid}.group_chat_last_read_at.{groupId}` map (milliseconds). */
+export function useGroupChatLastReads() {
+  const { user } = useAuthStore();
+  const [reads, setReads] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!user) {
+      setReads({});
+      return;
+    }
+    const ref = doc(db, COLLECTIONS.USERS, user.uid);
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        const raw = snap.data()?.group_chat_last_read_at;
+        if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+          const next: Record<string, number> = {};
+          for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+            if (typeof v === 'number' && !Number.isNaN(v)) next[k] = v;
+            else next[k] = firestoreTimestampMs(v);
+          }
+          setReads(next);
+        } else {
+          setReads({});
+        }
+      },
+      () => setReads({})
+    );
+    return unsub;
+  }, [user?.uid]);
+
+  const markGroupChatRead = useCallback(
+    async (groupId: string, atLeastTimestamp?: number) => {
+      if (!user?.uid) return;
+      const t = Math.max(Date.now(), atLeastTimestamp ?? 0);
+      // setDoc+merge: works if user doc is missing; nested map keys merge with existing reads
+      await setDoc(
+        doc(db, COLLECTIONS.USERS, user.uid),
+        { group_chat_last_read_at: { [groupId]: t } },
+        { merge: true }
+      );
+    },
+    [user?.uid]
+  );
+
+  return { reads, markGroupChatRead };
+}
+
+export type GroupLatestMeta = { ts: number; userId: string } | null;
+
+/**
+ * One listener per group: latest message timestamp + sender (for unread from others).
+ */
+export function useGroupLatestActivity(groupIds: string[]) {
+  const [latest, setLatest] = useState<Record<string, GroupLatestMeta>>({});
+  const sortedKey = useMemo(() => [...groupIds].sort().join(','), [groupIds]);
+
+  useEffect(() => {
+    if (!groupIds.length) {
+      setLatest({});
+      return;
+    }
+
+    const unsubs: (() => void)[] = [];
+
+    for (const gid of groupIds) {
+      const q = query(
+        collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, gid, 'messages'),
+        orderBy('timestamp', 'desc'),
+        limit(1)
+      );
+      const unsub = onSnapshot(
+        q,
+        (snap) => {
+          if (snap.empty) {
+            setLatest((prev) => ({ ...prev, [gid]: null }));
+            return;
+          }
+          const d = snap.docs[0].data();
+          const ts = firestoreTimestampMs(d.timestamp);
+          const userId = typeof d.user_id === 'string' ? d.user_id : '';
+          setLatest((prev) => ({ ...prev, [gid]: { ts, userId } }));
+        },
+        () => setLatest((prev) => ({ ...prev, [gid]: null }))
+      );
+      unsubs.push(unsub);
+    }
+
+    return () => {
+      unsubs.forEach((u) => u());
+    };
+  }, [sortedKey]);
+
+  return latest;
 }
