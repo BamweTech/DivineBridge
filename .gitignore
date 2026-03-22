@@ -1,5 +1,6 @@
 # Environment variables
 .env
+scripts/deploy.env
 
 # Python
 __pycache__/

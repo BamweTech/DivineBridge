@@ -334,7 +334,10 @@ def get_sfu_token(room_id):
         if isinstance(custom_token, bytes):
             custom_token = custom_token.decode('utf-8')
 
-        sfu_url = os.getenv('SFU_URL', 'ws://localhost:3000/ws')
+        # Production default must be the public WSS URL. Web clients use this value
+        # (mobile overrides with constants). If unset on Cloud Run, localhost here
+        # breaks all browser audio/video. Local dev: set SFU_URL=ws://127.0.0.1:3000/ws
+        sfu_url = os.getenv('SFU_URL', 'wss://sfu.divinebridge.io/ws')
 
         return jsonify({'customToken': custom_token, 'sfuUrl': sfu_url})
 

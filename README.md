@@ -232,7 +232,22 @@ Daily emails sent at 6 AM ET with:
 
 ## 🚀 Deployment
 
-### Production Deployment
+### Unified deploy (Cloud Run + Firestore)
+
+From the repo root:
+
+```bash
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh                 # Firestore rules/indexes + Cloud Run
+./scripts/deploy.sh --dry-run       # preview commands
+```
+
+Optional overrides: copy `scripts/deploy.env.example` → `scripts/deploy.env` (gitignored).
+
+**CI/CD:** GitHub Actions → **Deploy (Cloud Run + Firestore)** (manual `workflow_dispatch`).  
+**Docs:** [DEPLOY_PIPELINE.md](docs/deployment/DEPLOY_PIPELINE.md)
+
+### Production Deployment (manual gcloud only)
 ```bash
 # Build and deploy to Cloud Run
 gcloud run deploy divinebridge \

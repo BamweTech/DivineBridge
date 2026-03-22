@@ -22,6 +22,32 @@
 
 'use strict';
 
+/** Public SFU — must match mobile `lib/constants.ts` SFU_URL */
+const DEFAULT_PRODUCTION_SFU_URL = 'wss://sfu.divinebridge.io/ws';
+
+/**
+ * Flask may return ws://localhost when SFU_URL is missing on the server.
+ * Browsers on https://divinebridge.io cannot use that; fall back to production WSS.
+ * Local dev (page on localhost): keep server-provided URL so local SFU still works.
+ */
+function resolveSfuUrl(sfuUrlFromServer) {
+  try {
+    const host = typeof window !== 'undefined' ? window.location.hostname : '';
+    const isLocalPage = host === 'localhost' || host === '127.0.0.1';
+    const raw = (sfuUrlFromServer || '').trim();
+    if (isLocalPage) {
+      return raw || 'ws://127.0.0.1:3000/ws';
+    }
+    if (!raw || /localhost|127\.0\.0\.1/i.test(raw)) {
+      console.warn('[sfu] Replacing unusable SFU URL with production:', DEFAULT_PRODUCTION_SFU_URL);
+      return DEFAULT_PRODUCTION_SFU_URL;
+    }
+    return raw;
+  } catch (_) {
+    return DEFAULT_PRODUCTION_SFU_URL;
+  }
+}
+
 // ─── SFU Client ────────────────────────────────────────────────────────────────
 
 class SfuClient {
@@ -438,7 +464,8 @@ async function createSfuClient({ roomId, userId, userName, isSpeaker, videoEnabl
   // 1. Get a Firebase Custom Token (with roomId claim) from Flask
   const resp = await fetch(`/api/prayer-room/sfu-token/${roomId}`, { method: 'POST' });
   if (!resp.ok) throw new Error(`Failed to get SFU token: ${resp.status}`);
-  const { customToken, sfuUrl } = await resp.json();
+  const { customToken, sfuUrl: sfuUrlRaw } = await resp.json();
+  const sfuUrl = resolveSfuUrl(sfuUrlRaw);
 
   // 2. Exchange custom token → Firebase ID token.
   //    Supports both Firebase compat SDK (auth.signInWithCustomToken)
