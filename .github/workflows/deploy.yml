@@ -1,0 +1,97 @@
+# Manual production deploy: Firestore (rules + indexes) + Cloud Run.
+# Required repo secrets:
+#   GCP_SA_KEY     — JSON key for a service account with Cloud Run Admin, Cloud Build Editor,
+#                    and permission to push to gcr.io/$PROJECT (e.g. Storage Admin on GCR buckets)
+#   FIREBASE_TOKEN — optional but recommended for Firestore deploy; create with: firebase login:ci
+#                    If omitted, ensure the GCP SA has Firebase deploy roles (e.g. Firebase Rules Admin).
+
+name: Deploy (Cloud Run + Firestore)
+
+on:
+  workflow_dispatch:
+    inputs:
+      gcp_region:
+        description: "Cloud Run region (must match existing service)"
+        required: true
+        default: "us-central1"
+        type: string
+      cloud_run_method:
+        description: "Cloud Run: build from repo source vs prebuilt image"
+        required: true
+        default: "source"
+        type: choice
+        options:
+          - source
+          - image
+      deploy_firestore:
+        description: "Deploy firestore.rules + firestore.indexes.json"
+        required: true
+        type: boolean
+        default: true
+      deploy_cloud_run:
+        description: "Deploy Cloud Run service (divinebridge)"
+        required: true
+        type: boolean
+        default: true
+
+concurrency:
+  group: deploy-divinebridge-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (for npx firebase-tools)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup Python for gcloud (SDK requires 3.10+)
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Make deploy script executable
+        run: chmod +x scripts/deploy.sh
+
+      - name: Validate inputs
+        if: ${{ !inputs.deploy_firestore && !inputs.deploy_cloud_run }}
+        run: |
+          echo "Select at least one of: deploy_firestore, deploy_cloud_run"
+          exit 1
+
+      - name: Deploy — Firestore + Cloud Run
+        if: ${{ inputs.deploy_firestore && inputs.deploy_cloud_run }}
+        env:
+          CLOUDSDK_PYTHON: ${{ steps.setup-python.outputs.python-path }}
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          GCP_REGION: ${{ inputs.gcp_region }}
+        run: ./scripts/deploy.sh --cloud-run-method ${{ inputs.cloud_run_method }}
+
+      - name: Deploy — Firestore only
+        if: ${{ inputs.deploy_firestore && !inputs.deploy_cloud_run }}
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: ./scripts/deploy.sh --firestore-only
+
+      - name: Deploy — Cloud Run only
+        if: ${{ !inputs.deploy_firestore && inputs.deploy_cloud_run }}
+        env:
+          CLOUDSDK_PYTHON: ${{ steps.setup-python.outputs.python-path }}
+          GCP_REGION: ${{ inputs.gcp_region }}
+        run: ./scripts/deploy.sh --cloud-run-only --cloud-run-method ${{ inputs.cloud_run_method }}
