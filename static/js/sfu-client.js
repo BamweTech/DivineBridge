@@ -155,6 +155,44 @@ class SfuClient {
     }
   }
 
+  /**
+   * Start publishing local mic (and optional video) after joining as a listener
+   * or when promoted to speaker mid-session.
+   */
+  async startPublishing({ videoEnabled = false } = {}) {
+    if (!this._device || !this._recvTransport) {
+      console.warn('[sfu] startPublishing: client not fully started');
+      return;
+    }
+    if (this._audioProducer) {
+      return;
+    }
+    this.isSpeaker = true;
+    if (this._sendTransport) {
+      this._sendTransport.close();
+      this._sendTransport = null;
+    }
+    await this._acquireLocalMedia({ audio: true, video: videoEnabled });
+    await this._setupSendTransport();
+  }
+
+  /**
+   * Stop local producers and send transport (e.g. demoted to listener).
+   */
+  async stopPublishing() {
+    this.isSpeaker = false;
+    this._audioProducer?.close();
+    this._audioProducer = null;
+    this._videoProducer?.close();
+    this._videoProducer = null;
+    this._sendTransport?.close();
+    this._sendTransport = null;
+    if (this.localStream) {
+      this.localStream.getTracks().forEach((t) => t.stop());
+      this.localStream = null;
+    }
+  }
+
   /** Enable or disable the local microphone. */
   async setAudioEnabled(enabled) {
     this.localStream?.getAudioTracks().forEach((t) => { t.enabled = enabled; });
@@ -288,7 +326,22 @@ class SfuClient {
 
       case 'consumerClosed': {
         const meta = this._consumerMeta.get(data.consumerId);
-        if (meta?.kind === 'video') {
+        const consumer = this._consumers.get(data.consumerId);
+        if (meta && consumer?.track) {
+          const p = this.peers.get(meta.userId);
+          if (p?.stream) {
+            try {
+              p.stream.removeTrack(consumer.track);
+            } catch (_) { /* track may already be ended */ }
+            if (p.stream.getTracks().length === 0) {
+              p.stream = null;
+            }
+          }
+          if (meta.kind === 'video' && p) {
+            p.isVideoEnabled = false;
+          }
+          this._emitPeers();
+        } else if (meta?.kind === 'video') {
           const p = this.peers.get(meta.userId);
           if (p) { p.isVideoEnabled = false; this._emitPeers(); }
         }

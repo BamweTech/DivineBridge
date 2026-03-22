@@ -21,6 +21,8 @@ import type { PrayerRoom, ChatMessage, RoomMode, Participant } from '@/types';
 export function usePrayerRoom(roomId: string) {
   const { user, profile } = useAuthStore();
   const engineRef = useRef<SfuEngine | null>(null);
+  /** Last known room role for SFU publish sync (null = not joined) */
+  const prevRoomSpeakerRef = useRef<boolean | null>(null);
 
   const [room, setRoom] = useState<PrayerRoom | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -121,6 +123,7 @@ export function usePrayerRoom(roomId: string) {
       await engine.start({ videoEnabled: false });
 
       engineRef.current = engine;
+      prevRoomSpeakerRef.current = isSpeaker;
       setLocalStream(engine.getLocalStream());
       setRoomMode(engine.getCurrentMode());
       setIsJoined(true);
@@ -135,9 +138,29 @@ export function usePrayerRoom(roomId: string) {
     if (!roomId) return;
     engineRef.current?.destroy();
     engineRef.current = null;
+    prevRoomSpeakerRef.current = null;
     setIsJoined(false);
     await roomApi.leave(roomId).catch(() => null);
   }, [roomId]);
+
+  // ── SFU publish when promoted/demoted (Firestore may update after join) ───────
+  useEffect(() => {
+    if (!isJoined || !engineRef.current || !user?.uid) return;
+    const me = room?.participants?.find((p: Participant) => p.user_id === user.uid);
+    if (!me) return;
+    const isSpeakerNow = me.role === 'speaker';
+    if (prevRoomSpeakerRef.current === isSpeakerNow) return;
+    const wasSpeaker = prevRoomSpeakerRef.current;
+    prevRoomSpeakerRef.current = isSpeakerNow;
+    if (wasSpeaker === null || wasSpeaker === undefined) return;
+    const eng = engineRef.current;
+    if (isSpeakerNow && !wasSpeaker) {
+      eng.startPublishing({ videoEnabled: false }).catch(() => null);
+    } else if (!isSpeakerNow && wasSpeaker) {
+      eng.stopPublishing().catch(() => null);
+    }
+    setLocalStream(eng.getLocalStream());
+  }, [room?.participants, isJoined, user?.uid]);
 
   // ── Mute / Video toggles ─────────────────────────────────────────────────────
   const toggleMute = useCallback(() => {

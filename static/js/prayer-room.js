@@ -121,7 +121,9 @@ class PrayerRoomService {
         this.pendingSpeakerRequest = false;
         this.maxSpeakers = 20;
         this.currentSpeakerCount = 0;
-        
+        /** Last speaker-role state synced to SFU publish layer (undefined until first check) */
+        this._sfuPublishingSynced = undefined;
+
         // Message reactions storage
         this.messageReactions = new Map();
         
@@ -1144,26 +1146,85 @@ class PrayerRoomService {
     }
 
     updateParticipants(participants = []) {
-        const participantsContainer = document.getElementById('participantsList');
-        if (!participantsContainer) {
-            return;
+        const participantList = Array.isArray(participants) ? participants : [];
+        this.allParticipants = participantList;
+
+        const currentParticipantIds = participantList.map(p => p.user_id);
+        const existingPeerIds = Array.from(this.peers.keys());
+
+        // 1. Clean up connections for participants who have left (P2P mesh)
+        existingPeerIds.forEach(peerId => {
+            if (!currentParticipantIds.includes(peerId)) {
+                console.log(`🧹 Participant ${peerId} left, cleaning up peer connection`);
+                this.cleanupPeerConnection(peerId);
+            }
+        });
+
+        // 2. Create connections for new participants and update mute states (P2P mesh)
+        if (this.localStream && participantList.length) {
+            participantList.forEach(participant => {
+                const participantId = participant.user_id;
+
+                if (participantId !== this.userId) {
+                    const audioElement = document.getElementById(`audio-${participantId}`);
+                    if (audioElement) {
+                        audioElement.muted = participant.is_muted || false;
+                    }
+                }
+
+                if (participantId !== this.userId && !this.peers.has(participantId)) {
+                    const isInitiator = this.userId < participantId;
+                    console.log(`[WebRTC] Evaluating connection with ${participantId}. Am I the initiator? ${isInitiator}`);
+
+                    if (isInitiator) {
+                        console.log(`[WebRTC] I am the initiator for ${participantId}. Creating peer connection.`);
+                        this.createPeerConnection(participantId, true);
+                    } else {
+                        console.log(`[WebRTC] I am not the initiator for ${participantId}. I will wait for an offer.`);
+                    }
+                }
+            });
         }
-        
-        // Store all participants for filtering
-        this.allParticipants = Array.isArray(participants) ? participants : [];
-        
+
+        // 3. Track roles, speaker counts, and self state — MUST run even when the template
+        //    has no #participantsList (e.g. prayer_room.html). Otherwise participantRole
+        //    stays null and prayerRoomJoined dispatches isSpeaker:false → SFU never publishes host audio.
+        let speakerCount = 0;
+        let myRole = this.participantRole || 'listener';
+        let pendingRequest = this.pendingSpeakerRequest || false;
+
+        participantList.forEach(participant => {
+            const role = participant.role || 'listener';
+            if (role === 'speaker') {
+                speakerCount += 1;
+            }
+
+            if (participant.user_id === this.userId) {
+                myRole = role;
+                pendingRequest = participant.requested_role === 'speaker';
+            }
+        });
+
+        this.participantRole = myRole;
+        this.pendingSpeakerRequest = pendingRequest;
+        this.currentSpeakerCount = speakerCount;
+
+        if (this.participantRole !== 'speaker') {
+            this.enforceListenerMute();
+        }
+
+        const participantsContainer = document.getElementById('participantsList');
+        if (participantsContainer) {
         // Setup click-outside handler once (only for host)
         if (this.isHost && !this.participantClickOutsideHandler) {
             this.participantClickOutsideHandler = (e) => {
-                // Don't close if clicking on participant card or controls
                 const clickedParticipant = e.target.closest('.participant');
                 const clickedControls = e.target.closest('.participant-controls');
-                
+
                 if (clickedParticipant || clickedControls) {
                     return;
                 }
-                
-                // Close all expanded participants
+
                 const expandedParticipants = participantsContainer.querySelectorAll('.participant.expanded');
                 expandedParticipants.forEach(p => {
                     const userId = p.getAttribute('data-user-id');
@@ -1173,84 +1234,15 @@ class PrayerRoomService {
                     p.classList.remove('expanded');
                 });
             };
-            // Use a small delay to allow card click handlers to fire first
             document.addEventListener('click', (e) => {
                 setTimeout(() => {
                     this.participantClickOutsideHandler(e);
                 }, 10);
             });
         }
-        
-        // Remove loading indicator
+
         this.hideParticipantsLoading();
-        
-        const participantList = Array.isArray(participants) ? participants : [];
-        const currentParticipantIds = participantList.map(p => p.user_id);
-        const existingPeerIds = Array.from(this.peers.keys());
-        
-        // 1. Clean up connections for participants who have left
-        existingPeerIds.forEach(peerId => {
-            if (!currentParticipantIds.includes(peerId)) {
-                console.log(`🧹 Participant ${peerId} left, cleaning up peer connection`);
-                this.cleanupPeerConnection(peerId);
-            }
-        });
-        
-        // 2. Create connections for new participants and update mute states for existing ones
-        if (this.localStream && participantList.length) {
-            participantList.forEach(participant => {
-                const participantId = participant.user_id;
-                
-                // Update mute state for existing audio elements
-                if (participantId !== this.userId) {
-                    const audioElement = document.getElementById(`audio-${participantId}`);
-                    if (audioElement) {
-                        audioElement.muted = participant.is_muted || false;
-                    }
-                }
-                
-                // Don't connect to self or existing peers
-                if (participantId !== this.userId && !this.peers.has(participantId)) {
-                    // **Deterministic Initiator Logic**
-                    // The user with the lexicographically smaller ID is the initiator.
-                    const isInitiator = this.userId < participantId;
-                    console.log(`[WebRTC] Evaluating connection with ${participantId}. Am I the initiator? ${isInitiator}`);
-                    
-                    if (isInitiator) {
-                        console.log(`[WebRTC] I am the initiator for ${participantId}. Creating peer connection.`);
-                        this.createPeerConnection(participantId, true); // true for initiator
-                    } else {
-                        console.log(`[WebRTC] I am not the initiator for ${participantId}. I will wait for an offer.`);
-                    }
-                }
-            });
-        }
-        
-        // 3. Track roles, speaker counts, and self state
-        let speakerCount = 0;
-        let myRole = this.participantRole || 'listener';
-        let pendingRequest = this.pendingSpeakerRequest || false;
-        
-        participantList.forEach(participant => {
-            const role = participant.role || 'listener';
-            if (role === 'speaker') {
-                speakerCount += 1;
-            }
-            
-            if (participant.user_id === this.userId) {
-                myRole = role;
-                pendingRequest = participant.requested_role === 'speaker';
-            }
-        });
-        
-        this.participantRole = myRole;
-        this.pendingSpeakerRequest = pendingRequest;
-        this.currentSpeakerCount = speakerCount;
-        
-        if (this.participantRole !== 'speaker') {
-            this.enforceListenerMute();
-        }
-        
+
         // 4. Filter participants based on search and tab
         const filteredParticipants = this.getFilteredParticipants(participantList);
         
@@ -1393,13 +1385,16 @@ class PrayerRoomService {
         } else {
             participantsContainer.innerHTML = '<div class="no-participants">No participants yet</div>';
         }
-        
+        }
+
         this.updateAudioControls();
         this.updateRoleUI();
         this.updateStageArea(participantList);
-        
+
         // Update participant count badge immediately
         this.updateParticipantBadge(participantList.length);
+
+        this.syncSfuPublishingWithRole();
     }
     
     updateParticipantBadge(count) {
@@ -2362,10 +2357,12 @@ class PrayerRoomService {
             this.muteStateSyncing = false;
             
             // Tear down SFU client if active
+            this._sfuPublishingSynced = undefined;
             if (window.__sfuClient) {
-                window.__sfuClient.destroy();
+                const c = window.__sfuClient;
                 window.__sfuClient = null;
                 window.__sfuClientActive = false;
+                await Promise.resolve(c.destroy?.()).catch(() => null);
             }
             document.querySelectorAll('audio[id^="sfu-audio-"]').forEach((el) => {
                 el.srcObject = null;
@@ -3462,21 +3459,17 @@ class PrayerRoomService {
     }
     
     getParticipantsForMentions() {
-        // Get participants from current participants list
         const participants = [];
-        
-        if (this.participants && Array.isArray(this.participants)) {
-            this.participants.forEach(p => {
-                if (p.user_id !== this.userId) { // Don't include self
-                    participants.push({
-                        userId: p.user_id,
-                        name: p.user_name || 'Anonymous',
-                        userName: p.user_name ? p.user_name.toLowerCase().replace(/\s+/g, '') : 'anonymous'
-                    });
-                }
-            });
-        }
-        
+        const list = Array.isArray(this.allParticipants) ? this.allParticipants : [];
+        list.forEach(p => {
+            if (p.user_id !== this.userId) {
+                participants.push({
+                    userId: p.user_id,
+                    name: p.user_name || 'Anonymous',
+                    userName: p.user_name ? p.user_name.toLowerCase().replace(/\s+/g, '') : 'anonymous'
+                });
+            }
+        });
         return participants;
     }
     
@@ -4911,6 +4904,43 @@ Listening for unmute event...`);
                 el.classList.toggle('speaking', ids.includes(uid));
             }
         });
+        // Stage grid tiles (SFU active speaker — same ids as participants list)
+        const grid = document.getElementById('speakersGrid');
+        if (grid) {
+            grid.querySelectorAll('.speaker-tile').forEach((el) => {
+                const uid = el.getAttribute('data-user-id');
+                if (uid) {
+                    el.classList.toggle('active', ids.includes(uid));
+                }
+            });
+        }
+    }
+
+    /**
+     * When room role changes to/from speaker, start or stop SFU send transport so
+     * promoted users publish audio and demoted users stop.
+     */
+    syncSfuPublishingWithRole() {
+        if (!window.__sfuClientActive || !window.__sfuClient) {
+            return;
+        }
+        const nowSpeaker = this.participantRole === 'speaker';
+        if (this._sfuPublishingSynced === nowSpeaker) {
+            return;
+        }
+        this._sfuPublishingSynced = nowSpeaker;
+        const client = window.__sfuClient;
+        if (nowSpeaker) {
+            const p = client.startPublishing?.({ videoEnabled: false });
+            if (p && typeof p.then === 'function') {
+                p.catch((e) => console.warn('[sfu] startPublishing:', e));
+            }
+        } else {
+            const p = client.stopPublishing?.();
+            if (p && typeof p.then === 'function') {
+                p.catch((e) => console.warn('[sfu] stopPublishing:', e));
+            }
+        }
     }
 
     updateSfuMode(mode) {

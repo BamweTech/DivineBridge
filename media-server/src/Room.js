@@ -22,6 +22,8 @@ class Room {
     /** @type {Map<string, Peer>} userId → Peer */
     this.peers = new Map();
     this._activeSpeakerInterval = null;
+    /** @type {string | null} JSON snapshot of last broadcast active speaker ids */
+    this._lastActiveSpeakersJson = null;
     this._startActiveSpeakerDetection();
   }
 
@@ -230,7 +232,9 @@ class Room {
       .slice(0, 5)
       .map((l) => l.userId);
 
-    if (speakers.length > 0) {
+    const json = JSON.stringify(speakers);
+    if (json !== this._lastActiveSpeakersJson) {
+      this._lastActiveSpeakersJson = json;
       this.broadcast(null, {
         event: 'activeSpeakers',
         data: { speakers },

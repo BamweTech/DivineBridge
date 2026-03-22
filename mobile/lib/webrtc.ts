@@ -18,9 +18,9 @@ import type React from 'react';
 import Constants from 'expo-constants';
 
 // 'storeClient' = Expo Go  |  'standalone' / 'bare' = real build
+const _execEnv = Constants.executionEnvironment as string;
 const _isExpoGo =
-  Constants.executionEnvironment === 'storeClient' ||
-  Constants.executionEnvironment === 'expo';
+  Constants.executionEnvironment === 'storeClient' || _execEnv === 'expo';
 
 let _RTCPeerConnection: any = null;
 let _RTCIceCandidate: any = null;

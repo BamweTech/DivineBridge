@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { initializeAuth, getAuth } from 'firebase/auth';
+import { initializeAuth, getAuth, type Persistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getDatabase } from 'firebase/database';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -9,7 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // which exports getReactNativePersistence. Using require() avoids TS errors
 // since the public type declarations don't list this export.
 const { getReactNativePersistence } = require('@firebase/auth') as {
-  getReactNativePersistence: (storage: typeof AsyncStorage) => unknown;
+  getReactNativePersistence: (storage: typeof AsyncStorage) => Persistence;
 };
 
 const firebaseConfig = {

@@ -23,9 +23,10 @@ import type { RoomMode } from '@/types';
 import { ROOM_MODES, GROUP_CALL_MAX_PARTICIPANTS } from '@/lib/constants';
 
 // ─── Expo Go guard ─────────────────────────────────────────────────────────────
+// Runtime may report legacy 'expo'; current typings only list storeClient | bare | standalone.
+const _execEnv = Constants.executionEnvironment as string;
 const _isExpoGo =
-  Constants.executionEnvironment === 'storeClient' ||
-  Constants.executionEnvironment === 'expo';
+  Constants.executionEnvironment === 'storeClient' || _execEnv === 'expo';
 
 let _mediaDevices: any = null;
 let _RTCView: any = null;
@@ -185,6 +186,39 @@ export class SfuEngine {
         console.warn('[sfu] audio producer was not created — mic may not work (simulator limitation)');
       }
     }
+  }
+
+  /** Promoted to speaker mid-session — acquire mic and create send transport + producers */
+  async startPublishing(options: { videoEnabled?: boolean } = {}) {
+    if (_isExpoGo || !_nativeModuleAvailable) return;
+    if (!this.device || !this.recvTransport) {
+      console.warn('[sfu] startPublishing: client not fully started');
+      return;
+    }
+    if (this.audioProducer) {
+      return;
+    }
+    this.isSpeaker = true;
+    if (this.sendTransport) {
+      this.sendTransport.close();
+      this.sendTransport = null;
+    }
+    const videoEnabled = options.videoEnabled ?? false;
+    await this._acquireLocalMedia({ audio: true, video: videoEnabled });
+    await this._setupSendTransport();
+  }
+
+  /** Demoted to listener — tear down local producers and send transport */
+  async stopPublishing() {
+    this.isSpeaker = false;
+    this.audioProducer?.close();
+    this.audioProducer = null;
+    this.videoProducer?.close();
+    this.videoProducer = null;
+    this.sendTransport?.close();
+    this.sendTransport = null;
+    this.localStream?.getTracks?.().forEach((t: any) => t.stop());
+    this.localStream = null;
   }
 
   getLocalStream() {
@@ -354,10 +388,32 @@ export class SfuEngine {
 
       case 'consumerClosed': {
         const meta = this.consumerMeta.get(data.consumerId);
-        if (meta?.kind === 'video') {
+        const consumer = this.consumers.get(data.consumerId);
+        if (meta && consumer?.track) {
           const p = this.peers.get(meta.userId);
-          if (p) { p.isVideoEnabled = false; this.peers.set(meta.userId, p); }
+          if (p?.stream) {
+            try {
+              p.stream.removeTrack(consumer.track);
+            } catch {
+              /* track may already be ended */
+            }
+            if (p.stream.getTracks?.().length === 0) {
+              p.stream = null;
+            }
+            this.peers.set(meta.userId, p);
+          }
+          if (meta.kind === 'video' && p) {
+            p.isVideoEnabled = false;
+            this.peers.set(meta.userId, p);
+          }
           this._notifyPeers();
+        } else if (meta?.kind === 'video') {
+          const p = this.peers.get(meta.userId);
+          if (p) {
+            p.isVideoEnabled = false;
+            this.peers.set(meta.userId, p);
+            this._notifyPeers();
+          }
         }
         this.consumers.get(data.consumerId)?.close();
         this.consumers.delete(data.consumerId);

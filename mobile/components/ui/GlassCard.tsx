@@ -1,4 +1,4 @@
-import { View, ViewStyle, StyleProp } from 'react-native';
+import { View, ViewStyle, StyleProp, ColorValue } from 'react-native';
 import { THEME_COLORS } from '@/lib/constants';
 
 interface GlassCardProps {
@@ -19,8 +19,8 @@ export function GlassCard({
   sage = false,
   violet = false,
 }: GlassCardProps) {
-  let bg = THEME_COLORS.bg2;
-  let borderColor = THEME_COLORS.border;
+  let bg: ColorValue = THEME_COLORS.bg2;
+  let borderColor: ColorValue = THEME_COLORS.border;
 
   if (amber) {
     bg = 'rgba(176,125,32,0.06)';

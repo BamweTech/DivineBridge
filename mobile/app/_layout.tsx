@@ -211,9 +211,11 @@ function AuthGuard() {
 
   useEffect(() => {
     if (!isInitialized) return;
-    const inAuthGroup = segments[0] === '(auth)';
+    // Runtime paths vary; expo-router's Segment types omit some roots (e.g. index / empty).
+    const seg = segments as readonly string[];
+    const inAuthGroup = seg[0] === '(auth)';
     // The root index route (onboarding) is public — don't redirect away from it
-    const atRoot = segments.length === 0 || (segments.length === 1 && segments[0] === 'index');
+    const atRoot = seg.length === 0 || (seg.length === 1 && seg[0] === 'index');
     if (!user && !inAuthGroup && !atRoot) {
       router.replace('/(auth)/login');
     } else if (user && inAuthGroup) {
