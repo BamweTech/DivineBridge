@@ -192,6 +192,10 @@ def create_app():
         elif response.content_type and 'text/html' in response.content_type:
             # HTML should not be cached aggressively, but allow short cache for faster navigation
             response.headers['Cache-Control'] = 'public, max-age=60, must-revalidate'
+        elif request.path.startswith('/api/prayer-room/'):
+            # Live room data (participants, roles, signaling) must not be cached — otherwise
+            # browsers reuse stale JSON for minutes and the web UI (speaker list, etc.) lags.
+            response.headers['Cache-Control'] = 'private, no-store'
         elif response.content_type and ('application/json' in response.content_type or 'text/javascript' in response.content_type):
             # API responses and JS - short cache
             response.headers['Cache-Control'] = 'public, max-age=300'

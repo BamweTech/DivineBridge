@@ -884,7 +884,8 @@ class PrayerRoomService {
             
             const response = await fetch(`/api/prayer-room/${this.roomId}/participants`, {
                 credentials: 'include',
-                signal: controller.signal
+                signal: controller.signal,
+                cache: 'no-store',
             }).finally(() => clearTimeout(timeoutId));
             
             const data = await response.json();
@@ -1013,6 +1014,21 @@ class PrayerRoomService {
         } catch (e) {
             console.warn('Failed to initialize RTDB, falling back to HTTP:', e);
             this.rtdb = null;
+        }
+    }
+
+    /**
+     * Chrome (and some mobile browsers) suspend WebSockets when a tab is in the
+     * background; DevTools may log "WebSocket is closed due to suspension" for
+     * Firebase RTDB. The SDK usually recovers; calling goOnline() when the page
+     * is visible again speeds reconnection. Harmless if already connected.
+     */
+    nudgeRtdbReconnect() {
+        if (!this.rtdb || typeof this.rtdb.goOnline !== 'function') return;
+        try {
+            this.rtdb.goOnline();
+        } catch (e) {
+            console.warn('[RTDB] goOnline after resume:', e);
         }
     }
 
@@ -4011,7 +4027,8 @@ class PrayerRoomService {
             console.log('[WebRTC] 🔍 Checking for participants without peer connections...');
             
             const response = await fetch(`/api/prayer-room/${this.roomId}/participants`, {
-                credentials: 'include'
+                credentials: 'include',
+                cache: 'no-store',
             });
             
             const data = await response.json();
@@ -4709,7 +4726,8 @@ Listening for unmute event...`);
             
             // Check if participant is still in the room
             const response = await fetch(`/api/prayer-room/${this.roomId}/participants`, {
-                credentials: 'include'
+                credentials: 'include',
+                cache: 'no-store',
             });
             if (!response.ok) {
                 console.error(`Failed to fetch participants for signaling recovery: ${response.status}`);
@@ -5154,7 +5172,8 @@ Listening for unmute event...`);
             // Load participants to get current mute state from server
             const response = await fetch(`/api/prayer-room/${this.roomId}/participants`, {
                 method: 'GET',
-                credentials: 'include'
+                credentials: 'include',
+                cache: 'no-store',
             });
             
             if (response.ok) {
@@ -5994,7 +6013,8 @@ Listening for unmute event...`);
             
             // Get current participants via API
             const response = await fetch(`/api/prayer-room/${this.roomId}/participants`, {
-                credentials: 'include'
+                credentials: 'include',
+                cache: 'no-store',
             });
             if (!response.ok) {
                 console.error('Failed to fetch participants:', await response.text());
@@ -6022,7 +6042,8 @@ Listening for unmute event...`);
     async getCurrentParticipants() {
         try {
             const response = await fetch(`/api/prayer-room/${this.roomId}/participants`, {
-                credentials: 'include'
+                credentials: 'include',
+                cache: 'no-store',
             });
             const data = await response.json();
             return data.participants || [];
@@ -6390,15 +6411,28 @@ Listening for unmute event...`);
             console.log(`📊 Page visibility changed: ${this.isPageVisible ? 'visible' : 'hidden'}`);
             
             if (this.isPageVisible) {
+                this.nudgeRtdbReconnect();
                 this.resumePolling();
             } else {
                 this.pausePolling();
             }
         });
+
+        // Back/forward cache restore (same RTDB WebSocket suspension class of issues)
+        window.addEventListener('pageshow', (ev) => {
+            if (ev.persisted) {
+                this.nudgeRtdbReconnect();
+            }
+        });
+
+        window.addEventListener('online', () => {
+            this.nudgeRtdbReconnect();
+        });
         
         // Window focus/blur detection
         window.addEventListener('focus', () => {
             this.isPageVisible = true;
+            this.nudgeRtdbReconnect();
             this.resumePolling();
         });
         
