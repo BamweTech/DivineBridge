@@ -2,6 +2,7 @@
 Prayer Groups routes — CRUD for small prayer communities.
 Designed per docs/PRAYER_GROUPS_BRAINSTORM.md.
 """
+import datetime
 import uuid
 import logging
 from flask import Blueprint, request, jsonify, g
@@ -17,6 +18,16 @@ MAX_NAME_LEN = 50
 MAX_DESC_LEN = 200
 
 
+def _created_at_sort_ts(row):
+    """Sort key for group dicts (newest first). Avoids Firestore composite index on array_contains + order_by."""
+    ts = row.get('created_at')
+    if ts is None:
+        return 0.0
+    if isinstance(ts, datetime.datetime):
+        return ts.timestamp()
+    return 0.0
+
+
 # ─── Group CRUD ───────────────────────────────────────────────────────────────
 
 @groups_bp.route('', methods=['GET'])
@@ -24,14 +35,11 @@ MAX_DESC_LEN = 200
 def list_public_groups():
     """Return public groups ordered by member count descending."""
     db = get_firestore_client()
-    snaps = (
-        db.collection('prayer_groups')
-        .where('privacy', '==', 'public')
-        .order_by('member_count', direction=firestore.Query.DESCENDING)
-        .limit(50)
-        .stream()
-    )
-    groups = [{'group_id': s.id, **s.to_dict()} for s in snaps]
+    # Equality-only query (no order_by) so no composite index is required; sort in Python.
+    snaps = db.collection('prayer_groups').where('privacy', '==', 'public').stream()
+    groups = [{'group_id': s.id, **(s.to_dict() or {})} for s in snaps]
+    groups.sort(key=lambda g: int(g.get('member_count') or 0), reverse=True)
+    groups = groups[:50]
     return jsonify({'success': True, 'groups': groups}), 200
 
 
@@ -41,13 +49,14 @@ def my_groups():
     """Return groups the current user belongs to."""
     uid = g.user_id
     db = get_firestore_client()
+    # array_contains alone uses automatic indexing; order_by(created_at) needs a composite index and caused 500s.
     snaps = (
         db.collection('prayer_groups')
         .where('member_ids', 'array_contains', uid)
-        .order_by('created_at', direction=firestore.Query.DESCENDING)
         .stream()
     )
-    groups = [{'group_id': s.id, **s.to_dict()} for s in snaps]
+    groups = [{'group_id': s.id, **(s.to_dict() or {})} for s in snaps]
+    groups.sort(key=_created_at_sort_ts, reverse=True)
     return jsonify({'success': True, 'groups': groups}), 200
 
 

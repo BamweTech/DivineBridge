@@ -1,0 +1,23 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Group chat uploads — members only; images + PDF; 10 MiB max
+    match /group_chat_uploads/{groupId}/{userId}/{fileName} {
+      allow read: if request.auth != null
+        && firestore.get(/databases/(default)/documents/prayer_groups/$(groupId)).data.member_ids.hasAny([request.auth.uid]);
+
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && firestore.get(/databases/(default)/documents/prayer_groups/$(groupId)).data.member_ids.hasAny([request.auth.uid])
+        && request.resource.size < 10 * 1024 * 1024
+        && (
+          request.resource.contentType.matches('image/.*')
+          || request.resource.contentType == 'application/pdf'
+        )
+        && fileName.matches('^[a-zA-Z0-9_.-]+$')
+        && fileName.size() < 200;
+
+      allow update, delete: if false;
+    }
+  }
+}

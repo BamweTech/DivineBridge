@@ -980,10 +980,14 @@ def get_global_watch_prayers():
                 'summary': p.get('summary', ''),
                 'wall_prayer': wall_prayer,
                 'created_at': p.get('created_at', ''),
+                'updated_at': p.get('updated_at', ''),
             })
 
-        # Most recent first
-        result.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        # Most recent first (prefer latest content refresh on the same event)
+        def _gw_recency(row):
+            return (row.get('updated_at') or row.get('created_at') or '')
+
+        result.sort(key=_gw_recency, reverse=True)
 
         return jsonify({'success': True, 'prayers': result}), 200
 

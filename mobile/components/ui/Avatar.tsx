@@ -15,10 +15,38 @@ function getColorFromName(name: string): string {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
+function isAsciiAlnum(ch: string): boolean {
+  return /[a-zA-Z0-9]/.test(ch);
+}
+
+/** First ASCII letter or digit in a word. Emoji-only / punctuation-only segments return '' (never a lone surrogate). */
+function firstAlnumChar(word: string): string {
+  for (const ch of word) {
+    if (isAsciiAlnum(ch)) return ch;
+  }
+  return '';
+}
+
+/**
+ * Two-letter avatar label. Uses ASCII letters/digits so names like "K5Family" become
+ * "K5" (not a broken glyph from `slice` or non-Latin digits).
+ */
 function getInitials(name: string): string {
-  const parts = name.trim().split(' ');
-  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  return name.slice(0, 2).toUpperCase();
+  const trimmed = (name || '').trim();
+  if (!trimmed) return '?';
+
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) {
+    const a = firstAlnumChar(words[0]);
+    const b = firstAlnumChar(words[1]);
+    if (a && b) return `${a}${b}`.toUpperCase();
+  }
+
+  const alnums = [...trimmed].filter(isAsciiAlnum);
+  if (alnums.length >= 2) return `${alnums[0]}${alnums[1]}`.toUpperCase();
+  if (alnums.length === 1) return `${alnums[0]}${alnums[0]}`.toUpperCase();
+
+  return trimmed.slice(0, 2).toUpperCase();
 }
 
 interface AvatarProps {
@@ -70,6 +98,7 @@ export function Avatar({ name, photoUrl, size = 40, showSpeakingRing, isOnline }
               fontSize: size * 0.36,
               lineHeight: size * 0.36 * 1.2,
             }}
+            maxFontSizeMultiplier={1.25}
           >
             {getInitials(name)}
           </Text>

@@ -96,6 +96,16 @@ deploy_firestore() {
   npx --yes firebase-tools@latest deploy --only firestore --project "${FIREBASE_PROJECT}" --non-interactive
 }
 
+# Optional: set DEPLOY_FIREBASE_STORAGE=1 after enabling Storage in Firebase Console (Project → Storage → Get started).
+deploy_storage_rules() {
+  log "Deploying Storage rules → project ${FIREBASE_PROJECT}"
+  if $DRY_RUN; then
+    echo "[dry-run] npx firebase-tools@latest deploy --only storage --project ${FIREBASE_PROJECT} --non-interactive"
+    return
+  fi
+  npx --yes firebase-tools@latest deploy --only storage --project "${FIREBASE_PROJECT}" --non-interactive
+}
+
 deploy_cloud_run_source() {
   log "Cloud Run deploy from source (region ${GCP_REGION}, port ${CLOUD_RUN_PORT})"
   if $DRY_RUN; then
@@ -154,6 +164,9 @@ fi
 
 if $DO_FIRESTORE; then
   deploy_firestore
+  if [[ "${DEPLOY_FIREBASE_STORAGE:-}" == "1" ]]; then
+    deploy_storage_rules
+  fi
 fi
 
 if $DO_CLOUD_RUN; then

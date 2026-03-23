@@ -13,12 +13,15 @@ import type { IconName } from '@/components/ui/Icon';
 import { useGroupUnread } from '@/contexts/GroupUnreadContext';
 
 const TABS: { name: string; label: string; icon: IconName }[] = [
-  { name: 'home',       label: 'Home',       icon: 'home' },
-  { name: 'groups',     label: 'Groups',     icon: 'groups' },
-  { name: 'rooms',      label: 'Live',       icon: 'live' },
+  { name: 'home', label: 'Home', icon: 'home' },
+  { name: 'groups', label: 'Pray', icon: 'prayBridge' },
+  { name: 'rooms', label: 'Live', icon: 'live' },
   { name: 'devotional', label: 'Devotional', icon: 'book' },
-  { name: 'profile',    label: 'Profile',    icon: 'profile' },
+  { name: 'profile', label: 'Profile', icon: 'profile' },
 ] as const;
+
+/** Base icon size (dp); spring scale differentiates focused vs idle. */
+const ICON_BASE = 27;
 
 function TabBarIcon({
   icon,
@@ -29,61 +32,49 @@ function TabBarIcon({
   icon: IconName;
   label: string;
   focused: boolean;
-  /** Unread count (e.g. group chat). */
   badgeCount?: number;
 }) {
-  const scale = useSharedValue(focused ? 1.05 : 0.9);
-  const pillOpacity = useSharedValue(focused ? 1 : 0);
-  const pillScale = useSharedValue(focused ? 1 : 0);
+  const scale = useSharedValue(focused ? 1.06 : 0.95);
 
   useEffect(() => {
-    scale.value = withSpring(focused ? 1.05 : 0.9, { damping: 12 });
-    pillOpacity.value = withSpring(focused ? 1 : 0, { damping: 12 });
-    pillScale.value = withSpring(focused ? 1 : 0, { damping: 12 });
-  }, [focused]);
+    scale.value = withSpring(focused ? 1.06 : 0.95, { damping: 16, stiffness: 220 });
+  }, [focused, scale]);
 
   const iconStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
-  const pillStyle = useAnimatedStyle(() => ({
-    opacity: pillOpacity.value,
-    transform: [{ scale: pillScale.value }],
-  }));
+  const SLOT_W = 64;
 
   return (
-    <View style={{ alignItems: 'center', justifyContent: 'center', paddingTop: 8, paddingBottom: 4, width: 64 }}>
-      <Animated.View
-        style={[
-          {
-            width: 42,
-            height: 28,
-            borderRadius: 14,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: focused ? THEME_COLORS.goldDim : 'transparent',
-          },
-          pillStyle,
-        ]}
-      />
-      <Animated.View style={[{ position: 'absolute', top: 8 }, iconStyle]}>
+    <View
+      style={{
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        paddingTop: 2,
+        paddingBottom: 4,
+        width: SLOT_W,
+        minHeight: 48,
+      }}
+    >
+      <Animated.View style={[{ alignItems: 'center', justifyContent: 'center' }, iconStyle]}>
         <View>
           <Icon
             name={icon}
-            size={20}
+            size={ICON_BASE}
             color={focused ? THEME_COLORS.gold : THEME_COLORS.text3}
-            strokeWidth={focused ? 2.0 : 1.6}
+            strokeWidth={focused ? 2.35 : 1.7}
           />
           {badgeCount != null && badgeCount > 0 ? (
             <View
               style={{
                 position: 'absolute',
-                top: -4,
-                right: -10,
-                minWidth: 16,
-                height: 16,
+                top: -5,
+                right: -12,
+                minWidth: 17,
+                height: 17,
                 paddingHorizontal: 4,
-                borderRadius: 8,
+                borderRadius: 9,
                 backgroundColor: THEME_COLORS.rose,
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -101,7 +92,7 @@ function TabBarIcon({
           color: focused ? THEME_COLORS.gold : THEME_COLORS.text3,
           fontFamily: focused ? 'Geist_600SemiBold' : 'Geist_400Regular',
           fontSize: 9,
-          marginTop: 20,
+          marginTop: 6,
           letterSpacing: 0.5,
           textTransform: 'uppercase',
         }}
@@ -124,8 +115,9 @@ export default function TabsLayout() {
           backgroundColor: 'rgba(250,246,239,0.97)',
           borderTopColor: THEME_COLORS.border,
           borderTopWidth: 1,
-          height: 60 + insets.bottom,
+          height: 70 + insets.bottom,
           paddingBottom: insets.bottom,
+          paddingTop: 10,
           elevation: 0,
           shadowOpacity: 0,
         },

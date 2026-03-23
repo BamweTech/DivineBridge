@@ -331,16 +331,70 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    function groupChatAttachmentItem(m) {
+      return m is map
+        && m.keys().hasAll(['url', 'content_type', 'file_name'])
+        && m.url is string
+        && m.url.size() <= 2048
+        && m.url.matches('https://firebasestorage.googleapis.com/.*')
+        && m.content_type is string
+        && m.content_type.size() <= 120
+        && m.file_name is string
+        && m.file_name.size() <= 200;
+    }
+
+    function validGroupChatAttachments(att) {
+      return att is list
+        && att.size() >= 1
+        && att.size() <= 3
+        && groupChatAttachmentItem(att[0])
+        && (att.size() < 2 || groupChatAttachmentItem(att[1]))
+        && (att.size() < 3 || groupChatAttachmentItem(att[2]));
+    }
+
+    function groupChatHasBody() {
+      return request.resource.data.message is string
+        && request.resource.data.message.size() <= 2000
+        && (
+          request.resource.data.message.size() > 0
+          || (
+            request.resource.data.keys().hasAny(['link_url'])
+            && request.resource.data.link_url is string
+            && request.resource.data.link_url.size() > 0
+            && request.resource.data.link_url.size() <= 2048
+            && request.resource.data.link_url.matches('https://.*')
+          )
+          || (
+            request.resource.data.keys().hasAny(['attachments'])
+            && validGroupChatAttachments(request.resource.data.attachments)
+          )
+        );
+    }
+
+    function linkUrlFieldValid() {
+      return !request.resource.data.keys().hasAny(['link_url'])
+        || (
+          request.resource.data.link_url is string
+          && request.resource.data.link_url.size() <= 2048
+          && request.resource.data.link_url.matches('https://.*')
+        );
+    }
+
+    function attachmentsFieldValid() {
+      return !request.resource.data.keys().hasAny(['attachments'])
+        || validGroupChatAttachments(request.resource.data.attachments);
+    }
+
     // ─── Group Chat Messages ──────────────────────────────────────────────────
     match /group_chat_messages/{groupId}/messages/{messageId} {
       allow read: if isPrayerGroupMember(groupId);
-      // Direct mobile writes for low-latency chat (members only)
+      // Direct client writes (members only). Text, optional https link, optional Storage attachments.
       allow create: if isPrayerGroupMember(groupId) &&
                   request.resource.data.user_id == request.auth.uid &&
-                  request.resource.data.message is string &&
-                  request.resource.data.message.size() > 0 &&
-                  request.resource.data.message.size() <= 2000 &&
-                  request.resource.data.keys().hasAll(['user_id', 'user_name', 'message', 'message_type', 'timestamp']);
+                  request.resource.data.keys().hasAll(['user_id', 'user_name', 'message', 'message_type', 'timestamp']) &&
+                  groupChatHasBody() &&
+                  linkUrlFieldValid() &&
+                  attachmentsFieldValid();
       allow update: if isPrayerGroupMember(groupId) &&
                   resource.data.user_id == request.auth.uid;
       allow delete: if isPrayerGroupMember(groupId) &&

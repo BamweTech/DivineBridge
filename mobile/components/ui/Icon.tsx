@@ -63,6 +63,7 @@ export type IconName =
   | 'email'
   | 'edit'
   | 'pray'
+  | 'prayBridge'
   | 'play'
   | 'settings'
   | 'anchor'
@@ -95,6 +96,9 @@ const DEFAULTS = {
   strokeLinecap: 'round' as const,
   strokeLinejoin: 'round' as const,
 }
+
+/** prayBridge: pan + scale tuned for tab slot; align with “PRAY” label. */
+const PRAY_BRIDGE_TAB = { scale: 0.35, panX: -7.3, panY: -4.2 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -366,6 +370,33 @@ const Icon: React.FC<IconProps> = ({
       <G>
         <Path {...s} d="M12 2C10 5 7 9 7 13a5 5 0 0010 0c0-4-3-8-5-11z" />
         <Path {...s} d="M7 13H5a3 3 0 000 6h14a3 3 0 000-6h-2" />
+      </G>
+    ),
+
+    /**
+     * Full DivineBridge mark (LogoOnly1.svg): stroke-only outline, whole group rotated 90° CCW.
+     * Scale + pan: full outline in 24×24, optically centered (was sitting right).
+     */
+    prayBridge: (
+      <G
+        transform={`translate(${12 + PRAY_BRIDGE_TAB.panX},${12 + PRAY_BRIDGE_TAB.panY}) scale(${PRAY_BRIDGE_TAB.scale}) rotate(-90,20.67109,22.526011) translate(-69.531391,-70.903428)`}
+      >
+        <Path
+          fill="none"
+          stroke={color}
+          strokeWidth={strokeWidth / PRAY_BRIDGE_TAB.scale}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M 83.488159,98.975444 H 69.531388 V 115.95545 H 90.26604 c 2.485261,0 5.257993,-0.40936 8.318355,-1.22886 2.238785,-0.59414 4.333645,-1.78274 6.284885,-3.56516 1.95124,-1.80291 3.47135,-4.02543 4.55993,-6.66833 0.70925,-1.70314 1.18872,-2.93472 1.44436,-5.517656 H 96.830497 c -0.174322,1.375766 -0.440514,1.573216 -0.803051,2.413456 -0.698338,1.59803 -1.664104,2.72507 -2.896464,3.38067 -1.232361,0.63512 -3.306806,0.9524 -6.223393,0.9524 h -3.41943 z"
+        />
+        <Path
+          fill="none"
+          stroke={color}
+          strokeWidth={strokeWidth / PRAY_BRIDGE_TAB.scale}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="m 69.531388,70.903424 v 15.37016 h 13.956771 v -5.16716 h 3.481442 c 3.614925,0 6.202876,0.8808 7.763867,2.64273 0.735039,0.82966 1.293423,1.02256 1.680001,2.52443 h 14.162441 c -0.15907,-0.91803 -0.35436,-0.8424 -0.59221,-1.72551 -0.73942,-2.74534 -1.9308,-5.15254 -3.57394,-7.22178 -1.64315,-2.06925 -3.72754,-3.65669 -6.25388,-4.76302 -2.505805,-1.10633 -5.80251,-1.65985 -9.88984,-1.65985 z"
+        />
       </G>
     ),
 

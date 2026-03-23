@@ -24,6 +24,7 @@ import { groupApi, scheduledApi, prayerRequestApi, globalWatchApi } from '@/serv
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { THEME_COLORS } from '@/lib/constants';
+import { filterGlobalWatchForFeed } from '@/lib/globalWatchFeed';
 import Icon from '@/components/ui/Icon';
 import { useAuthStore } from '@/stores/authStore';
 import type { PrayerGroup, ScheduledSession } from '@/types';
@@ -626,8 +627,10 @@ function PrayerWallFeed({ currentUserId, onCompose }: { currentUserId?: string; 
     (p: any) => !(p.source === 'generated' && !p.user_id)
   );
 
-  // Global watch posts
-  const globalPosts: GlobalWatchPost[] = globalData?.prayers ?? [];
+  // Global watch: max 10, drop AI/meta junk, one card per event (dedupe)
+  const globalPosts: GlobalWatchPost[] = filterGlobalWatchForFeed(
+    globalData?.prayers ?? []
+  );
 
   // Build interleaved feed: global watch cards appear between every 3 community posts
   const feed: FeedItem[] = [];

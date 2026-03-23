@@ -9,8 +9,6 @@
     "userInterfaceStyle": "dark",
     "newArchEnabled": false,
     "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
       "backgroundColor": "#faf6ef"
     },
     "ios": {
@@ -67,6 +65,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#faf6ef"
+        }
+      ],
       "expo-font",
       [
         "expo-build-properties",

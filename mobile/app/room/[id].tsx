@@ -210,6 +210,7 @@ export default function RoomScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const scrollRef = useRef<ScrollView>(null);
+  const hostSessionEndHandled = useRef(false);
 
   const {
     room,
@@ -318,9 +319,55 @@ export default function RoomScreen() {
   }
 
   async function handleLeave() {
+    const isHost = Boolean(user?.uid && room?.host_id === user.uid);
+    if (isHost) {
+      Alert.alert(
+        'End session for everyone?',
+        'You started this prayer session. If you leave, it will end for all participants in this room.',
+        [
+          { text: 'Stay', style: 'cancel' },
+          {
+            text: 'End session',
+            style: 'destructive',
+            onPress: async () => {
+              await leave();
+              router.back();
+            },
+          },
+        ]
+      );
+      return;
+    }
     await leave();
     router.back();
   }
+
+  useEffect(() => {
+    if (!room || !isJoined || room.is_active !== false) return;
+    // Host chose to leave via confirmation — leave() clears isJoined first; guard if snapshot races.
+    if (user?.uid && room.host_id === user.uid) return;
+    if (hostSessionEndHandled.current) return;
+    hostSessionEndHandled.current = true;
+
+    let finished = false;
+    const finish = async () => {
+      if (finished) return;
+      finished = true;
+      await leave();
+      router.back();
+    };
+
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    Alert.alert(
+      'Session ended',
+      'The host ended this prayer session. You will leave the room in a moment.',
+      [{ text: 'OK', onPress: () => void finish() }],
+      { cancelable: false }
+    );
+
+    const forceTimer = setTimeout(() => void finish(), 4500);
+    return () => clearTimeout(forceTimer);
+  }, [room?.is_active, isJoined, room, leave, router, user?.uid, room?.host_id]);
 
   async function handleSend() {
     if (!chatText.trim()) return;

@@ -1354,6 +1354,301 @@
             height: 14px;
         }
     }
+
+    /* Prayer Room — in-page Groups tab */
+    button.icon-button.pr-room-tab {
+        border: none;
+        font: inherit;
+    }
+    button.icon-button.pr-room-tab.active {
+        box-shadow: 0 4px 18px rgba(74, 124, 94, 0.45);
+        background: linear-gradient(135deg, #e8f5ec 0%, #c8e6d0 100%);
+        border: 2px solid rgba(74, 124, 94, 0.55);
+    }
+    #pr-groups-panel {
+        display: none;
+        max-width: 720px;
+        margin: 0 auto 2rem;
+    }
+    .pr-groups-section-title {
+        font-family: 'Poppins', sans-serif;
+        font-size: 1.1rem;
+        color: var(--blue);
+        margin: 1.5rem 0 0.75rem;
+    }
+    .pr-groups-cards {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .pr-groups-card {
+        background: #fff;
+        border: 1px solid rgba(31, 60, 136, 0.12);
+        border-radius: 16px;
+        padding: 1rem 1.15rem;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+    }
+    .pr-groups-card-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .pr-groups-card-title {
+        font-weight: 700;
+        color: var(--blue);
+        font-size: 1.05rem;
+    }
+    .pr-groups-badge {
+        font-size: 0.8rem;
+        color: var(--gray);
+        white-space: nowrap;
+    }
+    .pr-groups-card-desc {
+        margin: 0.5rem 0 0;
+        color: #555;
+        font-size: 0.9rem;
+        line-height: 1.45;
+    }
+    .pr-groups-card-actions {
+        margin-top: 0.75rem;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .pr-groups-btn-sm {
+        padding: 0.35rem 0.85rem !important;
+        font-size: 0.85rem !important;
+    }
+    .pr-groups-toolbar {
+        margin-bottom: 1rem;
+    }
+    .pr-groups-join-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 0.35rem;
+    }
+    .pr-groups-input {
+        flex: 1;
+        min-width: 160px;
+        padding: 0.65rem 0.85rem;
+        border-radius: 12px;
+        border: 1px solid rgba(31, 60, 136, 0.2);
+        font-size: 0.95rem;
+    }
+    .pr-groups-msg {
+        min-height: 1.25rem;
+        font-size: 0.88rem;
+        color: #2d7a4d;
+        margin: 0 0 0.5rem;
+    }
+    .pr-groups-muted {
+        color: var(--gray);
+        font-size: 0.95rem;
+        line-height: 1.5;
+    }
+    .pr-groups-loading {
+        text-align: center;
+        padding: 2rem;
+        color: var(--gray);
+    }
+    .pr-groups-error {
+        color: #b91c1c;
+    }
+    .pr-groups-detail-top {
+        margin-bottom: 0.75rem;
+    }
+    .pr-groups-detail-title {
+        font-family: 'Poppins', sans-serif;
+        color: var(--blue);
+        margin: 0 0 0.35rem;
+        font-size: 1.5rem;
+    }
+    .pr-groups-action-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 1rem 0;
+    }
+    .pr-groups-code-hint {
+        margin: 0 0 1rem;
+        font-size: 0.9rem;
+    }
+    .pr-groups-leave-wrap {
+        margin: 0.5rem 0 1rem;
+    }
+    .pr-groups-chat-log {
+        min-height: 200px;
+        max-height: 360px;
+        overflow-y: auto;
+        background: rgba(255, 255, 255, 0.85);
+        border: 1px solid rgba(31, 60, 136, 0.12);
+        border-radius: 14px;
+        padding: 12px;
+        margin-bottom: 10px;
+    }
+    .pr-groups-msg-row {
+        margin-bottom: 10px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: rgba(31, 60, 136, 0.06);
+    }
+    .pr-groups-msg-row.mine {
+        background: rgba(245, 197, 66, 0.2);
+    }
+    .pr-groups-msg-who {
+        display: block;
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: var(--blue);
+        margin-bottom: 2px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .pr-groups-msg-text {
+        font-size: 0.92rem;
+        color: #222;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    .pr-groups-chat-compose {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .pr-groups-chat-extras {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+    }
+    .pr-groups-chat-compose-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+    }
+    .pr-groups-chat-input {
+        flex: 1;
+        min-width: 200px;
+    }
+    .pr-groups-link-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 13000;
+        background: rgba(44, 36, 22, 0.45);
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+    }
+    .pr-groups-link-box {
+        background: #fff;
+        border-radius: 16px;
+        padding: 1.25rem;
+        max-width: 420px;
+        width: 100%;
+        border: 1px solid rgba(31, 60, 136, 0.15);
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+    }
+    .pr-groups-link-title {
+        font-family: 'Poppins', sans-serif;
+        font-weight: 700;
+        color: var(--blue);
+        margin: 0 0 0.5rem;
+        font-size: 1.1rem;
+    }
+    .pr-groups-link-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        margin-top: 1rem;
+    }
+    .pr-groups-embed-link {
+        display: inline-block;
+        margin-bottom: 8px;
+        color: #b07d20;
+        font-weight: 600;
+        text-decoration: underline;
+        word-break: break-all;
+        font-size: 0.9rem;
+    }
+    .pr-groups-embed-img {
+        max-width: 220px;
+        max-height: 200px;
+        border-radius: 12px;
+        display: block;
+        margin-bottom: 8px;
+        cursor: pointer;
+    }
+    .pr-groups-embed-pdf {
+        display: inline-block;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: rgba(31, 60, 136, 0.08);
+        border: 1px solid rgba(31, 60, 136, 0.15);
+        margin-bottom: 8px;
+        text-decoration: none;
+        color: var(--blue);
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+    #pr-groups-create-modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 12000;
+        background: rgba(44, 36, 22, 0.45);
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+    }
+    #pr-groups-create-modal .pr-groups-create-inner {
+        background: #fff;
+        border-radius: 18px;
+        padding: 1.5rem;
+        max-width: 420px;
+        width: 100%;
+        position: relative;
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
+    }
+    #pr-groups-create-modal h2 {
+        margin: 0 0 1rem;
+        font-family: 'Poppins', sans-serif;
+        color: var(--blue);
+        font-size: 1.25rem;
+    }
+    #pr-groups-create-modal .form-group {
+        margin-bottom: 1rem;
+    }
+    #pr-groups-create-modal label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 0.35rem;
+        font-size: 0.9rem;
+    }
+    #pr-groups-create-modal input,
+    #pr-groups-create-modal textarea {
+        width: 100%;
+        padding: 0.65rem 0.75rem;
+        border-radius: 10px;
+        border: 1px solid rgba(31, 60, 136, 0.2);
+        font-size: 0.95rem;
+        box-sizing: border-box;
+    }
+    #pr-groups-create-close {
+        position: absolute;
+        top: 12px;
+        right: 14px;
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        line-height: 1;
+        cursor: pointer;
+        color: #666;
+    }
 </style>
 {% endblock %}
 
@@ -1399,6 +1694,23 @@
                 </p>
             </div>
             <div style="display: flex; gap: 1rem; align-items: center;">
+                <button type="button" id="pr-tab-feed" class="icon-button pr-room-tab active" title="Community prayer wall">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <span class="button-label">Community</span>
+                </button>
+                <button type="button" id="pr-tab-groups" class="icon-button pr-room-tab" title="Prayer groups">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <span class="button-label">Groups</span>
+                </button>
                 <a href="/daily-prayer" class="icon-button" title="View Daily Prayer" style="text-decoration: none;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
@@ -1607,6 +1919,7 @@
     // loadInitialPrayers() will be called by setupAuthListener() instead
     </script>
 
+    <div id="prayers-feed-view">
     <!-- Welcome Message (First-time visitors) -->
     <div id="welcome-banner" class="welcome-banner" style="display: none;">
         <div class="welcome-content">
@@ -1665,6 +1978,32 @@
 
     <!-- Auth Required Message -->
     <!-- Removed: auth-required gating message. Prayer Room is public-readable by design. -->
+    </div>
+
+    <!-- Prayer groups (same page tab) -->
+    <div id="pr-groups-panel" class="pr-groups-panel" aria-label="Prayer groups">
+        <div id="pr-groups-list-root"></div>
+        <div id="pr-groups-detail-root" style="display: none;"></div>
+    </div>
+</div>
+
+<!-- Create prayer group (web) -->
+<div id="pr-groups-create-modal" role="dialog" aria-modal="true" aria-labelledby="pr-groups-create-heading">
+    <div class="pr-groups-create-inner">
+        <button type="button" id="pr-groups-create-close" aria-label="Close">&times;</button>
+        <h2 id="pr-groups-create-heading">Create a prayer group</h2>
+        <p class="pr-groups-muted" style="margin-top:0">Private groups use an invite link and code so only people you share with can join.</p>
+        <div class="form-group">
+            <label for="pr-groups-create-name">Group name</label>
+            <input id="pr-groups-create-name" type="text" maxlength="50" placeholder="At least 3 characters" />
+        </div>
+        <div class="form-group">
+            <label for="pr-groups-create-desc">Description (optional)</label>
+            <textarea id="pr-groups-create-desc" rows="3" maxlength="200" placeholder="What is this group for?"></textarea>
+        </div>
+        <p id="pr-groups-create-msg" class="pr-groups-error" role="status"></p>
+        <button type="button" class="btn btn-primary" id="pr-groups-create-submit" style="width:100%;margin-top:0.5rem;">Create group</button>
+    </div>
 </div>
 
 <!-- Floating Action Button -->
@@ -1736,6 +2075,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{{ url_for('static', filename='js/prayer-room-groups.js') }}"></script>
 <script>
     // Note: currentUser and expandedPrayers are defined in inline script above
     // Note: openPrayerModal is defined in inline script above
@@ -2943,8 +3283,13 @@
     // Called by base.html on auth state changes
     function updatePrayersPage(user) {
         const banner = document.getElementById('guest-banner');
-        if (!banner) return;
-        banner.style.display = user ? 'none' : 'flex';
+        if (banner) {
+            banner.style.display = user ? 'none' : 'flex';
+        }
+        if (window.PrayerRoomGroups) {
+            window.PrayerRoomGroups.syncTabToLocation();
+            window.PrayerRoomGroups.tryConsumeJoinIntent();
+        }
     }
 
     // Check for active public prayer sessions and update button styling
@@ -3015,6 +3360,9 @@
         // Start checking for active sessions
         startSessionPolling();
         console.log('DOM loaded, waiting for Firebase auth...');
+        if (window.PrayerRoomGroups) {
+            window.PrayerRoomGroups.init();
+        }
     });
 
     // Clean up polling when page is hidden

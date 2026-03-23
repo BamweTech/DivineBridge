@@ -11,6 +11,8 @@ import {
   Modal,
   Share,
   ActivityIndicator,
+  ActionSheetIOS,
+  Linking,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,7 +21,10 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import dayjs from 'dayjs';
+import * as DocumentPicker from 'expo-document-picker';
+import { Image } from 'expo-image';
 import { useGroupChat, useGroupDetails, firestoreTimestampMs } from '@/hooks/useGroups';
+import { uploadGroupChatFile } from '@/lib/groupChatUpload';
 import { useGroupUnread } from '@/contexts/GroupUnreadContext';
 import { usePrayerRoom } from '@/hooks/usePrayerRoom';
 import { roomApi } from '@/services/api';
@@ -29,7 +34,16 @@ import { Avatar } from '@/components/ui/Avatar';
 import { useAuthStore } from '@/stores/authStore';
 import { THEME_COLORS, MESSAGE_TYPES } from '@/lib/constants';
 import Icon from '@/components/ui/Icon';
-import type { MessageType, PrayerGroup, GroupChatMessage } from '@/types';
+import type { MessageType, PrayerGroup, GroupChatMessage, GroupChatAttachment } from '@/types';
+
+function normalizeHttpsUrl(raw: string): string | null {
+  const t = raw.trim();
+  if (!t) return null;
+  if (/^https:\/\//i.test(t)) return t;
+  if (/^http:\/\//i.test(t)) return t.replace(/^http:/i, 'https:');
+  if (/^[\w.-]+\.[a-z]{2,}([/?#].*)?$/i.test(t)) return `https://${t}`;
+  return null;
+}
 
 const MESSAGE_TYPE_OPTIONS: { type: MessageType; label: string }[] = [
   { type: MESSAGE_TYPES.TEXT, label: 'Message' },
@@ -70,6 +84,8 @@ function GroupChatBubble({ msg, userUid }: { msg: GroupChatMessage; userUid?: st
   const isSpecial = msg.message_type !== 'text';
   const bg = isSpecial ? TYPE_COLORS[msg.message_type] : isMe ? THEME_COLORS.goldDim : THEME_COLORS.bg2;
   const borderColor = isSpecial ? TYPE_BORDER_COLORS[msg.message_type] : isMe ? THEME_COLORS.goldBorder : THEME_COLORS.border;
+  const attachments = msg.attachments ?? [];
+  const showText = (msg.message ?? '').trim().length > 0;
 
   return (
     <Animated.View
@@ -92,9 +108,48 @@ function GroupChatBubble({ msg, userUid }: { msg: GroupChatMessage; userUid?: st
             {msg.message_type.replace('_', ' ')}
           </Text>
         )}
-        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 22 }}>
-          {msg.message}
-        </Text>
+        {!!msg.link_url && (
+          <Pressable
+            onPress={() => Linking.openURL(msg.link_url!)}
+            style={{ marginBottom: showText || attachments.length ? 8 : 0 }}
+          >
+            <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 13, textDecorationLine: 'underline' }} numberOfLines={3}>
+              {msg.link_url}
+            </Text>
+          </Pressable>
+        )}
+        {attachments.map((a: GroupChatAttachment, idx: number) => (
+          <Pressable
+            key={`${msg.message_id}-att-${idx}`}
+            onPress={() => Linking.openURL(a.url)}
+            style={{ marginBottom: idx < attachments.length - 1 || showText ? 10 : 0 }}
+          >
+            {a.content_type.startsWith('image/') ? (
+              <Image
+                source={{ uri: a.url }}
+                style={{ width: 220, height: 160, borderRadius: 12, backgroundColor: THEME_COLORS.bg3 }}
+                contentFit="cover"
+                accessibilityLabel={a.file_name}
+              />
+            ) : (
+              <View style={{
+                paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12,
+                backgroundColor: THEME_COLORS.bg3, borderWidth: 1, borderColor: THEME_COLORS.border,
+              }}>
+                <Text style={{ color: THEME_COLORS.violet, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>PDF</Text>
+                <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 4 }} numberOfLines={2}>
+                  {a.file_name}
+                </Text>
+                <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_500Medium', fontSize: 11, marginTop: 6 }}>Tap to open</Text>
+              </View>
+            )}
+          </Pressable>
+        ))}
+        {showText ? (
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 22 }}>
+            {msg.message}
+          </Text>
+        ) : null}
       </View>
       <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 10, marginTop: 3, marginHorizontal: 6 }}>
         {msg.timestamp
@@ -279,6 +334,12 @@ export default function GroupScreen() {
   const [startingLive, setStartingLive] = useState(false);
   const [fsChatOpen, setFsChatOpen] = useState(true);
   const [fsChatText, setFsChatText] = useState('');
+  const [linkModal, setLinkModal] = useState<{ open: boolean; target: 'main' | 'fs' }>({
+    open: false,
+    target: 'main',
+  });
+  const [linkUrlDraft, setLinkUrlDraft] = useState('');
+  const [uploading, setUploading] = useState(false);
 
   const prayer = usePrayerRoom(liveRoomId ?? '');
   const joinRef = useRef(prayer.join);
@@ -350,6 +411,91 @@ export default function GroupScreen() {
     await sendMessage(fsChatText.trim(), 'text');
     setFsChatText('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }
+
+  function showAttachMenu(target: 'main' | 'fs') {
+    const runPick = () => {
+      void pickAndUpload(target === 'fs');
+    };
+    const runLink = () => {
+      setLinkModal({ open: true, target });
+      setLinkUrlDraft('');
+    };
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: ['Cancel', 'Photo or PDF', 'Add link'], cancelButtonIndex: 0 },
+        (i) => {
+          if (i === 1) runPick();
+          if (i === 2) runLink();
+        }
+      );
+    } else {
+      Alert.alert('Attach', undefined, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Photo or PDF', onPress: runPick },
+        { text: 'Add link', onPress: runLink },
+      ]);
+    }
+  }
+
+  async function pickAndUpload(fromFs: boolean) {
+    if (!id) return;
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'application/pdf'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      const mime = asset.mimeType || 'application/octet-stream';
+      if (!mime.startsWith('image/') && mime !== 'application/pdf') {
+        Alert.alert('Unsupported file', 'Choose a photo or PDF.');
+        return;
+      }
+      setUploading(true);
+      const res = await fetch(asset.uri);
+      const blob = await res.blob();
+      const att = await uploadGroupChatFile(id, blob, mime, asset.name || 'attachment');
+      const caption = (fromFs ? fsChatText : text).trim();
+      await sendMessage(caption, fromFs ? 'text' : messageType, { attachments: [att] });
+      if (fromFs) {
+        setFsChatText('');
+      } else {
+        setText('');
+        setMessageType('text');
+        setShowTypePicker(false);
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e) {
+      Alert.alert('Upload failed', e instanceof Error ? e.message : 'Try again.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function submitLinkFromModal() {
+    const u = normalizeHttpsUrl(linkUrlDraft);
+    if (!u) {
+      Alert.alert('Invalid link', 'Enter a full URL (e.g. https://example.org).');
+      return;
+    }
+    const fromFs = linkModal.target === 'fs';
+    try {
+      const caption = (fromFs ? fsChatText : text).trim();
+      await sendMessage(caption, fromFs ? 'text' : messageType, { linkUrl: u });
+      setLinkModal({ open: false, target: 'main' });
+      setLinkUrlDraft('');
+      if (fromFs) {
+        setFsChatText('');
+      } else {
+        setText('');
+        setMessageType('text');
+        setShowTypePicker(false);
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (e) {
+      Alert.alert('Could not send', e instanceof Error ? e.message : 'Try again.');
+    }
   }
 
   async function handleStartGroupLive() {
@@ -608,6 +754,21 @@ export default function GroupScreen() {
                   borderTopColor: THEME_COLORS.border,
                   backgroundColor: THEME_COLORS.bg,
                 }}>
+                  <Pressable
+                    onPress={() => showAttachMenu('fs')}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 11,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 1,
+                      backgroundColor: THEME_COLORS.bg3,
+                      borderColor: THEME_COLORS.border,
+                    }}
+                  >
+                    <Icon name="plus" size={16} color={THEME_COLORS.text2} />
+                  </Pressable>
                   <TextInput
                     value={fsChatText}
                     onChangeText={setFsChatText}
@@ -632,17 +793,17 @@ export default function GroupScreen() {
                   />
                   <Pressable
                     onPress={handleFsSend}
-                    disabled={!fsChatText.trim()}
+                    disabled={!fsChatText.trim() || uploading}
                     style={{
                       width: 36,
                       height: 36,
                       borderRadius: 18,
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: fsChatText.trim() ? THEME_COLORS.gold : THEME_COLORS.bg3,
+                      backgroundColor: fsChatText.trim() && !uploading ? THEME_COLORS.gold : THEME_COLORS.bg3,
                     }}
                   >
-                    <Icon name="send" size={14} color={fsChatText.trim() ? '#ffffff' : THEME_COLORS.text3} />
+                    <Icon name="send" size={14} color={fsChatText.trim() && !uploading ? '#ffffff' : THEME_COLORS.text3} />
                   </Pressable>
                 </View>
               </View>
@@ -658,7 +819,7 @@ export default function GroupScreen() {
         borderTopWidth: showTypePicker ? 0 : 1, borderTopColor: THEME_COLORS.border,
         backgroundColor: THEME_COLORS.bg,
       }}>
-        {/* Pray / attach buttons */}
+        {/* Message type + attach */}
         <View style={{ flexDirection: 'row', gap: 6 }}>
           <Pressable
             onPress={() => setShowTypePicker((v) => !v)}
@@ -669,6 +830,16 @@ export default function GroupScreen() {
             }}
           >
             <Icon name={messageType !== 'text' ? 'pray' : 'attach'} size={14} color={messageType !== 'text' ? THEME_COLORS.gold : THEME_COLORS.text2} />
+          </Pressable>
+          <Pressable
+            onPress={() => showAttachMenu('main')}
+            style={{
+              width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 1,
+              backgroundColor: THEME_COLORS.bg3,
+              borderColor: THEME_COLORS.border,
+            }}
+          >
+            <Icon name="plus" size={16} color={THEME_COLORS.text2} />
           </Pressable>
         </View>
         <TextInput
@@ -688,15 +859,106 @@ export default function GroupScreen() {
         />
         <Pressable
           onPress={handleSend}
-          disabled={!text.trim()}
+          disabled={!text.trim() || uploading}
           style={{
             width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
-            backgroundColor: text.trim() ? THEME_COLORS.gold : THEME_COLORS.bg3,
+            backgroundColor: text.trim() && !uploading ? THEME_COLORS.gold : THEME_COLORS.bg3,
           }}
         >
-          <Icon name="send" size={14} color={text.trim() ? '#ffffff' : THEME_COLORS.text3} />
+          <Icon name="send" size={14} color={text.trim() && !uploading ? '#ffffff' : THEME_COLORS.text3} />
         </Pressable>
       </View>
+
+      <Modal visible={uploading} transparent animationType="fade">
+        <View style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: 'rgba(44,36,22,0.35)',
+        }}>
+          <View style={{
+            padding: 24,
+            borderRadius: 16,
+            backgroundColor: THEME_COLORS.bg,
+            borderWidth: 1,
+            borderColor: THEME_COLORS.border,
+            alignItems: 'center',
+            gap: 12,
+          }}>
+            <ActivityIndicator size="large" color={THEME_COLORS.gold} />
+            <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_500Medium', fontSize: 14 }}>Uploading…</Text>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={linkModal.open} transparent animationType="fade" onRequestClose={() => setLinkModal((m) => ({ ...m, open: false }))}>
+        <Pressable
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            padding: 24,
+            backgroundColor: 'rgba(44,36,22,0.45)',
+          }}
+          onPress={() => setLinkModal((m) => ({ ...m, open: false }))}
+        >
+          <Pressable
+            onPress={(e) => e.stopPropagation()}
+            style={{
+              borderRadius: 18,
+              padding: 20,
+              backgroundColor: THEME_COLORS.bg,
+              borderWidth: 1,
+              borderColor: THEME_COLORS.border,
+            }}
+          >
+            <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 17, color: THEME_COLORS.text, marginBottom: 8 }}>
+              Add a link
+            </Text>
+            <Text style={{ fontFamily: 'Geist_400Regular', fontSize: 13, color: THEME_COLORS.text3, marginBottom: 12 }}>
+              Paste a web address (https). Your optional message above will be sent as a caption.
+            </Text>
+            <TextInput
+              value={linkUrlDraft}
+              onChangeText={setLinkUrlDraft}
+              placeholder="https://…"
+              placeholderTextColor={THEME_COLORS.text3}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              style={{
+                borderWidth: 1,
+                borderColor: THEME_COLORS.border,
+                borderRadius: 12,
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                fontFamily: 'Geist_400Regular',
+                fontSize: 15,
+                color: THEME_COLORS.text,
+                marginBottom: 16,
+              }}
+            />
+            <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'flex-end' }}>
+              <Pressable
+                onPress={() => setLinkModal((m) => ({ ...m, open: false }))}
+                style={{ paddingVertical: 10, paddingHorizontal: 16 }}
+              >
+                <Text style={{ fontFamily: 'Geist_600SemiBold', color: THEME_COLORS.text2 }}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => void submitLinkFromModal()}
+                style={{
+                  paddingVertical: 10,
+                  paddingHorizontal: 18,
+                  borderRadius: 12,
+                  backgroundColor: THEME_COLORS.gold,
+                }}
+              >
+                <Text style={{ fontFamily: 'Geist_600SemiBold', color: '#ffffff' }}>Send</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }

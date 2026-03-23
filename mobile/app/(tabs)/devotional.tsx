@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -35,57 +35,124 @@ const THEMES = [
   'Spiritual Growth', 'Hope & Perseverance',
 ];
 
-// ─── Week Strip ────────────────────────────────────────────────────────────────
+// ─── Day selector (horizontal) — pick which day to read; one card below ─────────
 
-function WeekStrip({ plan }: { plan: DevotionalPlan }) {
-  // Show the 7 days surrounding the current day
-  const startDay = Math.max(1, plan.current_day - 3);
-  const endDay = Math.min(plan.duration, startDay + 6);
-  const visibleDays = Array.from({ length: endDay - startDay + 1 }, (_, i) => startDay + i);
-
-  // Use today's date as the anchor
-  const today = dayjs();
+function DaySelectorStrip({
+  plan,
+  selectedDay,
+  onSelectDay,
+}: {
+  plan: DevotionalPlan;
+  selectedDay: number;
+  onSelectDay: (dayNum: number) => void;
+}) {
+  const scrollRef = useRef<ScrollView>(null);
   const planStartDate = plan.created_at
-    ? dayjs(typeof plan.created_at === 'number' ? plan.created_at : (plan.created_at as any)?.toMillis?.() ?? Date.now())
+    ? dayjs(
+        typeof plan.created_at === 'number'
+          ? plan.created_at
+          : (plan.created_at as { toMillis?: () => number })?.toMillis?.() ?? Date.now()
+      )
     : dayjs();
 
+  const dayNumbers = Array.from({ length: plan.duration }, (_, i) => i + 1);
+
+  // Keep the selected pill roughly in view (especially for 14/30-day plans)
+  useEffect(() => {
+    const idx = Math.max(0, selectedDay - 1);
+    const approxX = idx * 56;
+    scrollRef.current?.scrollTo({ x: Math.max(0, approxX - 80), animated: true });
+  }, [selectedDay, plan.duration]);
+
   return (
-    <View style={{ paddingHorizontal: 22, marginBottom: 16 }}>
-      <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, marginBottom: 10 }}>This Week</Text>
-      <View style={{ flexDirection: 'row', gap: 6 }}>
-        {visibleDays.map((dayNum) => {
+    <View style={{ marginBottom: 14 }}>
+      <Text
+        style={{
+          color: THEME_COLORS.text,
+          fontFamily: 'PlusJakartaSans_700Bold',
+          fontSize: 13,
+          marginBottom: 10,
+          paddingHorizontal: 22,
+        }}
+      >
+        Plan days
+      </Text>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 22, gap: 8, paddingBottom: 4 }}
+      >
+        {dayNumbers.map((dayNum) => {
           const dayData = plan.days.find((d) => d.day === dayNum);
-          const isToday = dayNum === plan.current_day;
+          const isPlanToday = dayNum === plan.current_day;
+          const isSelected = dayNum === selectedDay;
           const isDone = dayData?.completed ?? false;
           const dayDate = planStartDate.add(dayNum - 1, 'day');
           const dayName = dayDate.format('ddd').substring(0, 3);
-          const dayNum2 = dayDate.format('D');
 
           return (
-            <View
+            <Pressable
               key={dayNum}
+              onPress={() => {
+                onSelectDay(dayNum);
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }}
               style={{
-                flex: 1,
-                backgroundColor: isToday ? THEME_COLORS.bg2 : THEME_COLORS.bg3,
-                borderWidth: 1,
-                borderColor: isToday ? THEME_COLORS.gold : isDone ? THEME_COLORS.goldBorder : THEME_COLORS.border,
-                borderRadius: 12,
-                paddingVertical: 8,
-                paddingHorizontal: 2,
+                minWidth: 52,
+                paddingVertical: 10,
+                paddingHorizontal: 10,
+                borderRadius: 14,
                 alignItems: 'center',
+                backgroundColor: isSelected ? THEME_COLORS.goldDim : THEME_COLORS.bg3,
+                borderWidth: 2,
+                borderColor: isSelected
+                  ? THEME_COLORS.gold
+                  : isPlanToday
+                    ? THEME_COLORS.goldBorder
+                    : isDone
+                      ? THEME_COLORS.goldBorder
+                      : THEME_COLORS.border,
               }}
             >
-              <Text style={{ color: THEME_COLORS.text3, fontSize: 8, fontFamily: 'Geist_400Regular', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+              <Text
+                style={{
+                  color: THEME_COLORS.text3,
+                  fontSize: 9,
+                  fontFamily: 'Geist_500Medium',
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.4,
+                  marginBottom: 4,
+                }}
+              >
                 {dayName}
               </Text>
-              <Text style={{ color: (isToday || isDone) ? THEME_COLORS.gold : THEME_COLORS.text3, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14 }}>
+              <Text
+                style={{
+                  color: isSelected || isPlanToday ? THEME_COLORS.gold : THEME_COLORS.text2,
+                  fontFamily: 'PlusJakartaSans_700Bold',
+                  fontSize: 16,
+                }}
+              >
                 {dayNum}
               </Text>
-              <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: (isToday || isDone) ? THEME_COLORS.gold : THEME_COLORS.border, marginTop: 4 }} />
-            </View>
+              <View
+                style={{
+                  width: 5,
+                  height: 5,
+                  borderRadius: 2.5,
+                  marginTop: 5,
+                  backgroundColor: isDone
+                    ? THEME_COLORS.sage
+                    : isPlanToday
+                      ? THEME_COLORS.gold
+                      : THEME_COLORS.border,
+                }}
+              />
+            </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -195,7 +262,14 @@ function DayCard({
 
 // ─── Generate Plan Screen ─────────────────────────────────────────────────────
 
-function GeneratePlanScreen({ onGenerated }: { onGenerated: () => void }) {
+function GeneratePlanScreen({
+  onGenerated,
+  onDismiss,
+}: {
+  onGenerated: () => void;
+  /** When set (e.g. user already has a plan), show a way to leave without generating. */
+  onDismiss?: () => void;
+}) {
   const [selectedTheme, setSelectedTheme] = useState('');
   const [customTheme, setCustomTheme] = useState('');
   const [duration, setDuration] = useState<7 | 14 | 30>(7);
@@ -303,6 +377,27 @@ function GeneratePlanScreen({ onGenerated }: { onGenerated: () => void }) {
         fullWidth
         size="lg"
       />
+
+      {onDismiss && (
+        <Pressable
+          onPress={() => {
+            if (isGenerating) return;
+            onDismiss();
+          }}
+          disabled={isGenerating}
+          style={{ marginTop: 20, alignItems: 'center', paddingVertical: 12 }}
+        >
+          <Text
+            style={{
+              color: THEME_COLORS.text3,
+              fontFamily: 'Geist_500Medium',
+              fontSize: 14,
+            }}
+          >
+            Cancel — back to my current plan
+          </Text>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }
@@ -315,12 +410,17 @@ export default function DevotionalScreen() {
   const [plan, setPlan] = useState<DevotionalPlan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refresh, setRefresh] = useState(0);
+  /** True while user chose "Start a New Plan" but has not finished or cancelled. */
+  const [showNewPlanFlow, setShowNewPlanFlow] = useState(false);
+  /** Which plan day is shown below the strip (defaults to plan's "today" when you open the tab). */
+  const [selectedDay, setSelectedDay] = useState(1);
   const { toggle: speechToggle, stop: stopSpeech, isSpeaking, activeSource } = useSpeechPlayback();
 
   useFocusEffect(
     useCallback(() => {
+      if (plan) setSelectedDay(plan.current_day);
       return () => stopSpeech();
-    }, [stopSpeech])
+    }, [plan?.plan_id, plan?.current_day, stopSpeech])
   );
 
   const handleListenDay = useCallback(
@@ -406,6 +506,69 @@ export default function DevotionalScreen() {
     );
   }
 
+  if (showNewPlanFlow) {
+    const exitNewPlan = () => {
+      setShowNewPlanFlow(false);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    };
+    return (
+      <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}>
+        <View
+          style={{
+            paddingTop: insets.top + 8,
+            paddingHorizontal: 22,
+            paddingBottom: 4,
+            flexDirection: 'row',
+            alignItems: 'center',
+          }}
+        >
+          <Pressable
+            onPress={exitNewPlan}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              paddingVertical: 10,
+              paddingRight: 16,
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Back to current devotional plan"
+          >
+            <View
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 12,
+                backgroundColor: THEME_COLORS.bg3,
+                borderWidth: 1,
+                borderColor: THEME_COLORS.border,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon name="back" size={16} color={THEME_COLORS.text2} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 15 }}>
+                Back to current plan
+              </Text>
+              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 2 }} numberOfLines={1}>
+                {plan.theme}
+              </Text>
+            </View>
+          </Pressable>
+        </View>
+        <GeneratePlanScreen
+          onGenerated={() => {
+            setRefresh((v) => v + 1);
+            setShowNewPlanFlow(false);
+          }}
+          onDismiss={exitNewPlan}
+        />
+      </View>
+    );
+  }
+
   const progressPct = Math.round((plan.current_day / plan.duration) * 100);
 
   return (
@@ -448,26 +611,66 @@ export default function DevotionalScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Week strip */}
-        <WeekStrip plan={plan} />
+        <DaySelectorStrip
+          plan={plan}
+          selectedDay={selectedDay}
+          onSelectDay={setSelectedDay}
+        />
 
-        {/* Day cards */}
         <View style={{ paddingHorizontal: 22 }}>
-          {plan.days.map((day, i) => (
-            <Animated.View key={day.day} entering={FadeInDown.delay(i * 30).duration(400)}>
-              <DayCard
-                day={day}
-                isToday={day.day === plan.current_day}
-                onCheckIn={() => handleCheckIn(day.day)}
-                listenLabel={activeSource === `day-${day.day}` && isSpeaking ? 'Stop' : 'Listen'}
-                onListen={() => handleListenDay(day)}
-              />
-            </Animated.View>
-          ))}
+          {selectedDay !== plan.current_day && (
+            <Pressable
+              onPress={() => {
+                setSelectedDay(plan.current_day);
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                paddingVertical: 10,
+                paddingHorizontal: 14,
+                marginBottom: 12,
+                borderRadius: 14,
+                backgroundColor: THEME_COLORS.bg3,
+                borderWidth: 1,
+                borderColor: THEME_COLORS.border,
+              }}
+            >
+              <Icon name="book" size={14} color={THEME_COLORS.gold} />
+              <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_500Medium', fontSize: 13 }}>
+                Viewing day {selectedDay} ·{' '}
+                <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold' }}>Go to today (day {plan.current_day})</Text>
+              </Text>
+            </Pressable>
+          )}
+
+          {(() => {
+            const day = plan.days.find((d) => d.day === selectedDay);
+            if (!day) {
+              return (
+                <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 14, textAlign: 'center', paddingVertical: 24 }}>
+                  This day is not available yet.
+                </Text>
+              );
+            }
+            return (
+              <Animated.View key={day.day} entering={FadeInDown.duration(350)}>
+                <DayCard
+                  day={day}
+                  isToday={day.day === plan.current_day}
+                  onCheckIn={() => handleCheckIn(day.day)}
+                  listenLabel={activeSource === `day-${day.day}` && isSpeaking ? 'Stop' : 'Listen'}
+                  onListen={() => handleListenDay(day)}
+                />
+              </Animated.View>
+            );
+          })()}
 
           <Button
             label="Start a New Plan"
-            onPress={() => setPlan(null)}
+            onPress={() => setShowNewPlanFlow(true)}
             variant="secondary"
             fullWidth
             style={{ marginTop: 8 }}

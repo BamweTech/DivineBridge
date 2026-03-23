@@ -16,7 +16,7 @@ import { db } from '@/lib/firebase';
 import { COLLECTIONS } from '@/lib/constants';
 import { useAuthStore } from '@/stores/authStore';
 import { getDisplayName } from '@/lib/userDisplayName';
-import type { PrayerGroup, GroupChatMessage, PrayerRoom } from '@/types';
+import type { PrayerGroup, GroupChatMessage, GroupChatAttachment, PrayerRoom } from '@/types';
 
 // useLiveRooms — real-time Firestore listener for active prayer rooms.
 // Rooms appear instantly when created without polling.
@@ -184,21 +184,31 @@ export function useGroupChat(groupId: string) {
     return unsub;
   }, [groupId]);
 
-  async function sendMessage(text: string, type: GroupChatMessage['message_type'] = 'text') {
+  async function sendMessage(
+    text: string,
+    type: GroupChatMessage['message_type'] = 'text',
+    options?: { linkUrl?: string; attachments?: GroupChatAttachment[] }
+  ) {
     if (!user) return;
-    await addDoc(
-      collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages'),
-      {
-        user_id: user.uid,
-        user_name: getDisplayName(profile, user),
-        user_photo: profile?.photoURL ?? null,
-        message: text.trim(),
-        message_type: type,
-        timestamp: serverTimestamp(),
-        reactions: {},
-        read_by: [user.uid],
-      }
-    );
+    const body = text.trim();
+    const link = options?.linkUrl?.trim();
+    const atts = options?.attachments?.filter((a) => a?.url && a?.content_type && a?.file_name) ?? [];
+    if (!body && !link && atts.length === 0) return;
+
+    const payload: Record<string, unknown> = {
+      user_id: user.uid,
+      user_name: getDisplayName(profile, user),
+      user_photo: profile?.photoURL ?? null,
+      message: body,
+      message_type: type,
+      timestamp: serverTimestamp(),
+      reactions: {},
+      read_by: [user.uid],
+    };
+    if (link) payload.link_url = link;
+    if (atts.length > 0) payload.attachments = atts;
+
+    await addDoc(collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages'), payload);
   }
 
   return { messages, isLoading, sendMessage };

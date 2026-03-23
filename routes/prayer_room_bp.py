@@ -720,20 +720,20 @@ def leave_prayer_room(room_id):
             return jsonify({'error': 'Room not found'}), 404
         
         room_data = room_doc.to_dict()
-        participants = room_data.get('participants', [])
-        
-        # Remove participant
-        participants = [p for p in participants if p['user_id'] != user_id]
-        
+        participants_before = list(room_data.get('participants', []))
+
+        # Resolve host display name before mutating the participant list (host was incorrectly looked up after removal).
+        host_name_for_notice = room_data.get('host_name') or 'The host'
+        for _p in participants_before:
+            if _p.get('user_id') == user_id:
+                host_name_for_notice = _p.get('user_name') or host_name_for_notice
+                break
+
+        # Remove leaver from participants
+        participants = [p for p in participants_before if p.get('user_id') != user_id]
+
         # If host leaves, close the room and add notification message
         if room_data.get('host_id') == user_id:
-            # Get host name for the notification
-            host_name = None
-            for participant in participants:
-                if participant['user_id'] == user_id:
-                    host_name = participant.get('user_name', 'Host')
-                    break
-            
             # Add notification message to chat
             chat_ref = db.collection('chat_messages')
             sys_msg_id = str(uuid.uuid4())
@@ -742,7 +742,10 @@ def leave_prayer_room(room_id):
                 'message_id': sys_msg_id,
                 'user_id': 'system',
                 'user_name': 'System',
-                'message': f"⚠️ {host_name or 'The host'} has left the room. This prayer session will end shortly.",
+                'message': (
+                    f"⚠️ {host_name_for_notice} (host) has ended this prayer session. "
+                    f"The room will close for everyone in a few seconds."
+                ),
                 'timestamp': datetime.utcnow(),
                 'message_type': 'system_notification'
             }

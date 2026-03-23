@@ -33,6 +33,14 @@ DISASTER_TYPES = [
     'mass shooting', 'gun violence'
 ]
 
+# Breaking disaster discovery: reject items older than this (prompt + validation must align)
+DISASTER_DISCOVERY_MAX_AGE_DAYS = 3
+# Summaries often repeat the onset date ("on March 10…") while the story is still breaking; use a
+# looser cutoff only for calendar dates *in prose* so we still block October 2025–style recaps.
+DISASTER_TEXT_DATE_MAX_AGE_DAYS = 21
+# "March 2026" without a day: treat as stale only if that month is well behind "now"
+DISASTER_TEXT_MONTH_ONLY_MIN_AGE_DAYS = 45
+
 
 class DisasterPrayerService:
     """Service for hourly disaster monitoring and customized prayer generation"""
@@ -56,123 +64,71 @@ class DisasterPrayerService:
             List of disaster dictionaries with news details
         """
         try:
-            # Build search query for breaking disasters
             disaster_types_str = ", ".join(DISASTER_TYPES)
-            from datetime import datetime
-            current_time = datetime.now().strftime("%B %d, %Y %H:%M UTC")
-            
-            prompt = f"""You are a breaking news monitor searching for RECENT disasters and crises that occurred in the LAST 12-24 HOURS worldwide.
+            now = datetime.now()
+            max_age_days = DISASTER_DISCOVERY_MAX_AGE_DAYS
+            current_time = now.strftime("%B %d, %Y %H:%M (local server)")
+            window_start = (now - timedelta(days=max_age_days)).strftime("%B %d, %Y")
+            window_end = now.strftime("%B %d, %Y")
+            cutoff_iso = (now - timedelta(days=max_age_days)).strftime("%Y-%m-%dT%H:%M:%S")
+            example_ts = (now - timedelta(hours=6)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            reject_ts = (now - timedelta(days=max_age_days + 14)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            today_tokens = f"{now.strftime('%B')} {now.day}, {now.year}"
+
+            prompt = f"""You are a breaking news monitor searching for RECENT disasters and crises worldwide.
 
 CURRENT TIME: {current_time}
+ROLLING WINDOW: Include only events (or clearly documented major breaking updates) from **on or after {window_start}** through **{window_end}** — approximately the last **{max_age_days} days**. Do not anchor examples to a fixed calendar month; use real-time search.
 
-CRITICAL: Only include disasters that occurred in the LAST 24 HOURS. Do NOT include disasters from last year, last month, or even last week. Only include disasters that happened TODAY or YESTERDAY.
+CRITICAL RELEVANCE:
+- Do NOT include named storms, earthquakes, or conflicts whose **main** reporting is months old (e.g. summaries that say the event was in a past month/year like "October {now.year - 1}" unless there is a verifiable **new** development inside the window above).
+- Do NOT recycle background articles: the **news_summary** must read as current breaking context, not a historical recap.
+- If you cannot verify timing within the window, omit the item.
 
 SEARCH INSTRUCTIONS:
-1. Search the web for BREAKING NEWS and RECENT disasters. Use time-specific search queries like:
-   - "disaster breaking news last 12 hours" OR "disaster breaking news last 24 hours"
-   - "natural disaster news {current_time.split()[0]} {current_time.split()[1]}" (today's date)
-   - "emergency response today" OR "disaster alert today"
-   - "earthquake today" OR "earthquake breaking news"
-   - "flood [country] today" OR "flooding breaking news"
-   - "hurricane breaking news" OR "typhoon today"
-   - "wildfire breaking news" OR "fire [location] today"
-   - "mass shooting today" OR "gun violence breaking news"
-   - "conflict breaking news" OR "war [region] today"
-   - "developing disaster" OR "ongoing emergency"
-   - "natural disaster breaking news today"
+1. Search the web for BREAKING NEWS. Prefer queries such as:
+   - "natural disaster breaking news last {max_age_days} days"
+   - "disaster breaking news last 24 hours"
+   - "earthquake today" / "flood [region] today" / "wildfire breaking news"
+   - "emergency alert" + today's date ({today_tokens})
 
-2. Use diverse sources:
-   - International news agencies (Reuters, AP, BBC, CNN)
-   - Local news sources
-   - Government emergency services
-   - Humanitarian organizations
-   - Verified social media reports
+2. Use diverse sources: major wires, local outlets, government alerts, verified humanitarian updates.
 
-3. Focus on these disaster types: {disaster_types_str}
+3. Disaster types to cover: {disaster_types_str}
 
-4. TIME WINDOW GUIDANCE (STRICT - only recent disasters):
-   - PRIMARY: Disasters from the last 12 hours (highest priority)
-   - SECONDARY: Disasters from 12-24 hours ago that are:
-     * Still developing or ongoing
-     * Have breaking updates or new developments
-     * Are part of active emergency response
-   - STRICTLY EXCLUDE:
-     * Disasters from last year, last month, or last week
-     * Disasters older than 24 hours unless they have breaking updates TODAY
-     * Historical disasters mentioned in news articles
-     * Disasters that occurred more than 24 hours ago with no recent updates
-   - ONLY INCLUDE disasters that:
-     * Occurred in the last 24 hours
-     * Have breaking updates or new developments TODAY
-     * Are part of active emergency response happening NOW
+4. TIME WINDOW:
+   - Highest priority: last 12–24 hours.
+   - Also allow {max_age_days}-day window only for ongoing emergencies with **new** developments in that period.
+   - EXCLUDE: anniversaries, "on this day", old recaps, stories whose primary dates fall **before** the window.
 
-5. Prioritize disasters with:
-   - Significant casualties or injuries
-   - Large-scale evacuations
-   - Major property damage
-   - Ongoing emergency response
-   - Breaking/developing situations
-
-For each BREAKING disaster found, return a JSON array with this EXACT structure:
+For each qualifying disaster, return a JSON array with this EXACT structure:
 [
   {{
     "type": "one of: typhoon, hurricane, earthquake, flood, landslide, drought, wildfire, tornado, tsunami, volcano, conflict, war, epidemic, pandemic, famine, storm, mass_shooting",
-    "country": "Full country name (e.g., 'Japan', 'Philippines', 'United States', 'Mexico')",
-    "location": "Specific location/city/region if mentioned (e.g., 'Tokyo', 'Manila', 'California')",
+    "country": "Full country name (e.g., 'Japan', 'United States')",
+    "location": "City/region if known",
     "severity": "minor" | "moderate" | "severe" | "catastrophic",
     "casualties": number or null,
-    "news_summary": "Detailed summary of what happened (2-4 sentences with specific details from the news)",
-    "news_source": "Source of the news (e.g., 'Reuters', 'BBC', 'AP News')",
-    "timestamp": "When the disaster occurred (ISO format if available, or approximate time)"
+    "news_summary": "2–4 sentences; must not cite a primary event date outside the allowed window unless clearly labeled as a **new** update in-window",
+    "news_source": "Outlet name or URL",
+    "timestamp": "ISO 8601 UTC when the event or the reported breaking update occurred (YYYY-MM-DDTHH:MM:SSZ)"
   }}
 ]
 
-CRITICAL REQUIREMENTS FOR TIMESTAMPS:
-- ⚠️ MANDATORY: Every disaster MUST have an accurate timestamp showing when it occurred
-- ⚠️ TIMESTAMP FORMAT: Use ISO 8601 format: YYYY-MM-DDTHH:MM:SSZ (e.g., "2025-12-16T14:30:00Z")
-- ⚠️ DATE VALIDATION: The timestamp year MUST be 2025 (current year)
-- ⚠️ DATE VALIDATION: The timestamp date MUST be within the last 7 days (December 9-16, 2025)
-- ⚠️ STRICTLY EXCLUDE:
-  * Disasters with timestamps from 2024 or earlier (last year)
-  * Disasters with timestamps older than 7 days
-  * Disasters with timestamps in the future
-  * Disasters without timestamps
-  * Disasters where the timestamp year is not 2025
-- ⚠️ VERIFY TIMESTAMP: Before including a disaster, verify:
-  1. The timestamp year is 2025
-  2. The timestamp date is December 9-16, 2025 (last 7 days)
-  3. The timestamp is in correct ISO format
-  4. The timestamp makes sense (not in future, not too old)
+TIMESTAMPS (mandatory):
+- Every item MUST have a parseable **timestamp** on or after **{cutoff_iso}** (UTC or with offset).
+- EXCLUDE future timestamps, missing timestamps, or timestamps older than the window.
+- The calendar **year** in the timestamp must match reality for that event (use **{now.year}** or the correct year if the window crosses New Year — still must fall inside the rolling window).
 
-CRITICAL REQUIREMENTS:
-- STRICTLY EXCLUDE disasters that occurred more than 7 days ago
-- STRICTLY EXCLUDE disasters from last year (2024 or earlier), last month, or last week
-- ONLY INCLUDE disasters if they meet ALL of these criteria:
-  * Occurred in the last 7 days (December 9-16, 2025)
-  * Have a VALID timestamp showing the disaster occurred in 2025
-  * Have a timestamp date within the last 7 days
-  * Are breaking news or have updates from TODAY
-- Be specific with country names (full names, not abbreviations like 'US' - use 'United States')
-- Include specific details from the news in the summary (what happened, where, impact)
-- Include accurate timestamp in ISO format: YYYY-MM-DDTHH:MM:SSZ (e.g., "2025-12-16T14:30:00Z")
-- Verify the date/timestamp before including - if a disaster occurred last year (2024), DO NOT include it
-- If you cannot determine an accurate timestamp within the last 7 days, DO NOT include the disaster
-- Only return empty array [] if NO disasters are found in the past 7 days
-- Return ONLY valid JSON array, no explanations, no markdown, no code blocks
-- Verify information from multiple sources when possible
-- Focus on verified, reliable news sources
-- When in doubt about timing, EXCLUDE the disaster rather than include old news
+OUTPUT:
+- Return ONLY a valid JSON array, no markdown or prose.
+- If nothing qualifies, return [].
 
-Return ONLY the JSON array, nothing else. 
+EXAMPLE SHAPE (replace timestamp with a real value from your search that satisfies the window):
+[{{"type":"earthquake","country":"Japan","location":"Tokyo","severity":"severe","casualties":150,"news_summary":"Brief current breaking summary with no historical month/year outside the window.","news_source":"Reuters","timestamp":"{example_ts}"}}]
 
-EXAMPLE FORMAT (note: timestamp must be within last 7 days, year must be 2025):
-[{{"type":"earthquake","country":"Japan","location":"Tokyo","severity":"severe","casualties":150,"news_summary":"A magnitude 7.2 earthquake struck Tokyo at 2:30 PM local time, causing widespread damage to buildings and infrastructure. Emergency services are responding to multiple collapsed structures. At least 150 people are reported injured.","news_source":"Reuters","timestamp":"2025-12-16T14:30:00Z"}}]
-
-REMEMBER: 
-- Timestamp year MUST be 2025
-- Timestamp date MUST be December 9-16, 2025 (last 7 days)
-- If disaster occurred in 2024 or earlier, DO NOT include it
-- If you cannot verify the timestamp is recent (within last 7 days), DO NOT include the disaster"""
+REJECT (too old — do not emit items like this):
+[{{"type":"storm","country":"France","location":"Brittany","severity":"moderate","casualties":null,"news_summary":"Storm named months ago; recap only.","news_source":"Example","timestamp":"{reject_ts}"}}]"""
 
             response = self.client.query(prompt)
             
@@ -255,49 +211,69 @@ REMEMBER:
             # Validate and normalize disasters
             validated_disasters = []
             now = datetime.now()
-            max_age = timedelta(days=7)  # Only accept disasters from last week
-            
+            max_age = timedelta(days=DISASTER_DISCOVERY_MAX_AGE_DAYS)
+
             for disaster in disasters:
                 if isinstance(disaster, dict) and disaster.get('country') and disaster.get('type'):
-                    # Check timestamp - CRITICAL: reject old disasters
-                    timestamp_str = disaster.get('timestamp', '')
-                    if timestamp_str:
-                        disaster_time = None
-                        try:
-                            # Try ISO format first
-                            disaster_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-                            # Remove timezone for comparison
-                            if disaster_time.tzinfo:
-                                disaster_time = disaster_time.replace(tzinfo=None)
-                        except:
+                    timestamp_str = disaster.get('timestamp')
+                    if not timestamp_str or not str(timestamp_str).strip():
+                        logger.warning(
+                            f"Rejected disaster (missing timestamp): {disaster.get('type')} in {disaster.get('country')}"
+                        )
+                        continue
+                    timestamp_str = str(timestamp_str).strip()
+
+                    disaster_time = None
+                    try:
+                        disaster_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                        if disaster_time.tzinfo:
+                            disaster_time = disaster_time.replace(tzinfo=None)
+                    except (ValueError, TypeError):
+                        for fmt in ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
                             try:
-                                # Try common formats
-                                for fmt in ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
-                                    try:
-                                        disaster_time = datetime.strptime(timestamp_str[:19], fmt)
-                                        break
-                                    except:
-                                        continue
-                            except:
-                                pass
-                        
-                        if disaster_time:
-                            # Check if disaster is within last week
-                            age = now - disaster_time
-                            if age > max_age:
-                                logger.warning(f"Rejected old disaster: {disaster.get('type')} in {disaster.get('country')} - occurred {age.days} days ago (timestamp: {timestamp_str})")
+                                disaster_time = datetime.strptime(timestamp_str[:19], fmt)
+                                break
+                            except (ValueError, TypeError):
                                 continue
-                            elif age.days < 0:
-                                # Future timestamp - invalid
-                                logger.warning(f"Rejected future disaster: {disaster.get('type')} in {disaster.get('country')} - timestamp is in future: {timestamp_str}")
-                                continue
-                        else:
-                            # Could not parse timestamp - check if it contains year
-                            current_year = datetime.now().year
-                            if str(current_year - 1) in timestamp_str or str(current_year - 2) in timestamp_str:
-                                logger.warning(f"Rejected disaster with old year in timestamp: {disaster.get('type')} in {disaster.get('country')} - timestamp: {timestamp_str}")
-                                continue
-                    
+
+                    if not disaster_time:
+                        logger.warning(
+                            f"Rejected disaster (unparseable timestamp): {disaster.get('type')} in "
+                            f"{disaster.get('country')} — {timestamp_str!r}"
+                        )
+                        continue
+
+                    age = now - disaster_time
+                    if age > max_age:
+                        logger.warning(
+                            f"Rejected old disaster: {disaster.get('type')} in {disaster.get('country')} — "
+                            f"{age.days}d ago ({timestamp_str})"
+                        )
+                        continue
+                    if age.total_seconds() < -3600:
+                        logger.warning(
+                            f"Rejected future disaster: {disaster.get('type')} in {disaster.get('country')} — "
+                            f"{timestamp_str}"
+                        )
+                        continue
+
+                    combined_text = f"{disaster.get('news_summary', '')} {disaster.get('news_source', '')}"
+                    if self._has_old_date_in_text(
+                        combined_text,
+                        max_age_days=DISASTER_TEXT_DATE_MAX_AGE_DAYS,
+                    ):
+                        logger.warning(
+                            f"Rejected disaster (stale date in summary/source text): {disaster.get('type')} in "
+                            f"{disaster.get('country')}"
+                        )
+                        continue
+                    if self._text_suggests_historical_event(combined_text):
+                        logger.warning(
+                            f"Rejected disaster (historical phrasing in summary): {disaster.get('type')} in "
+                            f"{disaster.get('country')}"
+                        )
+                        continue
+
                     # Normalize disaster type
                     disaster['type'] = self._normalize_disaster_type(disaster.get('type', ''))
                     # Ensure country is properly formatted
@@ -520,29 +496,41 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
     
     def save_grouped_disaster_prayer(self, disaster_type: str, info: Dict, result: Dict) -> bool:
         """
-        Save grouped disaster prayer by type with all affected countries
-        
-        Args:
-            disaster_type: Type of disaster (should already be normalized, but we'll ensure it)
-            info: Comprehensive information dictionary
-            result: Dictionary with 'summary' and 'prayer' keys
-            
-        Returns:
-            True if saved successfully
+        Save grouped disaster prayer by type with all affected countries.
+        If an active grouped prayer already exists for the same disaster type with overlapping
+        affected countries (same evolving event, e.g. earthquake then aftershocks/building collapse),
+        updates that object in place (stable id) instead of creating a second post.
         """
         try:
             # Ensure disaster_type is normalized (storm -> typhoon, etc.)
             disaster_type = self._normalize_disaster_type(disaster_type)
-            
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            prayer_id = f"{disaster_type}_grouped_{timestamp}"
-            
+            now = datetime.now()
+            countries = info.get('affected_countries', []) or []
+
+            match = self._find_grouped_prayer_to_update(disaster_type, countries)
+            if match:
+                blob_path, existing = match
+                prayer_id = existing.get('id') or ''
+                if not prayer_id:
+                    prayer_id = f"{disaster_type}_grouped_{now.strftime('%Y%m%d_%H%M%S')}"
+                created_at = existing.get('created_at') or now.isoformat()
+                logger.info(
+                    f"Updating existing grouped disaster prayer {prayer_id} at {blob_path} "
+                    f"(same-event merge, {len(countries)} countries in latest snapshot)"
+                )
+            else:
+                timestamp = now.strftime('%Y%m%d_%H%M%S')
+                prayer_id = f"{disaster_type}_grouped_{timestamp}"
+                created_at = now.isoformat()
+                blob_path = f"disaster_prayers/grouped/{prayer_id}.json"
+                logger.info(f"Creating new grouped disaster prayer: {prayer_id}")
+
             # Create grouped prayer data
             prayer_data = {
                 'id': prayer_id,
                 'disaster_type': disaster_type,
                 'disaster_type_display': disaster_type.replace('_', ' ').replace('-', ' ').title(),
-                'affected_countries': info.get('affected_countries', []),
+                'affected_countries': countries,
                 'affected_regions': info.get('affected_regions', []),
                 'overall_severity': info.get('overall_severity', 'moderate'),
                 'total_casualties': info.get('total_casualties'),
@@ -553,23 +541,30 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                 'comprehensive_summary': info.get('comprehensive_summary', ''),
                 'key_details': info.get('key_details', []),
                 'all_news_summaries': info.get('all_news_summaries', []),
-                'created_at': datetime.now().isoformat(),
-                'expires_at': (datetime.now() + timedelta(days=3)).isoformat(),
+                'all_areas': info.get('all_areas', []),
+                'created_at': created_at,
+                'updated_at': now.isoformat(),
+                'expires_at': (now + timedelta(days=3)).isoformat(),
                 'source': 'disaster_prayer_service_grouped',
                 'is_grouped': True
             }
-            
-            # Save to storage
-            blob_path = f"disaster_prayers/grouped/{prayer_id}.json"
+
             blob = self.storage.bucket.blob(blob_path)
             blob.upload_from_string(
                 json.dumps(prayer_data, indent=2),
                 content_type='application/json'
             )
-            
-            logger.info(f"Saved grouped disaster prayer: {prayer_id} for {disaster_type} covering {len(info.get('affected_countries', []))} countries")
+
+            self._delete_absorbed_grouped_duplicates(
+                disaster_type, blob_path, countries
+            )
+
+            logger.info(
+                f"Saved grouped disaster prayer: {prayer_id} for {disaster_type} "
+                f"covering {len(countries)} countries"
+            )
             return True
-            
+
         except Exception as e:
             logger.error(f"Error saving grouped disaster prayer: {e}")
             return False
@@ -626,13 +621,21 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                                         has_old_date = False
                                         
                                         # Check text content for old dates (previous years or old months)
-                                        if summary and self._has_old_date_in_text(summary):
+                                        if summary and self._has_old_date_in_text(
+                                            summary, max_age_days=DISASTER_TEXT_DATE_MAX_AGE_DAYS
+                                        ):
                                             has_old_date = True
-                                        elif comprehensive_summary and self._has_old_date_in_text(comprehensive_summary):
+                                        elif comprehensive_summary and self._has_old_date_in_text(
+                                            comprehensive_summary,
+                                            max_age_days=DISASTER_TEXT_DATE_MAX_AGE_DAYS,
+                                        ):
                                             has_old_date = True
                                         else:
                                             for news_summary in all_summaries:
-                                                if news_summary and self._has_old_date_in_text(news_summary):
+                                                if news_summary and self._has_old_date_in_text(
+                                                    news_summary,
+                                                    max_age_days=DISASTER_TEXT_DATE_MAX_AGE_DAYS,
+                                                ):
                                                     has_old_date = True
                                                     break
                                         
@@ -753,9 +756,9 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                         logger.warning(f"Error reading disaster prayer {blob.name}: {e}")
                         continue
             
-            # Sort by created_at (most recent first)
-            grouped_prayers.sort(key=lambda x: x.get('created_at', ''), reverse=True)
-            prayers.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+            grouped_prayers = self._dedupe_grouped_by_event_signature(grouped_prayers)
+            grouped_prayers.sort(key=lambda x: self._prayer_recency_ts(x), reverse=True)
+            prayers.sort(key=lambda x: self._prayer_recency_ts(x), reverse=True)
             
             logger.info(f"Returning {len(grouped_prayers)} grouped prayers and {len(prayers)} individual prayers (all within last week)")
             
@@ -850,107 +853,140 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                         return True
         
         return False
-    
-    def _has_old_date_in_text(self, text: str) -> bool:
+
+    def _text_suggests_historical_event(self, text: str) -> bool:
+        """True if wording suggests a recap / anniversary / far-past framing (not breaking news)."""
+        if not text:
+            return False
+        t = text.lower()
+        if re.search(r'\b(?:several|many|few)\s+months\s+ago\b', t):
+            return True
+        if re.search(r'\blast\s+year\b', t):
+            return True
+        if re.search(r'\b\d+\s+years?\s+ago\b', t):
+            return True
+        if re.search(r'\banniversary\s+of\b', t):
+            return True
+        if 'on this day' in t:
+            return True
+        cy = datetime.now().year
+        for y in range(2000, cy):
+            if re.search(rf'\b(?:in|during|since)\s+{y}\b', t):
+                return True
+        return False
+
+    def _has_old_date_in_text(self, text: str, max_age_days: Optional[int] = None) -> bool:
         """
-        Check if text contains references to old dates (previous years or old months within current year)
-        
-        Args:
-            text: Text to check
-            
-        Returns:
-            True if old date found, False otherwise
+        True if text cites a calendar date clearly outside the recent window (e.g. "October 2025"
+        when we are in 2026, or a full date older than max_age_days).
+
+        max_age_days defaults to DISASTER_DISCOVERY_MAX_AGE_DAYS; discovery parsing passes
+        DISASTER_TEXT_DATE_MAX_AGE_DAYS so onset dates in prose do not over-filter vs. timestamp.
         """
         if not text:
             return False
-        
-        current_year = datetime.now().year
-        previous_year = current_year - 1
+
         now = datetime.now()
-        max_age = timedelta(days=7)
-        cutoff_date = now - max_age
-        
-        import re
-        
-        # Check for previous year in text with various patterns
-        if str(previous_year) in text:
-            # Look for date patterns like "December 14, 2024" or "2024-12-14"
-            date_patterns = [
-                rf'\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{{1,2}},\s+{previous_year}\b',
-                rf'\b{previous_year}-\d{{2}}-\d{{2}}\b',
-                rf'\b{previous_year}/\d{{2}}/\d{{2}}\b',
-                rf'\b\d{{1,2}}/\d{{1,2}}/{previous_year}\b',
-                rf'\bsince\s+{previous_year}\b',
-                rf'\bin\s+{previous_year}\b',
-                rf'\bfrom\s+{previous_year}\b',
-                rf'\bstarting\s+in\s+{previous_year}\b',
-                rf'\bbegan\s+in\s+{previous_year}\b',
-                rf'\bstarted\s+in\s+{previous_year}\b',
+        days = max_age_days if max_age_days is not None else DISASTER_DISCOVERY_MAX_AGE_DAYS
+        cutoff = now - timedelta(days=days)
+        cy, cm = now.year, now.month
+        month_only_cutoff = now - timedelta(days=DISASTER_TEXT_MONTH_ONLY_MIN_AGE_DAYS)
+
+        month_names = [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December',
+        ]
+        month_re = '|'.join(month_names)
+        month_by_lower = {m.lower(): i for i, m in enumerate(month_names, 1)}
+
+        # "October 2025" / "March 2024" (no day)
+        for m in re.finditer(rf'\b({month_re})\s+(\d{{4}})\b', text, re.IGNORECASE):
+            y = int(m.group(2))
+            mon = month_by_lower.get(m.group(1).lower())
+            if not mon:
+                continue
+            if y < cy:
+                logger.debug(f"Stale month+year in text: {m.group(1)} {y}")
+                return True
+            if y == cy and mon < cm:
+                try:
+                    mid_month = datetime(y, mon, 15)
+                except ValueError:
+                    mid_month = datetime(y, mon, 1)
+                if mid_month < month_only_cutoff:
+                    logger.debug(f"Stale month+year in text (earlier month this year, >~{DISASTER_TEXT_MONTH_ONLY_MIN_AGE_DAYS}d): {m.group(1)} {y}")
+                    return True
+
+        # "January 15, 2025" / "15 January 2025" — any year
+        for m in re.finditer(rf'\b({month_re})\s+(\d{{1,2}}),\s+(\d{{4}})\b', text, re.IGNORECASE):
+            mon = month_by_lower.get(m.group(1).lower())
+            if not mon:
+                continue
+            try:
+                d, y = int(m.group(2)), int(m.group(3))
+                dt = datetime(y, mon, d)
+            except (ValueError, TypeError):
+                continue
+            if dt < cutoff:
+                logger.debug(f"Stale full date in text: {m.group(0)}")
+                return True
+
+        for m in re.finditer(rf'\b(\d{{1,2}})\s+({month_re})\s+(\d{{4}})\b', text, re.IGNORECASE):
+            mon = month_by_lower.get(m.group(2).lower())
+            if not mon:
+                continue
+            try:
+                d, y = int(m.group(1)), int(m.group(3))
+                dt = datetime(y, mon, d)
+            except (ValueError, TypeError):
+                continue
+            if dt < cutoff:
+                logger.debug(f"Stale EU-style date in text: {m.group(0)}")
+                return True
+
+        # ISO YYYY-MM-DD anywhere in text
+        for m in re.finditer(r'\b(\d{4})-(\d{2})-(\d{2})(?:T|\b)', text):
+            try:
+                y, mon, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+                dt = datetime(y, mon, d)
+            except (ValueError, TypeError):
+                continue
+            if y < 1990 or y > cy + 1:
+                continue
+            if dt < cutoff:
+                logger.debug(f"Stale ISO date in text: {m.group(0)}")
+                return True
+
+        py = cy - 1
+        if str(py) in text:
+            prev_patterns = [
+                rf'\b({month_re})\s+\d{{1,2}},\s+{py}\b',
+                rf'\b{py}-\d{{2}}-\d{{2}}\b',
+                rf'\b{py}/\d{{2}}/\d{{2}}\b',
+                rf'\b\d{{1,2}}/\d{{1,2}}/{py}\b',
+                rf'\bsince\s+{py}\b',
+                rf'\bin\s+{py}\b',
+                rf'\bfrom\s+{py}\b',
             ]
-            
-            for pattern in date_patterns:
+            for pattern in prev_patterns:
                 if re.search(pattern, text, re.IGNORECASE):
                     return True
-        
-        # Also check for years older than previous year (2023, 2022, etc.)
-        for year in range(2020, previous_year):
-            year_str = str(year)
-            if year_str in text:
-                # Check for context indicating it's a date
-                year_patterns = [
-                    rf'\bsince\s+{year_str}\b',
-                    rf'\bin\s+{year_str}\b',
-                    rf'\bfrom\s+{year_str}\b',
-                    rf'\bstarting\s+in\s+{year_str}\b',
-                    rf'\bbegan\s+in\s+{year_str}\b',
-                    rf'\bstarted\s+in\s+{year_str}\b',
-                    rf'\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{{1,2}},\s+{year_str}\b',
-                    rf'\b{year_str}-\d{{2}}-\d{{2}}\b',
-                ]
-                
-                for pattern in year_patterns:
-                    if re.search(pattern, text, re.IGNORECASE):
-                        return True
-        
-        # Check for dates within current year that are older than 7 days
-        # Pattern: "January 15, 2025" or "2025-01-15" etc.
-        current_year_str = str(current_year)
-        if current_year_str in text:
-            # Match dates like "January 15, 2025" or "2025-01-15"
-            month_names = ['January', 'February', 'March', 'April', 'May', 'June', 
-                          'July', 'August', 'September', 'October', 'November', 'December']
-            
-            # Check for "Month Day, Year" format
-            for month_idx, month_name in enumerate(month_names, 1):
-                pattern = rf'\b{month_name}\s+(\d{{1,2}}),\s+{current_year_str}\b'
-                matches = re.finditer(pattern, text, re.IGNORECASE)
-                for match in matches:
-                    try:
-                        day = int(match.group(1))
-                        # Create date object for this date
-                        date_obj = datetime(current_year, month_idx, day)
-                        # Check if this date is older than 7 days
-                        if date_obj < cutoff_date:
-                            logger.debug(f"Found old date in text: {month_name} {day}, {current_year_str} ({now - date_obj} ago)")
-                            return True
-                    except (ValueError, TypeError):
-                        continue
-            
-            # Check for ISO format dates "2025-01-15" or "2025-01-15T..."
-            iso_pattern = rf'\b{current_year_str}-(\d{{2}})-(\d{{2}})(?:T|\b)'
-            matches = re.finditer(iso_pattern, text)
-            for match in matches:
-                try:
-                    month = int(match.group(1))
-                    day = int(match.group(2))
-                    date_obj = datetime(current_year, month, day)
-                    # Check if this date is older than 7 days
-                    if date_obj < cutoff_date:
-                        logger.debug(f"Found old ISO date in text: {current_year_str}-{match.group(1)}-{match.group(2)} ({now - date_obj} ago)")
-                        return True
-                except (ValueError, TypeError):
-                    continue
-        
+
+        for year in range(2000, py):
+            ys = str(year)
+            if ys not in text:
+                continue
+            year_patterns = [
+                rf'\bsince\s+{ys}\b',
+                rf'\bin\s+{ys}\b',
+                rf'\bfrom\s+{ys}\b',
+                rf'\b({month_re})\s+\d{{1,2}},\s+{ys}\b',
+                rf'\b{ys}-\d{{2}}-\d{{2}}\b',
+            ]
+            for pattern in year_patterns:
+                if re.search(pattern, text, re.IGNORECASE):
+                    return True
+
         return False
     
     def _collect_disaster_info_by_type(self, disaster_type: str, disasters: List[Dict]) -> Dict:
@@ -987,7 +1023,9 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                     news_summary = re.sub(r'\s+', ' ', news_summary).strip()
                 
                 # Check if news summary contains old dates
-                if self._has_old_date_in_text(news_summary):
+                if self._has_old_date_in_text(
+                    news_summary, max_age_days=DISASTER_TEXT_DATE_MAX_AGE_DAYS
+                ):
                     logger.warning(f"Rejected disaster with old date in summary: {disaster_type} in {country} - summary contains previous year")
                     continue
                 
@@ -1118,11 +1156,20 @@ Return ONLY valid JSON, no explanations."""
                 country = prayer.get('country', '')
                 location = prayer.get('location', '')
                 if country:
-                    existing_countries.add(country)
+                    existing_countries.add(str(country).strip())
+                for c in prayer.get('affected_countries') or []:
+                    if c:
+                        existing_countries.add(str(c).strip())
                 if location:
-                    existing_regions.append(f"{location}, {country}" if location != country else country)
+                    existing_regions.append(f"{location}, {country}" if country and location != country else (country or location))
+                for r in prayer.get('affected_regions') or []:
+                    if r:
+                        existing_regions.append(str(r).strip())
                 if prayer.get('news_summary'):
                     existing_summaries.append(prayer.get('news_summary'))
+                for s in prayer.get('all_news_summaries') or []:
+                    if s:
+                        existing_summaries.append(s)
             
             # Merge countries
             merged_countries = list(set(new_info.get('affected_countries', []) + list(existing_countries)))
@@ -1146,6 +1193,161 @@ Return ONLY valid JSON, no explanations."""
         except Exception as e:
             logger.error(f"Error merging existing info for {disaster_type}: {e}")
             return new_info
+
+    @staticmethod
+    def _canonical_country_slug(raw) -> str:
+        """Map common aliases to one slug so USA / United States / US dedupe correctly."""
+        if raw is None:
+            return ''
+        s = str(raw).strip().lower()
+        s = re.sub(r'[\.\u2019]', ' ', s)
+        s = re.sub(r'\s+', ' ', s).strip()
+        if not s:
+            return ''
+        aliases = {
+            'usa': 'united states',
+            'us': 'united states',
+            'u s': 'united states',
+            'u s a': 'united states',
+            'united states of america': 'united states',
+            'uk': 'united kingdom',
+            'u k': 'united kingdom',
+            'great britain': 'united kingdom',
+            'britain': 'united kingdom',
+            'republic of korea': 'south korea',
+            'south korea': 'south korea',
+            # US state/region often used as "country" in breaking-news blobs
+            'hawaii': 'united states',
+        }
+        return aliases.get(s, s)
+
+    @staticmethod
+    def _norm_country_set(countries) -> set:
+        """Canonical country slugs for overlap / dedupe checks."""
+        out = set()
+        for c in countries or []:
+            slug = DisasterPrayerService._canonical_country_slug(c)
+            if slug:
+                out.add(slug)
+        return out
+
+    @staticmethod
+    def _country_sets_jaccard(a: set, b: set) -> float:
+        if not a or not b:
+            return 0.0
+        inter = len(a & b)
+        union = len(a | b)
+        return float(inter) / float(union) if union else 0.0
+
+    @staticmethod
+    def _prayer_recency_ts(prayer: Dict) -> float:
+        """Prefer updated_at, then created_at, for merge targets and feed ordering."""
+        for fld in ('updated_at', 'created_at'):
+            s = prayer.get(fld)
+            if not s:
+                continue
+            try:
+                d = datetime.fromisoformat(str(s).replace('Z', '+00:00'))
+                return d.timestamp()
+            except Exception:
+                try:
+                    d = datetime.fromisoformat(str(s)[:19])
+                    return d.timestamp()
+                except Exception:
+                    continue
+        return 0.0
+
+    def _dedupe_grouped_by_event_signature(self, prayers: List[Dict]) -> List[Dict]:
+        """
+        Collapse multiple stored blobs for the same logical event (same normalized type + countries).
+        Keeps the most recently updated prayer so the feed shows one card with the latest text.
+        """
+        buckets: Dict[tuple, Dict] = {}
+        for p in prayers:
+            dt = self._normalize_disaster_type(p.get('disaster_type', '') or '')
+            cset = frozenset(self._norm_country_set(p.get('affected_countries', [])))
+            if not cset:
+                key = (dt, frozenset(), p.get('id', '') or '')
+            else:
+                key = (dt, cset)
+            cur = buckets.get(key)
+            if cur is None or self._prayer_recency_ts(p) > self._prayer_recency_ts(cur):
+                buckets[key] = p
+        return list(buckets.values())
+
+    def _find_grouped_prayer_to_update(
+        self, disaster_type: str, new_countries: List[str], min_jaccard: float = 0.45
+    ):
+        """
+        Find an existing grouped prayer blob that likely describes the same evolving event
+        (e.g. earthquake then building collapse in the same country): same disaster type and
+        sufficient overlap of affected_countries.
+        If several match (e.g. duplicate hourly saves), pick the most recently updated blob
+        so we overwrite that file and duplicate cleanup can remove the rest.
+        Returns (blob_name, existing_prayer_dict) or None.
+        """
+        disaster_type = self._normalize_disaster_type(disaster_type)
+        new_set = self._norm_country_set(new_countries)
+        if not new_set:
+            return None
+        candidates: List[tuple] = []
+        try:
+            for blob in self.storage.bucket.list_blobs(prefix='disaster_prayers/grouped/'):
+                if not blob.name.endswith('.json'):
+                    continue
+                try:
+                    prayer = json.loads(blob.download_as_text())
+                except Exception as e:
+                    logger.debug(f"Skip unreadable grouped blob {blob.name}: {e}")
+                    continue
+                if not (prayer.get('is_grouped') or 'grouped' in blob.name):
+                    continue
+                if self._normalize_disaster_type(prayer.get('disaster_type', '')) != disaster_type:
+                    continue
+                old_set = self._norm_country_set(prayer.get('affected_countries', []))
+                score = self._country_sets_jaccard(new_set, old_set)
+                if score >= min_jaccard:
+                    rec = self._prayer_recency_ts(prayer)
+                    candidates.append((score, rec, blob.name, prayer))
+        except Exception as e:
+            logger.warning(f"Error scanning grouped prayers for update match: {e}")
+            return None
+        if not candidates:
+            return None
+        candidates.sort(key=lambda x: (-x[0], -x[1]))
+        _, _, blob_name, prayer = candidates[0]
+        return (blob_name, prayer)
+
+    def _delete_absorbed_grouped_duplicates(
+        self,
+        disaster_type: str,
+        keep_blob_name: str,
+        final_countries: List[str],
+        min_jaccard: float = 0.45,
+    ) -> None:
+        """After upserting one grouped prayer, remove other grouped blobs of the same type that overlap the same event set."""
+        disaster_type = self._normalize_disaster_type(disaster_type)
+        final_set = self._norm_country_set(final_countries)
+        if not final_set:
+            return
+        try:
+            for blob in self.storage.bucket.list_blobs(prefix='disaster_prayers/grouped/'):
+                if not blob.name.endswith('.json') or blob.name == keep_blob_name:
+                    continue
+                try:
+                    prayer = json.loads(blob.download_as_text())
+                except Exception:
+                    continue
+                if not (prayer.get('is_grouped') or 'grouped' in blob.name):
+                    continue
+                if self._normalize_disaster_type(prayer.get('disaster_type', '')) != disaster_type:
+                    continue
+                other = self._norm_country_set(prayer.get('affected_countries', []))
+                if self._country_sets_jaccard(final_set, other) >= min_jaccard:
+                    blob.delete()
+                    logger.info(f"Removed absorbed duplicate grouped prayer: {blob.name}")
+        except Exception as e:
+            logger.warning(f"Duplicate cleanup skipped: {e}")
     
     def _generate_grouped_summary_and_prayer(self, disaster_type: str, info: Dict) -> Dict:
         """

@@ -1,6 +1,6 @@
 import '../global.css';
 console.log('[DivineBridge] _layout.tsx: JS runtime started');
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -34,10 +34,9 @@ import { GroupUnreadProvider } from '@/contexts/GroupUnreadContext';
 import { groupApi } from '@/services/api';
 import { THEME_COLORS } from '@/lib/constants';
 import Icon from '@/components/ui/Icon';
+import BrandedSplashOverlay from '@/components/BrandedSplashOverlay';
 
 SplashScreen.preventAutoHideAsync();
-// Dismiss splash unconditionally after 1 s — JS is running so we can proceed
-setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 1000);
 
 const PENDING_INVITE_KEY = '@divinebridge:pending_group_invite';
 
@@ -63,6 +62,16 @@ function parseInviteUrl(url: string | null): { groupId: string; code: string } |
       normalized = url.replace('io.divinebridge.app://', 'https://placeholder/');
     }
     const u = new URL(normalized);
+    const joinGroup = u.searchParams.get('join_group');
+    if (joinGroup) {
+      return {
+        groupId: joinGroup,
+        code:
+          u.searchParams.get('invite_code') ||
+          u.searchParams.get('code') ||
+          '',
+      };
+    }
     const match = u.pathname.match(/\/join\/([^?/#]+)/);
     if (!match) return null;
     return { groupId: match[1], code: u.searchParams.get('code') || '' };
@@ -236,6 +245,8 @@ export default function RootLayout() {
   const initialize = useAuthStore((s) => s.initialize);
   const { user, isInitialized } = useAuthStore();
   const [pendingInvite, setPendingInvite] = useState<{ groupId: string; code: string } | null>(null);
+  const [showBrandedSplash, setShowBrandedSplash] = useState(true);
+  const onBrandedSplashFinish = useCallback(() => setShowBrandedSplash(false), []);
 
   const [fontsLoaded, fontError] = useFonts({
     PlusJakartaSans_400Regular,
@@ -337,6 +348,8 @@ export default function RootLayout() {
               onClose={() => setPendingInvite(null)}
             />
           )}
+
+          {showBrandedSplash && <BrandedSplashOverlay onFinish={onBrandedSplashFinish} />}
         </GroupUnreadProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>

@@ -5,6 +5,7 @@ class PrayerRoomService {
         this.userId = null;
         this.userName = null;
         this.isHost = false;
+        this._hostEndedUiShown = false;
         this.isMuted = false;
         this.isAudioEnabled = false;
         this.muteStateSyncing = false; // Track if mute state is being synced
@@ -2299,9 +2300,8 @@ class PrayerRoomService {
             console.error('Modal elements not found');
             // Fallback to browser confirm
             const confirmed = confirm(
-                '⚠️ Warning: You are the host of this prayer room.\n\n' +
-                'Leaving will end the session for ALL participants.\n\n' +
-                'Are you sure you want to end the prayer session?'
+                'You are the host. If you leave, this prayer session will end for everyone in the room.\n\n' +
+                'End the session for all participants?'
             );
             
             if (confirmed) {
@@ -2314,31 +2314,6 @@ class PrayerRoomService {
         // Show modal
         modal.style.display = 'flex';
         
-        // Handle cancel
-        cancelBtn.onclick = () => {
-            modal.style.display = 'none';
-            console.log('Host leave cancelled by user');
-            resolve();
-        };
-        
-        // Handle confirm
-        confirmBtn.onclick = async () => {
-            modal.style.display = 'none';
-            console.log('Host confirmed leaving - ending session for all participants');
-            await this.performLeave();
-            resolve();
-        };
-        
-        // Handle clicking outside modal
-        modal.onclick = (e) => {
-            if (e.target === modal) {
-                modal.style.display = 'none';
-                console.log('Host leave cancelled by clicking outside');
-                resolve();
-            }
-        };
-        
-        // Handle escape key
         const handleEscape = (e) => {
             if (e.key === 'Escape') {
                 modal.style.display = 'none';
@@ -2348,85 +2323,110 @@ class PrayerRoomService {
             }
         };
         document.addEventListener('keydown', handleEscape);
+
+        // Handle cancel
+        cancelBtn.onclick = () => {
+            modal.style.display = 'none';
+            document.removeEventListener('keydown', handleEscape);
+            console.log('Host leave cancelled by user');
+            resolve();
+        };
+
+        // Handle confirm
+        confirmBtn.onclick = async () => {
+            modal.style.display = 'none';
+            document.removeEventListener('keydown', handleEscape);
+            console.log('Host confirmed leaving - ending session for all participants');
+            await this.performLeave();
+            resolve();
+        };
+
+        // Handle clicking outside modal
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+                document.removeEventListener('keydown', handleEscape);
+                console.log('Host leave cancelled by clicking outside');
+                resolve();
+            }
+        };
+    }
+
+    /**
+     * Stop media, SFU, and listeners — used when leaving or when the host ends the session for everyone.
+     */
+    async disposeLocalMediaAndListeners() {
+        if (this.trackEnabledCheckInterval) {
+            clearInterval(this.trackEnabledCheckInterval);
+            this.trackEnabledCheckInterval = null;
+        }
+        if (this.stateValidationInterval) {
+            clearInterval(this.stateValidationInterval);
+            this.stateValidationInterval = null;
+        }
+        if (this.muteDebounceTimeout) {
+            clearTimeout(this.muteDebounceTimeout);
+            this.muteDebounceTimeout = null;
+        }
+        this.muteStateSyncing = false;
+
+        this._sfuPublishingSynced = undefined;
+        if (window.__sfuClient) {
+            const c = window.__sfuClient;
+            window.__sfuClient = null;
+            window.__sfuClientActive = false;
+            await Promise.resolve(c.destroy?.()).catch(() => null);
+        }
+        document.querySelectorAll('audio[id^="sfu-audio-"]').forEach((el) => {
+            el.srcObject = null;
+            el.remove();
+        });
+
+        if (this.localStream) {
+            this.localStream.getTracks().forEach((track) => track.stop());
+        }
+        if (this.processedStream) {
+            this.processedStream.getTracks().forEach((track) => track.stop());
+            this.processedStream = null;
+        }
+        this.voiceActivityDetectionActive = false;
+
+        if (this.chatPollInterval) {
+            clearInterval(this.chatPollInterval);
+            this.chatPollInterval = null;
+        }
+        if (this.participantPollInterval) {
+            clearInterval(this.participantPollInterval);
+            this.participantPollInterval = null;
+        }
+        if (this.chatPollingInterval) {
+            clearInterval(this.chatPollingInterval);
+            this.chatPollingInterval = null;
+        }
+        if (this.participantPollingInterval) {
+            clearInterval(this.participantPollingInterval);
+            this.participantPollingInterval = null;
+        }
+        if (this.signalPollInterval) {
+            clearInterval(this.signalPollInterval);
+            this.signalPollInterval = null;
+        }
+
+        if (typeof this._firestoreChatUnsub === 'function') {
+            try {
+                this._firestoreChatUnsub();
+            } catch (e) { /* ignore */ }
+            this._firestoreChatUnsub = null;
+        }
+        if (this.rtdbRefs && this.rtdbRefs.chat) {
+            this.rtdbRefs.chat.off('child_added');
+        }
     }
 
     async performLeave() {
         try {
-            // Clean up intervals
-            if (this.trackEnabledCheckInterval) {
-                clearInterval(this.trackEnabledCheckInterval);
-                this.trackEnabledCheckInterval = null;
-            }
-            
-            if (this.stateValidationInterval) {
-                clearInterval(this.stateValidationInterval);
-                this.stateValidationInterval = null;
-            }
-            
-            // Clear debounce timeout
-            if (this.muteDebounceTimeout) {
-                clearTimeout(this.muteDebounceTimeout);
-                this.muteDebounceTimeout = null;
-            }
-            
-            // Reset mute state
-            this.muteStateSyncing = false;
-            
-            // Tear down SFU client if active
-            this._sfuPublishingSynced = undefined;
-            if (window.__sfuClient) {
-                const c = window.__sfuClient;
-                window.__sfuClient = null;
-                window.__sfuClientActive = false;
-                await Promise.resolve(c.destroy?.()).catch(() => null);
-            }
-            document.querySelectorAll('audio[id^="sfu-audio-"]').forEach((el) => {
-                el.srcObject = null;
-                el.remove();
-            });
+            await this.disposeLocalMediaAndListeners();
 
-            // Stop local stream
-            if (this.localStream) {
-                this.localStream.getTracks().forEach(track => track.stop());
-            }
-            
-            // Stop processed stream if it exists
-            if (this.processedStream) {
-                this.processedStream.getTracks().forEach(track => track.stop());
-                this.processedStream = null;
-            }
-            
-            // Stop voice activity detection
-            this.voiceActivityDetectionActive = false;
-            
-            // Clear all polling intervals
-            if (this.chatPollInterval) {
-                clearInterval(this.chatPollInterval);
-                this.chatPollInterval = null;
-            }
-            if (this.participantPollInterval) {
-                clearInterval(this.participantPollInterval);
-                this.participantPollInterval = null;
-            }
-            if (this.chatPollingInterval) {
-                clearInterval(this.chatPollingInterval);
-                this.chatPollingInterval = null;
-            }
-            if (this.participantPollingInterval) {
-                clearInterval(this.participantPollingInterval);
-                this.participantPollingInterval = null;
-            }
-            if (this.signalPollInterval) {
-                clearInterval(this.signalPollInterval);
-                this.signalPollInterval = null;
-            }
-            
-            // Detach RTDB chat listener
-            if (this.rtdbRefs && this.rtdbRefs.chat) {
-                this.rtdbRefs.chat.off('child_added');
-            }
-
-            // Leave room via API
             await fetch(`/api/prayer-room/leave/${this.roomId}`, {
                 method: 'POST',
                 headers: {
@@ -2435,13 +2435,10 @@ class PrayerRoomService {
                 credentials: 'include',
                 body: JSON.stringify({})
             });
-            
-            // Redirect to prayers page
+
             window.location.href = '/prayers';
-            
         } catch (error) {
             console.error('Error leaving room:', error);
-            // Still redirect even if API call fails
             window.location.href = '/prayers';
         }
     }
@@ -3581,7 +3578,11 @@ class PrayerRoomService {
     }
 
     showHostLeftNotification() {
-        // Clear any existing polling intervals
+        if (this._hostEndedUiShown) {
+            return;
+        }
+        this._hostEndedUiShown = true;
+
         if (this.chatPollingInterval) {
             clearInterval(this.chatPollingInterval);
             this.chatPollingInterval = null;
@@ -3590,27 +3591,41 @@ class PrayerRoomService {
             clearInterval(this.participantPollingInterval);
             this.participantPollingInterval = null;
         }
-        
-        // Show notification overlay
+
+        void this.disposeLocalMediaAndListeners().catch(() => null);
+
+        // Best-effort: remove this client from the room server-side (session already closed for everyone)
+        fetch(`/api/prayer-room/leave/${this.roomId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({}),
+        }).catch(() => null);
+
         const notificationOverlay = document.createElement('div');
         notificationOverlay.className = 'host-left-notification';
         notificationOverlay.innerHTML = `
             <div class="notification-content">
                 <div class="notification-icon">⚠️</div>
-                <h3>Host Has Left</h3>
-                <p>The host has left the prayer room. This session will end shortly.</p>
-                <button class="notification-btn" onclick="window.location.href='/prayer-room'">
+                <h3>Session ended</h3>
+                <p>The host ended this prayer session. You will be returned to the prayer rooms in a few seconds.</p>
+                <button type="button" class="notification-btn" id="hostEndedReturnBtn">
                     Return to Prayer Rooms
                 </button>
             </div>
         `;
-        
+
         document.body.appendChild(notificationOverlay);
-        
-        // Auto-redirect after 10 seconds
-        setTimeout(() => {
+        const returnBtn = notificationOverlay.querySelector('#hostEndedReturnBtn');
+        const go = () => {
             window.location.href = '/prayer-room';
-        }, 10000);
+        };
+        if (returnBtn) {
+            returnBtn.addEventListener('click', go);
+        }
+
+        // Auto-redirect within 5 seconds (requirement: participant notice + exit ≤ 5s)
+        setTimeout(go, 5000);
     }
 
     // WebRTC Voice Communication Methods

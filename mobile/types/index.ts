@@ -125,6 +125,13 @@ export interface GroupMember {
   joined_at: number;
 }
 
+export interface GroupChatAttachment {
+  url: string;
+  content_type: string;
+  file_name: string;
+  size_bytes?: number;
+}
+
 export interface GroupChatMessage {
   message_id: string;
   group_id: string;
@@ -133,6 +140,10 @@ export interface GroupChatMessage {
   user_photo?: string;
   message: string;
   message_type: MessageType;
+  /** Optional https URL shared with the message */
+  link_url?: string;
+  /** Files uploaded to Firebase Storage (see storage.rules) */
+  attachments?: GroupChatAttachment[];
   timestamp: number;
   reactions?: Record<string, string[]>;
   read_by?: string[];
