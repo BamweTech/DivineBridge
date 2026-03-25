@@ -4884,43 +4884,85 @@ Listening for unmute event...`);
             if (peerId === this.userId) return;
             activePeerIds.add(peerId);
 
-            const audioElId = `sfu-audio-${peerId}`;
-            let el = document.getElementById(audioElId);
+            if (!peer.stream) return;
 
-            if (peer.stream) {
-                const audioTracks = peer.stream.getAudioTracks();
-                if (audioTracks.length === 0) return;
+            // ── Audio ──
+            const audioTracks = peer.stream.getAudioTracks();
+            if (audioTracks.length > 0) {
+                const audioElId = `sfu-audio-${peerId}`;
+                let audioEl = document.getElementById(audioElId);
+                const audioStream = new MediaStream(audioTracks);
 
-                if (!el) {
-                    el = document.createElement('audio');
-                    el.id = audioElId;
-                    el.autoplay = true;
-                    el.playsInline = true;
-                    el.controls = false;
-                    el.volume = 1.0;
-                    el.muted = false;
-                    document.body.appendChild(el);
+                if (!audioEl) {
+                    audioEl = document.createElement('audio');
+                    audioEl.id = audioElId;
+                    audioEl.autoplay = true;
+                    audioEl.playsInline = true;
+                    audioEl.controls = false;
+                    audioEl.volume = 1.0;
+                    audioEl.muted = false;
+                    document.body.appendChild(audioEl);
                 }
 
-                if (el.srcObject !== peer.stream) {
-                    el.srcObject = peer.stream;
-                    el.play().catch(() => {
+                if (audioEl.srcObject !== audioStream) {
+                    audioEl.srcObject = audioStream;
+                    audioEl.play().catch(() => {
                         console.warn(`[sfu] autoplay blocked for ${peerId} — retrying on interaction`);
                         const resume = () => {
-                            el.play().catch(() => {});
+                            audioEl.play().catch(() => {});
                             document.removeEventListener('click', resume);
                         };
                         document.addEventListener('click', resume, { once: true });
                     });
                 }
 
-                el.muted = !!peer.isMuted;
+                audioEl.muted = !!peer.isMuted;
+            }
+
+            // ── Video ──
+            const videoTracks = peer.stream.getVideoTracks();
+            const tile = document.querySelector(`.speaker-tile[data-user-id="${peerId}"]`);
+
+            if (videoTracks.length > 0 && peer.isVideoEnabled) {
+                const videoElId = `sfu-video-${peerId}`;
+                let videoEl = document.getElementById(videoElId);
+                const videoStream = new MediaStream(videoTracks);
+
+                if (!videoEl && tile) {
+                    videoEl = document.createElement('video');
+                    videoEl.id = videoElId;
+                    videoEl.autoplay = true;
+                    videoEl.playsInline = true;
+                    videoEl.muted = true;
+                    videoEl.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;z-index:1;';
+                    tile.style.position = 'relative';
+                    tile.style.overflow = 'hidden';
+                    tile.prepend(videoEl);
+                }
+
+                if (videoEl && videoEl.srcObject !== videoStream) {
+                    videoEl.srcObject = videoStream;
+                    videoEl.play().catch(() => {});
+                }
+            } else {
+                const existing = document.getElementById(`sfu-video-${peerId}`);
+                if (existing) {
+                    existing.srcObject = null;
+                    existing.remove();
+                }
             }
         });
 
-        // Remove audio elements for peers that left
+        // Remove audio/video elements for peers that left
         document.querySelectorAll('audio[id^="sfu-audio-"]').forEach((el) => {
             const peerId = el.id.replace('sfu-audio-', '');
+            if (!activePeerIds.has(peerId)) {
+                el.srcObject = null;
+                el.remove();
+            }
+        });
+        document.querySelectorAll('video[id^="sfu-video-"]').forEach((el) => {
+            const peerId = el.id.replace('sfu-video-', '');
             if (!activePeerIds.has(peerId)) {
                 el.srcObject = null;
                 el.remove();

@@ -377,6 +377,9 @@ export default function RoomScreen() {
   }
 
   const isGroupCall = roomMode === ROOM_MODES.GROUP_CALL;
+  const hasAnyVideo = isVideoOn || Array.from(peers.values()).some(
+    (p) => p.userId !== user?.uid && p.stream && p.isVideoEnabled,
+  );
   const participants = room?.participants ?? [];
   const speakers = participants.filter((p) => p.role === 'speaker');
   const currentUser = participants.find((p) => p.user_id === user?.uid);
@@ -602,8 +605,8 @@ export default function RoomScreen() {
           /* Participants / video panel */
           <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
 
-            {/* Video views (group call mode) */}
-            {isGroupCall && (
+            {/* Video views — shown whenever anyone has video enabled */}
+            {(isGroupCall || hasAnyVideo) && (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
                 {isSpeaker && isVideoOn ? (
                   <View
@@ -679,8 +682,8 @@ export default function RoomScreen() {
           onPress={() => { void toggleAudioOutput(); }}
           active={audioOutputRoute === 'speaker'}
         />
-        {isSpeaker && isGroupCall && (
-          <ControlButton iconName={isVideoOn ? 'video' : 'video'} label={isVideoOn ? 'Stop Video' : 'Video'} onPress={toggleVideo} active={isVideoOn} />
+        {isSpeaker && (
+          <ControlButton iconName="video" label={isVideoOn ? 'Stop Video' : 'Video'} onPress={toggleVideo} active={isVideoOn} />
         )}
         <ControlButton
           iconName="chat"

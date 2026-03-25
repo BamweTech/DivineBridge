@@ -1,0 +1,44 @@
+diff --git a/node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift b/node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift
+index 09ac20b..8299134 100644
+--- a/node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift
++++ b/node_modules/expo-camera/ios/Current/CameraPhotoCapture.swift
+@@ -54,13 +54,18 @@ class CameraPhotoCapture: NSObject, AVCapturePhotoCaptureDelegate {
+       throw CameraNotReadyException()
+     }
+ 
++    let orientation: UIDeviceOrientation
++    if captureDelegate?.responsiveWhenOrientationLocked == true {
++      orientation = captureDelegate?.physicalOrientation ?? .unknown
++    } else {
++      orientation = await MainActor.run { UIDevice.current.orientation }
++    }
++
+     return try await withCheckedThrowingContinuation { continuation in
+       photoCapturedContinuation = continuation
+       photoCaptureOptions = options
+ 
+       let connection = photoOutput.connection(with: .video)
+-      let orientation = captureDelegate?.responsiveWhenOrientationLocked == true ?
+-        captureDelegate?.physicalOrientation ?? .unknown : UIDevice.current.orientation
+       connection?.videoOrientation = ExpoCameraUtils.videoOrientation(for: orientation)
+ 
+       // options.mirror is deprecated but should continue to work until removed
+diff --git a/node_modules/expo-camera/ios/Current/CameraVideoRecording.swift b/node_modules/expo-camera/ios/Current/CameraVideoRecording.swift
+index 0cf1b56..76f4e18 100644
+--- a/node_modules/expo-camera/ios/Current/CameraVideoRecording.swift
++++ b/node_modules/expo-camera/ios/Current/CameraVideoRecording.swift
+@@ -28,8 +28,12 @@ class CameraVideoRecording: NSObject, AVCaptureFileOutputRecordingDelegate {
+     }
+ 
+     if let connection = videoFileOutput.connection(with: .video) {
+-      let orientation = delegate?.responsiveWhenOrientationLocked == true ?
+-        delegate?.physicalOrientation ?? .unknown : UIDevice.current.orientation
++      let orientation: UIDeviceOrientation
++      if delegate?.responsiveWhenOrientationLocked == true {
++        orientation = delegate?.physicalOrientation ?? .unknown
++      } else {
++        orientation = await MainActor.run { UIDevice.current.orientation }
++      }
+       connection.videoOrientation = ExpoCameraUtils.videoOrientation(for: orientation)
+       await setVideoOptions(options: options, for: connection, videoFileOutput: videoFileOutput, promise: promise)
+ 

@@ -22,8 +22,9 @@ import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import dayjs from 'dayjs';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
-import { useGroupChat, useGroupDetails, firestoreTimestampMs } from '@/hooks/useGroups';
+import { useGroupChat, useGroupDetails, useGroupLiveRoom, firestoreTimestampMs } from '@/hooks/useGroups';
 import { uploadGroupChatFile } from '@/lib/groupChatUpload';
 import { useGroupUnread } from '@/contexts/GroupUnreadContext';
 import { usePrayerRoom } from '@/hooks/usePrayerRoom';
@@ -31,19 +32,11 @@ import { roomApi } from '@/services/api';
 import { isWebRTCAvailable } from '@/lib/sfu';
 import { GroupLiveAvPanel } from '@/components/group/GroupLiveAvPanel';
 import { Avatar } from '@/components/ui/Avatar';
+import { PulsingDot } from '@/components/ui/PulsingDot';
 import { useAuthStore } from '@/stores/authStore';
 import { THEME_COLORS, MESSAGE_TYPES } from '@/lib/constants';
 import Icon from '@/components/ui/Icon';
 import type { MessageType, PrayerGroup, GroupChatMessage, GroupChatAttachment } from '@/types';
-
-function normalizeHttpsUrl(raw: string): string | null {
-  const t = raw.trim();
-  if (!t) return null;
-  if (/^https:\/\//i.test(t)) return t;
-  if (/^http:\/\//i.test(t)) return t.replace(/^http:/i, 'https:');
-  if (/^[\w.-]+\.[a-z]{2,}([/?#].*)?$/i.test(t)) return `https://${t}`;
-  return null;
-}
 
 const MESSAGE_TYPE_OPTIONS: { type: MessageType; label: string }[] = [
   { type: MESSAGE_TYPES.TEXT, label: 'Message' },
@@ -311,6 +304,57 @@ function InviteSheet({ group, onClose }: { group: PrayerGroup; onClose: () => vo
   );
 }
 
+function LiveSessionBanner({
+  participantCount,
+  onJoin,
+  loading,
+}: {
+  participantCount: number;
+  onJoin: () => void;
+  loading: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onJoin}
+      disabled={loading}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(52,211,153,0.08)',
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(52,211,153,0.18)',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        gap: 10,
+      }}
+    >
+      <PulsingDot size={8} />
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: '#34d399', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13 }}>
+          Live prayer session
+        </Text>
+        <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 11, marginTop: 1 }}>
+          {participantCount > 0
+            ? `${participantCount} ${participantCount === 1 ? 'person' : 'people'} praying now`
+            : 'Tap to join'}
+        </Text>
+      </View>
+      {loading ? (
+        <ActivityIndicator size="small" color="#34d399" />
+      ) : (
+        <View style={{
+          paddingHorizontal: 14,
+          paddingVertical: 6,
+          borderRadius: 10,
+          backgroundColor: '#34d399',
+        }}>
+          <Text style={{ color: '#fff', fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>Join</Text>
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
 export default function GroupScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -320,6 +364,7 @@ export default function GroupScreen() {
   const fsScrollRef = useRef<ScrollView>(null);
 
   const { group } = useGroupDetails(id!);
+  const groupLiveRoom = useGroupLiveRoom(id!);
   const { messages, sendMessage } = useGroupChat(id!);
   const { markGroupChatRead } = useGroupUnread();
   const [text, setText] = useState('');
@@ -334,11 +379,6 @@ export default function GroupScreen() {
   const [startingLive, setStartingLive] = useState(false);
   const [fsChatOpen, setFsChatOpen] = useState(true);
   const [fsChatText, setFsChatText] = useState('');
-  const [linkModal, setLinkModal] = useState<{ open: boolean; target: 'main' | 'fs' }>({
-    open: false,
-    target: 'main',
-  });
-  const [linkUrlDraft, setLinkUrlDraft] = useState('');
   const [uploading, setUploading] = useState(false);
 
   const prayer = usePrayerRoom(liveRoomId ?? '');
@@ -414,57 +454,49 @@ export default function GroupScreen() {
   }
 
   function showAttachMenu(target: 'main' | 'fs') {
-    const runPick = () => {
-      void pickAndUpload(target === 'fs');
-    };
-    const runLink = () => {
-      setLinkModal({ open: true, target });
-      setLinkUrlDraft('');
-    };
+    const runPhoto = () => { void pickPhotoAndUpload(target === 'fs'); };
+    const runDoc = () => { void pickDocumentAndUpload(target === 'fs'); };
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
-        { options: ['Cancel', 'Photo or PDF', 'Add link'], cancelButtonIndex: 0 },
+        { options: ['Cancel', 'Photo', 'Document'], cancelButtonIndex: 0 },
         (i) => {
-          if (i === 1) runPick();
-          if (i === 2) runLink();
+          if (i === 1) runPhoto();
+          if (i === 2) runDoc();
         }
       );
     } else {
       Alert.alert('Attach', undefined, [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Photo or PDF', onPress: runPick },
-        { text: 'Add link', onPress: runLink },
+        { text: 'Photo', onPress: runPhoto },
+        { text: 'Document', onPress: runDoc },
       ]);
     }
   }
 
-  async function pickAndUpload(fromFs: boolean) {
+  async function pickPhotoAndUpload(fromFs: boolean) {
     if (!id) return;
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['image/*', 'application/pdf'],
-        copyToCacheDirectory: true,
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please allow access to your photo library in Settings.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+        allowsMultipleSelection: false,
       });
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
-      const mime = asset.mimeType || 'application/octet-stream';
-      if (!mime.startsWith('image/') && mime !== 'application/pdf') {
-        Alert.alert('Unsupported file', 'Choose a photo or PDF.');
-        return;
-      }
+      const mime = asset.mimeType || 'image/jpeg';
       setUploading(true);
       const res = await fetch(asset.uri);
       const blob = await res.blob();
-      const att = await uploadGroupChatFile(id, blob, mime, asset.name || 'attachment');
+      const name = asset.fileName || `photo_${Date.now()}.jpg`;
+      const att = await uploadGroupChatFile(id, blob, mime, name);
       const caption = (fromFs ? fsChatText : text).trim();
       await sendMessage(caption, fromFs ? 'text' : messageType, { attachments: [att] });
-      if (fromFs) {
-        setFsChatText('');
-      } else {
-        setText('');
-        setMessageType('text');
-        setShowTypePicker(false);
-      }
+      if (fromFs) { setFsChatText(''); } else { setText(''); setMessageType('text'); setShowTypePicker(false); }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
       Alert.alert('Upload failed', e instanceof Error ? e.message : 'Try again.');
@@ -473,28 +505,32 @@ export default function GroupScreen() {
     }
   }
 
-  async function submitLinkFromModal() {
-    const u = normalizeHttpsUrl(linkUrlDraft);
-    if (!u) {
-      Alert.alert('Invalid link', 'Enter a full URL (e.g. https://example.org).');
-      return;
-    }
-    const fromFs = linkModal.target === 'fs';
+  async function pickDocumentAndUpload(fromFs: boolean) {
+    if (!id) return;
     try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'application/msword',
+               'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+               'application/vnd.ms-excel',
+               'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+               'text/plain'],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      const mime = asset.mimeType || 'application/octet-stream';
+      setUploading(true);
+      const res = await fetch(asset.uri);
+      const blob = await res.blob();
+      const att = await uploadGroupChatFile(id, blob, mime, asset.name || 'document');
       const caption = (fromFs ? fsChatText : text).trim();
-      await sendMessage(caption, fromFs ? 'text' : messageType, { linkUrl: u });
-      setLinkModal({ open: false, target: 'main' });
-      setLinkUrlDraft('');
-      if (fromFs) {
-        setFsChatText('');
-      } else {
-        setText('');
-        setMessageType('text');
-        setShowTypePicker(false);
-      }
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await sendMessage(caption, fromFs ? 'text' : messageType, { attachments: [att] });
+      if (fromFs) { setFsChatText(''); } else { setText(''); setMessageType('text'); setShowTypePicker(false); }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
-      Alert.alert('Could not send', e instanceof Error ? e.message : 'Try again.');
+      Alert.alert('Upload failed', e instanceof Error ? e.message : 'Try again.');
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -595,6 +631,15 @@ export default function GroupScreen() {
           </Pressable>
         </View>
       </View>
+
+      {/* Live-session banner: visible when a room exists but user hasn't joined yet */}
+      {groupLiveRoom && !prayer.isJoined && !avFullscreen ? (
+        <LiveSessionBanner
+          participantCount={groupLiveRoom.participants?.length ?? 0}
+          onJoin={onLiveHeaderPress}
+          loading={startingLive}
+        />
+      ) : null}
 
       {prayer.isJoined && !avFullscreen ? (
         <GroupLiveAvPanel
@@ -891,74 +936,6 @@ export default function GroupScreen() {
         </View>
       </Modal>
 
-      <Modal visible={linkModal.open} transparent animationType="fade" onRequestClose={() => setLinkModal((m) => ({ ...m, open: false }))}>
-        <Pressable
-          style={{
-            flex: 1,
-            justifyContent: 'center',
-            padding: 24,
-            backgroundColor: 'rgba(44,36,22,0.45)',
-          }}
-          onPress={() => setLinkModal((m) => ({ ...m, open: false }))}
-        >
-          <Pressable
-            onPress={(e) => e.stopPropagation()}
-            style={{
-              borderRadius: 18,
-              padding: 20,
-              backgroundColor: THEME_COLORS.bg,
-              borderWidth: 1,
-              borderColor: THEME_COLORS.border,
-            }}
-          >
-            <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 17, color: THEME_COLORS.text, marginBottom: 8 }}>
-              Add a link
-            </Text>
-            <Text style={{ fontFamily: 'Geist_400Regular', fontSize: 13, color: THEME_COLORS.text3, marginBottom: 12 }}>
-              Paste a web address (https). Your optional message above will be sent as a caption.
-            </Text>
-            <TextInput
-              value={linkUrlDraft}
-              onChangeText={setLinkUrlDraft}
-              placeholder="https://…"
-              placeholderTextColor={THEME_COLORS.text3}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              style={{
-                borderWidth: 1,
-                borderColor: THEME_COLORS.border,
-                borderRadius: 12,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                fontFamily: 'Geist_400Regular',
-                fontSize: 15,
-                color: THEME_COLORS.text,
-                marginBottom: 16,
-              }}
-            />
-            <View style={{ flexDirection: 'row', gap: 10, justifyContent: 'flex-end' }}>
-              <Pressable
-                onPress={() => setLinkModal((m) => ({ ...m, open: false }))}
-                style={{ paddingVertical: 10, paddingHorizontal: 16 }}
-              >
-                <Text style={{ fontFamily: 'Geist_600SemiBold', color: THEME_COLORS.text2 }}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => void submitLinkFromModal()}
-                style={{
-                  paddingVertical: 10,
-                  paddingHorizontal: 18,
-                  borderRadius: 12,
-                  backgroundColor: THEME_COLORS.gold,
-                }}
-              >
-                <Text style={{ fontFamily: 'Geist_600SemiBold', color: '#ffffff' }}>Send</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </KeyboardAvoidingView>
   );
 }

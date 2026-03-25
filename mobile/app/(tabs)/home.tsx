@@ -24,8 +24,10 @@ import { useAuthStore } from '@/stores/authStore';
 import { THEME_COLORS } from '@/lib/constants';
 import Icon from '@/components/ui/Icon';
 import { useGroupUnread } from '@/contexts/GroupUnreadContext';
+import { useGroupLiveRooms } from '@/hooks/useGroups';
 import { useDevotionalStreak } from '@/hooks/useHomeStats';
 import { Avatar } from '@/components/ui/Avatar';
+import { PulsingDot } from '@/components/ui/PulsingDot';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -240,6 +242,7 @@ export default function HomeScreen() {
   const queryClient = useQueryClient();
   const today = dayjs().format('YYYY-MM-DD');
   const { groups: myGroups, totalUnread: groupChatUnread, unreadByGroup } = useGroupUnread();
+  const liveByGroup = useGroupLiveRooms(myGroups.map((g) => g.group_id));
   const { devotionalStreak } = useDevotionalStreak();
 
   const [homeTabActive, setHomeTabActive] = useState(false);
@@ -707,39 +710,73 @@ export default function HomeScreen() {
           </Pressable>
         ) : (
           <View style={{ gap: 10 }}>
-            {myGroups.slice(0, 2).map((g) => (
-              <Pressable
-                key={g.group_id}
-                onPress={() => router.push(`/group/${g.group_id}` as any)}
-                style={{ backgroundColor: THEME_COLORS.bg2, borderWidth: 1, borderColor: THEME_COLORS.border, borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}
-              >
-                <View style={{ position: 'relative' }}>
-                  <Avatar name={g.name} size={44} />
-                  {unreadByGroup[g.group_id] ? (
-                    <View
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        right: 0,
-                        width: 12,
-                        height: 12,
-                        borderRadius: 6,
-                        backgroundColor: THEME_COLORS.rose,
-                        borderWidth: 2,
-                        borderColor: THEME_COLORS.bg2,
-                      }}
-                    />
-                  ) : null}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 15, marginBottom: 2 }}>{g.name}</Text>
-                  <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12 }}>
-                    {g.member_count} {g.member_count === 1 ? 'member' : 'members'}
-                  </Text>
-                </View>
-                <Icon name="chevron-r" size={16} color={THEME_COLORS.text3} />
-              </Pressable>
-            ))}
+            {myGroups.slice(0, 2).map((g) => {
+              const isLive = !!liveByGroup[g.group_id];
+              return (
+                <Pressable
+                  key={g.group_id}
+                  onPress={() => router.push(`/group/${g.group_id}` as any)}
+                  style={{
+                    backgroundColor: THEME_COLORS.bg2,
+                    borderWidth: 1,
+                    borderColor: isLive ? 'rgba(52,211,153,0.3)' : THEME_COLORS.border,
+                    borderRadius: 18,
+                    padding: 16,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
+                  <View style={{ position: 'relative' }}>
+                    <Avatar name={g.name} size={44} />
+                    {isLive ? (
+                      <View style={{ position: 'absolute', top: -4, right: -4 }}>
+                        <PulsingDot size={6} color="#34d399" />
+                      </View>
+                    ) : unreadByGroup[g.group_id] ? (
+                      <View
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          right: 0,
+                          width: 12,
+                          height: 12,
+                          borderRadius: 6,
+                          backgroundColor: THEME_COLORS.rose,
+                          borderWidth: 2,
+                          borderColor: THEME_COLORS.bg2,
+                        }}
+                      />
+                    ) : null}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                      <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 15 }}>{g.name}</Text>
+                      {isLive && (
+                        <View style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 4,
+                          backgroundColor: 'rgba(52,211,153,0.12)',
+                          paddingHorizontal: 7,
+                          paddingVertical: 2,
+                          borderRadius: 6,
+                        }}>
+                          <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#34d399' }} />
+                          <Text style={{ color: '#34d399', fontFamily: 'Geist_600SemiBold', fontSize: 10 }}>LIVE</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12 }}>
+                      {isLive
+                        ? `${liveByGroup[g.group_id].participants?.length ?? 0} praying now`
+                        : `${g.member_count} ${g.member_count === 1 ? 'member' : 'members'}`}
+                    </Text>
+                  </View>
+                  <Icon name="chevron-r" size={16} color={THEME_COLORS.text3} />
+                </Pressable>
+              );
+            })}
           </View>
         )}
       </Animated.View>

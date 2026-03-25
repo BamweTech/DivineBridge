@@ -98,7 +98,7 @@ const DEFAULTS = {
 }
 
 /** prayBridge: pan + scale tuned for tab slot; align with “PRAY” label. */
-const PRAY_BRIDGE_TAB = { scale: 0.35, panX: -7.3, panY: -4.2 }
+const PRAY_BRIDGE_TAB = { scale: 0.48, panX: -9.9, panY: -10.8 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 

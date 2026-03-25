@@ -20,9 +20,11 @@ import * as Haptics from 'expo-haptics';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { useGroupUnread } from '@/contexts/GroupUnreadContext';
+import { useGroupLiveRooms } from '@/hooks/useGroups';
 import { groupApi, scheduledApi, prayerRequestApi, globalWatchApi } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
+import { PulsingDot } from '@/components/ui/PulsingDot';
 import { THEME_COLORS } from '@/lib/constants';
 import { filterGlobalWatchForFeed } from '@/lib/globalWatchFeed';
 import Icon from '@/components/ui/Icon';
@@ -47,13 +49,13 @@ function timeAgo(dateStr: string): string {
 
 // ─── GroupCard ────────────────────────────────────────────────────────────────
 
-function GroupCard({ group, onPress, hasUnread }: { group: PrayerGroup; onPress: () => void; hasUnread?: boolean }) {
+function GroupCard({ group, onPress, hasUnread, isLive, liveCount }: { group: PrayerGroup; onPress: () => void; hasUnread?: boolean; isLive?: boolean; liveCount?: number }) {
   return (
     <Pressable onPress={onPress}>
       <View style={{
         backgroundColor: '#f0faf3',
         borderWidth: 1,
-        borderColor: 'rgba(74,124,94,0.22)',
+        borderColor: isLive ? 'rgba(52,211,153,0.35)' : 'rgba(74,124,94,0.22)',
         borderRadius: 22,
         padding: 18,
         marginBottom: 12,
@@ -63,7 +65,11 @@ function GroupCard({ group, onPress, hasUnread }: { group: PrayerGroup; onPress:
             <View style={{ width: 42, height: 42, borderRadius: 13, backgroundColor: THEME_COLORS.sageDim, alignItems: 'center', justifyContent: 'center' }}>
               <Icon name="groups" size={18} color={THEME_COLORS.sage} />
             </View>
-            {hasUnread ? (
+            {isLive ? (
+              <View style={{ position: 'absolute', top: -4, right: -4 }}>
+                <PulsingDot size={6} color="#34d399" />
+              </View>
+            ) : hasUnread ? (
               <View
                 style={{
                   position: 'absolute',
@@ -80,12 +86,33 @@ function GroupCard({ group, onPress, hasUnread }: { group: PrayerGroup; onPress:
             ) : null}
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15 }}>
-              {group.name}
-            </Text>
-            {group.description && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15 }}>
+                {group.name}
+              </Text>
+              {isLive && (
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  backgroundColor: 'rgba(52,211,153,0.12)',
+                  paddingHorizontal: 7,
+                  paddingVertical: 2,
+                  borderRadius: 6,
+                }}>
+                  <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#34d399' }} />
+                  <Text style={{ color: '#34d399', fontFamily: 'Geist_600SemiBold', fontSize: 10 }}>LIVE</Text>
+                </View>
+              )}
+            </View>
+            {group.description && !isLive && (
               <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 2 }} numberOfLines={1}>
                 {group.description}
+              </Text>
+            )}
+            {isLive && (
+              <Text style={{ color: '#34d399', fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 2 }}>
+                {(liveCount ?? 0) > 0 ? `${liveCount} praying now` : 'Live session in progress'}
               </Text>
             )}
           </View>
@@ -773,6 +800,7 @@ export default function GroupsScreen() {
   const [showCreate, setShowCreate] = useState(false);
   const [showCompose, setShowCompose] = useState(false);
   const { groups: myGroups, isLoadingGroups: myLoading, unreadByGroup, totalUnread } = useGroupUnread();
+  const liveByGroup = useGroupLiveRooms(myGroups.map((g) => g.group_id));
 
   // When Create Group or Compose Prayer modal is open, render it fullscreen
   if (showCreate) {
@@ -906,15 +934,20 @@ export default function GroupsScreen() {
               </View>
             </View>
           ) : (
-            myGroups.map((group, i) => (
-              <Animated.View key={group.group_id} entering={FadeInDown.delay(i * 50).duration(400)}>
-                <GroupCard
-                  group={group}
-                  hasUnread={unreadByGroup[group.group_id]}
-                  onPress={() => router.push(`/group/${group.group_id}`)}
-                />
-              </Animated.View>
-            ))
+            myGroups.map((group, i) => {
+              const liveRoom = liveByGroup[group.group_id];
+              return (
+                <Animated.View key={group.group_id} entering={FadeInDown.delay(i * 50).duration(400)}>
+                  <GroupCard
+                    group={group}
+                    hasUnread={unreadByGroup[group.group_id]}
+                    isLive={!!liveRoom}
+                    liveCount={liveRoom?.participants?.length}
+                    onPress={() => router.push(`/group/${group.group_id}`)}
+                  />
+                </Animated.View>
+              );
+            })
           )}
         </ScrollView>
       )}

@@ -30,11 +30,15 @@ DISASTER_TYPES = [
     'famine',
     'refugee_crisis',
     'storm',
-    'mass shooting', 'gun violence'
+    'mass shooting', 'gun violence',
+    # Major accidents & infrastructure (Global Prayer Watch, not only weather/geopolitics)
+    'plane crash', 'aviation accident', 'airport incident',
+    'train derailment', 'major transportation accident',
+    'building collapse', 'bridge collapse', 'industrial accident', 'explosion',
 ]
 
 # Breaking disaster discovery: reject items older than this (prompt + validation must align)
-DISASTER_DISCOVERY_MAX_AGE_DAYS = 3
+DISASTER_DISCOVERY_MAX_AGE_DAYS = 7
 # Summaries often repeat the onset date ("on March 10…") while the story is still breaking; use a
 # looser cutoff only for calendar dates *in prose* so we still block October 2025–style recaps.
 DISASTER_TEXT_DATE_MAX_AGE_DAYS = 21
@@ -90,11 +94,15 @@ SEARCH INSTRUCTIONS:
    - "natural disaster breaking news last {max_age_days} days"
    - "disaster breaking news last 24 hours"
    - "earthquake today" / "flood [region] today" / "wildfire breaking news"
+   - "plane crash today" / "airport incident breaking news" / "aviation accident today"
+   - "train derailment breaking" / "building collapse today" / "major explosion"
    - "emergency alert" + today's date ({today_tokens})
 
 2. Use diverse sources: major wires, local outlets, government alerts, verified humanitarian updates.
 
-3. Disaster types to cover: {disaster_types_str}
+3. Event types to cover (include **major human-impact accidents**, not only weather):
+   {disaster_types_str}
+   For airport/runway/tarmac incidents, passenger jet emergencies, and serious aviation accidents, use type **major_accident**.
 
 4. TIME WINDOW:
    - Highest priority: last 12–24 hours.
@@ -104,7 +112,7 @@ SEARCH INSTRUCTIONS:
 For each qualifying disaster, return a JSON array with this EXACT structure:
 [
   {{
-    "type": "one of: typhoon, hurricane, earthquake, flood, landslide, drought, wildfire, tornado, tsunami, volcano, conflict, war, epidemic, pandemic, famine, storm, mass_shooting",
+    "type": "one of: typhoon, hurricane, earthquake, flood, landslide, drought, wildfire, tornado, tsunami, volcano, conflict, war, epidemic, pandemic, famine, storm, mass_shooting, major_accident",
     "country": "Full country name (e.g., 'Japan', 'United States')",
     "location": "City/region if known",
     "severity": "minor" | "moderate" | "severe" | "catastrophic",
@@ -319,7 +327,28 @@ REJECT (too old — do not emit items like this):
             'war': 'conflict',
             'refugee_crisis': 'conflict',
             'mass shooting': 'mass_shooting',
-            'gun violence': 'mass_shooting'
+            'gun violence': 'mass_shooting',
+            # Major accidents → single bucket for grouping & prayer generation
+            'plane crash': 'major_accident',
+            'plane_crash': 'major_accident',
+            'aviation accident': 'major_accident',
+            'aviation_accident': 'major_accident',
+            'airport incident': 'major_accident',
+            'airport_incident': 'major_accident',
+            'airport emergency': 'major_accident',
+            'train derailment': 'major_accident',
+            'train_derailment': 'major_accident',
+            'major transportation accident': 'major_accident',
+            'transportation accident': 'major_accident',
+            'transport accident': 'major_accident',
+            'building collapse': 'major_accident',
+            'building_collapse': 'major_accident',
+            'bridge collapse': 'major_accident',
+            'bridge_collapse': 'major_accident',
+            'industrial accident': 'major_accident',
+            'industrial_accident': 'major_accident',
+            'explosion': 'major_accident',
+            'major accident': 'major_accident',
         }
         
         return type_mapping.get(disaster_type, disaster_type)
@@ -664,9 +693,9 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                                                                     pass
                                                             
                                                             if disaster_time:
-                                                                # Check if disaster is older than 7 days
+                                                                # Stale if older than display window (ignore calendar year)
                                                                 age = now - disaster_time
-                                                                if age > max_disaster_age or disaster_time.year != now.year:
+                                                                if age > max_disaster_age:
                                                                     has_old_date = True
                                                                     logger.warning(f"Found old disaster timestamp in grouped prayer: {area_timestamp} ({age.days} days old)")
                                                                     break
@@ -1562,8 +1591,8 @@ Return ONLY the post text. No quotes, no labels, no explanations."""
             
             # Additional validation: filter out any disasters with old timestamps
             now = datetime.now()
-            max_age = timedelta(days=7)
-            current_year = datetime.now().year
+            max_age = timedelta(days=DISASTER_DISCOVERY_MAX_AGE_DAYS)
+            current_year = now.year
             original_count = len(disasters)
             validated_disasters = []
             
@@ -1596,17 +1625,12 @@ Return ONLY the post text. No quotes, no labels, no explanations."""
                         pass
                 
                 if disaster_time:
-                    # Check year
-                    if disaster_time.year != current_year:
-                        logger.warning(f"Disaster from wrong year rejected: {disaster.get('type')} in {disaster.get('country')} - year: {disaster_time.year}, timestamp: {timestamp_str}")
-                        continue
-                    
-                    # Check age
+                    # Recency by age only (allows Dec→Jan and matches 7-day hub window)
                     age = now - disaster_time
                     if age > max_age:
                         logger.warning(f"Disaster too old rejected: {disaster.get('type')} in {disaster.get('country')} - {age.days} days old, timestamp: {timestamp_str}")
                         continue
-                    elif age.days < 0:
+                    if age.total_seconds() < -3600:
                         logger.warning(f"Disaster with future timestamp rejected: {disaster.get('type')} in {disaster.get('country')} - timestamp: {timestamp_str}")
                         continue
                 else:

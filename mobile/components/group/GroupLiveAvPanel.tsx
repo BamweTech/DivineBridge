@@ -2,7 +2,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { RTCView } from '@/lib/sfu';
 import { VideoStreamView } from '@/components/room/VideoStreamView';
-import { THEME_COLORS, ROOM_MODES } from '@/lib/constants';
+import { THEME_COLORS } from '@/lib/constants';
 import Icon from '@/components/ui/Icon';
 import type { IconName } from '@/components/ui/Icon';
 import type { PeerEntry } from '@/lib/sfu';
@@ -102,7 +102,9 @@ export function GroupLiveAvPanel({
   onMaximize,
   onMinimize,
 }: Props) {
-  const isGroupCall = roomMode === ROOM_MODES.GROUP_CALL;
+  const hasAnyVideo = isVideoOn || Array.from(peers.values()).some(
+    (p) => p.userId !== userId && p.stream && p.isVideoEnabled,
+  );
 
   return (
     <View style={[styles.shell, variant === 'embedded' && styles.shellEmbedded, variant === 'fullscreen' && styles.shellFullscreen]}>
@@ -123,7 +125,7 @@ export function GroupLiveAvPanel({
       )}
 
       <View style={[styles.videoRegion, variant === 'embedded' ? styles.videoEmbedded : styles.videoFullscreen]}>
-        {isGroupCall ? (
+        {hasAnyVideo ? (
           variant === 'embedded' ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
               {isSpeaker && isVideoOn ? (
@@ -168,7 +170,7 @@ export function GroupLiveAvPanel({
         ) : (
           <View style={styles.audioOnlyHint}>
             <Icon name="headphones" size={28} color={THEME_COLORS.text3} />
-            <Text style={styles.audioOnlyText}>Prayer room mode — audio only</Text>
+            <Text style={styles.audioOnlyText}>Audio only — tap Video below to enable</Text>
           </View>
         )}
       </View>
@@ -181,7 +183,7 @@ export function GroupLiveAvPanel({
           onPress={onToggleAudioOutput}
           active={audioOutputRoute === 'speaker'}
         />
-        {isSpeaker && isGroupCall ? (
+        {isSpeaker ? (
           <AvControl iconName="video" label={isVideoOn ? 'Stop' : 'Video'} onPress={onToggleVideo} active={isVideoOn} />
         ) : null}
         {variant === 'embedded' ? (

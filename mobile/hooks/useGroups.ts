@@ -55,6 +55,32 @@ export function useLiveRooms() {
   return { rooms, isLoading };
 }
 
+// useGroupLiveRooms — real-time map of group_id → active PrayerRoom (if any).
+// Reuses the global useLiveRooms listener and filters to the supplied group IDs.
+export function useGroupLiveRooms(groupIds: string[]) {
+  const { rooms } = useLiveRooms();
+  return useMemo(() => {
+    const map: Record<string, PrayerRoom> = {};
+    if (!groupIds.length) return map;
+    const idSet = new Set(groupIds);
+    for (const r of rooms) {
+      if (r.group_id && idSet.has(r.group_id) && !map[r.group_id]) {
+        map[r.group_id] = r;
+      }
+    }
+    return map;
+  }, [rooms, groupIds]);
+}
+
+// useGroupLiveRoom — single-group convenience wrapper around useLiveRooms.
+export function useGroupLiveRoom(groupId: string) {
+  const { rooms } = useLiveRooms();
+  return useMemo(
+    () => rooms.find((r) => r.group_id === groupId) ?? null,
+    [rooms, groupId],
+  );
+}
+
 // useMyGroups — removes orderBy to avoid composite index requirement.
 // Results are sorted client-side by created_at descending.
 export function useMyGroups() {

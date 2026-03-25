@@ -1,0 +1,13 @@
+diff --git a/node_modules/expo-router/ios/ExpoHeadModule.swift b/node_modules/expo-router/ios/ExpoHeadModule.swift
+index fd15bba..06a0da9 100644
+--- a/node_modules/expo-router/ios/ExpoHeadModule.swift
++++ b/node_modules/expo-router/ios/ExpoHeadModule.swift
+@@ -38,7 +38,7 @@ let indexRouteTag = Bundle.main.bundleIdentifier! + ".expo.index_route"
+ 
+ var launchedActivity: NSUserActivity?
+ 
+-internal class InvalidSchemeException: Exception {
++internal final class InvalidSchemeException: Exception {
+   override var reason: String {
+     "Scheme file:// is not allowed for location origin (webpageUrl in NSUserActivity)"
+   }

@@ -7,7 +7,6 @@ import {
   Pressable,
   Modal,
   ActivityIndicator,
-  Alert,
   Linking,
 } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
@@ -92,41 +91,49 @@ function JoinGroupModal({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const [groupInfo, setGroupInfo] = useState<{ name: string; memberCount: number } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [joining, setJoining] = useState(false);
+  const [groupName, setGroupName] = useState('Prayer Group');
+  const [joining, setJoining] = useState(true);
   const [joined, setJoined] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    groupApi
-      .get(groupId)
-      .then((data: any) => {
-        setGroupInfo({
-          name: data.group?.name ?? 'Prayer Group',
-          memberCount: data.group?.member_count ?? 0,
-        });
-      })
-      .catch(() => {
-        setGroupInfo({ name: 'Prayer Group', memberCount: 0 });
-      })
-      .finally(() => setLoading(false));
-  }, [groupId]);
+    let cancelled = false;
 
-  async function handleJoin() {
-    setJoining(true);
-    try {
-      await groupApi.join(groupId, code || undefined);
-      setJoined(true);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setTimeout(() => {
-        onClose();
-        router.push(`/group/${groupId}` as any);
-      }, 800);
-    } catch (err: any) {
-      Alert.alert('Could not join group', err.message ?? 'Please try again.');
-      setJoining(false);
+    async function autoJoin() {
+      // Fetch group name for the confirmation message (best-effort)
+      try {
+        const data: any = await groupApi.get(groupId);
+        if (!cancelled && data.group?.name) setGroupName(data.group.name);
+      } catch {}
+
+      // Join immediately
+      try {
+        await groupApi.join(groupId, code || undefined);
+        if (cancelled) return;
+        setJoined(true);
+        setJoining(false);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setTimeout(() => {
+          if (cancelled) return;
+          onClose();
+          router.push(`/group/${groupId}` as any);
+        }, 1200);
+      } catch (err: any) {
+        if (cancelled) return;
+        setJoining(false);
+        const msg = err.message ?? 'Please try again.';
+        if (/already a member/i.test(msg)) {
+          onClose();
+          router.push(`/group/${groupId}` as any);
+        } else {
+          setError(msg);
+        }
+      }
     }
-  }
+
+    autoJoin();
+    return () => { cancelled = true; };
+  }, [groupId, code]);
 
   return (
     <Modal transparent animationType="fade" visible onRequestClose={onClose}>
@@ -139,72 +146,44 @@ function JoinGroupModal({
           paddingTop: 20,
           paddingBottom: 48,
         }}>
-          {/* Handle bar */}
           <View style={{ width: 36, height: 4, backgroundColor: THEME_COLORS.border, borderRadius: 2, alignSelf: 'center', marginBottom: 28 }} />
 
-          {loading ? (
-            <ActivityIndicator color={THEME_COLORS.gold} style={{ paddingVertical: 40 }} />
+          {joining ? (
+            <View style={{ alignItems: 'center', paddingVertical: 32 }}>
+              <ActivityIndicator color={THEME_COLORS.gold} style={{ marginBottom: 16 }} />
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 16 }}>
+                Joining group…
+              </Text>
+            </View>
           ) : joined ? (
             <View style={{ alignItems: 'center', paddingVertical: 28 }}>
               <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: THEME_COLORS.sageDim, borderWidth: 1, borderColor: 'rgba(74,124,94,0.22)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                 <Icon name="groups" size={28} color={THEME_COLORS.sage} />
               </View>
               <Text style={{ color: THEME_COLORS.sage, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 22, marginBottom: 6 }}>
-                Joined!
+                You joined {groupName}!
               </Text>
               <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 14 }}>
                 Taking you to the group…
               </Text>
             </View>
           ) : (
-            <>
-              <View style={{ alignItems: 'center', marginBottom: 28 }}>
-                <View style={{ width: 72, height: 72, borderRadius: 22, backgroundColor: THEME_COLORS.sageDim, borderWidth: 1, borderColor: 'rgba(74,124,94,0.22)', alignItems: 'center', justifyContent: 'center', marginBottom: 18 }}>
-                  <Icon name="groups" size={32} color={THEME_COLORS.sage} />
-                </View>
-                <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_500Medium', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>
-                  You've been invited
-                </Text>
-                <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 24, textAlign: 'center', letterSpacing: -0.5, marginBottom: 10 }}>
-                  {groupInfo?.name}
-                </Text>
-                {groupInfo && groupInfo.memberCount > 0 && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 5, backgroundColor: THEME_COLORS.sageDim, borderRadius: 50, borderWidth: 1, borderColor: 'rgba(74,124,94,0.22)' }}>
-                    <Icon name="groups" size={12} color={THEME_COLORS.sage} />
-                    <Text style={{ color: THEME_COLORS.sage, fontFamily: 'Geist_500Medium', fontSize: 12 }}>
-                      {groupInfo.memberCount} {groupInfo.memberCount === 1 ? 'member' : 'members'}
-                    </Text>
-                  </View>
-                )}
+            <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+              <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: 'rgba(180,80,60,0.08)', borderWidth: 1, borderColor: 'rgba(180,80,60,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                <Icon name="error_outline" size={28} color="#b4503c" />
               </View>
-
-              <Pressable
-                onPress={handleJoin}
-                disabled={joining}
-                style={({ pressed }) => ({
-                  backgroundColor: THEME_COLORS.gold,
-                  borderRadius: 16,
-                  padding: 18,
-                  alignItems: 'center',
-                  marginBottom: 12,
-                  opacity: joining || pressed ? 0.8 : 1,
-                })}
-              >
-                {joining ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={{ color: '#fff', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16 }}>
-                    Join Group
-                  </Text>
-                )}
-              </Pressable>
-
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18, marginBottom: 6, textAlign: 'center' }}>
+                Could not join group
+              </Text>
+              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 14, textAlign: 'center', marginBottom: 24 }}>
+                {error}
+              </Text>
               <Pressable onPress={onClose} style={{ padding: 16, alignItems: 'center' }}>
                 <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_500Medium', fontSize: 15 }}>
-                  Maybe later
+                  Dismiss
                 </Text>
               </Pressable>
-            </>
+            </View>
           )}
         </View>
       </View>

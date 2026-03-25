@@ -15,11 +15,10 @@
       "supportsTablet": false,
       "bundleIdentifier": "io.divinebridge.app",
       "googleServicesFile": "./GoogleService-Info.plist",
-      "associatedDomains": ["applinks:divinebridge.io"],
       "infoPlist": {
         "NSCameraUsageDescription": "Divine Bridge uses your camera for video prayer sessions.",
         "NSMicrophoneUsageDescription": "Divine Bridge uses your microphone for audio prayer sessions.",
-        "UIBackgroundModes": ["audio", "voip", "fetch", "remote-notification"]
+        "UIBackgroundModes": ["audio", "voip", "fetch"]
       },
       "config": {
         "googleSignIn": {
