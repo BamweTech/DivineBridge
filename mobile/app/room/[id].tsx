@@ -9,6 +9,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -611,7 +612,7 @@ export default function RoomScreen() {
                 {isSpeaker && isVideoOn ? (
                   <View
                     key={`local-${localVideoRevision}`}
-                    style={{ width: '48%', aspectRatio: 3 / 4, borderRadius: 16, overflow: 'hidden', backgroundColor: THEME_COLORS.bg3 }}
+                    style={{ width: (Dimensions.get('window').width - 48) / 2, aspectRatio: 3 / 4, borderRadius: 16, overflow: 'hidden', backgroundColor: THEME_COLORS.bg3 }}
                   >
                     <VideoStreamView
                       stream={localStream}
@@ -624,7 +625,7 @@ export default function RoomScreen() {
                 ) : null}
                 {Array.from(peers.values()).map((peer) => (
                   peer.userId !== user?.uid && peer.stream && peer.isVideoEnabled ? (
-                    <View key={`${peer.userId}-r${peer.revision}`} style={{ width: '48%', aspectRatio: 3 / 4, borderRadius: 16, overflow: 'hidden', backgroundColor: THEME_COLORS.bg3 }}>
+                    <View key={`${peer.userId}-r${peer.revision}`} style={{ width: (Dimensions.get('window').width - 48) / 2, aspectRatio: 3 / 4, borderRadius: 16, overflow: 'hidden', backgroundColor: THEME_COLORS.bg3 }}>
                       <VideoStreamView
                         stream={peer.stream}
                         style={{ flex: 1 }}

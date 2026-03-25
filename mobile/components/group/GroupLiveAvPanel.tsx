@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Dimensions } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { RTCView } from '@/lib/sfu';
 import { VideoStreamView } from '@/components/room/VideoStreamView';
@@ -158,18 +158,15 @@ export function GroupLiveAvPanel({
               )}
             </ScrollView>
           ) : (
-            <ScrollView
-              style={{ flex: 1 }}
-              contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 8 }}
-            >
+            <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 8, alignContent: 'flex-start' }}>
               {isSpeaker && isVideoOn ? (
-                <View key={`local-${localVideoRevision}`} style={styles.tileFull}>
+                <View key={`local-${localVideoRevision}`} style={[styles.tileFull, { width: (Dimensions.get('window').width - 24) / 2 }]}>
                   <VideoStreamView stream={localStream} style={StyleSheet.absoluteFillObject} objectFit="cover" mirror label="You" />
                 </View>
               ) : null}
               {Array.from(peers.values()).map((peer) =>
                 peer.userId !== userId && peer.stream && peer.isVideoEnabled ? (
-                  <View key={`${peer.userId}-r${peer.revision}`} style={styles.tileFull}>
+                  <View key={`${peer.userId}-r${peer.revision}`} style={[styles.tileFull, { width: (Dimensions.get('window').width - 24) / 2 }]}>
                     <VideoStreamView
                       stream={peer.stream}
                       style={StyleSheet.absoluteFillObject}
@@ -179,7 +176,7 @@ export function GroupLiveAvPanel({
                   </View>
                 ) : null
               )}
-            </ScrollView>
+            </View>
           )
         ) : (
           <View style={styles.audioOnlyHint}>
@@ -260,7 +257,6 @@ const styles = StyleSheet.create({
     borderColor: THEME_COLORS.border,
   },
   tileFull: {
-    width: '48%',
     aspectRatio: 3 / 4,
     borderRadius: 16,
     overflow: 'hidden',

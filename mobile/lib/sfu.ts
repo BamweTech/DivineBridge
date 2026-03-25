@@ -429,10 +429,15 @@ export class SfuEngine {
       case 'consumerPaused':
       case 'consumerResumed': {
         const meta = this.consumerMeta.get(data.consumerId);
-        if (meta?.kind === 'audio') {
+        if (meta) {
           const p = this.peers.get(meta.userId);
           if (p) {
-            p.isMuted = event === 'consumerPaused';
+            if (meta.kind === 'audio') {
+              p.isMuted = event === 'consumerPaused';
+            } else if (meta.kind === 'video') {
+              p.isVideoEnabled = event === 'consumerResumed';
+              p.revision = (p.revision ?? 0) + 1;
+            }
             this.peers.set(meta.userId, p);
             this._notifyPeers();
           }
