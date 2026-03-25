@@ -25,8 +25,7 @@ import QRCode from 'react-native-qrcode-svg';
 import dayjs from 'dayjs';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+import * as WebBrowser from 'expo-web-browser';
 import { Image } from 'expo-image';
 import { useGroupChat, useGroupDetails, useGroupLiveRoom, firestoreTimestampMs } from '@/hooks/useGroups';
 import { uploadGroupChatFile } from '@/lib/groupChatUpload';
@@ -573,19 +572,11 @@ export default function GroupScreen() {
     }
   }
 
-  async function handleOpenDocument(url: string, fileName: string) {
+  async function handleOpenDocument(url: string, _fileName: string) {
     try {
-      const ext = fileName.split('.').pop()?.toLowerCase() || 'pdf';
-      const localUri = `${FileSystem.cacheDirectory}${Date.now()}_${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-      const { uri } = await FileSystem.downloadAsync(url, localUri);
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: ext === 'pdf' ? 'application/pdf' : 'application/octet-stream',
-          UTI: ext === 'pdf' ? 'com.adobe.pdf' : 'public.data',
-        });
-      } else {
-        Linking.openURL(url);
-      }
+      await WebBrowser.openBrowserAsync(url, {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+      });
     } catch {
       Linking.openURL(url);
     }
