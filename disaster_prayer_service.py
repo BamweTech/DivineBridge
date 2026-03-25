@@ -641,76 +641,13 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                                 try:
                                     created_at = datetime.fromisoformat(created_at_str)
                                     if (now - created_at) <= max_disaster_age:
-                                        # Check if summary/comprehensive_summary contains old dates
-                                        summary = prayer_data.get('summary', '')
-                                        comprehensive_summary = prayer_data.get('comprehensive_summary', '')
-                                        all_summaries = prayer_data.get('all_news_summaries', [])
-                                        all_areas = prayer_data.get('all_areas', [])
-                                        
-                                        has_old_date = False
-                                        
-                                        # Check text content for old dates (previous years or old months)
-                                        if summary and self._has_old_date_in_text(
-                                            summary, max_age_days=DISASTER_TEXT_DATE_MAX_AGE_DAYS
-                                        ):
-                                            has_old_date = True
-                                        elif comprehensive_summary and self._has_old_date_in_text(
-                                            comprehensive_summary,
-                                            max_age_days=DISASTER_TEXT_DATE_MAX_AGE_DAYS,
-                                        ):
-                                            has_old_date = True
-                                        else:
-                                            for news_summary in all_summaries:
-                                                if news_summary and self._has_old_date_in_text(
-                                                    news_summary,
-                                                    max_age_days=DISASTER_TEXT_DATE_MAX_AGE_DAYS,
-                                                ):
-                                                    has_old_date = True
-                                                    break
-                                        
-                                        # Also check actual disaster timestamps from all_areas
-                                        if not has_old_date and all_areas:
-                                            for area in all_areas:
-                                                if isinstance(area, dict):
-                                                    area_timestamp = area.get('timestamp', '')
-                                                    if area_timestamp:
-                                                        try:
-                                                            # Try to parse timestamp
-                                                            disaster_time = None
-                                                            try:
-                                                                disaster_time = datetime.fromisoformat(area_timestamp.replace('Z', '+00:00'))
-                                                                if disaster_time.tzinfo:
-                                                                    disaster_time = disaster_time.replace(tzinfo=None)
-                                                            except:
-                                                                try:
-                                                                    for fmt in ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
-                                                                        try:
-                                                                            disaster_time = datetime.strptime(area_timestamp[:19], fmt)
-                                                                            break
-                                                                        except:
-                                                                            continue
-                                                                except:
-                                                                    pass
-                                                            
-                                                            if disaster_time:
-                                                                # Stale if older than display window (ignore calendar year)
-                                                                age = now - disaster_time
-                                                                if age > max_disaster_age:
-                                                                    has_old_date = True
-                                                                    logger.warning(f"Found old disaster timestamp in grouped prayer: {area_timestamp} ({age.days} days old)")
-                                                                    break
-                                                        except Exception as e:
-                                                            logger.debug(f"Could not parse timestamp {area_timestamp} in grouped prayer: {e}")
-                                        
-                                        if has_old_date:
-                                            logger.warning(f"Filtered out grouped prayer with old date in content: {blob.name}")
-                                            blob.delete()
-                                            logger.info(f"Deleted grouped disaster prayer with old date: {blob.name}")
-                                        else:
-                                            grouped_prayers.append(prayer_data)
+                                        # Prayer was generated recently — trust it.
+                                        # Text-scanning prayer prose for old dates was
+                                        # over-filtering: summaries naturally reference
+                                        # when events started (e.g. "conflict since 2024").
+                                        grouped_prayers.append(prayer_data)
                                     else:
                                         logger.info(f"Filtered out old grouped prayer: {blob.name} (created {now - created_at} ago)")
-                                        # Delete old prayer
                                         blob.delete()
                                         logger.info(f"Deleted old grouped disaster prayer: {blob.name}")
                                 except Exception as e:
@@ -884,13 +821,16 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
         return False
 
     def _text_suggests_historical_event(self, text: str) -> bool:
-        """True if wording suggests a recap / anniversary / far-past framing (not breaking news)."""
+        """True if wording suggests a recap / anniversary / far-past framing (not breaking news).
+
+        Intentionally narrow: phrases like "since 2024" or "ongoing since 2023" are
+        common in coverage of current events and should NOT be flagged here.  Only
+        clearly retrospective framing should trigger a rejection.
+        """
         if not text:
             return False
         t = text.lower()
         if re.search(r'\b(?:several|many|few)\s+months\s+ago\b', t):
-            return True
-        if re.search(r'\blast\s+year\b', t):
             return True
         if re.search(r'\b\d+\s+years?\s+ago\b', t):
             return True
@@ -898,10 +838,10 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
             return True
         if 'on this day' in t:
             return True
-        cy = datetime.now().year
-        for y in range(2000, cy):
-            if re.search(rf'\b(?:in|during|since)\s+{y}\b', t):
-                return True
+        if re.search(r'\blooking\s+back\b', t):
+            return True
+        if re.search(r'\bin\s+retrospect\b', t):
+            return True
         return False
 
     def _has_old_date_in_text(self, text: str, max_age_days: Optional[int] = None) -> bool:
@@ -928,23 +868,20 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
         month_re = '|'.join(month_names)
         month_by_lower = {m.lower(): i for i, m in enumerate(month_names, 1)}
 
-        # "October 2025" / "March 2024" (no day)
+        # "October 2025" / "March 2024" (no day) — use the month_only_cutoff
+        # uniformly so recent previous-year months aren't over-rejected.
         for m in re.finditer(rf'\b({month_re})\s+(\d{{4}})\b', text, re.IGNORECASE):
             y = int(m.group(2))
             mon = month_by_lower.get(m.group(1).lower())
             if not mon:
                 continue
-            if y < cy:
-                logger.debug(f"Stale month+year in text: {m.group(1)} {y}")
+            try:
+                mid_month = datetime(y, mon, 15)
+            except ValueError:
+                mid_month = datetime(y, mon, 1)
+            if mid_month < month_only_cutoff:
+                logger.debug(f"Stale month+year in text (>{DISASTER_TEXT_MONTH_ONLY_MIN_AGE_DAYS}d old): {m.group(1)} {y}")
                 return True
-            if y == cy and mon < cm:
-                try:
-                    mid_month = datetime(y, mon, 15)
-                except ValueError:
-                    mid_month = datetime(y, mon, 1)
-                if mid_month < month_only_cutoff:
-                    logger.debug(f"Stale month+year in text (earlier month this year, >~{DISASTER_TEXT_MONTH_ONLY_MIN_AGE_DAYS}d): {m.group(1)} {y}")
-                    return True
 
         # "January 15, 2025" / "15 January 2025" — any year
         for m in re.finditer(rf'\b({month_re})\s+(\d{{1,2}}),\s+(\d{{4}})\b', text, re.IGNORECASE):
@@ -986,35 +923,11 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                 logger.debug(f"Stale ISO date in text: {m.group(0)}")
                 return True
 
-        py = cy - 1
-        if str(py) in text:
-            prev_patterns = [
-                rf'\b({month_re})\s+\d{{1,2}},\s+{py}\b',
-                rf'\b{py}-\d{{2}}-\d{{2}}\b',
-                rf'\b{py}/\d{{2}}/\d{{2}}\b',
-                rf'\b\d{{1,2}}/\d{{1,2}}/{py}\b',
-                rf'\bsince\s+{py}\b',
-                rf'\bin\s+{py}\b',
-                rf'\bfrom\s+{py}\b',
-            ]
-            for pattern in prev_patterns:
-                if re.search(pattern, text, re.IGNORECASE):
-                    return True
-
-        for year in range(2000, py):
-            ys = str(year)
-            if ys not in text:
-                continue
-            year_patterns = [
-                rf'\bsince\s+{ys}\b',
-                rf'\bin\s+{ys}\b',
-                rf'\bfrom\s+{ys}\b',
-                rf'\b({month_re})\s+\d{{1,2}},\s+{ys}\b',
-                rf'\b{ys}-\d{{2}}-\d{{2}}\b',
-            ]
-            for pattern in year_patterns:
-                if re.search(pattern, text, re.IGNORECASE):
-                    return True
+        # NOTE: We intentionally do NOT scan for loose "since {year}" / "in {year}"
+        # / "from {year}" patterns here — those phrases appear frequently in ongoing
+        # disaster coverage (e.g. "conflict escalating since 2024") and the timestamp
+        # age check is the authoritative recency gate.  The "Month YYYY" and full-date
+        # patterns above already catch stale calendar dates in the text.
 
         return False
     
@@ -1050,13 +963,6 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                     news_summary = re.sub(r'\[\d+\]', '', news_summary).strip()
                     # Clean up any double spaces left after removing citations
                     news_summary = re.sub(r'\s+', ' ', news_summary).strip()
-                
-                # Check if news summary contains old dates
-                if self._has_old_date_in_text(
-                    news_summary, max_age_days=DISASTER_TEXT_DATE_MAX_AGE_DAYS
-                ):
-                    logger.warning(f"Rejected disaster with old date in summary: {disaster_type} in {country} - summary contains previous year")
-                    continue
                 
                 area_info = {
                     'country': country,
@@ -1589,60 +1495,9 @@ Return ONLY the post text. No quotes, no labels, no explanations."""
                     'prayers_generated': 0
                 }
             
-            # Additional validation: filter out any disasters with old timestamps
-            now = datetime.now()
-            max_age = timedelta(days=DISASTER_DISCOVERY_MAX_AGE_DAYS)
-            current_year = now.year
-            original_count = len(disasters)
-            validated_disasters = []
-            
-            for disaster in disasters:
-                timestamp_str = disaster.get('timestamp', '')
-                if not timestamp_str:
-                    logger.warning(f"Disaster without timestamp rejected: {disaster.get('type')} in {disaster.get('country')}")
-                    continue
-                
-                # Check if timestamp contains old year
-                if str(current_year - 1) in timestamp_str or str(current_year - 2) in timestamp_str:
-                    logger.warning(f"Disaster with old year rejected: {disaster.get('type')} in {disaster.get('country')} - timestamp: {timestamp_str}")
-                    continue
-                
-                # Parse and validate timestamp
-                disaster_time = None
-                try:
-                    disaster_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
-                    if disaster_time.tzinfo:
-                        disaster_time = disaster_time.replace(tzinfo=None)
-                except:
-                    try:
-                        for fmt in ['%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d']:
-                            try:
-                                disaster_time = datetime.strptime(timestamp_str[:19], fmt)
-                                break
-                            except:
-                                continue
-                    except:
-                        pass
-                
-                if disaster_time:
-                    # Recency by age only (allows Dec→Jan and matches 7-day hub window)
-                    age = now - disaster_time
-                    if age > max_age:
-                        logger.warning(f"Disaster too old rejected: {disaster.get('type')} in {disaster.get('country')} - {age.days} days old, timestamp: {timestamp_str}")
-                        continue
-                    if age.total_seconds() < -3600:
-                        logger.warning(f"Disaster with future timestamp rejected: {disaster.get('type')} in {disaster.get('country')} - timestamp: {timestamp_str}")
-                        continue
-                else:
-                    # Could not parse timestamp - reject if contains old year
-                    if str(current_year - 1) in timestamp_str:
-                        logger.warning(f"Disaster with unparseable old timestamp rejected: {disaster.get('type')} in {disaster.get('country')} - timestamp: {timestamp_str}")
-                        continue
-                
-                validated_disasters.append(disaster)
-            
-            disasters = validated_disasters
-            logger.info(f"After timestamp validation: {len(disasters)} disasters remaining (rejected {original_count - len(disasters)} with invalid/old timestamps)")
+            # _parse_disaster_response already validates timestamps, age, and text
+            # content — no redundant pass needed here.
+            logger.info(f"Proceeding with {len(disasters)} validated disasters from parsing stage")
             
             if not disasters:
                 logger.info("No valid recent disasters found after timestamp validation")

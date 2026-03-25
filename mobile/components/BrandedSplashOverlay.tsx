@@ -10,8 +10,8 @@ import Animated, {
 import DivineBridgeLogo from '@/components/ui/DivineBridgeLogo';
 import { THEME_COLORS } from '@/lib/constants';
 
-const LOGO_SIZE = 56;
-const GAP = 14;
+const LOGO_SIZE = 80;
+const GAP = 18;
 
 type Props = {
   onFinish: () => void;
@@ -26,10 +26,10 @@ export default function BrandedSplashOverlay({ onFinish }: Props) {
   const { width: W } = useWindowDimensions();
 
   // Reserve horizontal space for the title so the row shift math matches real layout.
-  const textBlock = Math.min(268, Math.max(188, W * 0.62));
+  const textBlock = Math.min(320, Math.max(220, W * 0.58));
   const initialRowShift = (textBlock + GAP) / 2;
 
-  const logoScale = useSharedValue(0.68);
+  const logoScale = useSharedValue(0.6);
   const rowShift = useSharedValue(initialRowShift);
   const textOpacity = useSharedValue(0);
   const textTx = useSharedValue(12);
@@ -128,8 +128,8 @@ const styles = StyleSheet.create({
   title: {
     color: THEME_COLORS.text,
     fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 30,
-    letterSpacing: -0.45,
+    fontSize: 38,
+    letterSpacing: -0.5,
     width: '100%',
     textAlign: 'left',
   },
