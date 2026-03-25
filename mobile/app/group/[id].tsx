@@ -13,6 +13,8 @@ import {
   ActivityIndicator,
   ActionSheetIOS,
   Linking,
+  Dimensions,
+  StatusBar,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -72,13 +74,66 @@ const TYPE_LABEL_COLORS: Record<MessageType, string> = {
   system_notification: THEME_COLORS.rose,
 };
 
-function GroupChatBubble({ msg, userUid }: { msg: GroupChatMessage; userUid?: string }) {
+function GroupChatBubble({
+  msg,
+  userUid,
+  onViewImage,
+  onDelete,
+}: {
+  msg: GroupChatMessage;
+  userUid?: string;
+  onViewImage: (url: string) => void;
+  onDelete: (messageId: string) => void;
+}) {
   const isMe = msg.user_id === userUid;
   const isSpecial = msg.message_type !== 'text';
   const bg = isSpecial ? TYPE_COLORS[msg.message_type] : isMe ? THEME_COLORS.goldDim : THEME_COLORS.bg2;
   const borderColor = isSpecial ? TYPE_BORDER_COLORS[msg.message_type] : isMe ? THEME_COLORS.goldBorder : THEME_COLORS.border;
   const attachments = msg.attachments ?? [];
   const showText = (msg.message ?? '').trim().length > 0;
+  const imageAtts = attachments.filter((a) => a.content_type.startsWith('image/'));
+  const nonImageAtts = attachments.filter((a) => !a.content_type.startsWith('image/'));
+  const imageOnly = imageAtts.length > 0 && !showText && !msg.link_url && !isSpecial && nonImageAtts.length === 0;
+
+  const BUBBLE_W = 264;
+  const rTL = 18;
+  const rTR = 18;
+  const rBR = isMe ? 4 : 18;
+  const rBL = isMe ? 18 : 4;
+
+  function handleLongPress() {
+    if (!isMe) return;
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Copy', 'Delete Message'],
+          destructiveButtonIndex: 2,
+          cancelButtonIndex: 0,
+        },
+        (i) => {
+          if (i === 1 && msg.message) Clipboard.setStringAsync(msg.message);
+          if (i === 2) confirmDelete();
+        },
+      );
+    } else {
+      Alert.alert('Message', undefined, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Copy', onPress: () => msg.message && Clipboard.setStringAsync(msg.message) },
+        { text: 'Delete', style: 'destructive', onPress: confirmDelete },
+      ]);
+    }
+  }
+
+  function confirmDelete() {
+    Alert.alert(
+      'Delete Message',
+      'This message will be permanently deleted for everyone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => onDelete(msg.message_id) },
+      ],
+    );
+  }
 
   return (
     <Animated.View
@@ -91,59 +146,99 @@ function GroupChatBubble({ msg, userUid }: { msg: GroupChatMessage; userUid?: st
           <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_500Medium', fontSize: 11 }}>{msg.user_name}</Text>
         </View>
       )}
-      <View style={{
-        maxWidth: '82%', backgroundColor: bg, borderRadius: 18,
-        borderBottomRightRadius: isMe ? 4 : 18, borderBottomLeftRadius: isMe ? 18 : 4,
-        padding: 12, borderWidth: 1, borderColor,
-      }}>
-        {isSpecial && (
-          <Text style={{ fontSize: 10, marginBottom: 4, color: TYPE_LABEL_COLORS[msg.message_type], fontFamily: 'Geist_600SemiBold', letterSpacing: 0.8, textTransform: 'uppercase' }}>
-            {msg.message_type.replace('_', ' ')}
-          </Text>
-        )}
-        {!!msg.link_url && (
-          <Pressable
-            onPress={() => Linking.openURL(msg.link_url!)}
-            style={{ marginBottom: showText || attachments.length ? 8 : 0 }}
-          >
-            <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 13, textDecorationLine: 'underline' }} numberOfLines={3}>
-              {msg.link_url}
-            </Text>
-          </Pressable>
-        )}
-        {attachments.map((a: GroupChatAttachment, idx: number) => (
-          <Pressable
-            key={`${msg.message_id}-att-${idx}`}
-            onPress={() => Linking.openURL(a.url)}
-            style={{ marginBottom: idx < attachments.length - 1 || showText ? 10 : 0 }}
-          >
-            {a.content_type.startsWith('image/') ? (
-              <Image
-                source={{ uri: a.url }}
-                style={{ width: 220, height: 160, borderRadius: 12, backgroundColor: THEME_COLORS.bg3 }}
-                contentFit="cover"
-                accessibilityLabel={a.file_name}
-              />
-            ) : (
-              <View style={{
-                paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12,
-                backgroundColor: THEME_COLORS.bg3, borderWidth: 1, borderColor: THEME_COLORS.border,
-              }}>
-                <Text style={{ color: THEME_COLORS.violet, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>PDF</Text>
-                <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 4 }} numberOfLines={2}>
-                  {a.file_name}
+      <Pressable onLongPress={handleLongPress} delayLongPress={400}>
+        {imageOnly ? (
+          /* Image-only message: no padding, no border — image IS the bubble */
+          <View style={{
+            width: BUBBLE_W, borderRadius: 18,
+            borderTopLeftRadius: rTL, borderTopRightRadius: rTR,
+            borderBottomRightRadius: rBR, borderBottomLeftRadius: rBL,
+            overflow: 'hidden', backgroundColor: THEME_COLORS.bg3,
+          }}>
+            {imageAtts.map((a, idx) => (
+              <Pressable key={`${msg.message_id}-img-${idx}`} onPress={() => onViewImage(a.url)}>
+                <Image
+                  source={{ uri: a.url }}
+                  style={{ width: BUBBLE_W, aspectRatio: 4 / 3, backgroundColor: THEME_COLORS.bg3 }}
+                  contentFit="contain"
+                  accessibilityLabel={a.file_name}
+                />
+              </Pressable>
+            ))}
+          </View>
+        ) : (
+          /* Normal bubble (text, mixed content, docs) */
+          <View style={{
+            maxWidth: BUBBLE_W,
+            backgroundColor: bg,
+            borderRadius: 18,
+            borderTopLeftRadius: rTL, borderTopRightRadius: rTR,
+            borderBottomRightRadius: rBR, borderBottomLeftRadius: rBL,
+            overflow: 'hidden',
+            borderWidth: imageAtts.length > 0 ? 0 : 1,
+            borderColor,
+          }}>
+            {/* Images sit edge-to-edge at the top */}
+            {imageAtts.map((a, idx) => (
+              <Pressable key={`${msg.message_id}-img-${idx}`} onPress={() => onViewImage(a.url)}>
+                <Image
+                  source={{ uri: a.url }}
+                  style={{
+                    width: '100%', aspectRatio: 4 / 3,
+                    backgroundColor: THEME_COLORS.bg3,
+                  }}
+                  contentFit="contain"
+                  accessibilityLabel={a.file_name}
+                />
+              </Pressable>
+            ))}
+
+            {/* Text / type label / link / docs go in the padded area */}
+            <View style={{ padding: 12 }}>
+              {isSpecial && (
+                <Text style={{ fontSize: 10, marginBottom: 4, color: TYPE_LABEL_COLORS[msg.message_type], fontFamily: 'Geist_600SemiBold', letterSpacing: 0.8, textTransform: 'uppercase' }}>
+                  {msg.message_type.replace('_', ' ')}
                 </Text>
-                <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_500Medium', fontSize: 11, marginTop: 6 }}>Tap to open</Text>
-              </View>
-            )}
-          </Pressable>
-        ))}
-        {showText ? (
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 22 }}>
-            {msg.message}
-          </Text>
-        ) : null}
-      </View>
+              )}
+              {!!msg.link_url && (
+                <Pressable
+                  onPress={() => Linking.openURL(msg.link_url!)}
+                  style={{ marginBottom: showText || nonImageAtts.length ? 8 : 0 }}
+                >
+                  <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 13, textDecorationLine: 'underline' }} numberOfLines={3}>
+                    {msg.link_url}
+                  </Text>
+                </Pressable>
+              )}
+              {nonImageAtts.map((a: GroupChatAttachment, idx: number) => (
+                <Pressable
+                  key={`${msg.message_id}-doc-${idx}`}
+                  onPress={() => Linking.openURL(a.url)}
+                  style={{ marginBottom: idx < nonImageAtts.length - 1 || showText ? 10 : 0 }}
+                >
+                  <View style={{
+                    paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12,
+                    backgroundColor: THEME_COLORS.bg3, borderWidth: 1, borderColor: THEME_COLORS.border,
+                  }}>
+                    <Text style={{ color: THEME_COLORS.violet, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
+                      {a.file_name?.toLowerCase().endsWith('.pdf') ? 'PDF' : 'File'}
+                    </Text>
+                    <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 4 }} numberOfLines={2}>
+                      {a.file_name}
+                    </Text>
+                    <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_500Medium', fontSize: 11, marginTop: 6 }}>Tap to open</Text>
+                  </View>
+                </Pressable>
+              ))}
+              {showText ? (
+                <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 22 }}>
+                  {msg.message}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+        )}
+      </Pressable>
       <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 10, marginTop: 3, marginHorizontal: 6 }}>
         {msg.timestamp
           ? dayjs(
@@ -365,7 +460,7 @@ export default function GroupScreen() {
 
   const { group } = useGroupDetails(id!);
   const groupLiveRoom = useGroupLiveRoom(id!);
-  const { messages, sendMessage } = useGroupChat(id!);
+  const { messages, sendMessage, deleteMessage } = useGroupChat(id!);
   const { markGroupChatRead } = useGroupUnread();
   const [text, setText] = useState('');
   const [messageType, setMessageType] = useState<MessageType>('text');
@@ -380,6 +475,7 @@ export default function GroupScreen() {
   const [fsChatOpen, setFsChatOpen] = useState(true);
   const [fsChatText, setFsChatText] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [viewerImage, setViewerImage] = useState<string | null>(null);
 
   const prayer = usePrayerRoom(liveRoomId ?? '');
   const joinRef = useRef(prayer.join);
@@ -470,6 +566,15 @@ export default function GroupScreen() {
         { text: 'Photo', onPress: runPhoto },
         { text: 'Document', onPress: runDoc },
       ]);
+    }
+  }
+
+  async function handleDeleteMessage(messageId: string) {
+    try {
+      await deleteMessage(messageId);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert('Error', 'Could not delete message. Please try again.');
     }
   }
 
@@ -671,7 +776,7 @@ export default function GroupScreen() {
         showsVerticalScrollIndicator={false}
       >
         {messages.map((msg) => (
-          <GroupChatBubble key={msg.message_id} msg={msg} userUid={user?.uid} />
+          <GroupChatBubble key={msg.message_id} msg={msg} userUid={user?.uid} onViewImage={setViewerImage} onDelete={handleDeleteMessage} />
         ))}
       </ScrollView>
 
@@ -786,7 +891,7 @@ export default function GroupScreen() {
                   showsVerticalScrollIndicator={false}
                 >
                   {messages.map((msg) => (
-                    <GroupChatBubble key={`fs-${msg.message_id}`} msg={msg} userUid={user?.uid} />
+                    <GroupChatBubble key={`fs-${msg.message_id}`} msg={msg} userUid={user?.uid} onViewImage={setViewerImage} onDelete={handleDeleteMessage} />
                   ))}
                 </ScrollView>
                 <View style={{
@@ -933,6 +1038,57 @@ export default function GroupScreen() {
             <ActivityIndicator size="large" color={THEME_COLORS.gold} />
             <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_500Medium', fontSize: 14 }}>Uploading…</Text>
           </View>
+        </View>
+      </Modal>
+
+      {/* Fullscreen image viewer */}
+      <Modal
+        visible={!!viewerImage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewerImage(null)}
+        statusBarTranslucent
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' }}>
+          <Pressable
+            onPress={() => setViewerImage(null)}
+            style={{
+              position: 'absolute', top: insets.top + 8, right: 16, zIndex: 10,
+              width: 36, height: 36, borderRadius: 18,
+              backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center',
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Close image"
+          >
+            <Icon name="cross" size={14} color="#fff" />
+          </Pressable>
+          {viewerImage && (
+            <Image
+              source={{ uri: viewerImage }}
+              style={{
+                width: Dimensions.get('window').width,
+                height: Dimensions.get('window').height * 0.75,
+              }}
+              contentFit="contain"
+              accessibilityLabel="Full-size image"
+            />
+          )}
+          <Pressable
+            onPress={() => {
+              if (viewerImage) {
+                Share.share({ url: viewerImage, message: viewerImage });
+              }
+            }}
+            style={{
+              position: 'absolute', bottom: insets.bottom + 24,
+              paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24,
+              backgroundColor: 'rgba(255,255,255,0.12)',
+              flexDirection: 'row', alignItems: 'center', gap: 8,
+            }}
+          >
+            <Icon name="share" size={16} color="#fff" />
+            <Text style={{ color: '#fff', fontFamily: 'Geist_500Medium', fontSize: 14 }}>Share</Text>
+          </Pressable>
         </View>
       </Modal>
 

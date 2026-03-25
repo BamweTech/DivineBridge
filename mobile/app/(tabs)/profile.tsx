@@ -17,7 +17,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { collection, query, where, getDocs, limit, doc, updateDoc } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
-import { db, auth } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import * as ImagePicker from 'expo-image-picker';
+import { db, auth, storage } from '@/lib/firebase';
 import { COLLECTIONS, THEME_COLORS, API_BASE_URL } from '@/lib/constants';
 import { useAuthStore } from '@/stores/authStore';
 import { getDisplayName } from '@/lib/userDisplayName';
@@ -132,6 +134,7 @@ export default function ProfileScreen() {
   const [dailyVerseNotif, setDailyVerseNotif] = useState(false);
   const [sessionReminders, setSessionReminders] = useState(false);
   const [prefBusy, setPrefBusy] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -182,6 +185,42 @@ export default function ProfileScreen() {
       syncDailyVerseReminder(false).catch(() => {});
     }
   }, [user?.uid, profile?.notifyDailyVerse]);
+
+  const pickProfilePhoto = async () => {
+    const u = auth.currentUser;
+    if (!u) return;
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please allow access to your photo library in Settings.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    setUploadingPhoto(true);
+    try {
+      const resp = await fetch(asset.uri);
+      const blob = await resp.blob();
+      const ext = (asset.fileName?.split('.').pop() || 'jpg').replace(/[^a-z0-9]/gi, '').toLowerCase() || 'jpg';
+      const fileName = `avatar_${Date.now()}.${ext}`;
+      const storageRef = ref(storage, `profile_photos/${u.uid}/${fileName}`);
+      await uploadBytes(storageRef, blob, { contentType: asset.mimeType || 'image/jpeg' });
+      const downloadUrl = await getDownloadURL(storageRef);
+      await updateDoc(doc(db, COLLECTIONS.USERS, u.uid), { photoURL: downloadUrl });
+      await updateProfile(u, { photoURL: downloadUrl });
+      await refreshProfile();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Please try again.';
+      Alert.alert('Could not update photo', msg);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   const openEdit = () => {
     setFirstName(profile?.firstName?.trim() ?? '');
@@ -355,38 +394,48 @@ export default function ProfileScreen() {
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(0).duration(400)} style={{ alignItems: 'center', marginBottom: 24 }}>
-        <Pressable onPress={openEdit} style={{ position: 'relative', marginBottom: 14 }}>
-          <View
-            style={{
-              width: 80,
-              height: 80,
-              borderRadius: 26,
-              backgroundColor: THEME_COLORS.bg3,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 2,
-              borderColor: THEME_COLORS.goldBorder,
-              overflow: 'hidden',
-            }}
-          >
-            <Avatar name={getDisplayName(profile, user)} photoUrl={profile?.photoURL} size={80} />
-          </View>
-          <View
+        <View style={{ position: 'relative', marginBottom: 14 }}>
+          <Pressable onPress={pickProfilePhoto} disabled={uploadingPhoto}>
+            <View
+              style={{
+                width: 80,
+                height: 80,
+                borderRadius: 26,
+                backgroundColor: THEME_COLORS.bg3,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 2,
+                borderColor: THEME_COLORS.goldBorder,
+                overflow: 'hidden',
+              }}
+            >
+              {uploadingPhoto ? (
+                <ActivityIndicator size="small" color={THEME_COLORS.gold} />
+              ) : (
+                <Avatar name={getDisplayName(profile, user)} photoUrl={profile?.photoURL} size={80} />
+              )}
+            </View>
+          </Pressable>
+          <Pressable
+            onPress={pickProfilePhoto}
+            disabled={uploadingPhoto}
             style={{
               position: 'absolute',
               bottom: -4,
               right: -4,
-              width: 24,
-              height: 24,
-              borderRadius: 8,
+              width: 28,
+              height: 28,
+              borderRadius: 10,
               backgroundColor: THEME_COLORS.gold,
               alignItems: 'center',
               justifyContent: 'center',
+              borderWidth: 2,
+              borderColor: THEME_COLORS.bg,
             }}
           >
             <Icon name="edit" size={10} color="#ffffff" />
-          </View>
-        </Pressable>
+          </Pressable>
+        </View>
         <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 20 }}>
           {getDisplayName(profile, user)}
         </Text>

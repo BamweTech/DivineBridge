@@ -6,6 +6,7 @@ import {
   onSnapshot,
   doc,
   addDoc,
+  deleteDoc,
   serverTimestamp,
   limit,
   getDoc,
@@ -237,7 +238,12 @@ export function useGroupChat(groupId: string) {
     await addDoc(collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages'), payload);
   }
 
-  return { messages, isLoading, sendMessage };
+  async function deleteMessage(messageId: string) {
+    if (!user || !groupId) return;
+    await deleteDoc(doc(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages', messageId));
+  }
+
+  return { messages, isLoading, sendMessage, deleteMessage };
 }
 
 // ── Group chat unread (latest message vs per-group last read on user doc) ─────

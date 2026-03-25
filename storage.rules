@@ -1,6 +1,21 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // Profile photos — owner only; images; 5 MiB max
+    match /profile_photos/{userId}/{fileName} {
+      allow read: if request.auth != null;
+
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*')
+        && fileName.matches('^[a-zA-Z0-9_.-]+$')
+        && fileName.size() < 100;
+
+      allow delete: if request.auth != null
+        && request.auth.uid == userId;
+    }
+
     // Group chat uploads — members only; images + PDF; 10 MiB max
     match /group_chat_uploads/{groupId}/{userId}/{fileName} {
       allow read: if request.auth != null
