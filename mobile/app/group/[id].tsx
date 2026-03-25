@@ -25,6 +25,8 @@ import QRCode from 'react-native-qrcode-svg';
 import dayjs from 'dayjs';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { Image } from 'expo-image';
 import { useGroupChat, useGroupDetails, useGroupLiveRoom, firestoreTimestampMs } from '@/hooks/useGroups';
 import { uploadGroupChatFile } from '@/lib/groupChatUpload';
@@ -78,11 +80,13 @@ function GroupChatBubble({
   msg,
   userUid,
   onViewImage,
+  onOpenDoc,
   onDelete,
 }: {
   msg: GroupChatMessage;
   userUid?: string;
   onViewImage: (url: string) => void;
+  onOpenDoc: (url: string, fileName: string) => void;
   onDelete: (messageId: string) => void;
 }) {
   const isMe = msg.user_id === userUid;
@@ -213,7 +217,7 @@ function GroupChatBubble({
               {nonImageAtts.map((a: GroupChatAttachment, idx: number) => (
                 <Pressable
                   key={`${msg.message_id}-doc-${idx}`}
-                  onPress={() => Linking.openURL(a.url)}
+                  onPress={() => onOpenDoc(a.url, a.file_name)}
                   style={{ marginBottom: idx < nonImageAtts.length - 1 || showText ? 10 : 0 }}
                 >
                   <View style={{
@@ -569,6 +573,24 @@ export default function GroupScreen() {
     }
   }
 
+  async function handleOpenDocument(url: string, fileName: string) {
+    try {
+      const ext = fileName.split('.').pop()?.toLowerCase() || 'pdf';
+      const localUri = `${FileSystem.cacheDirectory}${Date.now()}_${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const { uri } = await FileSystem.downloadAsync(url, localUri);
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: ext === 'pdf' ? 'application/pdf' : 'application/octet-stream',
+          UTI: ext === 'pdf' ? 'com.adobe.pdf' : 'public.data',
+        });
+      } else {
+        Linking.openURL(url);
+      }
+    } catch {
+      Linking.openURL(url);
+    }
+  }
+
   async function handleDeleteMessage(messageId: string) {
     try {
       await deleteMessage(messageId);
@@ -776,7 +798,7 @@ export default function GroupScreen() {
         showsVerticalScrollIndicator={false}
       >
         {messages.map((msg) => (
-          <GroupChatBubble key={msg.message_id} msg={msg} userUid={user?.uid} onViewImage={setViewerImage} onDelete={handleDeleteMessage} />
+          <GroupChatBubble key={msg.message_id} msg={msg} userUid={user?.uid} onViewImage={setViewerImage} onOpenDoc={handleOpenDocument} onDelete={handleDeleteMessage} />
         ))}
       </ScrollView>
 
@@ -838,7 +860,7 @@ export default function GroupScreen() {
           </View>
 
           <View style={{ flex: 1 }}>
-            <View style={{ flex: fsChatOpen ? 1 : 1 }}>
+            <View style={{ flex: fsChatOpen ? 2 : 1 }}>
               <GroupLiveAvPanel
                 variant="fullscreen"
                 peers={prayer.peers}
@@ -891,7 +913,7 @@ export default function GroupScreen() {
                   showsVerticalScrollIndicator={false}
                 >
                   {messages.map((msg) => (
-                    <GroupChatBubble key={`fs-${msg.message_id}`} msg={msg} userUid={user?.uid} onViewImage={setViewerImage} onDelete={handleDeleteMessage} />
+                    <GroupChatBubble key={`fs-${msg.message_id}`} msg={msg} userUid={user?.uid} onViewImage={setViewerImage} onOpenDoc={handleOpenDocument} onDelete={handleDeleteMessage} />
                   ))}
                 </ScrollView>
                 <View style={{

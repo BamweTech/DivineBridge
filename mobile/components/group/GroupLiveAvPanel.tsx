@@ -124,10 +124,21 @@ export function GroupLiveAvPanel({
         ) : null
       )}
 
-      <View style={[styles.videoRegion, variant === 'embedded' ? styles.videoEmbedded : styles.videoFullscreen]}>
+      <View
+        key={`vr-${hasAnyVideo ? 'vid' : 'aud'}`}
+        style={[
+          styles.videoRegion,
+          variant === 'embedded' ? styles.videoEmbedded : styles.videoFullscreen,
+        ]}
+      >
         {hasAnyVideo ? (
           variant === 'embedded' ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ gap: 8, paddingVertical: 4, alignItems: 'center' }}
+            >
               {isSpeaker && isVideoOn ? (
                 <View key={`local-${localVideoRevision}`} style={styles.tileEmbedded}>
                   <VideoStreamView stream={localStream} style={StyleSheet.absoluteFillObject} objectFit="cover" mirror label="You" />
@@ -147,7 +158,10 @@ export function GroupLiveAvPanel({
               )}
             </ScrollView>
           ) : (
-            <ScrollView contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingBottom: 8 }}>
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 8 }}
+            >
               {isSpeaker && isVideoOn ? (
                 <View key={`local-${localVideoRevision}`} style={styles.tileFull}>
                   <VideoStreamView stream={localStream} style={StyleSheet.absoluteFillObject} objectFit="cover" mirror label="You" />
@@ -226,21 +240,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
-  videoRegion: {
-    overflow: 'hidden',
-  },
+  videoRegion: {},
   videoEmbedded: {
-    minHeight: 120,
-    maxHeight: 140,
+    height: 136,
     paddingHorizontal: 12,
-    paddingTop: 8,
+    paddingTop: 4,
   },
   videoFullscreen: {
-    flexGrow: 1,
-    flexShrink: 1,
-    minHeight: 180,
-    paddingHorizontal: 12,
-    paddingTop: 8,
+    flex: 1,
+    minHeight: 200,
   },
   tileEmbedded: {
     width: 108,
