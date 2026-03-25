@@ -62,6 +62,8 @@ export interface PeerEntry {
   audioLevel: number;
   isVideoEnabled: boolean;
   isMuted: boolean;
+  /** Bumped whenever the stream's tracks change so UI can force a remount. */
+  revision: number;
 }
 
 export type OnPeersChanged = (peers: Map<string, PeerEntry>) => void;
@@ -84,6 +86,9 @@ export class SfuEngine {
 
   /** newConsumer events that arrived before recvTransport was ready */
   private pendingConsumers: any[] = [];
+
+  /** Serializes async event handling to prevent concurrent peer mutations */
+  private _eventQueue: Promise<void> = Promise.resolve();
 
   private peers = new Map<string, PeerEntry>();
   private activeSpeakers: string[] = [];
@@ -167,6 +172,7 @@ export class SfuEngine {
         audioLevel: 0,
         isVideoEnabled: false,
         isMuted: false,
+        revision: 0,
       });
     }
     this._notifyPeers();
@@ -316,9 +322,9 @@ export class SfuEngine {
     }
 
     if (msg.event) {
-      this._handleEvent(msg.event, msg.data).catch((err) =>
-        console.warn('[sfu] event handler error:', err)
-      );
+      this._eventQueue = this._eventQueue
+        .then(() => this._handleEvent(msg.event, msg.data))
+        .catch((err) => console.warn('[sfu] event handler error:', err));
     }
   }
 
@@ -349,6 +355,7 @@ export class SfuEngine {
             audioLevel: 0,
             isVideoEnabled: false,
             isMuted: false,
+            revision: 0,
           });
           this._notifyPeers();
         }
@@ -368,6 +375,7 @@ export class SfuEngine {
             audioLevel: 0,
             isVideoEnabled: false,
             isMuted: false,
+            revision: 0,
           });
         }
         if (data.kind === 'video') {
@@ -392,14 +400,10 @@ export class SfuEngine {
         if (meta && consumer?.track) {
           const p = this.peers.get(meta.userId);
           if (p?.stream) {
-            try {
-              p.stream.removeTrack(consumer.track);
-            } catch {
-              /* track may already be ended */
-            }
-            if (p.stream.getTracks?.().length === 0) {
-              p.stream = null;
-            }
+            const { MediaStream: MS } = require('react-native-webrtc');
+            const remaining = p.stream.getTracks().filter((t: any) => t !== consumer.track);
+            p.stream = remaining.length > 0 ? new MS(remaining) : null;
+            p.revision = (p.revision ?? 0) + 1;
             this.peers.set(meta.userId, p);
           }
           if (meta.kind === 'video' && p) {
@@ -411,6 +415,7 @@ export class SfuEngine {
           const p = this.peers.get(meta.userId);
           if (p) {
             p.isVideoEnabled = false;
+            p.revision = (p.revision ?? 0) + 1;
             this.peers.set(meta.userId, p);
             this._notifyPeers();
           }
@@ -580,18 +585,17 @@ export class SfuEngine {
         audioLevel: 0,
         isVideoEnabled: false,
         isMuted: false,
+        revision: 0,
       });
     }
 
-    // Attach track to a MediaStream and give it to the peer entry
+    // Build a NEW MediaStream so RTCView picks up the changed toURL()
     const { MediaStream } = require('react-native-webrtc');
     const peer = this.peers.get(data.producerUserId)!;
-    if (!peer.stream) {
-      peer.stream = new MediaStream([consumer.track]);
-    } else {
-      peer.stream.addTrack(consumer.track);
-    }
+    const existingTracks = peer.stream ? peer.stream.getTracks() : [];
+    peer.stream = new MediaStream([...existingTracks, consumer.track]);
     if (data.kind === 'video') peer.isVideoEnabled = true;
+    peer.revision = (peer.revision ?? 0) + 1;
     this.peers.set(data.producerUserId, peer);
     this._notifyPeers();
 

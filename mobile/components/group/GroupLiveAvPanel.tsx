@@ -117,7 +117,7 @@ export function GroupLiveAvPanel({
       {Array.from(peers.values()).map((peer) =>
         peer.userId !== userId && peer.stream && !peer.isVideoEnabled ? (
           <RTCView
-            key={`audio-${peer.userId}`}
+            key={`audio-${peer.userId}-r${peer.revision}`}
             streamURL={peer.stream.toURL()}
             style={{ width: 0, height: 0, opacity: 0, position: 'absolute' }}
           />
@@ -146,7 +146,7 @@ export function GroupLiveAvPanel({
               ) : null}
               {Array.from(peers.values()).map((peer) =>
                 peer.userId !== userId && peer.stream && peer.isVideoEnabled ? (
-                  <View key={peer.userId} style={styles.tileEmbedded}>
+                  <View key={`${peer.userId}-r${peer.revision}`} style={styles.tileEmbedded}>
                     <VideoStreamView
                       stream={peer.stream}
                       style={StyleSheet.absoluteFillObject}
@@ -169,7 +169,7 @@ export function GroupLiveAvPanel({
               ) : null}
               {Array.from(peers.values()).map((peer) =>
                 peer.userId !== userId && peer.stream && peer.isVideoEnabled ? (
-                  <View key={peer.userId} style={styles.tileFull}>
+                  <View key={`${peer.userId}-r${peer.revision}`} style={styles.tileFull}>
                     <VideoStreamView
                       stream={peer.stream}
                       style={StyleSheet.absoluteFillObject}

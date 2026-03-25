@@ -512,7 +512,7 @@ export default function RoomScreen() {
       {Array.from(peers.values()).map((peer) => (
         peer.userId !== user?.uid && peer.stream && !peer.isVideoEnabled ? (
           <RTCView
-            key={`audio-${peer.userId}`}
+            key={`audio-${peer.userId}-r${peer.revision}`}
             streamURL={peer.stream.toURL()}
             style={{ width: 0, height: 0, opacity: 0, position: 'absolute' }}
           />
@@ -624,7 +624,7 @@ export default function RoomScreen() {
                 ) : null}
                 {Array.from(peers.values()).map((peer) => (
                   peer.userId !== user?.uid && peer.stream && peer.isVideoEnabled ? (
-                    <View key={peer.userId} style={{ width: '48%', aspectRatio: 3 / 4, borderRadius: 16, overflow: 'hidden', backgroundColor: THEME_COLORS.bg3 }}>
+                    <View key={`${peer.userId}-r${peer.revision}`} style={{ width: '48%', aspectRatio: 3 / 4, borderRadius: 16, overflow: 'hidden', backgroundColor: THEME_COLORS.bg3 }}>
                       <VideoStreamView
                         stream={peer.stream}
                         style={{ flex: 1 }}
