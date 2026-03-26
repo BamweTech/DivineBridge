@@ -12,6 +12,8 @@ import {
   getDoc,
   orderBy,
   setDoc,
+  Timestamp,
+  limitToLast,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { COLLECTIONS } from '@/lib/constants';
@@ -188,7 +190,8 @@ export function useGroupChat(groupId: string) {
     if (!groupId) return;
     const q = query(
       collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages'),
-      limit(100)
+      orderBy('timestamp', 'asc'),
+      limitToLast(100)
     );
     const unsub = onSnapshot(
       q,
@@ -290,7 +293,7 @@ export function useGroupChatLastReads() {
   const markGroupChatRead = useCallback(
     async (groupId: string, atLeastTimestamp?: number) => {
       if (!user?.uid) return;
-      const t = Math.max(Date.now(), atLeastTimestamp ?? 0);
+      const t = atLeastTimestamp ?? Date.now();
       // setDoc+merge: works if user doc is missing; nested map keys merge with existing reads
       await setDoc(
         doc(db, COLLECTIONS.USERS, user.uid),
@@ -385,7 +388,7 @@ export function useGroupUnreadCounts(groupIds: string[], reads: Record<string, n
       const lastRead = reads[gid] ?? 0;
       const q = query(
         collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, gid, 'messages'),
-        where('timestamp', '>', new Date(lastRead)),
+        where('timestamp', '>', Timestamp.fromMillis(lastRead)),
         orderBy('timestamp', 'desc')
       );
       const unsub = onSnapshot(

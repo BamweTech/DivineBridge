@@ -1,10 +1,11 @@
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useMemo } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 import {
   useMyGroups,
   useGroupChatLastReads,
   useGroupUnreadCounts,
 } from '@/hooks/useGroups';
+import { syncAppIconBadge } from '@/lib/appBadge';
 
 export type GroupUnreadContextValue = {
   groups: ReturnType<typeof useMyGroups>['groups'];
@@ -18,6 +19,7 @@ export type GroupUnreadContextValue = {
 const GroupUnreadContext = createContext<GroupUnreadContextValue | null>(null);
 
 export function GroupUnreadProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuthStore();
   const { groups, isLoading: isLoadingGroups } = useMyGroups();
   const groupIds = useMemo(() => groups.map((g) => g.group_id), [groups]);
   const { reads, markGroupChatRead } = useGroupChatLastReads();
@@ -33,6 +35,10 @@ export function GroupUnreadProvider({ children }: { children: React.ReactNode })
     }
     return { totalUnread, unreadByGroup };
   }, [groupIds, unreadCountByGroup]);
+
+  useEffect(() => {
+    void syncAppIconBadge(user ? totalUnread : 0);
+  }, [user?.uid, totalUnread]);
 
   const value = useMemo<GroupUnreadContextValue>(
     () => ({
