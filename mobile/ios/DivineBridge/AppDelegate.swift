@@ -21,6 +21,12 @@ public class AppDelegate: ExpoAppDelegate {
     reactNativeFactory = factory
     bindReactNativeFactory(factory)
 
+#if DEBUG
+    let metroHost = "metro.divinebridge.io"
+    RCTBundleURLProvider.sharedSettings().jsLocation = metroHost
+    NSLog("[DivineBridge] jsLocation = \(metroHost)")
+#endif
+
 #if os(iOS) || os(tvOS)
     window = UIWindow(frame: UIScreen.main.bounds)
     factory.startReactNative(
@@ -57,12 +63,17 @@ class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
 
   override func sourceURL(for bridge: RCTBridge) -> URL? {
     // needed to return the correct URL for expo-dev-client.
-    bridge.bundleURL ?? bundleURL()
+    let resolved = bridge.bundleURL ?? bundleURL()
+    NSLog("[DivineBridge] sourceURL resolved = \(resolved?.absoluteString ?? "nil")")
+    return resolved
   }
 
   override func bundleURL() -> URL? {
 #if DEBUG
-    return URL(string: "http://136.112.119.41:8081/.expo/.virtual-metro-entry.bundle?platform=ios&dev=true&minify=false&lazy=true")
+    let metroHost = "metro.divinebridge.io"
+    let url = URL(string: "http://\(metroHost):8081/.expo/.virtual-metro-entry.bundle?platform=ios&dev=true&minify=false&lazy=true")
+    NSLog("[DivineBridge] bundleURL() = \(url?.absoluteString ?? "nil")")
+    return url
 #else
     return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif

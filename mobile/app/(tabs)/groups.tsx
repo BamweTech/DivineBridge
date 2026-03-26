@@ -49,7 +49,8 @@ function timeAgo(dateStr: string): string {
 
 // ─── GroupCard ────────────────────────────────────────────────────────────────
 
-function GroupCard({ group, onPress, hasUnread, isLive, liveCount }: { group: PrayerGroup; onPress: () => void; hasUnread?: boolean; isLive?: boolean; liveCount?: number }) {
+function GroupCard({ group, onPress, unreadCount, isLive, liveCount }: { group: PrayerGroup; onPress: () => void; unreadCount?: number; isLive?: boolean; liveCount?: number }) {
+  const hasUnread = (unreadCount ?? 0) > 0;
   return (
     <Pressable onPress={onPress}>
       <View style={{
@@ -73,16 +74,23 @@ function GroupCard({ group, onPress, hasUnread, isLive, liveCount }: { group: Pr
               <View
                 style={{
                   position: 'absolute',
-                  top: -2,
-                  right: -2,
-                  width: 12,
-                  height: 12,
-                  borderRadius: 6,
+                  top: -4,
+                  right: -6,
+                  minWidth: 18,
+                  height: 18,
+                  paddingHorizontal: 4,
+                  borderRadius: 9,
                   backgroundColor: THEME_COLORS.rose,
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   borderWidth: 2,
                   borderColor: '#f0faf3',
                 }}
-              />
+              >
+                <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Geist_700Bold' }}>
+                  {(unreadCount ?? 0) > 99 ? '99+' : unreadCount}
+                </Text>
+              </View>
             ) : null}
           </View>
           <View style={{ flex: 1 }}>
@@ -105,7 +113,7 @@ function GroupCard({ group, onPress, hasUnread, isLive, liveCount }: { group: Pr
                 </View>
               )}
             </View>
-            {group.description && !isLive && (
+            {group.description && !isLive && !hasUnread && (
               <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 2 }} numberOfLines={1}>
                 {group.description}
               </Text>
@@ -113,6 +121,11 @@ function GroupCard({ group, onPress, hasUnread, isLive, liveCount }: { group: Pr
             {isLive && (
               <Text style={{ color: '#34d399', fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 2 }}>
                 {(liveCount ?? 0) > 0 ? `${liveCount} praying now` : 'Live session in progress'}
+              </Text>
+            )}
+            {!isLive && hasUnread && (
+              <Text style={{ color: THEME_COLORS.rose, fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 2 }}>
+                {unreadCount} unread message{unreadCount === 1 ? '' : 's'}
               </Text>
             )}
           </View>
@@ -799,7 +812,7 @@ export default function GroupsScreen() {
   }
   const [showCreate, setShowCreate] = useState(false);
   const [showCompose, setShowCompose] = useState(false);
-  const { groups: myGroups, isLoadingGroups: myLoading, unreadByGroup, totalUnread } = useGroupUnread();
+  const { groups: myGroups, isLoadingGroups: myLoading, unreadByGroup, unreadCountByGroup, totalUnread } = useGroupUnread();
   const liveByGroup = useGroupLiveRooms(myGroups.map((g) => g.group_id));
 
   // When Create Group or Compose Prayer modal is open, render it fullscreen
@@ -891,7 +904,8 @@ export default function GroupsScreen() {
                     justifyContent: 'center',
                   }}
                 >
-                  <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Geist_700Bold' }}>{totalUnread > 9 ? '9+' : totalUnread}</Text>
+                  <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Geist_700Bold' }}>{totalUnread > 99 ? '99+' : totalUnread}</Text>
+                  
                 </View>
               ) : null}
             </Pressable>
@@ -940,7 +954,7 @@ export default function GroupsScreen() {
                 <Animated.View key={group.group_id} entering={FadeInDown.delay(i * 50).duration(400)}>
                   <GroupCard
                     group={group}
-                    hasUnread={unreadByGroup[group.group_id]}
+                    unreadCount={unreadCountByGroup[group.group_id]}
                     isLive={!!liveRoom}
                     liveCount={liveRoom?.participants?.length}
                     onPress={() => router.push(`/group/${group.group_id}`)}

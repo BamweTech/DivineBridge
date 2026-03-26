@@ -16,7 +16,7 @@ import { Avatar } from '@/components/ui/Avatar';
 export default function ActivityScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { groups: myGroups, isLoadingGroups: isLoading, unreadByGroup } = useGroupUnread();
+  const { groups: myGroups, isLoadingGroups: isLoading, unreadByGroup, unreadCountByGroup, totalUnread } = useGroupUnread();
 
   function goToPrayerWall() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -64,7 +64,7 @@ export default function ActivityScreen() {
               Activity
             </Text>
             <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 2 }}>
-              Community prayer wall and your groups
+              Community prayer wall and your groups{totalUnread > 0 ? ` · ${totalUnread} unread` : ''}
             </Text>
           </View>
         </Animated.View>
@@ -170,16 +170,23 @@ export default function ActivityScreen() {
                           <View
                             style={{
                               position: 'absolute',
-                              top: 0,
-                              right: 0,
-                              width: 12,
-                              height: 12,
-                              borderRadius: 6,
+                              top: -2,
+                              right: -4,
+                              minWidth: 18,
+                              height: 18,
+                              paddingHorizontal: 4,
+                              borderRadius: 9,
                               backgroundColor: THEME_COLORS.rose,
+                              alignItems: 'center',
+                              justifyContent: 'center',
                               borderWidth: 2,
                               borderColor: THEME_COLORS.bg2,
                             }}
-                          />
+                          >
+                            <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Geist_700Bold' }}>
+                              {(unreadCountByGroup[g.group_id] ?? 0) > 99 ? '99+' : unreadCountByGroup[g.group_id]}
+                            </Text>
+                          </View>
                         ) : null}
                       </View>
                       <View style={{ flex: 1 }}>
@@ -187,7 +194,9 @@ export default function ActivityScreen() {
                           {g.name}
                         </Text>
                         <Text style={{ color: unreadByGroup[g.group_id] ? THEME_COLORS.rose : THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12 }}>
-                          {unreadByGroup[g.group_id] ? 'New messages' : 'Open chat'}
+                          {unreadByGroup[g.group_id]
+                            ? `${unreadCountByGroup[g.group_id]} unread message${unreadCountByGroup[g.group_id] === 1 ? '' : 's'}`
+                            : 'Open chat'}
                         </Text>
                       </View>
                       <Icon name="chevron-r" size={16} color={THEME_COLORS.text3} />

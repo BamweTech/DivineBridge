@@ -351,3 +351,62 @@ export function useGroupLatestActivity(groupIds: string[]) {
 
   return latest;
 }
+
+/**
+ * One listener per group for unread message counts since the user's last read timestamp.
+ * Counts only messages from other users so your own sends do not badge the UI.
+ */
+export function useGroupUnreadCounts(groupIds: string[], reads: Record<string, number>) {
+  const { user } = useAuthStore();
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const sortedKey = useMemo(() => [...groupIds].sort().join(','), [groupIds]);
+  const readsKey = useMemo(
+    () =>
+      [...groupIds]
+        .sort()
+        .map((id) => `${id}:${reads[id] ?? 0}`)
+        .join('|'),
+    [groupIds, reads]
+  );
+
+  useEffect(() => {
+    if (!user?.uid || !groupIds.length) {
+      setCounts({});
+      return;
+    }
+
+    const nextBase: Record<string, number> = {};
+    for (const gid of groupIds) nextBase[gid] = 0;
+    setCounts(nextBase);
+
+    const unsubs: Array<() => void> = [];
+
+    for (const gid of groupIds) {
+      const lastRead = reads[gid] ?? 0;
+      const q = query(
+        collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, gid, 'messages'),
+        where('timestamp', '>', new Date(lastRead)),
+        orderBy('timestamp', 'desc')
+      );
+      const unsub = onSnapshot(
+        q,
+        (snap) => {
+          let unread = 0;
+          snap.forEach((d) => {
+            const data = d.data() as { user_id?: string };
+            if (data.user_id !== user.uid) unread += 1;
+          });
+          setCounts((prev) => ({ ...prev, [gid]: unread }));
+        },
+        () => setCounts((prev) => ({ ...prev, [gid]: 0 }))
+      );
+      unsubs.push(unsub);
+    }
+
+    return () => {
+      unsubs.forEach((u) => u());
+    };
+  }, [user?.uid, sortedKey, readsKey]);
+
+  return counts;
+}

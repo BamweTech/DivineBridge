@@ -81,7 +81,7 @@ function TabBarIcon({
               }}
             >
               <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Geist_700Bold' }}>
-                {badgeCount > 9 ? '9+' : badgeCount}
+                {badgeCount > 99 ? '99+' : badgeCount}
               </Text>
             </View>
           ) : null}

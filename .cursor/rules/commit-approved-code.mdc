@@ -1,0 +1,11 @@
+---
+description: Commit and push approved code changes
+alwaysApply: true
+---
+
+# Commit Approved Code
+
+- When the user has approved code changes, commit them before considering the task complete.
+- After a successful commit, push the approved commit to the tracked remote branch unless the user asks not to push.
+- Review the current git status and diff first so only approved changes are included.
+- If unrelated or unapproved local changes are present, pause and ask how to proceed before committing.

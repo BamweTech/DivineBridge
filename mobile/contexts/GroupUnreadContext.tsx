@@ -3,13 +3,14 @@ import { useAuthStore } from '@/stores/authStore';
 import {
   useMyGroups,
   useGroupChatLastReads,
-  useGroupLatestActivity,
+  useGroupUnreadCounts,
 } from '@/hooks/useGroups';
 
 export type GroupUnreadContextValue = {
   groups: ReturnType<typeof useMyGroups>['groups'];
   isLoadingGroups: boolean;
   totalUnread: number;
+  unreadCountByGroup: Record<string, number>;
   unreadByGroup: Record<string, boolean>;
   markGroupChatRead: (groupId: string, atLeastTimestamp?: number) => Promise<void>;
 };
@@ -17,41 +18,32 @@ export type GroupUnreadContextValue = {
 const GroupUnreadContext = createContext<GroupUnreadContextValue | null>(null);
 
 export function GroupUnreadProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuthStore();
   const { groups, isLoading: isLoadingGroups } = useMyGroups();
   const groupIds = useMemo(() => groups.map((g) => g.group_id), [groups]);
   const { reads, markGroupChatRead } = useGroupChatLastReads();
-  const latest = useGroupLatestActivity(groupIds);
+  const unreadCountByGroup = useGroupUnreadCounts(groupIds, reads);
 
   const { totalUnread, unreadByGroup } = useMemo(() => {
     const unreadByGroup: Record<string, boolean> = {};
-    if (!user) {
-      return { totalUnread: 0, unreadByGroup };
-    }
     let totalUnread = 0;
     for (const id of groupIds) {
-      const L = latest[id];
-      if (!L?.ts) {
-        unreadByGroup[id] = false;
-        continue;
-      }
-      const lastRead = reads[id] ?? 0;
-      const isUnread = L.userId !== user.uid && L.ts > lastRead;
-      unreadByGroup[id] = isUnread;
-      if (isUnread) totalUnread += 1;
+      const count = unreadCountByGroup[id] ?? 0;
+      unreadByGroup[id] = count > 0;
+      totalUnread += count;
     }
     return { totalUnread, unreadByGroup };
-  }, [user, groupIds, latest, reads]);
+  }, [groupIds, unreadCountByGroup]);
 
   const value = useMemo<GroupUnreadContextValue>(
     () => ({
       groups,
       isLoadingGroups,
       totalUnread,
+      unreadCountByGroup,
       unreadByGroup,
       markGroupChatRead,
     }),
-    [groups, isLoadingGroups, totalUnread, unreadByGroup, markGroupChatRead]
+    [groups, isLoadingGroups, totalUnread, unreadCountByGroup, unreadByGroup, markGroupChatRead]
   );
 
   return <GroupUnreadContext.Provider value={value}>{children}</GroupUnreadContext.Provider>;

@@ -241,7 +241,7 @@ export default function HomeScreen() {
   const { profile, user } = useAuthStore();
   const queryClient = useQueryClient();
   const today = dayjs().format('YYYY-MM-DD');
-  const { groups: myGroups, totalUnread: groupChatUnread, unreadByGroup } = useGroupUnread();
+  const { groups: myGroups, totalUnread: groupChatUnread, unreadByGroup, unreadCountByGroup } = useGroupUnread();
   const liveByGroup = useGroupLiveRooms(myGroups.map((g) => g.group_id));
   const { devotionalStreak } = useDevotionalStreak();
 
@@ -491,6 +491,26 @@ export default function HomeScreen() {
           }}
         >
           <Icon name="bell" size={18} color={THEME_COLORS.text2} />
+          {groupChatUnread > 0 ? (
+            <View
+              style={{
+                position: 'absolute',
+                top: -4,
+                right: -4,
+                minWidth: 18,
+                height: 18,
+                paddingHorizontal: 4,
+                borderRadius: 9,
+                backgroundColor: THEME_COLORS.rose,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Geist_700Bold' }}>
+                {groupChatUnread > 99 ? '99+' : groupChatUnread}
+              </Text>
+            </View>
+          ) : null}
         </Pressable>
       </Animated.View>
 
@@ -737,16 +757,23 @@ export default function HomeScreen() {
                       <View
                         style={{
                           position: 'absolute',
-                          top: 0,
-                          right: 0,
-                          width: 12,
-                          height: 12,
-                          borderRadius: 6,
+                          top: -2,
+                          right: -4,
+                          minWidth: 18,
+                          height: 18,
+                          paddingHorizontal: 4,
+                          borderRadius: 9,
                           backgroundColor: THEME_COLORS.rose,
-                          borderWidth: 2,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderWidth: 1.5,
                           borderColor: THEME_COLORS.bg2,
                         }}
-                      />
+                      >
+                        <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Geist_700Bold' }}>
+                          {(unreadCountByGroup[g.group_id] ?? 0) > 99 ? '99+' : unreadCountByGroup[g.group_id]}
+                        </Text>
+                      </View>
                     ) : null}
                   </View>
                   <View style={{ flex: 1 }}>
@@ -767,9 +794,11 @@ export default function HomeScreen() {
                         </View>
                       )}
                     </View>
-                    <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12 }}>
+                    <Text style={{ color: unreadByGroup[g.group_id] ? THEME_COLORS.rose : THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12 }}>
                       {isLive
                         ? `${liveByGroup[g.group_id].participants?.length ?? 0} praying now`
+                        : unreadByGroup[g.group_id]
+                          ? `${unreadCountByGroup[g.group_id]} unread message${unreadCountByGroup[g.group_id] === 1 ? '' : 's'}`
                         : `${g.member_count} ${g.member_count === 1 ? 'member' : 'members'}`}
                     </Text>
                   </View>
