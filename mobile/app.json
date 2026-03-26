@@ -108,7 +108,8 @@
           "color": "#F59E0B",
           "sounds": []
         }
-      ]
+      ],
+      "./plugins/withATS.js"
     ],
     "experiments": {
       "typedRoutes": true

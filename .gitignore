@@ -71,6 +71,7 @@ local_storage_data/
 !mobile/package.json
 !mobile/package-lock.json
 !mobile/app.json
+!mobile/tsconfig.json
 !web-client/package.json
 !web-client/package-lock.json
 !media-server/package.json
