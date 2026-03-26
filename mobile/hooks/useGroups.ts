@@ -2,8 +2,8 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   collection,
   query,
-  where,
   onSnapshot,
+  where,
   doc,
   addDoc,
   deleteDoc,
@@ -12,8 +12,6 @@ import {
   getDoc,
   orderBy,
   setDoc,
-  Timestamp,
-  limitToLast,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { COLLECTIONS } from '@/lib/constants';
@@ -190,8 +188,7 @@ export function useGroupChat(groupId: string) {
     if (!groupId) return;
     const q = query(
       collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages'),
-      orderBy('timestamp', 'asc'),
-      limitToLast(100)
+      limit(100)
     );
     const unsub = onSnapshot(
       q,
@@ -386,18 +383,15 @@ export function useGroupUnreadCounts(groupIds: string[], reads: Record<string, n
 
     for (const gid of groupIds) {
       const lastRead = reads[gid] ?? 0;
-      const q = query(
-        collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, gid, 'messages'),
-        where('timestamp', '>', Timestamp.fromMillis(lastRead)),
-        orderBy('timestamp', 'desc')
-      );
+      const ref = collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, gid, 'messages');
       const unsub = onSnapshot(
-        q,
+        ref,
         (snap) => {
           let unread = 0;
           snap.forEach((d) => {
-            const data = d.data() as { user_id?: string };
-            if (data.user_id !== user.uid) unread += 1;
+            const data = d.data() as { user_id?: string; timestamp?: unknown };
+            if (data.user_id === user.uid) return;
+            if (firestoreTimestampMs(data.timestamp) > lastRead) unread += 1;
           });
           setCounts((prev) => ({ ...prev, [gid]: unread }));
         },
