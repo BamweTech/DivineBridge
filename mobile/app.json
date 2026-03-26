@@ -19,7 +19,11 @@
         "NSCameraUsageDescription": "Divine Bridge uses your camera for video prayer sessions.",
         "NSMicrophoneUsageDescription": "Divine Bridge uses your microphone for audio prayer sessions.",
         "NSPhotoLibraryUsageDescription": "Divine Bridge needs access to your photos so you can share them in group chats.",
-        "UIBackgroundModes": ["audio", "voip", "fetch"]
+        "UIBackgroundModes": ["audio", "voip", "fetch"],
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsLocalNetworking": true
+        }
       },
       "config": {
         "googleSignIn": {
