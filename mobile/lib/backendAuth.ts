@@ -46,3 +46,22 @@ export async function syncSignupWithBackend(
     throw new Error(msg);
   }
 }
+
+export async function requestPasswordResetWithBackend(email: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+
+  let message = 'Could not send reset email';
+  try {
+    const data = (await res.json()) as { error?: string; message?: string };
+    if (typeof data.message === 'string') message = data.message;
+    if (typeof data.error === 'string') message = data.error;
+  } catch {
+    /* ignore */
+  }
+
+  if (!res.ok) throw new Error(message);
+}

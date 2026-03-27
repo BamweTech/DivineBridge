@@ -6,12 +6,11 @@ import {
   updateProfile,
   onAuthStateChanged,
   User,
-  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { COLLECTIONS } from '@/lib/constants';
-import { syncSignupWithBackend } from '@/lib/backendAuth';
+import { syncSignupWithBackend, requestPasswordResetWithBackend } from '@/lib/backendAuth';
 import type { UserProfile } from '@/types';
 
 interface AuthState {
@@ -121,7 +120,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   resetPassword: async (email) => {
     set({ isLoading: true, error: null });
     try {
-      await sendPasswordResetEmail(auth, email);
+      await requestPasswordResetWithBackend(email);
     } catch (err: any) {
       set({ error: err.message });
       throw err;

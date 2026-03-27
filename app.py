@@ -228,7 +228,7 @@ def create_app():
     # Email configuration
     app.config['SMTP_SERVER'] = 'smtp.gmail.com'
     app.config['SMTP_PORT'] = 587
-    app.config['SENDER_EMAIL'] = 'divinebridge.prayer@gmail.com'
+    app.config['SENDER_EMAIL'] = 'blessings@divinebridge.io'
     
     # Set host URL for email verification and password reset
     is_cloud_run = os.getenv('K_SERVICE') is not None
