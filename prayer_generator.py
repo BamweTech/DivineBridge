@@ -16,6 +16,8 @@ from typing import Optional, Dict
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+DAILY_PRAYER_LOOKBACK_HOURS = 48
+
 class PrayerGenerator:
     def __init__(self, storage=None):
         logger.debug("Initializing PrayerGenerator")
@@ -46,10 +48,11 @@ class PrayerGenerator:
             
     def _get_default_prompt(self):
         """Return the default prayer generation prompt (HYBRID: Structure + Warmth)"""
-        return """You are a compassionate prayer leader writing today's global prayer for a Christian community. Write as if you're gathering believers together and leading them in heartfelt prayer.
+        lookback_hours = DAILY_PRAYER_LOOKBACK_HOURS
+        return f"""You are a compassionate prayer leader writing today's global prayer for a Christian community. Write as if you're gathering believers together and leading them in heartfelt prayer.
 
 RESEARCH & NEWS GATHERING:
-1. Search the web for the latest (last 72 hours) news worldwide about:
+1. Search the web for the latest (last {lookback_hours} hours) news worldwide about:
    - Natural disasters (earthquakes, floods, storms, wildfires, etc.)
    - Wars and armed conflicts
    - Mass shootings and gun violence
@@ -66,12 +69,12 @@ RESEARCH & NEWS GATHERING:
    - Firsthand accounts from social media (Twitter/X, TikTok, YouTube)
 
 3. Prioritize:
-   - Latest developments (focus on last 72 hours)
+   - Latest developments (focus on last {lookback_hours} hours)
    - Underreported regions and communities
    - Specific locations and human impact
    - Accuracy and verification from multiple sources
 
-⚠️ CRITICAL: If there were ANY mass shootings or gun violence incidents in the last 72 hours, you MUST include them in your prayer. Search specifically for "mass shooting", "gun violence", "shooting incident", "active shooter" in your research. Use search queries like "mass shooting today", "gun violence December 2025", "shooting incident last 3 days". If you find ANY mass shootings, you MUST mention them explicitly in the prayer body (e.g., "We pray for victims of recent mass shootings", "We lift up communities shattered by gun violence", "We remember those affected by shootings").
+⚠️ CRITICAL: If there were ANY mass shootings or gun violence incidents in the last {lookback_hours} hours, you MUST include them in your prayer. Search specifically for "mass shooting", "gun violence", "shooting incident", "active shooter" in your research. Use search queries like "mass shooting today", "gun violence this week", "shooting incident last 2 days". If you find ANY mass shootings, you MUST mention them explicitly in the prayer body (e.g., "We pray for victims of recent mass shootings", "We lift up communities shattered by gun violence", "We remember those affected by shootings").
 
 PRAYER STRUCTURE & CONTENT:
 Write a prayer that addresses current global challenges with both structure and warmth:
@@ -88,7 +91,7 @@ Body (2-3 paragraphs):
   * Name the regions/countries affected
   * Acknowledge the suffering without graphic details or specific casualty numbers
   * Pray for specific groups: families, children, aid workers, leaders, those grieving
-  * ⚠️ CRITICAL REQUIREMENT: If ANY mass shootings occurred in the last 72 hours, you MUST include them in your prayer. Search for "mass shooting December 2025", "gun violence today", "shooting incident last 3 days". If found, mention them explicitly in the first or second paragraph (e.g., "We pray for victims of recent mass shootings", "We lift up communities shattered by gun violence", "We remember those affected by shootings and their families"). DO NOT skip mass shootings if they occurred.
+  * ⚠️ CRITICAL REQUIREMENT: If ANY mass shootings occurred in the last {lookback_hours} hours, you MUST include them in your prayer. Search for "mass shooting today", "gun violence today", "shooting incident last 2 days". If found, mention them explicitly in the first or second paragraph (e.g., "We pray for victims of recent mass shootings", "We lift up communities shattered by gun violence", "We remember those affected by shootings and their families"). DO NOT skip mass shootings if they occurred.
   * Include victims of wars and armed conflicts around the world
 - ALWAYS include prayer for:
   * Those who are sick and fighting illness

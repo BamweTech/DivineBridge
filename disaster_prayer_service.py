@@ -37,11 +37,14 @@ DISASTER_TYPES = [
     'building collapse', 'bridge collapse', 'industrial accident', 'explosion',
 ]
 
-# Breaking disaster discovery: reject items older than this (prompt + validation must align)
-DISASTER_DISCOVERY_MAX_AGE_DAYS = 7
-# Summaries often repeat the onset date ("on March 10…") while the story is still breaking; use a
-# looser cutoff only for calendar dates *in prose* so we still block October 2025–style recaps.
-DISASTER_TEXT_DATE_MAX_AGE_DAYS = 21
+# Global Prayer Watch is the active-event feed on the mobile prayer wall, so discovery should
+# stay close to breaking-news cadence while still allowing a short tail for active response.
+DISASTER_DISCOVERY_MAX_AGE_DAYS = 3
+BREAKING_EVENT_PRIORITY_HOURS = 24
+ACTIVE_EVENT_MAX_AGE_HOURS = 72
+# Summaries sometimes repeat the onset date ("on March 10…") while an event is still active; keep
+# a modest buffer for prose dates, but much tighter than the daily prayer's broader summary scope.
+DISASTER_TEXT_DATE_MAX_AGE_DAYS = 10
 # "March 2026" without a day: treat as stale only if that month is well behind "now"
 DISASTER_TEXT_MONTH_ONLY_MIN_AGE_DAYS = 45
 
@@ -62,7 +65,7 @@ class DisasterPrayerService:
     
     def search_breaking_disasters(self) -> List[Dict]:
         """
-        Search for breaking news about disasters in the last few hours
+        Search for active breaking events for Global Prayer Watch
         
         Returns:
             List of disaster dictionaries with news details
@@ -79,12 +82,15 @@ class DisasterPrayerService:
             reject_ts = (now - timedelta(days=max_age_days + 14)).strftime("%Y-%m-%dT%H:%M:%SZ")
             today_tokens = f"{now.strftime('%B')} {now.day}, {now.year}"
 
-            prompt = f"""You are a breaking news monitor searching for RECENT disasters and crises worldwide.
+            prompt = f"""You are the Global Prayer Watch news monitor searching for ACTIVE breaking events worldwide.
 
 CURRENT TIME: {current_time}
 ROLLING WINDOW: Include only events (or clearly documented major breaking updates) from **on or after {window_start}** through **{window_end}** — approximately the last **{max_age_days} days**. Do not anchor examples to a fixed calendar month; use real-time search.
 
 CRITICAL RELEVANCE:
+- Global Prayer Watch is for active, breaking-style situations people should be praying about right now.
+- Favor events that are still unfolding: rescues underway, evacuations, emergency declarations, active response operations, major aftershocks/new impacts, fast-rising casualty counts, or fresh official warnings.
+- If an event happened inside the window but no longer has an active response or meaningful new development, omit it.
 - Do NOT include named storms, earthquakes, or conflicts whose **main** reporting is months old (e.g. summaries that say the event was in a past month/year like "October {now.year - 1}" unless there is a verifiable **new** development inside the window above).
 - Do NOT recycle background articles: the **news_summary** must read as current breaking context, not a historical recap.
 - If you cannot verify timing within the window, omit the item.
@@ -105,8 +111,8 @@ SEARCH INSTRUCTIONS:
    For airport/runway/tarmac incidents, passenger jet emergencies, and serious aviation accidents, use type **major_accident**.
 
 4. TIME WINDOW:
-   - Highest priority: last 12–24 hours.
-   - Also allow {max_age_days}-day window only for ongoing emergencies with **new** developments in that period.
+   - Highest priority: last 6–24 hours.
+   - Also allow the full {max_age_days}-day window only for genuinely active emergencies with **new** developments in that period.
    - EXCLUDE: anniversaries, "on this day", old recaps, stories whose primary dates fall **before** the window.
 
 For each qualifying disaster, return a JSON array with this EXACT structure:
@@ -117,7 +123,7 @@ For each qualifying disaster, return a JSON array with this EXACT structure:
     "location": "City/region if known",
     "severity": "minor" | "moderate" | "severe" | "catastrophic",
     "casualties": number or null,
-    "news_summary": "2–4 sentences; must not cite a primary event date outside the allowed window unless clearly labeled as a **new** update in-window",
+    "news_summary": "2–4 sentences; explain why the event is active right now; must not cite a primary event date outside the allowed window unless clearly labeled as a **new** update in-window",
     "news_source": "Outlet name or URL",
     "timestamp": "ISO 8601 UTC when the event or the reported breaking update occurred (YYYY-MM-DDTHH:MM:SSZ)"
   }}
@@ -219,7 +225,7 @@ REJECT (too old — do not emit items like this):
             # Validate and normalize disasters
             validated_disasters = []
             now = datetime.now()
-            max_age = timedelta(days=DISASTER_DISCOVERY_MAX_AGE_DAYS)
+            max_age = timedelta(hours=ACTIVE_EVENT_MAX_AGE_HOURS)
 
             for disaster in disasters:
                 if isinstance(disaster, dict) and disaster.get('country') and disaster.get('type'):
@@ -281,6 +287,15 @@ REJECT (too old — do not emit items like this):
                             f"{disaster.get('country')}"
                         )
                         continue
+                    if (
+                        age.total_seconds() > BREAKING_EVENT_PRIORITY_HOURS * 3600
+                        and not self._summary_indicates_active_response(combined_text)
+                    ):
+                        logger.warning(
+                            f"Rejected stale non-active disaster: {disaster.get('type')} in "
+                            f"{disaster.get('country')}"
+                        )
+                        continue
 
                     # Normalize disaster type
                     disaster['type'] = self._normalize_disaster_type(disaster.get('type', ''))
@@ -311,6 +326,36 @@ REJECT (too old — do not emit items like this):
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             return []
+
+    @staticmethod
+    def _summary_indicates_active_response(text: str) -> bool:
+        """Heuristic for whether a writeup still reads like an active breaking event."""
+        lowered = (text or '').lower()
+        active_markers = (
+            'rescue',
+            'search and rescue',
+            'emergency',
+            'evacuat',
+            'warning',
+            'alert',
+            'responders',
+            'response',
+            'underway',
+            'ongoing',
+            'continuing',
+            'still burning',
+            'still missing',
+            'aftershock',
+            'landfall',
+            'shelter',
+            'hospital',
+            'recover',
+            'crews',
+            'authorities said',
+            'officials said',
+            'declared',
+        )
+        return any(marker in lowered for marker in active_markers)
     
     def _normalize_disaster_type(self, disaster_type: str) -> str:
         """Normalize disaster type to standard format"""
@@ -600,7 +645,7 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
     
     def get_active_disaster_prayers(self) -> List[Dict]:
         """
-        Get all active disaster prayers (not expired, within 3 days, and disasters from last week)
+        Get all active disaster prayers for Global Prayer Watch.
         Prioritizes grouped prayers, falls back to individual prayers
         
         Returns:
@@ -610,8 +655,7 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
             prayers = []
             grouped_prayers = []
             now = datetime.now()
-            # Only show disasters from the last week (7 days)
-            max_disaster_age = timedelta(days=7)
+            max_disaster_age = timedelta(hours=ACTIVE_EVENT_MAX_AGE_HOURS)
             
             # List all disaster prayers (both grouped and individual)
             blobs = self.storage.bucket.list_blobs(prefix='disaster_prayers/')
@@ -634,24 +678,26 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                         
                         # Check disaster timestamp for grouped prayers
                         if prayer_data.get('is_grouped') or 'grouped' in blob.name:
-                            # For grouped prayers, check created_at (when we generated the prayer)
-                            # Only include if created within last week
-                            created_at_str = prayer_data.get('created_at')
-                            if created_at_str:
+                            # For grouped prayers, use the latest refresh time so active events can
+                            # stay visible while the hourly summarizer keeps updating them.
+                            refreshed_at_str = prayer_data.get('updated_at') or prayer_data.get('created_at')
+                            if refreshed_at_str:
                                 try:
-                                    created_at = datetime.fromisoformat(created_at_str)
-                                    if (now - created_at) <= max_disaster_age:
+                                    refreshed_at = datetime.fromisoformat(str(refreshed_at_str).replace('Z', '+00:00'))
+                                    if refreshed_at.tzinfo:
+                                        refreshed_at = refreshed_at.replace(tzinfo=None)
+                                    if (now - refreshed_at) <= max_disaster_age:
                                         # Prayer was generated recently — trust it.
                                         # Text-scanning prayer prose for old dates was
                                         # over-filtering: summaries naturally reference
                                         # when events started (e.g. "conflict since 2024").
                                         grouped_prayers.append(prayer_data)
                                     else:
-                                        logger.info(f"Filtered out old grouped prayer: {blob.name} (created {now - created_at} ago)")
+                                        logger.info(f"Filtered out inactive grouped prayer: {blob.name} (last update {now - refreshed_at} ago)")
                                         blob.delete()
                                         logger.info(f"Deleted old grouped disaster prayer: {blob.name}")
                                 except Exception as e:
-                                    logger.warning(f"Error parsing created_at for {blob.name}: {e}")
+                                    logger.warning(f"Error parsing grouped prayer recency for {blob.name}: {e}")
                                     continue
                         else:
                             # For individual prayers, check the disaster timestamp
@@ -674,7 +720,7 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                                             pass
                                     
                                     if disaster_time:
-                                        # Check if disaster is within last week
+                                        # Check if disaster is still within the active-event window
                                         if (now - disaster_time.replace(tzinfo=None)) <= max_disaster_age:
                                             prayers.append(prayer_data)
                                         else:
@@ -726,7 +772,7 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
             grouped_prayers.sort(key=lambda x: self._prayer_recency_ts(x), reverse=True)
             prayers.sort(key=lambda x: self._prayer_recency_ts(x), reverse=True)
             
-            logger.info(f"Returning {len(grouped_prayers)} grouped prayers and {len(prayers)} individual prayers (all within last week)")
+            logger.info(f"Returning {len(grouped_prayers)} grouped prayers and {len(prayers)} individual prayers in the active-event window")
             
             # Return grouped prayers first, then individual prayers
             return grouped_prayers + prayers
