@@ -20,7 +20,11 @@
         "NSMicrophoneUsageDescription": "Divine Bridge uses your microphone for audio prayer sessions.",
         "NSPhotoLibraryUsageDescription": "Divine Bridge needs access to your photos so you can share them in group chats.",
         "NSPhotoLibraryAddUsageDescription": "Divine Bridge needs permission to save shared photos and videos to your device.",
-        "UIBackgroundModes": ["audio", "voip", "fetch"],
+        "UIBackgroundModes": [
+          "audio",
+          "voip",
+          "fetch"
+        ],
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true,
           "NSAllowsLocalNetworking": true,
@@ -53,7 +57,13 @@
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.VIBRATE",
-        "android.permission.RECEIVE_BOOT_COMPLETED"
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
       ],
       "intentFilters": [
         {
@@ -66,7 +76,10 @@
               "pathPrefix": "/join"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -130,9 +143,11 @@
       "typedRoutes": true
     },
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "divinebridge"
+        "projectId": "e1dd06ba-dda2-4c47-ba99-13f9c8443005"
       }
-    }
+    },
+    "owner": "kubwayo"
   }
 }
