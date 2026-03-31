@@ -12,12 +12,19 @@ import {
   getDoc,
   orderBy,
   setDoc,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { COLLECTIONS } from '@/lib/constants';
 import { useAuthStore } from '@/stores/authStore';
 import { getDisplayName } from '@/lib/userDisplayName';
-import type { PrayerGroup, GroupChatMessage, GroupChatAttachment, PrayerRoom } from '@/types';
+import type {
+  PrayerGroup,
+  GroupChatMessage,
+  GroupChatAttachment,
+  GroupChatReplyRef,
+  PrayerRoom,
+} from '@/types';
 
 // useLiveRooms — real-time Firestore listener for active prayer rooms.
 // Rooms appear instantly when created without polling.
@@ -214,7 +221,11 @@ export function useGroupChat(groupId: string) {
   async function sendMessage(
     text: string,
     type: GroupChatMessage['message_type'] = 'text',
-    options?: { linkUrl?: string; attachments?: GroupChatAttachment[] }
+    options?: {
+      linkUrl?: string;
+      attachments?: GroupChatAttachment[];
+      replyTo?: GroupChatReplyRef | null;
+    }
   ) {
     if (!user) return;
     const body = text.trim();
@@ -234,8 +245,40 @@ export function useGroupChat(groupId: string) {
     };
     if (link) payload.link_url = link;
     if (atts.length > 0) payload.attachments = atts;
+    if (options?.replyTo) payload.reply_to = options.replyTo;
 
     await addDoc(collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages'), payload);
+  }
+
+  async function toggleReaction(messageId: string, emoji: string) {
+    if (!user?.uid || !groupId || !emoji.trim()) return;
+
+    const ref = doc(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages', messageId);
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) return;
+
+      const data = snap.data() as { reactions?: Record<string, unknown> };
+      const nextReactions: Record<string, string[]> = {};
+      const rawReactions = data.reactions ?? {};
+
+      for (const [key, value] of Object.entries(rawReactions)) {
+        if (!Array.isArray(value)) continue;
+        const users = value.filter((item): item is string => typeof item === 'string');
+        if (users.length > 0) nextReactions[key] = users;
+      }
+
+      const currentUsers = nextReactions[emoji] ?? [];
+      const hasReacted = currentUsers.includes(user.uid);
+      const updatedUsers = hasReacted
+        ? currentUsers.filter((uid) => uid !== user.uid)
+        : [...currentUsers, user.uid];
+
+      if (updatedUsers.length > 0) nextReactions[emoji] = updatedUsers;
+      else delete nextReactions[emoji];
+
+      tx.update(ref, { reactions: nextReactions });
+    });
   }
 
   async function deleteMessage(messageId: string) {
@@ -243,7 +286,7 @@ export function useGroupChat(groupId: string) {
     await deleteDoc(doc(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages', messageId));
   }
 
-  return { messages, isLoading, sendMessage, deleteMessage };
+  return { messages, isLoading, sendMessage, toggleReaction, deleteMessage };
 }
 
 // ── Group chat unread (latest message vs per-group last read on user doc) ─────

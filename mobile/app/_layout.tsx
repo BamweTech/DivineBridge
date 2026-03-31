@@ -170,7 +170,7 @@ function JoinGroupModal({
           ) : (
             <View style={{ alignItems: 'center', paddingVertical: 20 }}>
               <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: 'rgba(180,80,60,0.08)', borderWidth: 1, borderColor: 'rgba(180,80,60,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                <Icon name="error_outline" size={28} color="#b4503c" />
+                <Icon name="cross" size={28} color="#b4503c" />
               </View>
               <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18, marginBottom: 6, textAlign: 'center' }}>
                 Could not join group

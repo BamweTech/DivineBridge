@@ -2,7 +2,20 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, storage } from '@/lib/firebase';
 import type { GroupChatAttachment } from '@/types';
 
-const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_BYTES = 50 * 1024 * 1024;
+
+function isAllowedGroupChatFileType(contentType: string) {
+  return (
+    contentType.startsWith('image/') ||
+    contentType.startsWith('video/') ||
+    contentType === 'application/pdf' ||
+    contentType === 'application/msword' ||
+    contentType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    contentType === 'application/vnd.ms-excel' ||
+    contentType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    contentType === 'text/plain'
+  );
+}
 
 export async function uploadGroupChatFile(
   groupId: string,
@@ -12,9 +25,9 @@ export async function uploadGroupChatFile(
 ): Promise<GroupChatAttachment> {
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error('Not signed in');
-  if (blob.size > MAX_BYTES) throw new Error('File must be 10 MB or smaller');
-  if (!contentType.startsWith('image/') && contentType !== 'application/pdf') {
-    throw new Error('Only photos and PDF files are allowed');
+  if (blob.size > MAX_BYTES) throw new Error('File must be 50 MB or smaller');
+  if (!isAllowedGroupChatFileType(contentType)) {
+    throw new Error('Only photos, videos, and supported documents are allowed');
   }
 
   const ext = (fileName.split('.').pop() || 'bin').replace(/[^a-z0-9]/gi, '').toLowerCase() || 'bin';

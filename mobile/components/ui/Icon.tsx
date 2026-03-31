@@ -43,6 +43,7 @@ export type IconName =
   | 'minimize'
   | 'audio'
   | 'share'
+  | 'download'
   | 'calendar'
   | 'plus'
   | 'chevron-r'
@@ -199,6 +200,14 @@ const Icon: React.FC<IconProps> = ({
         <Path {...s} d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" />
         <Polyline {...s} points="16 6 12 2 8 6" />
         <Line {...s} x1="12" y1="2" x2="12" y2="15" />
+      </G>
+    ),
+
+    download: (
+      <G>
+        <Path {...s} d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" />
+        <Polyline {...s} points="8 12 12 16 16 12" />
+        <Line {...s} x1="12" y1="3" x2="12" y2="16" />
       </G>
     ),
 

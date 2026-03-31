@@ -132,6 +132,13 @@ export interface GroupChatAttachment {
   size_bytes?: number;
 }
 
+export interface GroupChatReplyRef {
+  message_id: string;
+  user_id: string;
+  user_name: string;
+  message: string;
+}
+
 export interface GroupChatMessage {
   message_id: string;
   group_id: string;
@@ -144,6 +151,8 @@ export interface GroupChatMessage {
   link_url?: string;
   /** Files uploaded to Firebase Storage (see storage.rules) */
   attachments?: GroupChatAttachment[];
+  /** Lightweight quoted reference used to render reply previews without refetching. */
+  reply_to?: GroupChatReplyRef | null;
   timestamp: number;
   reactions?: Record<string, string[]>;
   read_by?: string[];

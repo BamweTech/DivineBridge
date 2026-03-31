@@ -16,7 +16,7 @@ service firebase.storage {
         && request.auth.uid == userId;
     }
 
-    // Group chat uploads — members only; images + PDF; 10 MiB max
+    // Group chat uploads — members only; images, videos, documents; 50 MiB max
     match /group_chat_uploads/{groupId}/{userId}/{fileName} {
       allow read: if request.auth != null
         && firestore.get(/databases/(default)/documents/prayer_groups/$(groupId)).data.member_ids.hasAny([request.auth.uid]);
@@ -24,10 +24,16 @@ service firebase.storage {
       allow create: if request.auth != null
         && request.auth.uid == userId
         && firestore.get(/databases/(default)/documents/prayer_groups/$(groupId)).data.member_ids.hasAny([request.auth.uid])
-        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.size < 50 * 1024 * 1024
         && (
           request.resource.contentType.matches('image/.*')
+          || request.resource.contentType.matches('video/.*')
           || request.resource.contentType == 'application/pdf'
+          || request.resource.contentType == 'application/msword'
+          || request.resource.contentType == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          || request.resource.contentType == 'application/vnd.ms-excel'
+          || request.resource.contentType == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          || request.resource.contentType == 'text/plain'
         )
         && fileName.matches('^[a-zA-Z0-9_.-]+$')
         && fileName.size() < 200;

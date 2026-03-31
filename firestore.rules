@@ -385,6 +385,14 @@ service cloud.firestore {
         || validGroupChatAttachments(request.resource.data.attachments);
     }
 
+    function groupChatReactionUpdateValid() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
+        && (
+          !request.resource.data.keys().hasAny(['reactions'])
+          || request.resource.data.reactions is map
+        );
+    }
+
     // ─── Group Chat Messages ──────────────────────────────────────────────────
     match /group_chat_messages/{groupId}/messages/{messageId} {
       allow read: if isPrayerGroupMember(groupId);
@@ -396,7 +404,10 @@ service cloud.firestore {
                   linkUrlFieldValid() &&
                   attachmentsFieldValid();
       allow update: if isPrayerGroupMember(groupId) &&
-                  resource.data.user_id == request.auth.uid;
+                  (
+                    resource.data.user_id == request.auth.uid
+                    || groupChatReactionUpdateValid()
+                  );
       allow delete: if isPrayerGroupMember(groupId) &&
                   resource.data.user_id == request.auth.uid;
     }
