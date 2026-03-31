@@ -29,7 +29,6 @@ import dayjs from 'dayjs';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
-import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
 import { ResizeMode, Video } from 'expo-av';
@@ -189,6 +188,14 @@ async function downloadAttachmentToCache(att: Pick<GroupChatAttachment, 'url' | 
   const result = await FileSystem.downloadAsync(att.url, dest);
   if (result.status !== 200) throw new Error('Could not download file.');
   return result.uri;
+}
+
+async function getMediaLibraryModule() {
+  try {
+    return await import('expo-media-library');
+  } catch {
+    throw new Error('Media saving needs the latest app build. Please update the app and try again.');
+  }
 }
 
 function toReplyRef(msg: GroupChatMessage): GroupChatReplyRef {
@@ -1436,6 +1443,7 @@ export default function GroupScreen() {
     if (!viewerMedia) return;
     try {
       setMediaActionBusy('save');
+      const MediaLibrary = await getMediaLibraryModule();
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission needed', 'Please allow photo library access to save media to your device.');
