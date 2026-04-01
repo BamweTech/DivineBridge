@@ -1557,12 +1557,10 @@ export default function GroupScreen() {
 
   const prevMessageLenRef = useRef(0);
   const prevGroupIdRef = useRef(id);
-  /** 'pending' until we've positioned the main list after open/group switch. */
-  const mainAnchorRef = useRef<'pending' | 'done'>('pending');
-  const fsAnchorRef = useRef<'pending' | 'done'>('done');
-  const mainDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** Captured on first load so it doesn't change once we start positioning. */
+  /** true = we still need to do the one-time initial scroll position. */
+  const mainNeedsInitialScrollRef = useRef(true);
+  const fsNeedsInitialScrollRef = useRef(false);
+  /** Captured once so the target doesn't shift while we wait for layout. */
   const initialUnreadIndexRef = useRef<number>(-1);
   const initialUnreadCapturedRef = useRef(false);
 
@@ -1572,97 +1570,70 @@ export default function GroupScreen() {
       prevMessageLenRef.current = 0;
       messageLayoutMapRef.current = {};
       fsMessageLayoutMapRef.current = {};
-      mainAnchorRef.current = 'pending';
+      mainNeedsInitialScrollRef.current = true;
       initialUnreadCapturedRef.current = false;
       initialUnreadIndexRef.current = -1;
-      if (mainDebounceRef.current) { clearTimeout(mainDebounceRef.current); mainDebounceRef.current = null; }
-      if (fsDebounceRef.current) { clearTimeout(fsDebounceRef.current); fsDebounceRef.current = null; }
     }
   }, [id]);
 
   useLayoutEffect(() => {
-    fsAnchorRef.current = avFullscreen ? 'pending' : 'done';
+    fsNeedsInitialScrollRef.current = avFullscreen;
   }, [avFullscreen]);
 
-  function scrollMainToTarget() {
+  function handleMainContentSizeChange(_w: number, h: number) {
+    if (h <= 0 || !mainNeedsInitialScrollRef.current) return;
+
     if (!initialUnreadCapturedRef.current && displayedMessages.length > 0) {
       initialUnreadCapturedRef.current = true;
       initialUnreadIndexRef.current = firstUnreadIndex;
     }
+
     const targetIdx = initialUnreadIndexRef.current;
-    if (targetIdx < 0 || targetIdx >= displayedMessages.length) {
-      scrollRef.current?.scrollToEnd({ animated: false });
-      setIsNearBottom(true);
-      return;
-    }
-    const mid = displayedMessages[targetIdx]?.message_id;
-    const y = mid ? messageLayoutMapRef.current[mid] : undefined;
-    if (typeof y === 'number') {
-      scrollRef.current?.scrollTo({ y: Math.max(0, y - 60), animated: false });
-      setIsNearBottom(false);
+    const hasUnreadTarget = targetIdx >= 0 && targetIdx < displayedMessages.length;
+
+    if (hasUnreadTarget) {
+      const mid = displayedMessages[targetIdx]?.message_id;
+      const y = mid ? messageLayoutMapRef.current[mid] : undefined;
+      if (typeof y === 'number') {
+        scrollRef.current?.scrollTo({ y: Math.max(0, y - 60), animated: false });
+        setIsNearBottom(false);
+        mainNeedsInitialScrollRef.current = false;
+      } else {
+        scrollRef.current?.scrollToEnd({ animated: false });
+      }
     } else {
       scrollRef.current?.scrollToEnd({ animated: false });
       setIsNearBottom(true);
+      mainNeedsInitialScrollRef.current = false;
     }
   }
 
-  function handleMainContentSizeChange(_w: number, h: number) {
-    if (h <= 0 || mainAnchorRef.current === 'done') return;
-    scrollMainToTarget();
-    if (mainDebounceRef.current) clearTimeout(mainDebounceRef.current);
-    mainDebounceRef.current = setTimeout(() => {
-      mainDebounceRef.current = null;
-      if (mainAnchorRef.current === 'done') return;
-      scrollMainToTarget();
-      mainAnchorRef.current = 'done';
-    }, 250);
-  }
-
   function handleFsContentSizeChange(_w: number, h: number) {
-    if (h <= 0 || fsAnchorRef.current === 'done') return;
+    if (h <= 0 || !fsNeedsInitialScrollRef.current) return;
     if (!avFullscreen || !fsChatOpen) return;
     fsScrollRef.current?.scrollToEnd({ animated: false });
-    if (fsDebounceRef.current) clearTimeout(fsDebounceRef.current);
-    fsDebounceRef.current = setTimeout(() => {
-      fsDebounceRef.current = null;
-      if (fsAnchorRef.current === 'done') return;
-      fsScrollRef.current?.scrollToEnd({ animated: false });
-      fsAnchorRef.current = 'done';
-    }, 250);
+    fsNeedsInitialScrollRef.current = false;
   }
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const len = displayedMessages.length;
     const prevLen = prevMessageLenRef.current;
 
     if (len === 0 && pendingCount === 0) {
       prevMessageLenRef.current = 0;
-      mainAnchorRef.current = 'pending';
+      mainNeedsInitialScrollRef.current = true;
       initialUnreadCapturedRef.current = false;
       initialUnreadIndexRef.current = -1;
       return;
     }
 
-    if (mainAnchorRef.current === 'pending' && (len > 0 || pendingCount > 0)) {
-      scrollMainToTarget();
-    }
-
-    if (len > prevLen && prevLen > 0 && mainAnchorRef.current === 'done') {
+    if (len > prevLen && prevLen > 0 && !mainNeedsInitialScrollRef.current) {
       scrollRef.current?.scrollToEnd({ animated: false });
-      fsScrollRef.current?.scrollToEnd({ animated: false });
       setIsNearBottom(true);
     }
 
     prevMessageLenRef.current = len;
   }, [displayedMessages.length, pendingCount, id]);
-
-  useLayoutEffect(() => {
-    const len = displayedMessages.length;
-    if (len === 0 && pendingCount === 0) return;
-    if (fsAnchorRef.current === 'pending' && avFullscreen && fsChatOpen && (len > 0 || pendingCount > 0)) {
-      fsScrollRef.current?.scrollToEnd({ animated: false });
-    }
-  }, [displayedMessages.length, pendingCount, avFullscreen, fsChatOpen]);
 
   useEffect(() => {
     if (!highlightedMessageId) return;
@@ -1670,20 +1641,11 @@ export default function GroupScreen() {
     return () => clearTimeout(timeout);
   }, [highlightedMessageId]);
 
-  function scrollNearBottomFromEvent(event: NativeSyntheticEvent<NativeScrollEvent>) {
+  function handleMainScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
-    return distanceFromBottom < 72;
-  }
-
-  function handleMainScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    const nearBottom = scrollNearBottomFromEvent(event);
+    const nearBottom = distanceFromBottom < 72;
     setIsNearBottom(nearBottom);
-
-    if (mainAnchorRef.current === 'pending') {
-      if (mainDebounceRef.current) { clearTimeout(mainDebounceRef.current); mainDebounceRef.current = null; }
-      mainAnchorRef.current = 'done';
-    }
 
     if (nearBottom && id) {
       const last = displayedMessages[displayedMessages.length - 1];
@@ -1693,13 +1655,10 @@ export default function GroupScreen() {
   }
 
   function handleFsScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    const nearBottom = scrollNearBottomFromEvent(event);
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
+    const nearBottom = distanceFromBottom < 72;
     setIsNearBottom(nearBottom);
-
-    if (fsAnchorRef.current === 'pending') {
-      if (fsDebounceRef.current) { clearTimeout(fsDebounceRef.current); fsDebounceRef.current = null; }
-      fsAnchorRef.current = 'done';
-    }
 
     if (nearBottom && id) {
       const last = displayedMessages[displayedMessages.length - 1];
