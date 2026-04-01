@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -1556,67 +1556,71 @@ export default function GroupScreen() {
   }, [messages]);
 
   const prevMessageLenRef = useRef(0);
-  const fsChatScrollReadyRef = useRef(false);
-  const mainInitialScrollDoneRef = useRef(false);
+  const prevGroupIdRef = useRef(id);
+  /** True until the main list has been snapped to bottom once after open / group switch (content-size + layout). */
+  const mainAnchorBottomPendingRef = useRef(true);
+  /** True until fullscreen chat panel has snapped to bottom after the modal opens. */
+  const fsAnchorBottomPendingRef = useRef(false);
 
-  useEffect(() => {
-    prevMessageLenRef.current = 0;
-    fsChatScrollReadyRef.current = false;
-    mainInitialScrollDoneRef.current = false;
-    messageLayoutMapRef.current = {};
-    fsMessageLayoutMapRef.current = {};
+  useLayoutEffect(() => {
+    if (prevGroupIdRef.current !== id) {
+      prevGroupIdRef.current = id;
+      prevMessageLenRef.current = 0;
+      messageLayoutMapRef.current = {};
+      fsMessageLayoutMapRef.current = {};
+      mainAnchorBottomPendingRef.current = true;
+    }
   }, [id]);
 
-  useEffect(() => {
-    const len = displayedMessages.length;
-    const prevLen = prevMessageLenRef.current;
-    const isAppend = len > prevLen && prevLen > 0;
-
-    if (len === 0 && pendingCount === 0) {
-      prevMessageLenRef.current = 0;
-      return;
-    }
-
-    const snapToBottomMain = () => {
-      scrollRef.current?.scrollToEnd({ animated: false });
-      setIsNearBottom(true);
-    };
-
-    if (prevLen === 0 && len > 0 && !mainInitialScrollDoneRef.current) {
-      mainInitialScrollDoneRef.current = true;
-      setTimeout(snapToBottomMain, 80);
-    } else if (prevLen === 0 && len === 0 && pendingCount > 0) {
-      setTimeout(snapToBottomMain, 80);
-    } else if (isAppend) {
-      setTimeout(snapToBottomMain, 0);
-    }
-
-    prevMessageLenRef.current = len;
-  }, [id, displayedMessages.length, pendingCount]);
-
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!avFullscreen) {
-      fsChatScrollReadyRef.current = false;
+      fsAnchorBottomPendingRef.current = false;
+    } else {
+      fsAnchorBottomPendingRef.current = true;
     }
   }, [avFullscreen]);
 
-  useEffect(() => {
+  function handleMainContentSizeChange(_w: number, h: number) {
+    if (h <= 0 || !mainAnchorBottomPendingRef.current) return;
+    scrollRef.current?.scrollToEnd({ animated: false });
+    setIsNearBottom(true);
+    mainAnchorBottomPendingRef.current = false;
+  }
+
+  function handleFsContentSizeChange(_w: number, h: number) {
+    if (h <= 0 || !fsAnchorBottomPendingRef.current) return;
     if (!avFullscreen || !fsChatOpen) return;
-    if (fsChatScrollReadyRef.current) return;
+    fsScrollRef.current?.scrollToEnd({ animated: false });
+    fsAnchorBottomPendingRef.current = false;
+  }
+
+  useLayoutEffect(() => {
     const len = displayedMessages.length;
-    if (len === 0 && pendingCount === 0) return;
-    if (len === 0) {
-      setTimeout(() => {
-        fsScrollRef.current?.scrollToEnd({ animated: false });
-      }, 80);
+    const prevLen = prevMessageLenRef.current;
+
+    if (len === 0 && pendingCount === 0) {
+      prevMessageLenRef.current = 0;
+      mainAnchorBottomPendingRef.current = true;
       return;
     }
 
-    fsChatScrollReadyRef.current = true;
-    setTimeout(() => {
+    if (mainAnchorBottomPendingRef.current && (len > 0 || pendingCount > 0)) {
+      scrollRef.current?.scrollToEnd({ animated: false });
+      setIsNearBottom(true);
+    }
+
+    if (fsAnchorBottomPendingRef.current && avFullscreen && fsChatOpen && (len > 0 || pendingCount > 0)) {
       fsScrollRef.current?.scrollToEnd({ animated: false });
-    }, 80);
-  }, [avFullscreen, fsChatOpen, displayedMessages.length, pendingCount]);
+    }
+
+    if (len > prevLen && prevLen > 0) {
+      scrollRef.current?.scrollToEnd({ animated: false });
+      fsScrollRef.current?.scrollToEnd({ animated: false });
+      setIsNearBottom(true);
+    }
+
+    prevMessageLenRef.current = len;
+  }, [displayedMessages.length, pendingCount, id, avFullscreen, fsChatOpen]);
 
   useEffect(() => {
     if (!highlightedMessageId) return;
@@ -2196,6 +2200,7 @@ export default function GroupScreen() {
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
+        onContentSizeChange={handleMainContentSizeChange}
       >
         {renderChatItems('main')}
       </ScrollView>
@@ -2301,6 +2306,7 @@ export default function GroupScreen() {
                   showsVerticalScrollIndicator={false}
                   onScroll={handleScroll}
                   scrollEventThrottle={16}
+                  onContentSizeChange={handleFsContentSizeChange}
                 >
                   {renderChatItems('fs')}
                 </ScrollView>
