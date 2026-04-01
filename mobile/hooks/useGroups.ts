@@ -20,6 +20,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { getDisplayName } from '@/lib/userDisplayName';
 import type {
   PrayerGroup,
+  GroupMember,
   GroupChatMessage,
   GroupChatAttachment,
   GroupChatReplyRef,
@@ -184,6 +185,44 @@ export function useGroupDetails(groupId: string) {
   }, [groupId]);
 
   return { group, isLoading };
+}
+
+export function useGroupMembers(groupId: string) {
+  const [members, setMembers] = useState<GroupMember[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!groupId) {
+      setMembers([]);
+      setIsLoading(false);
+      return;
+    }
+
+    const ref = collection(db, 'group_members', groupId, 'members');
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        const data = snap.docs
+          .map((d) => ({ uid: d.id, ...d.data() } as GroupMember))
+          .sort((a, b) => {
+            const roleScore = (role: GroupMember['role']) => (role === 'admin' ? 0 : 1);
+            const byRole = roleScore(a.role) - roleScore(b.role);
+            if (byRole !== 0) return byRole;
+            return a.display_name.localeCompare(b.display_name);
+          });
+        setMembers(data);
+        setIsLoading(false);
+      },
+      () => {
+        setMembers([]);
+        setIsLoading(false);
+      }
+    );
+
+    return unsub;
+  }, [groupId]);
+
+  return { members, isLoading };
 }
 
 export function useGroupChat(groupId: string) {

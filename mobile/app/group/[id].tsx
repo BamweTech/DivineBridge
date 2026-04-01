@@ -17,6 +17,7 @@ import {
   Animated as RNAnimated,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  Image as RNImage,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,6 +37,7 @@ import { Image } from 'expo-image';
 import {
   useGroupChat,
   useGroupDetails,
+  useGroupMembers,
   useGroupLiveRoom,
   useGroupChatLastReads,
   firestoreTimestampMs,
@@ -54,6 +56,7 @@ import Icon from '@/components/ui/Icon';
 import type {
   MessageType,
   PrayerGroup,
+  GroupMember,
   GroupChatMessage,
   GroupChatAttachment,
   GroupChatReplyRef,
@@ -104,6 +107,15 @@ const TYPE_LABEL_COLORS: Record<MessageType, string> = {
 };
 
 const REACTION_OPTIONS = ['🙏', '❤️', '🙌', '🔥', '😢', '✨'] as const;
+const EMOJI_LIBRARY = [
+  '🙏', '❤️', '🙌', '🔥', '✨', '😢', '😊', '😂', '😭', '😮',
+  '👏', '👍', '👎', '💯', '🎉', '🥹', '🤍', '💙', '💜', '💚',
+  '🕊️', '☀️', '🌙', '⭐', '🌈', '🙇', '🤲', '🫶', '💪', '🙋',
+  '😇', '🥰', '😌', '🤔', '😔', '😡', '😴', '🤯', '🥳', '🤝',
+  '📖', '✝️', '🛐', '🙃', '😎', '🤗', '💔', '❤️‍🔥', '🫂', '🕯️',
+] as const;
+
+type ChatSurface = 'main' | 'fs';
 
 function buildReplyPreviewText(msg: Pick<GroupChatMessage, 'message' | 'link_url' | 'attachments' | 'message_type'>) {
   const body = (msg.message ?? '').trim().replace(/\s+/g, ' ');
@@ -196,6 +208,13 @@ async function getMediaLibraryModule() {
   } catch {
     throw new Error('Media saving needs the latest app build. Please update the app and try again.');
   }
+}
+
+function isSingleEmoji(value: string) {
+  const normalized = value.trim();
+  if (!normalized) return false;
+  const withoutJoiners = normalized.replace(/\uFE0F/g, '');
+  return withoutJoiners.length <= 8;
 }
 
 function toReplyRef(msg: GroupChatMessage): GroupChatReplyRef {
@@ -325,6 +344,39 @@ function AttachmentTray({
   );
 }
 
+function AdaptiveImagePreview({
+  uri,
+  accessibilityLabel,
+}: {
+  uri: string;
+  accessibilityLabel: string;
+}) {
+  const [ratio, setRatio] = useState(4 / 3);
+
+  useEffect(() => {
+    let active = true;
+    RNImage.getSize(
+      uri,
+      (width, height) => {
+        if (active && width > 0 && height > 0) setRatio(width / height);
+      },
+      () => {}
+    );
+    return () => {
+      active = false;
+    };
+  }, [uri]);
+
+  return (
+    <Image
+      source={{ uri }}
+      style={{ width: 264, aspectRatio: ratio, backgroundColor: THEME_COLORS.bg3 }}
+      contentFit="contain"
+      accessibilityLabel={accessibilityLabel}
+    />
+  );
+}
+
 function MediaAttachmentCard({
   attachment,
   onOpen,
@@ -382,27 +434,194 @@ function MediaAttachmentCard({
           </View>
         </View>
       ) : (
-        <Image
-          source={{ uri: attachment.url }}
-          style={{ width: 264, aspectRatio: 4 / 3, backgroundColor: THEME_COLORS.bg3 }}
-          contentFit="cover"
-          accessibilityLabel={attachment.file_name}
-        />
+        <AdaptiveImagePreview uri={attachment.url} accessibilityLabel={attachment.file_name} />
       )}
-      <View style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
-        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_500Medium', fontSize: 12 }} numberOfLines={1}>
-          {attachment.file_name}
-        </Text>
-        <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 11, marginTop: 3 }}>
-          Tap to open, share, or save
-        </Text>
-      </View>
     </Pressable>
+  );
+}
+
+function GroupMembersSheet({
+  visible,
+  groupName,
+  members,
+  loading,
+  onClose,
+}: {
+  visible: boolean;
+  groupName: string;
+  members: GroupMember[];
+  loading: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
+      <Pressable
+        style={{ flex: 1, backgroundColor: 'rgba(44,36,22,0.45)', justifyContent: 'flex-end' }}
+        onPress={onClose}
+      >
+        <Pressable
+          onPress={() => {}}
+          style={{
+            backgroundColor: THEME_COLORS.bg,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            paddingHorizontal: 20,
+            paddingTop: 14,
+            paddingBottom: 32,
+            maxHeight: '72%',
+          }}
+        >
+          <View style={{ width: 36, height: 4, backgroundColor: THEME_COLORS.border, borderRadius: 2, alignSelf: 'center', marginBottom: 18 }} />
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18 }}>
+            {groupName}
+          </Text>
+          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 4, marginBottom: 14 }}>
+            {loading ? 'Loading members...' : `${members.length} ${members.length === 1 ? 'member' : 'members'}`}
+          </Text>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {loading ? (
+              <ActivityIndicator color={THEME_COLORS.gold} style={{ marginTop: 18 }} />
+            ) : (
+              members.map((member) => (
+                <View
+                  key={member.uid}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                    paddingVertical: 12,
+                    borderTopWidth: 1,
+                    borderTopColor: THEME_COLORS.border,
+                  }}
+                >
+                  <Avatar name={member.display_name} photoUrl={member.photo_url} size={34} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 14 }}>
+                      {member.display_name}
+                    </Text>
+                    <Text style={{ color: member.role === 'admin' ? THEME_COLORS.gold : THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 2 }}>
+                      {member.role === 'admin' ? 'Admin' : 'Member'}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function EmojiLibraryModal({
+  visible,
+  onClose,
+  onSelect,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (emoji: string) => void;
+}) {
+  const [customEmoji, setCustomEmoji] = useState('');
+
+  function handleSubmitCustom() {
+    const emoji = customEmoji.trim();
+    if (!isSingleEmoji(emoji)) {
+      Alert.alert('Choose one emoji', 'Please enter a single emoji.');
+      return;
+    }
+    onSelect(emoji);
+    setCustomEmoji('');
+    onClose();
+  }
+
+  return (
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
+      <Pressable
+        style={{ flex: 1, backgroundColor: 'rgba(44,36,22,0.45)', justifyContent: 'flex-end' }}
+        onPress={onClose}
+      >
+        <Pressable
+          onPress={() => {}}
+          style={{
+            backgroundColor: THEME_COLORS.bg,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            paddingHorizontal: 20,
+            paddingTop: 14,
+            paddingBottom: 28,
+          }}
+        >
+          <View style={{ width: 36, height: 4, backgroundColor: THEME_COLORS.border, borderRadius: 2, alignSelf: 'center', marginBottom: 18 }} />
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18 }}>
+            More reactions
+          </Text>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingTop: 18 }}
+          >
+            {EMOJI_LIBRARY.map((emoji) => (
+              <Pressable
+                key={emoji}
+                onPress={() => {
+                  onSelect(emoji);
+                  onClose();
+                }}
+                style={{
+                  width: 46,
+                  height: 46,
+                  borderRadius: 23,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: THEME_COLORS.bg3,
+                  borderWidth: 1,
+                  borderColor: THEME_COLORS.border,
+                }}
+              >
+                <Text style={{ fontSize: 22 }}>{emoji}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18 }}>
+            <TextInput
+              value={customEmoji}
+              onChangeText={setCustomEmoji}
+              placeholder="Paste any emoji"
+              placeholderTextColor={THEME_COLORS.text3}
+              style={{
+                flex: 1,
+                backgroundColor: THEME_COLORS.bg2,
+                borderRadius: 16,
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                color: THEME_COLORS.text,
+                fontFamily: 'Geist_400Regular',
+                fontSize: 16,
+                borderWidth: 1,
+                borderColor: THEME_COLORS.border,
+              }}
+            />
+            <Pressable
+              onPress={handleSubmitCustom}
+              style={{
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                borderRadius: 14,
+                backgroundColor: THEME_COLORS.gold,
+              }}
+            >
+              <Text style={{ color: '#fff', fontFamily: 'Geist_600SemiBold', fontSize: 13 }}>Use</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
 function GroupChatBubble({
   msg,
+  surface,
   userUid,
   showSender,
   showTimestamp,
@@ -412,10 +631,12 @@ function GroupChatBubble({
   onReply,
   onToggleReaction,
   onOpenActions,
+  onOpenEmojiLibrary,
   onJumpToReply,
   onLayoutMessage,
 }: {
   msg: GroupChatMessage;
+  surface: ChatSurface;
   userUid?: string;
   showSender: boolean;
   showTimestamp: boolean;
@@ -425,8 +646,9 @@ function GroupChatBubble({
   onReply: (message: GroupChatMessage) => void;
   onToggleReaction: (messageId: string, emoji: string) => void;
   onOpenActions: (message: GroupChatMessage) => void;
-  onJumpToReply: (messageId: string) => void;
-  onLayoutMessage: (messageId: string, y: number) => void;
+  onOpenEmojiLibrary: (message: GroupChatMessage) => void;
+  onJumpToReply: (messageId: string, surface: ChatSurface) => void;
+  onLayoutMessage: (messageId: string, y: number, surface: ChatSurface) => void;
 }) {
   const swipeRef = useRef<Swipeable | null>(null);
   const isMe = msg.user_id === userUid;
@@ -512,7 +734,7 @@ function GroupChatBubble({
               ],
             }}
           >
-            <Text style={{ color: THEME_COLORS.sage, fontSize: 14 }}>↩</Text>
+            <Icon name="reply" size={14} color={THEME_COLORS.sage} />
             <Text style={{ color: THEME_COLORS.sage, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
               Reply
             </Text>
@@ -523,7 +745,7 @@ function GroupChatBubble({
     >
       <Animated.View
         entering={FadeInDown.duration(200)}
-        onLayout={(event) => onLayoutMessage(msg.message_id, event.nativeEvent.layout.y)}
+        onLayout={(event) => onLayoutMessage(msg.message_id, event.nativeEvent.layout.y, surface)}
         style={{ marginBottom: showTimestamp ? 12 : 4, alignItems: isMe ? 'flex-end' : 'flex-start' }}
       >
         {!isMe && showSender && (
@@ -532,6 +754,7 @@ function GroupChatBubble({
             <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_500Medium', fontSize: 11 }}>{msg.user_name}</Text>
           </View>
         )}
+        <View style={{ position: 'relative', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
         {mediaAtts.length > 0 && (
           <Pressable onLongPress={handleLongPress} delayLongPress={400}>
             <View style={{ gap: 8, marginBottom: showText || docAtts.length > 0 || msg.reply_to || isSpecial || msg.link_url ? 8 : 0 }}>
@@ -565,7 +788,7 @@ function GroupChatBubble({
                 )}
                 {msg.reply_to && (
                   <Pressable
-                    onPress={() => onJumpToReply(msg.reply_to!.message_id)}
+                    onPress={() => onJumpToReply(msg.reply_to!.message_id, surface)}
                     style={{
                       marginBottom: showText || msg.link_url || docAtts.length > 0 ? 10 : 0,
                       paddingVertical: 8,
@@ -626,12 +849,14 @@ function GroupChatBubble({
         {reactionEntries.length > 0 && (
           <View
             style={{
+              position: 'absolute',
+              top: -12,
+              right: 6,
               flexDirection: 'row',
               flexWrap: 'wrap',
-              gap: 6,
-              marginTop: 6,
-              marginHorizontal: 6,
-              alignSelf: isMe ? 'flex-end' : 'flex-start',
+              gap: 4,
+              maxWidth: 220,
+              justifyContent: 'flex-end',
             }}
           >
             {reactionEntries.map(([emoji, users]) => {
@@ -644,9 +869,9 @@ function GroupChatBubble({
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
-                    gap: 4,
-                    paddingHorizontal: 8,
-                    paddingVertical: 4,
+                    gap: 3,
+                    paddingHorizontal: 7,
+                    paddingVertical: 3,
                     borderRadius: 999,
                     backgroundColor: reactedByMe ? THEME_COLORS.goldDim : THEME_COLORS.bg3,
                     borderWidth: 1,
@@ -660,8 +885,24 @@ function GroupChatBubble({
                 </Pressable>
               );
             })}
+            <Pressable
+              onPress={() => onOpenEmojiLibrary(msg)}
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 12,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: THEME_COLORS.bg3,
+                borderWidth: 1,
+                borderColor: THEME_COLORS.border,
+              }}
+            >
+              <Text style={{ color: THEME_COLORS.text3, fontSize: 13 }}>+</Text>
+            </Pressable>
           </View>
         )}
+        </View>
         {showTimestamp && (
           <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 10, marginTop: 3, marginHorizontal: 6 }}>
             {msg.timestamp
@@ -873,6 +1114,7 @@ function MessageActionSheet({
   onClose,
   onReply,
   onReact,
+  onOpenEmojiLibrary,
   onDelete,
 }: {
   visible: boolean;
@@ -881,6 +1123,7 @@ function MessageActionSheet({
   onClose: () => void;
   onReply: (message: GroupChatMessage) => void;
   onReact: (messageId: string, emoji: string) => void;
+  onOpenEmojiLibrary: (message: GroupChatMessage) => void;
   onDelete: (messageId: string) => void;
 }) {
   if (!msg) return null;
@@ -947,6 +1190,24 @@ function MessageActionSheet({
               );
             })}
           </ScrollView>
+
+          <Pressable
+            onPress={() => onOpenEmojiLibrary(msg)}
+            style={{
+              marginTop: 4,
+              alignSelf: 'flex-start',
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 12,
+              backgroundColor: THEME_COLORS.bg3,
+              borderWidth: 1,
+              borderColor: THEME_COLORS.border,
+            }}
+          >
+            <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
+              More emoji
+            </Text>
+          </Pressable>
 
           <View style={{ marginTop: 12, gap: 10 }}>
             <Pressable
@@ -1221,6 +1482,7 @@ export default function GroupScreen() {
   const fsScrollRef = useRef<ScrollView>(null);
 
   const { group } = useGroupDetails(id!);
+  const { members, isLoading: isLoadingMembers } = useGroupMembers(id!);
   const groupLiveRoom = useGroupLiveRoom(id!);
   const { messages, sendMessage, toggleReaction, deleteMessage } = useGroupChat(id!);
   const { markGroupChatRead, unreadCountByGroup } = useGroupUnread();
@@ -1229,11 +1491,14 @@ export default function GroupScreen() {
   const [showInviteSheet, setShowInviteSheet] = useState(false);
   const [replyTarget, setReplyTarget] = useState<GroupChatMessage | null>(null);
   const [activeMessage, setActiveMessage] = useState<GroupChatMessage | null>(null);
+  const [showMembersSheet, setShowMembersSheet] = useState(false);
+  const [emojiLibraryMessage, setEmojiLibraryMessage] = useState<GroupChatMessage | null>(null);
   const [optimisticReactions, setOptimisticReactions] = useState<Record<string, Record<string, string[]>>>({});
   const [pendingUploads, setPendingUploads] = useState<PendingUploadBubble[]>([]);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [isNearBottom, setIsNearBottom] = useState(true);
   const messageLayoutMapRef = useRef<Record<string, number>>({});
+  const fsMessageLayoutMapRef = useRef<Record<string, number>>({});
 
   const [liveRoomId, setLiveRoomId] = useState<string | null>(null);
   const [liveRoomCode, setLiveRoomCode] = useState<string | undefined>(undefined);
@@ -1368,16 +1633,18 @@ export default function GroupScreen() {
     }
   }
 
-  function registerMessageLayout(messageId: string, y: number) {
-    messageLayoutMapRef.current[messageId] = y;
+  function registerMessageLayout(messageId: string, y: number, surface: ChatSurface) {
+    if (surface === 'fs') fsMessageLayoutMapRef.current[messageId] = y;
+    else messageLayoutMapRef.current[messageId] = y;
   }
 
-  function jumpToMessage(messageId: string) {
-    const y = messageLayoutMapRef.current[messageId];
+  function jumpToMessage(messageId: string, surface: ChatSurface) {
+    const layouts = surface === 'fs' ? fsMessageLayoutMapRef.current : messageLayoutMapRef.current;
+    const y = layouts[messageId];
     if (typeof y !== 'number') return;
     const targetY = Math.max(0, y - 120);
-    scrollRef.current?.scrollTo({ y: targetY, animated: true });
-    if (fsChatOpen) fsScrollRef.current?.scrollTo({ y: targetY, animated: true });
+    if (surface === 'fs') fsScrollRef.current?.scrollTo({ y: targetY, animated: true });
+    else scrollRef.current?.scrollTo({ y: targetY, animated: true });
     setHighlightedMessageId(messageId);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
@@ -1490,6 +1757,11 @@ export default function GroupScreen() {
 
   function handleOpenMessageActions(message: GroupChatMessage) {
     setActiveMessage(message);
+  }
+
+  function handleOpenEmojiLibrary(message: GroupChatMessage) {
+    setActiveMessage(null);
+    setEmojiLibraryMessage(message);
   }
 
   async function handleToggleReaction(messageId: string, emoji: string) {
@@ -1747,7 +2019,7 @@ export default function GroupScreen() {
     setAvFullscreen(false);
   }
 
-  function renderChatItems(prefix: string) {
+  function renderChatItems(surface: ChatSurface) {
     const nodes: React.ReactNode[] = [];
 
     displayedMessages.forEach((msg, idx) => {
@@ -1757,13 +2029,14 @@ export default function GroupScreen() {
       const showTimestamp = !sameSenderCluster(msg, next);
 
       if (idx === firstUnreadIndex) {
-        nodes.push(<UnreadDivider key={`${prefix}-unread-divider`} count={unreadCount} />);
+        nodes.push(<UnreadDivider key={`${surface}-unread-divider`} count={unreadCount} />);
       }
 
       nodes.push(
         <GroupChatBubble
-          key={`${prefix}-${msg.message_id}`}
+          key={`${surface}-${msg.message_id}`}
           msg={msg}
+          surface={surface}
           userUid={user?.uid}
           showSender={showSender}
           showTimestamp={showTimestamp}
@@ -1779,6 +2052,7 @@ export default function GroupScreen() {
           onReply={handleReplyToMessage}
           onToggleReaction={handleToggleReaction}
           onOpenActions={handleOpenMessageActions}
+          onOpenEmojiLibrary={handleOpenEmojiLibrary}
           onJumpToReply={jumpToMessage}
           onLayoutMessage={registerMessageLayout}
         />
@@ -1788,7 +2062,7 @@ export default function GroupScreen() {
     pendingUploads.forEach((item) => {
       nodes.push(
         <PendingUploadChatBubble
-          key={`${prefix}-${item.temp_id}`}
+          key={`${surface}-${item.temp_id}`}
           item={item}
           userUid={user?.uid}
         />
@@ -1821,7 +2095,7 @@ export default function GroupScreen() {
           <Icon name="groups" size={16} color={THEME_COLORS.sage} />
         </View>
 
-        <View style={{ flex: 1 }}>
+        <Pressable style={{ flex: 1 }} onPress={() => setShowMembersSheet(true)}>
           <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16 }} numberOfLines={1}>
             {group?.name ?? 'Group Chat'}
           </Text>
@@ -1830,7 +2104,7 @@ export default function GroupScreen() {
               {group.member_count} {group.member_count === 1 ? 'member' : 'members'}
             </Text>
           )}
-        </View>
+        </Pressable>
 
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Pressable
@@ -1906,6 +2180,14 @@ export default function GroupScreen() {
       {showInviteSheet && group && (
         <InviteSheet group={group} onClose={() => setShowInviteSheet(false)} />
       )}
+
+      <GroupMembersSheet
+        visible={showMembersSheet}
+        groupName={group?.name ?? 'Group members'}
+        members={members}
+        loading={isLoadingMembers}
+        onClose={() => setShowMembersSheet(false)}
+      />
 
       <Modal
         visible={prayer.isJoined && avFullscreen}
@@ -2140,7 +2422,17 @@ export default function GroupScreen() {
         onClose={() => setActiveMessage(null)}
         onReply={handleReplyToMessage}
         onReact={handleToggleReaction}
+        onOpenEmojiLibrary={handleOpenEmojiLibrary}
         onDelete={requestDeleteMessage}
+      />
+
+      <EmojiLibraryModal
+        visible={!!emojiLibraryMessage}
+        onClose={() => setEmojiLibraryMessage(null)}
+        onSelect={(emoji) => {
+          if (emojiLibraryMessage) void handleToggleReaction(emojiLibraryMessage.message_id, emoji);
+          setEmojiLibraryMessage(null);
+        }}
       />
 
       {/* Fullscreen media viewer */}

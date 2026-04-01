@@ -53,6 +53,7 @@ export type IconName =
   | 'mic'
   | 'hand'
   | 'chat'
+  | 'reply'
   | 'leave'
   | 'send'
   | 'attach'
@@ -249,6 +250,13 @@ const Icon: React.FC<IconProps> = ({
 
     chat: (
       <Path {...s} d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+    ),
+
+    reply: (
+      <G>
+        <Path {...s} d="M9 17l-5-5 5-5" />
+        <Path {...s} d="M4 12h9a7 7 0 017 7" />
+      </G>
     ),
 
     send: (
