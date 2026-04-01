@@ -1557,12 +1557,14 @@ export default function GroupScreen() {
 
   const prevMessageLenRef = useRef(0);
   const prevGroupIdRef = useRef(id);
-  /** True until the main list has been snapped to bottom once after open / group switch (content-size + layout). */
-  const mainAnchorBottomPendingRef = useRef(true);
-  /** True until fullscreen chat panel has snapped to bottom after the modal opens. */
-  const fsAnchorBottomPendingRef = useRef(false);
-  const mainAnchorDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fsAnchorDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 'pending' until we've positioned the main list after open/group switch. */
+  const mainAnchorRef = useRef<'pending' | 'done'>('pending');
+  const fsAnchorRef = useRef<'pending' | 'done'>('done');
+  const mainDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Captured on first load so it doesn't change once we start positioning. */
+  const initialUnreadIndexRef = useRef<number>(-1);
+  const initialUnreadCapturedRef = useRef(false);
 
   useLayoutEffect(() => {
     if (prevGroupIdRef.current !== id) {
@@ -1570,51 +1572,63 @@ export default function GroupScreen() {
       prevMessageLenRef.current = 0;
       messageLayoutMapRef.current = {};
       fsMessageLayoutMapRef.current = {};
-      mainAnchorBottomPendingRef.current = true;
-      if (mainAnchorDebounceRef.current) {
-        clearTimeout(mainAnchorDebounceRef.current);
-        mainAnchorDebounceRef.current = null;
-      }
-      if (fsAnchorDebounceRef.current) {
-        clearTimeout(fsAnchorDebounceRef.current);
-        fsAnchorDebounceRef.current = null;
-      }
+      mainAnchorRef.current = 'pending';
+      initialUnreadCapturedRef.current = false;
+      initialUnreadIndexRef.current = -1;
+      if (mainDebounceRef.current) { clearTimeout(mainDebounceRef.current); mainDebounceRef.current = null; }
+      if (fsDebounceRef.current) { clearTimeout(fsDebounceRef.current); fsDebounceRef.current = null; }
     }
   }, [id]);
 
   useLayoutEffect(() => {
-    if (!avFullscreen) {
-      fsAnchorBottomPendingRef.current = false;
-    } else {
-      fsAnchorBottomPendingRef.current = true;
-    }
+    fsAnchorRef.current = avFullscreen ? 'pending' : 'done';
   }, [avFullscreen]);
 
-  function handleMainContentSizeChange(_w: number, h: number) {
-    if (h <= 0 || !mainAnchorBottomPendingRef.current) return;
-    scrollRef.current?.scrollToEnd({ animated: false });
-    setIsNearBottom(true);
-    if (mainAnchorDebounceRef.current) clearTimeout(mainAnchorDebounceRef.current);
-    mainAnchorDebounceRef.current = setTimeout(() => {
-      mainAnchorDebounceRef.current = null;
-      if (!mainAnchorBottomPendingRef.current) return;
+  function scrollMainToTarget() {
+    if (!initialUnreadCapturedRef.current && displayedMessages.length > 0) {
+      initialUnreadCapturedRef.current = true;
+      initialUnreadIndexRef.current = firstUnreadIndex;
+    }
+    const targetIdx = initialUnreadIndexRef.current;
+    if (targetIdx < 0 || targetIdx >= displayedMessages.length) {
       scrollRef.current?.scrollToEnd({ animated: false });
       setIsNearBottom(true);
-      mainAnchorBottomPendingRef.current = false;
-    }, 180);
+      return;
+    }
+    const mid = displayedMessages[targetIdx]?.message_id;
+    const y = mid ? messageLayoutMapRef.current[mid] : undefined;
+    if (typeof y === 'number') {
+      scrollRef.current?.scrollTo({ y: Math.max(0, y - 60), animated: false });
+      setIsNearBottom(false);
+    } else {
+      scrollRef.current?.scrollToEnd({ animated: false });
+      setIsNearBottom(true);
+    }
+  }
+
+  function handleMainContentSizeChange(_w: number, h: number) {
+    if (h <= 0 || mainAnchorRef.current === 'done') return;
+    scrollMainToTarget();
+    if (mainDebounceRef.current) clearTimeout(mainDebounceRef.current);
+    mainDebounceRef.current = setTimeout(() => {
+      mainDebounceRef.current = null;
+      if (mainAnchorRef.current === 'done') return;
+      scrollMainToTarget();
+      mainAnchorRef.current = 'done';
+    }, 250);
   }
 
   function handleFsContentSizeChange(_w: number, h: number) {
-    if (h <= 0 || !fsAnchorBottomPendingRef.current) return;
+    if (h <= 0 || fsAnchorRef.current === 'done') return;
     if (!avFullscreen || !fsChatOpen) return;
     fsScrollRef.current?.scrollToEnd({ animated: false });
-    if (fsAnchorDebounceRef.current) clearTimeout(fsAnchorDebounceRef.current);
-    fsAnchorDebounceRef.current = setTimeout(() => {
-      fsAnchorDebounceRef.current = null;
-      if (!fsAnchorBottomPendingRef.current) return;
+    if (fsDebounceRef.current) clearTimeout(fsDebounceRef.current);
+    fsDebounceRef.current = setTimeout(() => {
+      fsDebounceRef.current = null;
+      if (fsAnchorRef.current === 'done') return;
       fsScrollRef.current?.scrollToEnd({ animated: false });
-      fsAnchorBottomPendingRef.current = false;
-    }, 180);
+      fsAnchorRef.current = 'done';
+    }, 250);
   }
 
   useLayoutEffect(() => {
@@ -1623,16 +1637,17 @@ export default function GroupScreen() {
 
     if (len === 0 && pendingCount === 0) {
       prevMessageLenRef.current = 0;
-      mainAnchorBottomPendingRef.current = true;
+      mainAnchorRef.current = 'pending';
+      initialUnreadCapturedRef.current = false;
+      initialUnreadIndexRef.current = -1;
       return;
     }
 
-    if (mainAnchorBottomPendingRef.current && (len > 0 || pendingCount > 0)) {
-      scrollRef.current?.scrollToEnd({ animated: false });
-      setIsNearBottom(true);
+    if (mainAnchorRef.current === 'pending' && (len > 0 || pendingCount > 0)) {
+      scrollMainToTarget();
     }
 
-    if (len > prevLen && prevLen > 0) {
+    if (len > prevLen && prevLen > 0 && mainAnchorRef.current === 'done') {
       scrollRef.current?.scrollToEnd({ animated: false });
       fsScrollRef.current?.scrollToEnd({ animated: false });
       setIsNearBottom(true);
@@ -1644,7 +1659,7 @@ export default function GroupScreen() {
   useLayoutEffect(() => {
     const len = displayedMessages.length;
     if (len === 0 && pendingCount === 0) return;
-    if (fsAnchorBottomPendingRef.current && avFullscreen && fsChatOpen && (len > 0 || pendingCount > 0)) {
+    if (fsAnchorRef.current === 'pending' && avFullscreen && fsChatOpen && (len > 0 || pendingCount > 0)) {
       fsScrollRef.current?.scrollToEnd({ animated: false });
     }
   }, [displayedMessages.length, pendingCount, avFullscreen, fsChatOpen]);
@@ -1665,12 +1680,9 @@ export default function GroupScreen() {
     const nearBottom = scrollNearBottomFromEvent(event);
     setIsNearBottom(nearBottom);
 
-    if (nearBottom && mainAnchorBottomPendingRef.current) {
-      if (mainAnchorDebounceRef.current) {
-        clearTimeout(mainAnchorDebounceRef.current);
-        mainAnchorDebounceRef.current = null;
-      }
-      mainAnchorBottomPendingRef.current = false;
+    if (mainAnchorRef.current === 'pending') {
+      if (mainDebounceRef.current) { clearTimeout(mainDebounceRef.current); mainDebounceRef.current = null; }
+      mainAnchorRef.current = 'done';
     }
 
     if (nearBottom && id) {
@@ -1684,12 +1696,9 @@ export default function GroupScreen() {
     const nearBottom = scrollNearBottomFromEvent(event);
     setIsNearBottom(nearBottom);
 
-    if (nearBottom && fsAnchorBottomPendingRef.current) {
-      if (fsAnchorDebounceRef.current) {
-        clearTimeout(fsAnchorDebounceRef.current);
-        fsAnchorDebounceRef.current = null;
-      }
-      fsAnchorBottomPendingRef.current = false;
+    if (fsAnchorRef.current === 'pending') {
+      if (fsDebounceRef.current) { clearTimeout(fsDebounceRef.current); fsDebounceRef.current = null; }
+      fsAnchorRef.current = 'done';
     }
 
     if (nearBottom && id) {
