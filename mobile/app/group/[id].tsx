@@ -272,19 +272,15 @@ export default function GroupScreen() {
 
   const prevMessageIdsRef = useRef<Set<string>>(new Set());
   const prevGroupIdRef = useRef(id);
-  const initialScrollAppliedRef = useRef(false);
 
   useEffect(() => {
     if (prevGroupIdRef.current !== id) {
       prevGroupIdRef.current = id;
       prevMessageIdsRef.current = new Set();
-      initialScrollAppliedRef.current = false;
       messageLayoutMapRef.current = {};
       fsMessageLayoutMapRef.current = {};
     }
   }, [id]);
-
-  const mountTimeRef = useRef(Date.now());
 
   useEffect(() => {
     const currentIds = new Set(displayedMessages.map((m) => m.message_id));
@@ -299,12 +295,9 @@ export default function GroupScreen() {
       prevIds.size > 0 &&
       displayedMessages.some((m) => !prevIds.has(m.message_id));
 
-    const isSettling = Date.now() - mountTimeRef.current < 2000;
-
-    if (hasGenuinelyNewMessages && isNearBottom && !isSettling) {
-      scrollRef.current?.scrollToEnd({ animated: false });
-      fsScrollRef.current?.scrollToEnd({ animated: false });
-      setIsNearBottom(true);
+    if (hasGenuinelyNewMessages && isNearBottom) {
+      scrollRef.current?.scrollToOffset({ offset: 0, animated: false });
+      fsScrollRef.current?.scrollToOffset({ offset: 0, animated: false });
     }
 
     prevMessageIdsRef.current = currentIds;
@@ -317,9 +310,8 @@ export default function GroupScreen() {
   }, [highlightedMessageId]);
 
   function handleMainScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-    const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
-    const nearBottom = distanceFromBottom < 72;
+    const { contentOffset } = event.nativeEvent;
+    const nearBottom = contentOffset.y < 72;
     setIsNearBottom(nearBottom);
 
     if (nearBottom && id) {
@@ -330,9 +322,8 @@ export default function GroupScreen() {
   }
 
   function handleFsScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-    const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
-    const nearBottom = distanceFromBottom < 72;
+    const { contentOffset } = event.nativeEvent;
+    const nearBottom = contentOffset.y < 72;
     setIsNearBottom(nearBottom);
 
     if (nearBottom && id) {
@@ -343,8 +334,8 @@ export default function GroupScreen() {
   }
 
   function scrollToLatest() {
-    scrollRef.current?.scrollToEnd({ animated: true });
-    fsScrollRef.current?.scrollToEnd({ animated: true });
+    scrollRef.current?.scrollToOffset({ offset: 0, animated: true });
+    fsScrollRef.current?.scrollToOffset({ offset: 0, animated: true });
     setIsNearBottom(true);
     if (id) {
       const last = displayedMessages[displayedMessages.length - 1];
@@ -837,26 +828,13 @@ export default function GroupScreen() {
     return items;
   }, [displayedMessages, firstUnreadIndex, unreadCount, pendingUploads]);
 
-  const dataSettled = isReadsReady && !isLoadingChat;
-  const chatReady = dataSettled && chatItems.length > 0;
+  const invertedChatItems = useMemo(() => [...chatItems].reverse(), [chatItems]);
 
-  const initialChatIndex = useMemo(() => {
-    if (initialScrollAppliedRef.current) return undefined;
-    if (!chatReady) return undefined;
-    initialScrollAppliedRef.current = true;
-    if (firstUnreadIndex >= 0) {
-      const unreadItemIndex = chatItems.findIndex((item) => item.kind === 'unread');
-      if (unreadItemIndex >= 0) return unreadItemIndex;
-    }
-    return chatItems.length - 1;
-  }, [chatItems, firstUnreadIndex, chatReady]);
-
-  const didMarkReadOnLandRef = useRef(false);
+  const didMarkReadOnMountRef = useRef(false);
   useEffect(() => {
-    if (didMarkReadOnLandRef.current || !id || displayedMessages.length === 0) return;
-    if (!initialScrollAppliedRef.current) return;
+    if (didMarkReadOnMountRef.current || !id || displayedMessages.length === 0) return;
     if (firstUnreadIndex < 0) {
-      didMarkReadOnLandRef.current = true;
+      didMarkReadOnMountRef.current = true;
       const last = displayedMessages[displayedMessages.length - 1];
       const ts = last ? firestoreTimestampMs(last.timestamp) : undefined;
       if (ts) void markGroupChatRead(id, ts);
@@ -864,7 +842,7 @@ export default function GroupScreen() {
   }, [id, displayedMessages, firstUnreadIndex, markGroupChatRead]);
 
   const chatEmptyComponent = useMemo(() => (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: THEME_COLORS.bg }}>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: THEME_COLORS.bg, transform: [{ scaleY: -1 }] }}>
       <Icon name="gathering" size={48} color={THEME_COLORS.text3} />
       <Text style={{
         color: THEME_COLORS.text2,
@@ -915,18 +893,6 @@ export default function GroupScreen() {
         onLayoutMessage={registerMessageLayout}
       />
     );
-  }
-
-  function handleMainScrollToIndexFailed() {
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollToEnd({ animated: false });
-    });
-  }
-
-  function handleFsScrollToIndexFailed() {
-    requestAnimationFrame(() => {
-      fsScrollRef.current?.scrollToEnd({ animated: false });
-    });
   }
 
   return (
@@ -1021,28 +987,20 @@ export default function GroupScreen() {
       ) : null}
 
       {/* Messages */}
-      {chatReady ? (
-        <FlatList
-          key={`main-${id}`}
-          ref={scrollRef}
-          data={chatItems}
-          keyExtractor={(item) => item.key}
-          renderItem={({ item }) => renderChatItem(item, 'main')}
-          style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}
-          contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
-          showsVerticalScrollIndicator={false}
-          onScroll={handleMainScroll}
-          scrollEventThrottle={16}
-          initialScrollIndex={initialChatIndex}
-          onScrollToIndexFailed={handleMainScrollToIndexFailed}
-        />
-      ) : dataSettled ? (
-        chatEmptyComponent
-      ) : (
-        <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="small" color={THEME_COLORS.gold} />
-        </View>
-      )}
+      <FlatList
+        key={`main-${id}`}
+        ref={scrollRef}
+        data={invertedChatItems}
+        inverted
+        keyExtractor={(item) => item.key}
+        renderItem={({ item }) => renderChatItem(item, 'main')}
+        style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}
+        contentContainerStyle={invertedChatItems.length === 0 ? { flexGrow: 1 } : { padding: 16, paddingBottom: 8 }}
+        showsVerticalScrollIndicator={false}
+        onScroll={handleMainScroll}
+        scrollEventThrottle={16}
+        ListEmptyComponent={chatEmptyComponent}
+      />
       {!isNearBottom && <JumpToLatestButton count={unreadCount} onPress={scrollToLatest} />}
 
       {/* Invite sheet */}
@@ -1138,28 +1096,20 @@ export default function GroupScreen() {
 
             {fsChatOpen ? (
               <View style={{ flex: 1, borderTopWidth: 1, borderTopColor: THEME_COLORS.border }}>
-                {chatReady ? (
-                  <FlatList
-                    key={`fs-${id}-${fsChatOpen ? 'open' : 'closed'}`}
-                    ref={fsScrollRef}
-                    data={chatItems}
-                    keyExtractor={(item) => item.key}
-                    renderItem={({ item }) => renderChatItem(item, 'fs')}
-                    style={{ flex: 1 }}
-                    contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
-                    showsVerticalScrollIndicator={false}
-                    onScroll={handleFsScroll}
-                    scrollEventThrottle={16}
-                    initialScrollIndex={initialChatIndex}
-                    onScrollToIndexFailed={handleFsScrollToIndexFailed}
-                  />
-                ) : dataSettled ? (
-                  chatEmptyComponent
-                ) : (
-                  <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                    <ActivityIndicator size="small" color={THEME_COLORS.gold} />
-                  </View>
-                )}
+                <FlatList
+                  key={`fs-${id}-${fsChatOpen ? 'open' : 'closed'}`}
+                  ref={fsScrollRef}
+                  data={invertedChatItems}
+                  inverted
+                  keyExtractor={(item) => item.key}
+                  renderItem={({ item }) => renderChatItem(item, 'fs')}
+                  style={{ flex: 1 }}
+                  contentContainerStyle={invertedChatItems.length === 0 ? { flexGrow: 1 } : { padding: 16, paddingBottom: 8 }}
+                  showsVerticalScrollIndicator={false}
+                  onScroll={handleFsScroll}
+                  scrollEventThrottle={16}
+                  ListEmptyComponent={chatEmptyComponent}
+                />
                 {!isNearBottom && <JumpToLatestButton count={unreadCount} onPress={scrollToLatest} />}
                 <View style={{ borderTopWidth: 1, borderTopColor: THEME_COLORS.border, backgroundColor: THEME_COLORS.bg }}>
                   {showAttachTray === 'fs' && (
