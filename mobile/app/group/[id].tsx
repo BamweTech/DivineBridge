@@ -1531,7 +1531,7 @@ export default function GroupScreen() {
   const firstUnreadIndex = useMemo(() => {
     if (!user?.uid) return -1;
     if (lastReadAt === 0) {
-      return displayedMessages.findIndex((msg) => msg.user_id !== user.uid);
+      return -1;
     }
     return displayedMessages.findIndex(
       (msg) => msg.user_id !== user.uid && firestoreTimestampMs(msg.timestamp) > lastReadAt
@@ -1595,6 +1595,11 @@ export default function GroupScreen() {
     } else {
       scrollRef.current?.scrollToEnd({ animated: false });
       setIsNearBottom(true);
+      if (id) {
+        const last = displayedMessages[displayedMessages.length - 1];
+        const ts = last ? firestoreTimestampMs(last.timestamp) : undefined;
+        void markGroupChatRead(id, ts);
+      }
     }
 
     mainNeedsInitialScrollRef.current = false;
