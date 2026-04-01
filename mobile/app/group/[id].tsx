@@ -833,17 +833,19 @@ export default function GroupScreen() {
     return items;
   }, [displayedMessages, firstUnreadIndex, unreadCount, pendingUploads]);
 
+  const dataSettled = isReadsReady && !isLoadingChat;
+  const chatReady = dataSettled && chatItems.length > 0;
+
   const initialChatIndex = useMemo(() => {
     if (initialScrollAppliedRef.current) return undefined;
-    if (chatItems.length === 0) return undefined;
-    if (!isReadsReady) return undefined;
+    if (!chatReady) return undefined;
     initialScrollAppliedRef.current = true;
     if (firstUnreadIndex >= 0) {
       const unreadItemIndex = chatItems.findIndex((item) => item.kind === 'unread');
       if (unreadItemIndex >= 0) return unreadItemIndex;
     }
     return chatItems.length - 1;
-  }, [chatItems, firstUnreadIndex, isReadsReady]);
+  }, [chatItems, firstUnreadIndex, chatReady]);
 
   const didMarkReadOnLandRef = useRef(false);
   useEffect(() => {
@@ -857,31 +859,22 @@ export default function GroupScreen() {
     }
   }, [id, displayedMessages, firstUnreadIndex, markGroupChatRead]);
 
-  const chatEmptyComponent = useMemo(() => {
-    if (isLoadingChat) {
-      return (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <ActivityIndicator size="large" color={THEME_COLORS.gold} />
-        </View>
-      );
-    }
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-        <Icon name="gathering" size={48} color={THEME_COLORS.text3} />
-        <Text style={{
-          color: THEME_COLORS.text2,
-          fontFamily: 'Geist_500Medium',
-          fontSize: 15,
-          marginTop: 16,
-          textAlign: 'center',
-        }}>
-          {memberJoinedAt > 0 && lastReadAt === 0
-            ? 'You just joined! Start the conversation.'
-            : 'No messages yet. Say something!'}
-        </Text>
-      </View>
-    );
-  }, [isLoadingChat, memberJoinedAt, lastReadAt]);
+  const chatEmptyComponent = useMemo(() => (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: THEME_COLORS.bg }}>
+      <Icon name="gathering" size={48} color={THEME_COLORS.text3} />
+      <Text style={{
+        color: THEME_COLORS.text2,
+        fontFamily: 'Geist_500Medium',
+        fontSize: 15,
+        marginTop: 16,
+        textAlign: 'center',
+      }}>
+        {memberJoinedAt > 0 && lastReadAt === 0
+          ? 'You just joined! Start the conversation.'
+          : 'No messages yet. Say something!'}
+      </Text>
+    </View>
+  ), [memberJoinedAt, lastReadAt]);
 
   function renderChatItem(item: ChatListItem, surface: ChatSurface) {
     if (item.kind === 'date') {
@@ -1029,22 +1022,29 @@ export default function GroupScreen() {
       ) : null}
 
       {/* Messages */}
-      <FlatList
-        key={`main-${id}`}
-        ref={scrollRef}
-        data={chatItems}
-        keyExtractor={(item) => item.key}
-        renderItem={({ item }) => renderChatItem(item, 'main')}
-        style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}
-        contentContainerStyle={chatItems.length === 0 ? { flex: 1, padding: 16, paddingBottom: 8 } : { padding: 16, paddingBottom: 8 }}
-        showsVerticalScrollIndicator={false}
-        onScroll={handleMainScroll}
-        scrollEventThrottle={16}
-        initialScrollIndex={initialChatIndex}
-        onScrollToIndexFailed={handleMainScrollToIndexFailed}
-        maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
-        ListEmptyComponent={chatEmptyComponent}
-      />
+      {chatReady ? (
+        <FlatList
+          key={`main-${id}`}
+          ref={scrollRef}
+          data={chatItems}
+          keyExtractor={(item) => item.key}
+          renderItem={({ item }) => renderChatItem(item, 'main')}
+          style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}
+          contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+          showsVerticalScrollIndicator={false}
+          onScroll={handleMainScroll}
+          scrollEventThrottle={16}
+          initialScrollIndex={initialChatIndex}
+          onScrollToIndexFailed={handleMainScrollToIndexFailed}
+          maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
+        />
+      ) : dataSettled ? (
+        chatEmptyComponent
+      ) : (
+        <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="small" color={THEME_COLORS.gold} />
+        </View>
+      )}
       {!isNearBottom && <JumpToLatestButton count={unreadCount} onPress={scrollToLatest} />}
 
       {/* Invite sheet */}
@@ -1140,22 +1140,29 @@ export default function GroupScreen() {
 
             {fsChatOpen ? (
               <View style={{ flex: 1, borderTopWidth: 1, borderTopColor: THEME_COLORS.border }}>
-                <FlatList
-                  key={`fs-${id}-${fsChatOpen ? 'open' : 'closed'}`}
-                  ref={fsScrollRef}
-                  data={chatItems}
-                  keyExtractor={(item) => item.key}
-                  renderItem={({ item }) => renderChatItem(item, 'fs')}
-                  style={{ flex: 1 }}
-                  contentContainerStyle={chatItems.length === 0 ? { flex: 1, padding: 16, paddingBottom: 8 } : { padding: 16, paddingBottom: 8 }}
-                  showsVerticalScrollIndicator={false}
-                  onScroll={handleFsScroll}
-                  scrollEventThrottle={16}
-                  initialScrollIndex={initialChatIndex}
-                  onScrollToIndexFailed={handleFsScrollToIndexFailed}
-                  maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
-                  ListEmptyComponent={chatEmptyComponent}
-                />
+                {chatReady ? (
+                  <FlatList
+                    key={`fs-${id}-${fsChatOpen ? 'open' : 'closed'}`}
+                    ref={fsScrollRef}
+                    data={chatItems}
+                    keyExtractor={(item) => item.key}
+                    renderItem={({ item }) => renderChatItem(item, 'fs')}
+                    style={{ flex: 1 }}
+                    contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+                    showsVerticalScrollIndicator={false}
+                    onScroll={handleFsScroll}
+                    scrollEventThrottle={16}
+                    initialScrollIndex={initialChatIndex}
+                    onScrollToIndexFailed={handleFsScrollToIndexFailed}
+                    maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
+                  />
+                ) : dataSettled ? (
+                  chatEmptyComponent
+                ) : (
+                  <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                    <ActivityIndicator size="small" color={THEME_COLORS.gold} />
+                  </View>
+                )}
                 {!isNearBottom && <JumpToLatestButton count={unreadCount} onPress={scrollToLatest} />}
                 <View style={{ borderTopWidth: 1, borderTopColor: THEME_COLORS.border, backgroundColor: THEME_COLORS.bg }}>
                   {showAttachTray === 'fs' && (
