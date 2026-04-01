@@ -114,13 +114,6 @@ const TYPE_LABEL_COLORS: Record<MessageType, string> = {
 };
 
 const REACTION_OPTIONS = ['🙏', '❤️', '🙌', '🔥', '😢', '✨'] as const;
-const EMOJI_LIBRARY = [
-  '🙏', '❤️', '🙌', '🔥', '✨', '😢', '😊', '😂', '😭', '😮',
-  '👏', '👍', '👎', '💯', '🎉', '🥹', '🤍', '💙', '💜', '💚',
-  '🕊️', '☀️', '🌙', '⭐', '🌈', '🙇', '🤲', '🫶', '💪', '🙋',
-  '😇', '🥰', '😌', '🤔', '😔', '😡', '😴', '🤯', '🥳', '🤝',
-  '📖', '✝️', '🛐', '🙃', '😎', '🤗', '💔', '❤️‍🔥', '🫂', '🕯️',
-] as const;
 
 type ChatSurface = 'main' | 'fs';
 
@@ -215,13 +208,6 @@ async function getMediaLibraryModule() {
   } catch {
     throw new Error('Media saving needs the latest app build. Please update the app and try again.');
   }
-}
-
-function isSingleEmoji(value: string) {
-  const normalized = value.trim();
-  if (!normalized) return false;
-  const withoutJoiners = normalized.replace(/\uFE0F/g, '');
-  return withoutJoiners.length <= 8;
 }
 
 function toReplyRef(msg: GroupChatMessage): GroupChatReplyRef {
@@ -569,112 +555,6 @@ function GroupMembersSheet({
   );
 }
 
-function EmojiLibraryModal({
-  visible,
-  onClose,
-  onSelect,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  onSelect: (emoji: string) => void;
-}) {
-  const [customEmoji, setCustomEmoji] = useState('');
-
-  function handleSubmitCustom() {
-    const emoji = customEmoji.trim();
-    if (!isSingleEmoji(emoji)) {
-      Alert.alert('Choose one emoji', 'Please enter a single emoji.');
-      return;
-    }
-    onSelect(emoji);
-    setCustomEmoji('');
-    onClose();
-  }
-
-  return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
-      <Pressable
-        style={{ flex: 1, backgroundColor: 'rgba(44,36,22,0.45)', justifyContent: 'flex-end' }}
-        onPress={onClose}
-      >
-        <Pressable
-          onPress={() => {}}
-          style={{
-            backgroundColor: THEME_COLORS.bg,
-            borderTopLeftRadius: 28,
-            borderTopRightRadius: 28,
-            paddingHorizontal: 20,
-            paddingTop: 14,
-            paddingBottom: 28,
-          }}
-        >
-          <View style={{ width: 36, height: 4, backgroundColor: THEME_COLORS.border, borderRadius: 2, alignSelf: 'center', marginBottom: 18 }} />
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18 }}>
-            More reactions
-          </Text>
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingTop: 18 }}
-          >
-            {EMOJI_LIBRARY.map((emoji) => (
-              <Pressable
-                key={emoji}
-                onPress={() => {
-                  onSelect(emoji);
-                  onClose();
-                }}
-                style={{
-                  width: 46,
-                  height: 46,
-                  borderRadius: 23,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: THEME_COLORS.bg3,
-                  borderWidth: 1,
-                  borderColor: THEME_COLORS.border,
-                }}
-              >
-                <Text style={{ fontSize: 22 }}>{emoji}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 18 }}>
-            <TextInput
-              value={customEmoji}
-              onChangeText={setCustomEmoji}
-              placeholder="Paste any emoji"
-              placeholderTextColor={THEME_COLORS.text3}
-              style={{
-                flex: 1,
-                backgroundColor: THEME_COLORS.bg2,
-                borderRadius: 16,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                color: THEME_COLORS.text,
-                fontFamily: 'Geist_400Regular',
-                fontSize: 16,
-                borderWidth: 1,
-                borderColor: THEME_COLORS.border,
-              }}
-            />
-            <Pressable
-              onPress={handleSubmitCustom}
-              style={{
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                borderRadius: 14,
-                backgroundColor: THEME_COLORS.gold,
-              }}
-            >
-              <Text style={{ color: '#fff', fontFamily: 'Geist_600SemiBold', fontSize: 13 }}>Use</Text>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
 function GroupChatBubble({
   msg,
   surface,
@@ -687,7 +567,6 @@ function GroupChatBubble({
   onReply,
   onToggleReaction,
   onOpenReactions,
-  onOpenEmojiLibrary,
   onCopyMessage,
   onDeleteMessage,
   onJumpToReply,
@@ -704,7 +583,6 @@ function GroupChatBubble({
   onReply: (message: GroupChatMessage) => void;
   onToggleReaction: (messageId: string, emoji: string) => void;
   onOpenReactions: (message: GroupChatMessage, anchor: { x: number; y: number; align: 'left' | 'right' }) => void;
-  onOpenEmojiLibrary: (message: GroupChatMessage) => void;
   onCopyMessage: (message: GroupChatMessage) => void;
   onDeleteMessage: (messageId: string) => void;
   onJumpToReply: (messageId: string, surface: ChatSurface) => void;
@@ -969,13 +847,12 @@ function GroupChatBubble({
                 {reactionEntries.length > 0 && (
                   <View
                     style={{
-                      marginTop: 10,
-                      paddingTop: 10,
-                      borderTopWidth: 1,
-                      borderTopColor: isMe ? 'rgba(255,255,255,0.35)' : 'rgba(44,36,22,0.08)',
+                      marginTop: 8,
+                      paddingTop: 6,
                       flexDirection: 'row',
                       flexWrap: 'wrap',
-                      gap: 6,
+                      gap: 10,
+                      alignItems: 'center',
                       justifyContent: isMe ? 'flex-end' : 'flex-start',
                     }}
                   >
@@ -986,40 +863,24 @@ function GroupChatBubble({
                         <Pressable
                           key={`${msg.message_id}-${emoji}`}
                           onPress={() => onToggleReaction(msg.message_id, emoji)}
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 4,
-                            paddingHorizontal: 9,
-                            paddingVertical: 5,
-                            borderRadius: 999,
-                            backgroundColor: reactedByMe ? THEME_COLORS.goldDim : THEME_COLORS.bg3,
-                            borderWidth: 1,
-                            borderColor: reactedByMe ? THEME_COLORS.goldBorder : THEME_COLORS.border,
-                          }}
+                          hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
                         >
-                          <Text style={{ fontSize: 16, lineHeight: 20 }}>{emoji}</Text>
-                          <Text style={{ color: reactedByMe ? THEME_COLORS.gold : THEME_COLORS.text3, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
-                            {typedUsers.length}
-                          </Text>
+                          <Text style={{ fontSize: 18, lineHeight: 22 }}>{emoji}</Text>
+                          {typedUsers.length > 1 ? (
+                            <Text
+                              style={{
+                                color: reactedByMe ? THEME_COLORS.gold : THEME_COLORS.text3,
+                                fontFamily: 'Geist_600SemiBold',
+                                fontSize: 12,
+                              }}
+                            >
+                              {typedUsers.length}
+                            </Text>
+                          ) : null}
                         </Pressable>
                       );
                     })}
-                    <Pressable
-                      onPress={() => onOpenEmojiLibrary(msg)}
-                      style={{
-                        width: 30,
-                        height: 30,
-                        borderRadius: 15,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: THEME_COLORS.bg3,
-                        borderWidth: 1,
-                        borderColor: THEME_COLORS.border,
-                      }}
-                    >
-                      <Text style={{ color: THEME_COLORS.text2, fontSize: 18, lineHeight: 18 }}>+</Text>
-                    </Pressable>
                   </View>
                 )}
               </View>
@@ -1033,7 +894,8 @@ function GroupChatBubble({
               maxWidth: BUBBLE_W,
               flexDirection: 'row',
               flexWrap: 'wrap',
-              gap: 6,
+              gap: 10,
+              alignItems: 'center',
               justifyContent: isMe ? 'flex-end' : 'flex-start',
             }}
           >
@@ -1044,40 +906,24 @@ function GroupChatBubble({
                 <Pressable
                   key={`${msg.message_id}-media-${emoji}`}
                   onPress={() => onToggleReaction(msg.message_id, emoji)}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 4,
-                    paddingHorizontal: 9,
-                    paddingVertical: 5,
-                    borderRadius: 999,
-                    backgroundColor: reactedByMe ? THEME_COLORS.goldDim : THEME_COLORS.bg3,
-                    borderWidth: 1,
-                    borderColor: reactedByMe ? THEME_COLORS.goldBorder : THEME_COLORS.border,
-                  }}
+                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
                 >
-                  <Text style={{ fontSize: 16, lineHeight: 20 }}>{emoji}</Text>
-                  <Text style={{ color: reactedByMe ? THEME_COLORS.gold : THEME_COLORS.text3, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
-                    {typedUsers.length}
-                  </Text>
+                  <Text style={{ fontSize: 18, lineHeight: 22 }}>{emoji}</Text>
+                  {typedUsers.length > 1 ? (
+                    <Text
+                      style={{
+                        color: reactedByMe ? THEME_COLORS.gold : THEME_COLORS.text3,
+                        fontFamily: 'Geist_600SemiBold',
+                        fontSize: 12,
+                      }}
+                    >
+                      {typedUsers.length}
+                    </Text>
+                  ) : null}
                 </Pressable>
               );
             })}
-            <Pressable
-              onPress={() => onOpenEmojiLibrary(msg)}
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: 15,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: THEME_COLORS.bg3,
-                borderWidth: 1,
-                borderColor: THEME_COLORS.border,
-              }}
-            >
-              <Text style={{ color: THEME_COLORS.text2, fontSize: 18, lineHeight: 18 }}>+</Text>
-            </Pressable>
           </View>
         )}
         </View>
@@ -1293,7 +1139,6 @@ function MessageReactionPopover({
   topInset,
   onClose,
   onReact,
-  onOpenEmojiLibrary,
 }: {
   visible: boolean;
   state: ReactionPopoverState | null;
@@ -1301,7 +1146,6 @@ function MessageReactionPopover({
   topInset: number;
   onClose: () => void;
   onReact: (messageId: string, emoji: string) => void;
-  onOpenEmojiLibrary: (message: GroupChatMessage) => void;
 }) {
   if (!state) return null;
 
@@ -1345,7 +1189,7 @@ function MessageReactionPopover({
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8 }}
+              contentContainerStyle={{ gap: 4, alignItems: 'center', paddingVertical: 2 }}
             >
               {REACTION_OPTIONS.map((emoji) => {
                 const reactedByMe = !!userUid && (state.message.reactions?.[emoji] ?? []).includes(userUid);
@@ -1356,39 +1200,21 @@ function MessageReactionPopover({
                       onReact(state.message.message_id, emoji);
                       onClose();
                     }}
-                    style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: 21,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: reactedByMe ? THEME_COLORS.goldDim : THEME_COLORS.bg3,
-                      borderWidth: 1,
-                      borderColor: reactedByMe ? THEME_COLORS.goldBorder : THEME_COLORS.border,
-                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                    style={{ paddingHorizontal: 6, paddingVertical: 4 }}
                   >
-                    <Text style={{ fontSize: 20 }}>{emoji}</Text>
+                    <Text
+                      style={{
+                        fontSize: 26,
+                        lineHeight: 30,
+                        opacity: reactedByMe ? 1 : 0.92,
+                      }}
+                    >
+                      {emoji}
+                    </Text>
                   </Pressable>
                 );
               })}
-              <Pressable
-                onPress={() => {
-                  onOpenEmojiLibrary(state.message);
-                  onClose();
-                }}
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 21,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: THEME_COLORS.bg3,
-                  borderWidth: 1,
-                  borderColor: THEME_COLORS.border,
-                }}
-              >
-                <Text style={{ color: THEME_COLORS.text2, fontSize: 24, lineHeight: 24 }}>+</Text>
-              </Pressable>
             </ScrollView>
           </Pressable>
         </View>
@@ -1614,7 +1440,6 @@ export default function GroupScreen() {
   const [replyTarget, setReplyTarget] = useState<GroupChatMessage | null>(null);
   const [reactionPopover, setReactionPopover] = useState<ReactionPopoverState | null>(null);
   const [showMembersSheet, setShowMembersSheet] = useState(false);
-  const [emojiLibraryMessage, setEmojiLibraryMessage] = useState<GroupChatMessage | null>(null);
   const [optimisticReactions, setOptimisticReactions] = useState<Record<string, Record<string, string[]>>>({});
   const [pendingUploads, setPendingUploads] = useState<PendingUploadBubble[]>([]);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
@@ -1901,11 +1726,6 @@ export default function GroupScreen() {
       anchorY: anchor.y,
       align: anchor.align,
     });
-  }
-
-  function handleOpenEmojiLibrary(message: GroupChatMessage) {
-    setReactionPopover(null);
-    setEmojiLibraryMessage(message);
   }
 
   async function handleCopyMessage(message: GroupChatMessage) {
@@ -2202,7 +2022,6 @@ export default function GroupScreen() {
           onReply={handleReplyToMessage}
           onToggleReaction={handleToggleReaction}
           onOpenReactions={handleOpenReactionPopover}
-          onOpenEmojiLibrary={handleOpenEmojiLibrary}
           onCopyMessage={(message) => { void handleCopyMessage(message); }}
           onDeleteMessage={requestDeleteMessage}
           onJumpToReply={jumpToMessage}
@@ -2574,16 +2393,6 @@ export default function GroupScreen() {
         topInset={insets.top}
         onClose={() => setReactionPopover(null)}
         onReact={handleToggleReaction}
-        onOpenEmojiLibrary={handleOpenEmojiLibrary}
-      />
-
-      <EmojiLibraryModal
-        visible={!!emojiLibraryMessage}
-        onClose={() => setEmojiLibraryMessage(null)}
-        onSelect={(emoji) => {
-          if (emojiLibraryMessage) void handleToggleReaction(emojiLibraryMessage.message_id, emoji);
-          setEmojiLibraryMessage(null);
-        }}
       />
 
       {/* Fullscreen media viewer */}
