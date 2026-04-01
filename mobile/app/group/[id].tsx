@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   FlatList,
   TextInput,
   Pressable,
@@ -14,22 +13,14 @@ import {
   ActivityIndicator,
   Linking,
   Dimensions,
-  StatusBar,
-  Animated as RNAnimated,
   NativeSyntheticEvent,
   NativeScrollEvent,
-  Image as RNImage,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Swipeable from 'react-native-gesture-handler/Swipeable';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
-import QRCode from 'react-native-qrcode-svg';
-import dayjs from 'dayjs';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
@@ -49,1347 +40,35 @@ import { usePrayerRoom } from '@/hooks/usePrayerRoom';
 import { groupApi, roomApi } from '@/services/api';
 import { isWebRTCAvailable } from '@/lib/sfu';
 import { GroupLiveAvPanel } from '@/components/group/GroupLiveAvPanel';
-import { Avatar } from '@/components/ui/Avatar';
+import { GroupMembersSheet } from '@/components/group/GroupMembersSheet';
+import { VoiceRecorder } from '@/components/group/VoiceRecorder';
+import { ReplyComposerBanner } from '@/components/group/ReplyComposerBanner';
+import { AttachmentTray } from '@/components/group/AttachmentTray';
+import { DateDivider, UnreadDivider } from '@/components/group/ChatDividers';
+import { GroupChatBubble } from '@/components/group/GroupChatBubble';
+import { PendingUploadChatBubble } from '@/components/group/PendingUploadChatBubble';
+import { MessageReactionPopover } from '@/components/group/MessageReactionPopover';
+import { InviteSheet } from '@/components/group/InviteSheet';
+import { JumpToLatestButton } from '@/components/group/JumpToLatestButton';
+import {
+  applyReactionMutation,
+  buildReplyPreviewText,
+  type ChatListItem,
+  type ChatSurface,
+  downloadAttachmentToCache,
+  getMediaLibraryModule,
+  normalizeReactions,
+  type PendingUploadBubble,
+  type ReactionPopoverState,
+  sameSenderCluster,
+  toReplyRef,
+  type ViewerMedia,
+} from '@/components/group/groupChatUtils';
 import { PulsingDot } from '@/components/ui/PulsingDot';
 import { useAuthStore } from '@/stores/authStore';
 import { THEME_COLORS } from '@/lib/constants';
 import Icon from '@/components/ui/Icon';
-import type {
-  MessageType,
-  PrayerGroup,
-  GroupMember,
-  GroupChatMessage,
-  GroupChatAttachment,
-  GroupChatReplyRef,
-} from '@/types';
-
-type PendingUploadBubble = {
-  temp_id: string;
-  user_name: string;
-  user_photo?: string | null;
-  message: string;
-  local_uri?: string;
-  file_name: string;
-  content_type: string;
-  status: 'uploading' | 'failed';
-};
-
-type ViewerMedia = {
-  url: string;
-  contentType: string;
-  fileName: string;
-};
-
-type ReactionPopoverState = {
-  message: GroupChatMessage;
-  anchorX: number;
-  anchorY: number;
-  align: 'left' | 'right';
-};
-
-type ChatListItem =
-  | { key: string; kind: 'unread'; count: number }
-  | {
-      key: string;
-      kind: 'message';
-      msg: GroupChatMessage;
-      showSender: boolean;
-      showTimestamp: boolean;
-    }
-  | { key: string; kind: 'pending'; item: PendingUploadBubble };
-
-const TYPE_COLORS: Record<MessageType, string> = {
-  text: 'transparent',
-  prayer_request: THEME_COLORS.violetDim,
-  scripture: THEME_COLORS.goldDim2,
-  praise: THEME_COLORS.sageDim,
-  announcement: 'rgba(59,130,246,0.08)',
-  system_notification: 'rgba(176,90,80,0.08)',
-};
-
-const TYPE_BORDER_COLORS: Record<MessageType, string> = {
-  text: 'transparent',
-  prayer_request: 'rgba(112,64,184,0.18)',
-  scripture: THEME_COLORS.goldBorder,
-  praise: 'rgba(74,124,94,0.22)',
-  announcement: 'rgba(59,130,246,0.2)',
-  system_notification: 'rgba(176,90,80,0.2)',
-};
-
-const TYPE_LABEL_COLORS: Record<MessageType, string> = {
-  text: THEME_COLORS.text3,
-  prayer_request: THEME_COLORS.violet,
-  scripture: THEME_COLORS.gold,
-  praise: THEME_COLORS.sage,
-  announcement: '#3b82f6',
-  system_notification: THEME_COLORS.rose,
-};
-
-const REACTION_OPTIONS = ['🙏', '❤️', '🙌', '🔥', '😢', '✨'] as const;
-
-type ChatSurface = 'main' | 'fs';
-
-function buildReplyPreviewText(msg: Pick<GroupChatMessage, 'message' | 'link_url' | 'attachments' | 'message_type'>) {
-  const body = (msg.message ?? '').trim().replace(/\s+/g, ' ');
-  if (body) return body;
-
-  if (msg.link_url?.trim()) return msg.link_url.trim();
-
-  const attachments = msg.attachments ?? [];
-  if (attachments.length > 0) {
-    const imageCount = attachments.filter((a) => a.content_type.startsWith('image/')).length;
-    const videoCount = attachments.filter((a) => a.content_type.startsWith('video/')).length;
-    if (imageCount === attachments.length) return imageCount === 1 ? 'Photo' : `${imageCount} photos`;
-    if (videoCount === attachments.length) return videoCount === 1 ? 'Video' : `${videoCount} videos`;
-    return attachments.length === 1 ? `File: ${attachments[0].file_name}` : `${attachments.length} attachments`;
-  }
-
-  if (msg.message_type === 'prayer_request') return 'Prayer request';
-  if (msg.message_type === 'scripture') return 'Scripture';
-  if (msg.message_type === 'praise') return 'Praise report';
-  return 'Message';
-}
-
-function normalizeReactions(reactions?: Record<string, string[]>) {
-  const next: Record<string, string[]> = {};
-  for (const [emoji, users] of Object.entries(reactions ?? {})) {
-    if (!emoji || !Array.isArray(users)) continue;
-    const filtered = users.filter((uid): uid is string => typeof uid === 'string');
-    if (filtered.length > 0) next[emoji] = filtered;
-  }
-  return next;
-}
-
-function applyReactionMutation(
-  reactions: Record<string, string[]>,
-  emoji: string,
-  userUid?: string,
-) {
-  if (!userUid) return reactions;
-  const next = { ...normalizeReactions(reactions) };
-  const currentUsers = next[emoji] ?? [];
-  const hasReacted = currentUsers.includes(userUid);
-  const updatedUsers = hasReacted
-    ? currentUsers.filter((uid) => uid !== userUid)
-    : [...currentUsers, userUid];
-
-  if (updatedUsers.length > 0) next[emoji] = updatedUsers;
-  else delete next[emoji];
-
-  return next;
-}
-
-function sameSenderCluster(
-  current: GroupChatMessage,
-  adjacent?: GroupChatMessage,
-) {
-  if (!adjacent) return false;
-  if (current.user_id !== adjacent.user_id) return false;
-  const currentTs = firestoreTimestampMs(current.timestamp);
-  const adjacentTs = firestoreTimestampMs(adjacent.timestamp);
-  return Math.abs(currentTs - adjacentTs) < 5 * 60 * 1000;
-}
-
-function isVisualAttachment(att: GroupChatAttachment) {
-  return att.content_type.startsWith('image/') || att.content_type.startsWith('video/');
-}
-
-function fileExtensionFromAttachment(att: Pick<GroupChatAttachment, 'file_name' | 'content_type'>) {
-  const fromName = (att.file_name.split('.').pop() || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
-  if (fromName) return fromName;
-  if (att.content_type.startsWith('image/')) return att.content_type.split('/')[1] || 'jpg';
-  if (att.content_type.startsWith('video/')) return att.content_type.split('/')[1] || 'mp4';
-  return 'bin';
-}
-
-async function downloadAttachmentToCache(att: Pick<GroupChatAttachment, 'url' | 'file_name' | 'content_type'>) {
-  const baseDir = FileSystem.cacheDirectory;
-  if (!baseDir) throw new Error('File cache is unavailable on this device.');
-  const ext = fileExtensionFromAttachment(att);
-  const safeName =
-    att.file_name.replace(/[^a-z0-9._-]/gi, '_').slice(0, 80) || `attachment.${ext}`;
-  const dest = `${baseDir}${Date.now()}_${safeName.endsWith(`.${ext}`) ? safeName : `${safeName}.${ext}`}`;
-  const result = await FileSystem.downloadAsync(att.url, dest);
-  if (result.status !== 200) throw new Error('Could not download file.');
-  return result.uri;
-}
-
-async function getMediaLibraryModule() {
-  try {
-    return await import('expo-media-library');
-  } catch {
-    throw new Error('Media saving needs the latest app build. Please update the app and try again.');
-  }
-}
-
-function toReplyRef(msg: GroupChatMessage): GroupChatReplyRef {
-  return {
-    message_id: msg.message_id,
-    user_id: msg.user_id,
-    user_name: msg.user_name,
-    message: buildReplyPreviewText(msg),
-  };
-}
-
-function ReplyComposerBanner({
-  target,
-  onCancel,
-}: {
-  target: GroupChatMessage;
-  onCancel: () => void;
-}) {
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        paddingHorizontal: 14,
-        paddingTop: 10,
-        paddingBottom: 8,
-        backgroundColor: THEME_COLORS.bg,
-      }}
-    >
-      <View
-        style={{
-          flex: 1,
-          borderLeftWidth: 3,
-          borderLeftColor: THEME_COLORS.gold,
-          paddingLeft: 10,
-        }}
-      >
-        <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
-          Replying to {target.user_name}
-        </Text>
-        <Text
-          numberOfLines={2}
-          style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 2 }}
-        >
-          {buildReplyPreviewText(target)}
-        </Text>
-      </View>
-      <Pressable
-        onPress={onCancel}
-        accessibilityRole="button"
-        accessibilityLabel="Cancel reply"
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: 14,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: THEME_COLORS.bg3,
-          borderWidth: 1,
-          borderColor: THEME_COLORS.border,
-        }}
-      >
-        <Icon name="cross" size={12} color={THEME_COLORS.text3} />
-      </Pressable>
-    </View>
-  );
-}
-
-function AttachmentTray({
-  onPickPhoto,
-  onTakePhoto,
-  onPickVideo,
-  onPickDocument,
-}: {
-  onPickPhoto: () => void;
-  onTakePhoto: () => void;
-  onPickVideo: () => void;
-  onPickDocument: () => void;
-}) {
-  const options = [
-    {
-      key: 'photo',
-      label: 'Photo',
-      sublabel: 'Choose from library',
-      icon: 'image' as const,
-      iconColor: '#2F7D6B',
-      iconBg: 'rgba(47,125,107,0.14)',
-      onPress: onPickPhoto,
-    },
-    {
-      key: 'camera',
-      label: 'Camera',
-      sublabel: 'Take a photo',
-      icon: 'camera' as const,
-      iconColor: '#C67A12',
-      iconBg: 'rgba(198,122,18,0.14)',
-      onPress: onTakePhoto,
-    },
-    {
-      key: 'video',
-      label: 'Video',
-      sublabel: 'Choose a video',
-      icon: 'video' as const,
-      iconColor: '#8A5CF6',
-      iconBg: 'rgba(138,92,246,0.14)',
-      onPress: onPickVideo,
-    },
-    {
-      key: 'document',
-      label: 'Document',
-      sublabel: 'Share a file',
-      icon: 'scroll' as const,
-      iconColor: '#D3536A',
-      iconBg: 'rgba(211,83,106,0.14)',
-      onPress: onPickDocument,
-    },
-  ];
-
-  return (
-    <View
-      style={{
-        marginHorizontal: 12,
-        marginTop: 8,
-        marginBottom: 4,
-        padding: 8,
-        borderRadius: 18,
-        backgroundColor: THEME_COLORS.bg2,
-        borderWidth: 1,
-        borderColor: THEME_COLORS.border,
-      }}
-    >
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-        {options.map((option) => (
-          <Pressable
-            key={option.key}
-            onPress={option.onPress}
-            style={{
-              width: '48%',
-              minWidth: 146,
-              paddingVertical: 12,
-              paddingHorizontal: 12,
-              borderRadius: 14,
-              backgroundColor: THEME_COLORS.bg3,
-              borderWidth: 1,
-              borderColor: THEME_COLORS.border,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 10,
-            }}
-          >
-            <View
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: 19,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: option.iconBg,
-              }}
-            >
-              <Icon name={option.icon} size={18} color={option.iconColor} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 13 }}>
-                {option.label}
-              </Text>
-              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 11, marginTop: 2 }}>
-                {option.sublabel}
-              </Text>
-            </View>
-          </Pressable>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-function AdaptiveImagePreview({
-  uri,
-  accessibilityLabel,
-}: {
-  uri: string;
-  accessibilityLabel: string;
-}) {
-  const [ratio, setRatio] = useState(4 / 3);
-
-  useEffect(() => {
-    let active = true;
-    RNImage.getSize(
-      uri,
-      (width, height) => {
-        if (active && width > 0 && height > 0) setRatio(width / height);
-      },
-      () => {}
-    );
-    return () => {
-      active = false;
-    };
-  }, [uri]);
-
-  return (
-    <Image
-      source={{ uri }}
-      style={{ width: 264, aspectRatio: ratio, backgroundColor: THEME_COLORS.bg3 }}
-      contentFit="contain"
-      accessibilityLabel={accessibilityLabel}
-    />
-  );
-}
-
-function MediaAttachmentCard({
-  attachment,
-  onOpen,
-}: {
-  attachment: GroupChatAttachment;
-  onOpen: (attachment: GroupChatAttachment) => void;
-}) {
-  const isVideo = attachment.content_type.startsWith('video/');
-
-  return (
-    <Pressable
-      onPress={() => onOpen(attachment)}
-      style={{
-        width: 264,
-        borderRadius: 18,
-        overflow: 'hidden',
-        backgroundColor: THEME_COLORS.bg3,
-        borderWidth: 1,
-        borderColor: THEME_COLORS.border,
-      }}
-    >
-      {isVideo ? (
-        <View style={{ position: 'relative' }}>
-          <Video
-            source={{ uri: attachment.url }}
-            style={{ width: 264, height: 220, backgroundColor: '#111' }}
-            resizeMode={ResizeMode.COVER}
-            shouldPlay={false}
-            isLooping={false}
-            isMuted
-          />
-          <View
-            style={{
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              bottom: 0,
-              left: 0,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <View
-              style={{
-                width: 54,
-                height: 54,
-                borderRadius: 27,
-                backgroundColor: 'rgba(0,0,0,0.45)',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Icon name="play" size={18} color="#fff" />
-            </View>
-          </View>
-        </View>
-      ) : (
-        <AdaptiveImagePreview uri={attachment.url} accessibilityLabel={attachment.file_name} />
-      )}
-    </Pressable>
-  );
-}
-
-function GroupMembersSheet({
-  visible,
-  groupName,
-  members,
-  loading,
-  onClose,
-}: {
-  visible: boolean;
-  groupName: string;
-  members: GroupMember[];
-  loading: boolean;
-  onClose: () => void;
-}) {
-  return (
-    <Modal transparent animationType="slide" visible={visible} onRequestClose={onClose}>
-      <Pressable
-        style={{ flex: 1, backgroundColor: 'rgba(44,36,22,0.45)', justifyContent: 'flex-end' }}
-        onPress={onClose}
-      >
-        <Pressable
-          onPress={() => {}}
-          style={{
-            backgroundColor: THEME_COLORS.bg,
-            borderTopLeftRadius: 28,
-            borderTopRightRadius: 28,
-            paddingHorizontal: 20,
-            paddingTop: 14,
-            paddingBottom: 32,
-            maxHeight: '72%',
-          }}
-        >
-          <View style={{ width: 36, height: 4, backgroundColor: THEME_COLORS.border, borderRadius: 2, alignSelf: 'center', marginBottom: 18 }} />
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18 }}>
-            {groupName}
-          </Text>
-          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 4, marginBottom: 14 }}>
-            {loading ? 'Loading members...' : `${members.length} ${members.length === 1 ? 'member' : 'members'}`}
-          </Text>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {loading ? (
-              <ActivityIndicator color={THEME_COLORS.gold} style={{ marginTop: 18 }} />
-            ) : (
-              members.map((member) => (
-                <View
-                  key={member.uid}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 12,
-                    paddingVertical: 12,
-                    borderTopWidth: 1,
-                    borderTopColor: THEME_COLORS.border,
-                  }}
-                >
-                  <Avatar name={member.display_name} photoUrl={member.photo_url} size={34} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 14 }}>
-                      {member.display_name}
-                    </Text>
-                    <Text style={{ color: member.role === 'admin' ? THEME_COLORS.gold : THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 2 }}>
-                      {member.role === 'admin' ? 'Admin' : 'Member'}
-                    </Text>
-                  </View>
-                </View>
-              ))
-            )}
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
-function GroupChatBubble({
-  msg,
-  surface,
-  userUid,
-  showSender,
-  showTimestamp,
-  highlighted,
-  onOpenMedia,
-  onOpenDoc,
-  onReply,
-  onToggleReaction,
-  onOpenReactions,
-  onCopyMessage,
-  onDeleteMessage,
-  onJumpToReply,
-  onLayoutMessage,
-}: {
-  msg: GroupChatMessage;
-  surface: ChatSurface;
-  userUid?: string;
-  showSender: boolean;
-  showTimestamp: boolean;
-  highlighted?: boolean;
-  onOpenMedia: (attachment: GroupChatAttachment) => void;
-  onOpenDoc: (url: string, fileName: string) => void;
-  onReply: (message: GroupChatMessage) => void;
-  onToggleReaction: (messageId: string, emoji: string) => void;
-  onOpenReactions: (message: GroupChatMessage, anchor: { x: number; y: number; align: 'left' | 'right' }) => void;
-  onCopyMessage: (message: GroupChatMessage) => void;
-  onDeleteMessage: (messageId: string) => void;
-  onJumpToReply: (messageId: string, surface: ChatSurface) => void;
-  onLayoutMessage: (messageId: string, y: number, surface: ChatSurface) => void;
-}) {
-  const swipeRef = useRef<Swipeable | null>(null);
-  const isMe = msg.user_id === userUid;
-  const isSpecial = msg.message_type !== 'text';
-  const bg = highlighted
-    ? 'rgba(212, 168, 75, 0.18)'
-    : isSpecial
-      ? TYPE_COLORS[msg.message_type]
-      : isMe
-        ? THEME_COLORS.goldDim
-        : THEME_COLORS.bg2;
-  const borderColor = highlighted
-    ? THEME_COLORS.gold
-    : isSpecial
-      ? TYPE_BORDER_COLORS[msg.message_type]
-      : isMe
-        ? THEME_COLORS.goldBorder
-        : THEME_COLORS.border;
-  const attachments = msg.attachments ?? [];
-  const showText = (msg.message ?? '').trim().length > 0;
-  const mediaAtts = attachments.filter(isVisualAttachment);
-  const docAtts = attachments.filter((a) => !isVisualAttachment(a));
-  const reactionEntries = Object.entries(msg.reactions ?? {}).filter(
-    ([emoji, users]) => emoji && Array.isArray(users) && users.length > 0,
-  );
-  const hasMessageBubble =
-    showText || docAtts.length > 0 || !!msg.reply_to || isSpecial || !!msg.link_url;
-
-  const BUBBLE_W = 264;
-  const rTL = 18;
-  const rTR = 18;
-  const rBR = isMe ? 4 : 18;
-  const rBL = isMe ? 18 : 4;
-
-  function handleLongPress(event: { nativeEvent: { pageX: number; pageY: number } }) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onOpenReactions(msg, {
-      x: event.nativeEvent.pageX,
-      y: event.nativeEvent.pageY,
-      align: isMe ? 'right' : 'left',
-    });
-  }
-
-  function handleSwipeReply() {
-    swipeRef.current?.close();
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onReply(msg);
-  }
-
-  return (
-    <View
-      onLayout={(event) => onLayoutMessage(msg.message_id, event.nativeEvent.layout.y, surface)}
-      style={{ position: 'relative' }}
-    >
-    <Swipeable
-      ref={swipeRef}
-      overshootLeft={false}
-      overshootRight={false}
-      leftThreshold={36}
-      rightThreshold={44}
-      friction={2}
-      renderLeftActions={(_, dragX) => (
-        <View style={{ justifyContent: 'center', paddingHorizontal: 8, marginBottom: showTimestamp ? 12 : 4 }}>
-          <RNAnimated.View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 6,
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              borderRadius: 14,
-              backgroundColor: THEME_COLORS.sageDim,
-              borderWidth: 1,
-              borderColor: 'rgba(74,124,94,0.22)',
-              opacity: dragX.interpolate({
-                inputRange: [0, 16, 48],
-                outputRange: [0.1, 0.5, 1],
-                extrapolate: 'clamp',
-              }),
-              transform: [
-                {
-                  translateX: dragX.interpolate({
-                    inputRange: [0, 80],
-                    outputRange: [-16, 0],
-                    extrapolate: 'clamp',
-                  }),
-                },
-                {
-                  scale: dragX.interpolate({
-                    inputRange: [0, 80],
-                    outputRange: [0.85, 1],
-                    extrapolate: 'clamp',
-                  }),
-                },
-              ],
-            }}
-          >
-            <Icon name="reply" size={14} color={THEME_COLORS.sage} />
-            <Text style={{ color: THEME_COLORS.sage, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
-              Reply
-            </Text>
-          </RNAnimated.View>
-        </View>
-      )}
-      renderRightActions={() => (
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            gap: 8,
-            paddingLeft: 10,
-            marginBottom: showTimestamp ? 12 : 4,
-          }}
-        >
-          <Pressable
-            onPress={() => {
-              swipeRef.current?.close();
-              onCopyMessage(msg);
-            }}
-            style={{
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              borderRadius: 14,
-              backgroundColor: THEME_COLORS.bg3,
-              borderWidth: 1,
-              borderColor: THEME_COLORS.border,
-            }}
-          >
-            <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
-              Copy
-            </Text>
-          </Pressable>
-          {isMe ? (
-            <Pressable
-              onPress={() => {
-                swipeRef.current?.close();
-                onDeleteMessage(msg.message_id);
-              }}
-              style={{
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                borderRadius: 14,
-                backgroundColor: 'rgba(176,90,80,0.08)',
-                borderWidth: 1,
-                borderColor: 'rgba(176,90,80,0.16)',
-              }}
-            >
-              <Text style={{ color: THEME_COLORS.rose, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
-                Delete
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
-      )}
-      onSwipeableOpen={(direction) => {
-        if (direction === 'left') handleSwipeReply();
-      }}
-    >
-      <Animated.View
-        entering={FadeInDown.duration(200)}
-        style={{ marginBottom: showTimestamp ? 12 : 4, alignItems: isMe ? 'flex-end' : 'flex-start' }}
-      >
-        {!isMe && showSender && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, marginLeft: 4 }}>
-            <Avatar name={msg.user_name} photoUrl={msg.user_photo} size={20} />
-            <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_500Medium', fontSize: 11 }}>{msg.user_name}</Text>
-          </View>
-        )}
-        <View style={{ position: 'relative', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
-        {mediaAtts.length > 0 && (
-          <Pressable onLongPress={handleLongPress} delayLongPress={400}>
-            <View style={{ gap: 8, marginBottom: hasMessageBubble ? 8 : 0 }}>
-              {mediaAtts.map((a, idx) => (
-                <MediaAttachmentCard
-                  key={`${msg.message_id}-media-${idx}`}
-                  attachment={a}
-                  onOpen={onOpenMedia}
-                />
-              ))}
-            </View>
-          </Pressable>
-        )}
-        {hasMessageBubble && (
-          <View
-            style={{
-              maxWidth: BUBBLE_W,
-              alignSelf: isMe ? 'flex-end' : 'flex-start',
-              position: 'relative',
-            }}
-          >
-            <Pressable onLongPress={handleLongPress} delayLongPress={400}>
-              <View style={{
-                backgroundColor: bg,
-                borderRadius: 18,
-                borderTopLeftRadius: rTL, borderTopRightRadius: rTR,
-                borderBottomRightRadius: rBR, borderBottomLeftRadius: rBL,
-                overflow: 'hidden',
-                borderWidth: 1,
-                borderColor,
-              }}>
-                <View style={{ padding: 12 }}>
-                  {isSpecial && (
-                    <Text style={{ fontSize: 10, marginBottom: 4, color: TYPE_LABEL_COLORS[msg.message_type], fontFamily: 'Geist_600SemiBold', letterSpacing: 0.8, textTransform: 'uppercase' }}>
-                      {msg.message_type.replace('_', ' ')}
-                    </Text>
-                  )}
-                  {msg.reply_to && (
-                    <Pressable
-                      onPress={() => onJumpToReply(msg.reply_to!.message_id, surface)}
-                      style={{
-                        marginBottom: showText || msg.link_url || docAtts.length > 0 ? 10 : 0,
-                        paddingVertical: 8,
-                        paddingHorizontal: 10,
-                        borderRadius: 12,
-                        backgroundColor: isMe ? 'rgba(255,255,255,0.48)' : THEME_COLORS.bg3,
-                        borderLeftWidth: 3,
-                        borderLeftColor: TYPE_LABEL_COLORS[msg.message_type] || THEME_COLORS.gold,
-                      }}
-                    >
-                      <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 11 }}>
-                        {msg.reply_to.user_name}
-                      </Text>
-                      <Text numberOfLines={2} style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 2 }}>
-                        {msg.reply_to.message}
-                      </Text>
-                    </Pressable>
-                  )}
-                  {!!msg.link_url && (
-                    <Pressable
-                      onPress={() => Linking.openURL(msg.link_url!)}
-                      style={{ marginBottom: showText || docAtts.length ? 8 : 0 }}
-                    >
-                      <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 13, textDecorationLine: 'underline' }} numberOfLines={3}>
-                        {msg.link_url}
-                      </Text>
-                    </Pressable>
-                  )}
-                  {docAtts.map((a: GroupChatAttachment, idx: number) => (
-                    <Pressable
-                      key={`${msg.message_id}-doc-${idx}`}
-                      onPress={() => onOpenDoc(a.url, a.file_name)}
-                      style={{ marginBottom: idx < docAtts.length - 1 || showText ? 10 : 0 }}
-                    >
-                      <View style={{
-                        paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12,
-                        backgroundColor: THEME_COLORS.bg3, borderWidth: 1, borderColor: THEME_COLORS.border,
-                      }}>
-                        <Text style={{ color: THEME_COLORS.violet, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
-                          {a.file_name?.toLowerCase().endsWith('.pdf') ? 'PDF' : 'File'}
-                        </Text>
-                        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 4 }} numberOfLines={2}>
-                          {a.file_name}
-                        </Text>
-                        <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_500Medium', fontSize: 11, marginTop: 6 }}>Tap to open</Text>
-                      </View>
-                    </Pressable>
-                  ))}
-                  {showText ? (
-                    <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 22 }}>
-                      {msg.message}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-            </Pressable>
-            {reactionEntries.length > 0 ? (
-              <View
-                style={{
-                  marginTop: -11,
-                  zIndex: 1,
-                  elevation: 2,
-                  flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  gap: 8,
-                  alignItems: 'center',
-                  justifyContent: isMe ? 'flex-end' : 'flex-start',
-                  paddingHorizontal: 2,
-                }}
-              >
-                {reactionEntries.map(([emoji, users]) => {
-                  const typedUsers = users.filter((uid): uid is string => typeof uid === 'string');
-                  const reactedByMe = !!userUid && typedUsers.includes(userUid);
-                  return (
-                    <Pressable
-                      key={`${msg.message_id}-${emoji}`}
-                      onPress={() => onToggleReaction(msg.message_id, emoji)}
-                      hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-                      style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
-                    >
-                      <Text style={{ fontSize: 18, lineHeight: 22 }}>{emoji}</Text>
-                      {typedUsers.length > 1 ? (
-                        <Text
-                          style={{
-                            color: reactedByMe ? THEME_COLORS.gold : THEME_COLORS.text3,
-                            fontFamily: 'Geist_600SemiBold',
-                            fontSize: 12,
-                          }}
-                        >
-                          {typedUsers.length}
-                        </Text>
-                      ) : null}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
-          </View>
-        )}
-        {reactionEntries.length > 0 && mediaAtts.length > 0 && !hasMessageBubble && (
-          <View
-            style={{
-              marginTop: 8,
-              maxWidth: BUBBLE_W,
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              gap: 10,
-              alignItems: 'center',
-              justifyContent: isMe ? 'flex-end' : 'flex-start',
-            }}
-          >
-            {reactionEntries.map(([emoji, users]) => {
-              const typedUsers = users.filter((uid): uid is string => typeof uid === 'string');
-              const reactedByMe = !!userUid && typedUsers.includes(userUid);
-              return (
-                <Pressable
-                  key={`${msg.message_id}-media-${emoji}`}
-                  onPress={() => onToggleReaction(msg.message_id, emoji)}
-                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
-                >
-                  <Text style={{ fontSize: 18, lineHeight: 22 }}>{emoji}</Text>
-                  {typedUsers.length > 1 ? (
-                    <Text
-                      style={{
-                        color: reactedByMe ? THEME_COLORS.gold : THEME_COLORS.text3,
-                        fontFamily: 'Geist_600SemiBold',
-                        fontSize: 12,
-                      }}
-                    >
-                      {typedUsers.length}
-                    </Text>
-                  ) : null}
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
-        </View>
-        {showTimestamp && (
-          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 10, marginTop: 3, marginHorizontal: 6 }}>
-            {msg.timestamp
-              ? dayjs(
-                  typeof msg.timestamp === 'number'
-                    ? msg.timestamp
-                    : (msg.timestamp as { toMillis?: () => number })?.toMillis?.() ?? Date.now()
-                ).format('h:mm A')
-              : ''}
-          </Text>
-        )}
-      </Animated.View>
-    </Swipeable>
-    </View>
-  );
-}
-
-function PendingUploadChatBubble({
-  item,
-  userUid,
-}: {
-  item: PendingUploadBubble;
-  userUid?: string;
-}) {
-  const isMe = !!userUid;
-  const isImage = item.content_type.startsWith('image/');
-  const isVideo = item.content_type.startsWith('video/');
-
-  return (
-    <Animated.View
-      entering={FadeInDown.duration(180)}
-      style={{ marginBottom: 12, alignItems: isMe ? 'flex-end' : 'flex-start', opacity: item.status === 'failed' ? 0.72 : 1 }}
-    >
-      {(isImage || isVideo) && (
-        <View
-          style={{
-            width: 264,
-            borderRadius: 18,
-            overflow: 'hidden',
-            backgroundColor: THEME_COLORS.bg3,
-            borderWidth: 1,
-            borderStyle: 'dashed',
-            borderColor: item.status === 'failed' ? THEME_COLORS.rose : THEME_COLORS.border,
-            marginBottom: item.message ? 8 : 0,
-          }}
-        >
-          {isVideo ? (
-            <View style={{ position: 'relative' }}>
-              <Video
-                source={{ uri: item.local_uri ?? '' }}
-                style={{ width: 264, height: 220, backgroundColor: '#111' }}
-                resizeMode={ResizeMode.COVER}
-                shouldPlay={false}
-                isLooping={false}
-                isMuted
-              />
-              <View style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' }}>
-                <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name="play" size={18} color="#fff" />
-                </View>
-              </View>
-            </View>
-          ) : (
-            <Image
-              source={{ uri: item.local_uri ?? '' }}
-              style={{ width: 264, aspectRatio: 4 / 3, backgroundColor: THEME_COLORS.bg3 }}
-              contentFit="cover"
-              accessibilityLabel={item.file_name}
-            />
-          )}
-          <View style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
-            <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_500Medium', fontSize: 12 }} numberOfLines={1}>
-              {item.file_name}
-            </Text>
-            <Text
-              style={{
-                color: item.status === 'failed' ? THEME_COLORS.rose : THEME_COLORS.text3,
-                fontFamily: 'Geist_500Medium',
-                fontSize: 11,
-                marginTop: 4,
-              }}
-            >
-              {item.status === 'failed' ? 'Upload failed' : 'Uploading...'}
-            </Text>
-          </View>
-        </View>
-      )}
-      {(!isImage && !isVideo) || item.message ? (
-        <View
-          style={{
-            maxWidth: 264,
-            backgroundColor: THEME_COLORS.bg2,
-            borderRadius: 18,
-            borderBottomRightRadius: isMe ? 4 : 18,
-            borderBottomLeftRadius: isMe ? 18 : 4,
-            overflow: 'hidden',
-            borderWidth: 1,
-            borderStyle: 'dashed',
-            borderColor: item.status === 'failed' ? THEME_COLORS.rose : THEME_COLORS.border,
-          }}
-        >
-          <View style={{ padding: 12 }}>
-            {!isImage && !isVideo && (
-              <View
-                style={{
-                  paddingVertical: 10,
-                  paddingHorizontal: 12,
-                  borderRadius: 12,
-                  backgroundColor: THEME_COLORS.bg3,
-                  borderWidth: 1,
-                  borderColor: THEME_COLORS.border,
-                  marginBottom: item.message ? 10 : 0,
-                }}
-              >
-                <Text style={{ color: THEME_COLORS.violet, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
-                  File
-                </Text>
-                <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 4 }} numberOfLines={2}>
-                  {item.file_name}
-                </Text>
-              </View>
-            )}
-            {!!item.message && (
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 22 }}>
-                {item.message}
-              </Text>
-            )}
-            {!(isImage || isVideo) && (
-              <Text
-                style={{
-                  color: item.status === 'failed' ? THEME_COLORS.rose : THEME_COLORS.text3,
-                  fontFamily: 'Geist_500Medium',
-                  fontSize: 11,
-                  marginTop: 8,
-                }}
-              >
-                {item.status === 'failed' ? 'Upload failed' : 'Uploading...'}
-              </Text>
-            )}
-          </View>
-        </View>
-      ) : null}
-    </Animated.View>
-  );
-}
-
-function UnreadDivider({ count }: { count: number }) {
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 14 }}>
-      <View style={{ flex: 1, height: 1, backgroundColor: THEME_COLORS.goldBorder }} />
-      <View
-        style={{
-          paddingHorizontal: 10,
-          paddingVertical: 5,
-          borderRadius: 999,
-          backgroundColor: THEME_COLORS.goldDim,
-          borderWidth: 1,
-          borderColor: THEME_COLORS.goldBorder,
-        }}
-      >
-        <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 11 }}>
-          {count > 0 ? `${count} new message${count === 1 ? '' : 's'}` : 'New messages'}
-        </Text>
-      </View>
-      <View style={{ flex: 1, height: 1, backgroundColor: THEME_COLORS.goldBorder }} />
-    </View>
-  );
-}
-
-function JumpToLatestButton({
-  count,
-  onPress,
-}: {
-  count: number;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        position: 'absolute',
-        right: 16,
-        bottom: 18,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        borderRadius: 999,
-        backgroundColor: THEME_COLORS.text,
-        shadowColor: '#000',
-        shadowOpacity: 0.12,
-        shadowRadius: 10,
-        shadowOffset: { width: 0, height: 4 },
-        elevation: 4,
-      }}
-    >
-      <Text style={{ color: '#fff', fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
-        {count > 0 ? `${count} new` : 'Latest'}
-      </Text>
-      <Text style={{ color: '#fff', fontSize: 12 }}>↓</Text>
-    </Pressable>
-  );
-}
-
-function MessageReactionPopover({
-  visible,
-  state,
-  userUid,
-  topInset,
-  onClose,
-  onReact,
-}: {
-  visible: boolean;
-  state: ReactionPopoverState | null;
-  userUid?: string;
-  topInset: number;
-  onClose: () => void;
-  onReact: (messageId: string, emoji: string) => void;
-}) {
-  if (!state) return null;
-
-  const { width, height } = Dimensions.get('window');
-  const pickerWidth = Math.min(width - 24, 320);
-  const preferredLeft = state.align === 'right'
-    ? state.anchorX - pickerWidth + 32
-    : state.anchorX - 32;
-  const left = Math.min(Math.max(12, preferredLeft), width - pickerWidth - 12);
-  const top = state.anchorY > 98
-    ? Math.max(topInset + 8, state.anchorY - 70)
-    : Math.min(height - 82, state.anchorY + 18);
-
-  return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose} statusBarTranslucent>
-      <Pressable
-        style={{ flex: 1 }}
-        onPress={onClose}
-      >
-        <View pointerEvents="box-none" style={{ flex: 1 }}>
-          <Pressable
-            onPress={() => {}}
-            style={{
-              position: 'absolute',
-              top,
-              left,
-              width: pickerWidth,
-              paddingHorizontal: 10,
-              paddingVertical: 10,
-              borderRadius: 18,
-              backgroundColor: THEME_COLORS.bg,
-              borderWidth: 1,
-              borderColor: THEME_COLORS.border,
-              shadowColor: '#000',
-              shadowOpacity: 0.14,
-              shadowRadius: 12,
-              shadowOffset: { width: 0, height: 6 },
-              elevation: 12,
-            }}
-          >
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 4, alignItems: 'center', paddingVertical: 2 }}
-            >
-              {REACTION_OPTIONS.map((emoji) => {
-                const reactedByMe = !!userUid && (state.message.reactions?.[emoji] ?? []).includes(userUid);
-                return (
-                  <Pressable
-                    key={`${state.message.message_id}-picker-${emoji}`}
-                    onPress={() => {
-                      onReact(state.message.message_id, emoji);
-                      onClose();
-                    }}
-                    hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-                    style={{ paddingHorizontal: 6, paddingVertical: 4 }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 26,
-                        lineHeight: 30,
-                        opacity: reactedByMe ? 1 : 0.92,
-                      }}
-                    >
-                      {emoji}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </Pressable>
-        </View>
-      </Pressable>
-    </Modal>
-  );
-}
-
-// ─── InviteSheet ──────────────────────────────────────────────────────────────
-
-function InviteSheet({ group, onClose }: { group: PrayerGroup; onClose: () => void }) {
-  const inviteCode = group.invite_code;
-  const inviteUrl = inviteCode
-    ? `https://divinebridge.io/join/${group.group_id}?code=${inviteCode}`
-    : `https://divinebridge.io/join/${group.group_id}`;
-
-  const [copied, setCopied] = useState(false);
-
-  async function handleShare() {
-    try {
-      await Share.share({
-        message: `Join me in "${group.name}" on DivineBridge — a space for prayer and community.\n\n${inviteUrl}`,
-        url: inviteUrl,
-      });
-    } catch {}
-  }
-
-  async function handleCopy() {
-    await Clipboard.setStringAsync(inviteUrl);
-    setCopied(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  return (
-    <Modal transparent animationType="slide" visible onRequestClose={onClose}>
-      <Pressable
-        style={{ flex: 1, backgroundColor: 'rgba(44,36,22,0.55)', justifyContent: 'flex-end' }}
-        onPress={onClose}
-      >
-        <Pressable
-          onPress={() => {}}
-          style={{
-            backgroundColor: THEME_COLORS.bg,
-            borderTopLeftRadius: 28,
-            borderTopRightRadius: 28,
-            paddingHorizontal: 24,
-            paddingTop: 16,
-            paddingBottom: 48,
-          }}
-        >
-          {/* Handle */}
-          <View style={{ width: 36, height: 4, backgroundColor: THEME_COLORS.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
-
-          {/* Title */}
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 20, textAlign: 'center', marginBottom: 4, letterSpacing: -0.3 }}>
-            Invite to Group
-          </Text>
-          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 13, textAlign: 'center', marginBottom: 24 }} numberOfLines={1}>
-            {group.name}
-          </Text>
-
-          {/* QR Code */}
-          <View style={{ alignItems: 'center', marginBottom: 24 }}>
-            <View style={{
-              backgroundColor: '#ffffff',
-              padding: 18,
-              borderRadius: 22,
-              borderWidth: 1,
-              borderColor: THEME_COLORS.border,
-            }}>
-              <QRCode
-                value={inviteUrl}
-                size={180}
-                color={THEME_COLORS.text}
-                backgroundColor="#ffffff"
-              />
-            </View>
-            <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 10 }}>
-              Scan to join
-            </Text>
-          </View>
-
-          {/* Invite code badge */}
-          {inviteCode && (
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              paddingVertical: 10,
-              paddingHorizontal: 16,
-              backgroundColor: THEME_COLORS.goldDim2,
-              borderWidth: 1,
-              borderColor: THEME_COLORS.goldBorder,
-              borderRadius: 14,
-              marginBottom: 20,
-            }}>
-              <Icon name="lock" size={14} color={THEME_COLORS.gold} />
-              <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_400Regular', fontSize: 13 }}>
-                Code: <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_700Bold', letterSpacing: 2 }}>{inviteCode}</Text>
-              </Text>
-            </View>
-          )}
-
-          {/* Action buttons */}
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <Pressable
-              onPress={handleCopy}
-              style={({ pressed }) => ({
-                flex: 1,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                paddingVertical: 15,
-                borderRadius: 15,
-                backgroundColor: copied ? THEME_COLORS.sageDim : THEME_COLORS.bg3,
-                borderWidth: 1,
-                borderColor: copied ? 'rgba(74,124,94,0.3)' : THEME_COLORS.border,
-                opacity: pressed ? 0.8 : 1,
-              })}
-            >
-              <Icon name="attach" size={16} color={copied ? THEME_COLORS.sage : THEME_COLORS.text2} />
-              <Text style={{ color: copied ? THEME_COLORS.sage : THEME_COLORS.text2, fontFamily: 'Geist_600SemiBold', fontSize: 14 }}>
-                {copied ? 'Copied!' : 'Copy Link'}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={handleShare}
-              style={({ pressed }) => ({
-                flex: 1,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                paddingVertical: 15,
-                borderRadius: 15,
-                backgroundColor: THEME_COLORS.gold,
-                opacity: pressed ? 0.85 : 1,
-              })}
-            >
-              <Icon name="share" size={16} color="#ffffff" />
-              <Text style={{ color: '#ffffff', fontFamily: 'Geist_600SemiBold', fontSize: 14 }}>
-                Share
-              </Text>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
+import type { PrayerGroup, GroupChatMessage, GroupChatReplyRef } from '@/types';
 
 function LiveSessionBanner({
   participantCount,
@@ -1453,7 +132,7 @@ export default function GroupScreen() {
   const { group } = useGroupDetails(id!);
   const { members, isLoading: isLoadingMembers } = useGroupMembers(id!);
   const groupLiveRoom = useGroupLiveRoom(id!);
-  const { messages, sendMessage, toggleReaction, deleteMessage } = useGroupChat(id!);
+  const { messages, isLoading: isLoadingChat, sendMessage, toggleReaction, deleteMessage } = useGroupChat(id!);
   const { markGroupChatRead, unreadCountByGroup } = useGroupUnread();
   const { reads } = useGroupChatLastReads();
   const [text, setText] = useState('');
@@ -1476,6 +155,7 @@ export default function GroupScreen() {
   const [fsChatOpen, setFsChatOpen] = useState(true);
   const [fsChatText, setFsChatText] = useState('');
   const [showAttachTray, setShowAttachTray] = useState<'main' | 'fs' | null>(null);
+  const [voiceRecordingSurface, setVoiceRecordingSurface] = useState<'main' | 'fs' | null>(null);
   const [viewerMedia, setViewerMedia] = useState<ViewerMedia | null>(null);
   const [mediaActionBusy, setMediaActionBusy] = useState<'share' | 'save' | null>(null);
   const memberSyncRequestedRef = useRef(false);
@@ -1518,6 +198,24 @@ export default function GroupScreen() {
   const lastReadAt = id ? reads[id] ?? 0 : 0;
   const unreadCount = id ? unreadCountByGroup[id] ?? 0 : 0;
 
+  const currentMember = useMemo(
+    () => (user?.uid ? members.find((m) => m.uid === user.uid) : undefined),
+    [members, user?.uid],
+  );
+  const memberJoinedAt = currentMember?.joined_at ?? 0;
+  const lastReadSeededRef = useRef(false);
+
+  useEffect(() => {
+    if (!id || !user?.uid || lastReadSeededRef.current) return;
+    if (lastReadAt > 0) {
+      lastReadSeededRef.current = true;
+      return;
+    }
+    if (isLoadingMembers || memberJoinedAt === 0) return;
+    lastReadSeededRef.current = true;
+    void markGroupChatRead(id, memberJoinedAt);
+  }, [id, user?.uid, lastReadAt, isLoadingMembers, memberJoinedAt, markGroupChatRead]);
+
   useEffect(() => {
     if (!id || isLoadingMembers || members.length === 0 || memberSyncRequestedRef.current) return;
     const needsSync = members.some((member) => {
@@ -1531,14 +229,19 @@ export default function GroupScreen() {
     });
   }, [id, isLoadingMembers, members]);
 
-  const displayedMessages = useMemo(
-    () =>
-      messages.map((msg) => {
+  const displayedMessages = useMemo(() => {
+    const effectiveJoinedAt =
+      lastReadAt === 0 && memberJoinedAt > 0 ? memberJoinedAt : 0;
+
+    return messages
+      .filter((msg) =>
+        effectiveJoinedAt === 0 || firestoreTimestampMs(msg.timestamp) >= effectiveJoinedAt
+      )
+      .map((msg) => {
         const override = optimisticReactions[msg.message_id];
         return override ? { ...msg, reactions: override } : msg;
-      }),
-    [messages, optimisticReactions]
-  );
+      });
+  }, [messages, optimisticReactions, lastReadAt, memberJoinedAt]);
 
   const firstUnreadIndex = useMemo(() => {
     if (!user?.uid) return -1;
@@ -1567,35 +270,41 @@ export default function GroupScreen() {
     });
   }, [messages]);
 
-  const prevMessageLenRef = useRef(0);
+  const prevMessageIdsRef = useRef<Set<string>>(new Set());
   const prevGroupIdRef = useRef(id);
+  const initialScrollAppliedRef = useRef(false);
 
   useEffect(() => {
     if (prevGroupIdRef.current !== id) {
       prevGroupIdRef.current = id;
-      prevMessageLenRef.current = 0;
+      prevMessageIdsRef.current = new Set();
+      initialScrollAppliedRef.current = false;
       messageLayoutMapRef.current = {};
       fsMessageLayoutMapRef.current = {};
     }
   }, [id]);
 
   useEffect(() => {
-    const len = displayedMessages.length;
-    const prevLen = prevMessageLenRef.current;
+    const currentIds = new Set(displayedMessages.map((m) => m.message_id));
+    const prevIds = prevMessageIdsRef.current;
 
-    if (len === 0 && pendingCount === 0) {
-      prevMessageLenRef.current = 0;
+    if (currentIds.size === 0 && pendingCount === 0) {
+      prevMessageIdsRef.current = currentIds;
       return;
     }
 
-    if (len > prevLen && prevLen > 0 && isNearBottom) {
+    const hasGenuinelyNewMessages =
+      prevIds.size > 0 &&
+      displayedMessages.some((m) => !prevIds.has(m.message_id));
+
+    if (hasGenuinelyNewMessages && isNearBottom) {
       scrollRef.current?.scrollToEnd({ animated: false });
       fsScrollRef.current?.scrollToEnd({ animated: false });
       setIsNearBottom(true);
     }
 
-    prevMessageLenRef.current = len;
-  }, [displayedMessages.length, pendingCount, id, isNearBottom]);
+    prevMessageIdsRef.current = currentIds;
+  }, [displayedMessages, pendingCount, id, isNearBottom]);
 
   useEffect(() => {
     if (!highlightedMessageId) return;
@@ -1997,6 +706,37 @@ export default function GroupScreen() {
     }
   }
 
+  const handleVoiceSend = useCallback(async (uri: string, _durationMs: number) => {
+    if (!id || !user) return;
+    const tempId = `voice-${Date.now()}`;
+    const name = `voice_${Date.now()}.m4a`;
+    const mime = 'audio/mp4';
+    try {
+      addPendingUpload({
+        temp_id: tempId,
+        user_name: user.displayName ?? user.email ?? 'You',
+        user_photo: undefined,
+        message: '',
+        local_uri: uri,
+        file_name: name,
+        content_type: mime,
+        status: 'uploading',
+      });
+      const res = await fetch(uri);
+      const blob = await res.blob();
+      const att = await uploadGroupChatFile(id, blob, mime, name);
+      await sendMessage('', 'text', {
+        attachments: [att],
+        replyTo: replyTarget ? toReplyRef(replyTarget) : null,
+      });
+      setReplyTarget(null);
+      removePendingUpload(tempId);
+    } catch (e) {
+      updatePendingUpload(tempId, 'failed');
+      Alert.alert('Upload failed', e instanceof Error ? e.message : 'Try again.');
+    }
+  }, [id, user, sendMessage, replyTarget]);
+
   async function handleStartGroupLive() {
     if (!user || !id) return;
     setStartingLive(true);
@@ -2037,12 +777,33 @@ export default function GroupScreen() {
 
   const chatItems = useMemo<ChatListItem[]>(() => {
     const items: ChatListItem[] = [];
+    let lastDateKey = '';
 
     displayedMessages.forEach((msg, idx) => {
       const prev = displayedMessages[idx - 1];
       const next = displayedMessages[idx + 1];
       const showSender = !sameSenderCluster(msg, prev);
       const showTimestamp = !sameSenderCluster(msg, next);
+
+      const msgMs = firestoreTimestampMs(msg.timestamp);
+      const msgDate = new Date(msgMs);
+      const dateKey = `${msgDate.getFullYear()}-${String(msgDate.getMonth() + 1).padStart(2, '0')}-${String(msgDate.getDate()).padStart(2, '0')}`;
+
+      if (dateKey !== lastDateKey) {
+        lastDateKey = dateKey;
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const yesterdayKey = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+
+        let label: string;
+        if (dateKey === todayKey) label = 'Today';
+        else if (dateKey === yesterdayKey) label = 'Yesterday';
+        else label = msgDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: msgDate.getFullYear() !== today.getFullYear() ? 'numeric' : undefined });
+
+        items.push({ key: `date-${dateKey}`, kind: 'date', label });
+      }
 
       if (idx === firstUnreadIndex) {
         items.push({
@@ -2073,7 +834,9 @@ export default function GroupScreen() {
   }, [displayedMessages, firstUnreadIndex, unreadCount, pendingUploads]);
 
   const initialChatIndex = useMemo(() => {
-    if (chatItems.length === 0) return 0;
+    if (initialScrollAppliedRef.current) return undefined;
+    if (chatItems.length === 0) return undefined;
+    initialScrollAppliedRef.current = true;
     if (firstUnreadIndex >= 0) {
       const unreadItemIndex = chatItems.findIndex((item) => item.kind === 'unread');
       if (unreadItemIndex >= 0) return unreadItemIndex;
@@ -2081,7 +844,36 @@ export default function GroupScreen() {
     return chatItems.length - 1;
   }, [chatItems, firstUnreadIndex]);
 
+  const chatEmptyComponent = useMemo(() => {
+    if (isLoadingChat) {
+      return (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <ActivityIndicator size="large" color={THEME_COLORS.gold} />
+        </View>
+      );
+    }
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+        <Icon name="gathering" size={48} color={THEME_COLORS.text3} />
+        <Text style={{
+          color: THEME_COLORS.text2,
+          fontFamily: 'Geist_500Medium',
+          fontSize: 15,
+          marginTop: 16,
+          textAlign: 'center',
+        }}>
+          {memberJoinedAt > 0 && lastReadAt === 0
+            ? 'You just joined! Start the conversation.'
+            : 'No messages yet. Say something!'}
+        </Text>
+      </View>
+    );
+  }, [isLoadingChat, memberJoinedAt, lastReadAt]);
+
   function renderChatItem(item: ChatListItem, surface: ChatSurface) {
+    if (item.kind === 'date') {
+      return <DateDivider label={item.label} />;
+    }
     if (item.kind === 'unread') {
       return <UnreadDivider count={item.count} />;
     }
@@ -2177,7 +969,7 @@ export default function GroupScreen() {
             {startingLive ? (
               <ActivityIndicator size="small" color={THEME_COLORS.sage} />
             ) : (
-              <Icon name="live" size={16} color={THEME_COLORS.sage} />
+              <Icon name="gathering" size={16} color={THEME_COLORS.sage} />
             )}
           </Pressable>
           <Pressable
@@ -2231,12 +1023,14 @@ export default function GroupScreen() {
         keyExtractor={(item) => item.key}
         renderItem={({ item }) => renderChatItem(item, 'main')}
         style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}
-        contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+        contentContainerStyle={chatItems.length === 0 ? { flex: 1, padding: 16, paddingBottom: 8 } : { padding: 16, paddingBottom: 8 }}
         showsVerticalScrollIndicator={false}
         onScroll={handleMainScroll}
         scrollEventThrottle={16}
         initialScrollIndex={initialChatIndex}
         onScrollToIndexFailed={handleMainScrollToIndexFailed}
+        maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
+        ListEmptyComponent={chatEmptyComponent}
       />
       {!isNearBottom && <JumpToLatestButton count={unreadCount} onPress={scrollToLatest} />}
 
@@ -2340,12 +1134,14 @@ export default function GroupScreen() {
                   keyExtractor={(item) => item.key}
                   renderItem={({ item }) => renderChatItem(item, 'fs')}
                   style={{ flex: 1 }}
-                  contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+                  contentContainerStyle={chatItems.length === 0 ? { flex: 1, padding: 16, paddingBottom: 8 } : { padding: 16, paddingBottom: 8 }}
                   showsVerticalScrollIndicator={false}
                   onScroll={handleFsScroll}
                   scrollEventThrottle={16}
                   initialScrollIndex={initialChatIndex}
                   onScrollToIndexFailed={handleFsScrollToIndexFailed}
+                  maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
+                  ListEmptyComponent={chatEmptyComponent}
                 />
                 {!isNearBottom && <JumpToLatestButton count={unreadCount} onPress={scrollToLatest} />}
                 <View style={{ borderTopWidth: 1, borderTopColor: THEME_COLORS.border, backgroundColor: THEME_COLORS.bg }}>
@@ -2366,57 +1162,66 @@ export default function GroupScreen() {
                     gap: 8,
                     backgroundColor: THEME_COLORS.bg,
                   }}>
-                    <Pressable
-                      onPress={() => setShowAttachTray((current) => (current === 'fs' ? null : 'fs'))}
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 11,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderWidth: 1,
-                        backgroundColor: THEME_COLORS.bg3,
-                        borderColor: THEME_COLORS.border,
-                      }}
-                    >
-                      <Icon name="plus" size={16} color={THEME_COLORS.text2} />
-                    </Pressable>
-                    <TextInput
-                      value={fsChatText}
-                      onChangeText={setFsChatText}
-                      placeholder={replyTarget ? `Reply to ${replyTarget.user_name}…` : 'Message the group…'}
-                      placeholderTextColor={THEME_COLORS.text3}
-                      style={{
-                        flex: 1,
-                        backgroundColor: THEME_COLORS.bg2,
-                        borderRadius: 20,
-                        paddingHorizontal: 16,
-                        paddingVertical: 10,
-                        color: THEME_COLORS.text,
-                        fontFamily: 'Geist_400Regular',
-                        fontSize: 14,
-                        maxHeight: 88,
-                        borderWidth: 1,
-                        borderColor: THEME_COLORS.border,
-                      }}
-                      multiline
-                      returnKeyType="send"
-                      onSubmitEditing={handleFsSend}
-                    />
-                    <Pressable
-                      onPress={handleFsSend}
-                      disabled={!fsChatText.trim()}
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 18,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: fsChatText.trim() ? THEME_COLORS.gold : THEME_COLORS.bg3,
-                      }}
-                    >
-                      <Icon name="send" size={14} color={fsChatText.trim() ? '#ffffff' : THEME_COLORS.text3} />
-                    </Pressable>
+                    {voiceRecordingSurface === 'fs' ? (
+                      <VoiceRecorder onSend={handleVoiceSend} />
+                    ) : (
+                      <>
+                        <Pressable
+                          onPress={() => setShowAttachTray((current) => (current === 'fs' ? null : 'fs'))}
+                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 11,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1,
+                            backgroundColor: THEME_COLORS.bg3,
+                            borderColor: THEME_COLORS.border,
+                          }}
+                        >
+                          <Icon name="plus" size={16} color={THEME_COLORS.text2} />
+                        </Pressable>
+                        <TextInput
+                          value={fsChatText}
+                          onChangeText={setFsChatText}
+                          placeholder={replyTarget ? `Reply to ${replyTarget.user_name}…` : 'Message the group…'}
+                          placeholderTextColor={THEME_COLORS.text3}
+                          style={{
+                            flex: 1,
+                            backgroundColor: THEME_COLORS.bg2,
+                            borderRadius: 20,
+                            paddingHorizontal: 16,
+                            paddingVertical: 10,
+                            color: THEME_COLORS.text,
+                            fontFamily: 'Geist_400Regular',
+                            fontSize: 14,
+                            maxHeight: 88,
+                            borderWidth: 1,
+                            borderColor: THEME_COLORS.border,
+                          }}
+                          multiline
+                        />
+                        {fsChatText.trim() ? (
+                          <Pressable
+                            onPress={handleFsSend}
+                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                            style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 18,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              backgroundColor: THEME_COLORS.gold,
+                            }}
+                          >
+                            <Icon name="send" size={14} color="#ffffff" />
+                          </Pressable>
+                        ) : (
+                          <VoiceRecorder onSend={handleVoiceSend} />
+                        )}
+                      </>
+                    )}
                   </View>
                 </View>
               </View>
@@ -2445,41 +1250,50 @@ export default function GroupScreen() {
           padding: 12, paddingBottom: insets.bottom + 8, gap: 8,
           backgroundColor: THEME_COLORS.bg,
         }}>
-          <Pressable
-            onPress={() => setShowAttachTray((current) => (current === 'main' ? null : 'main'))}
-            style={{
-              width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 1,
-              backgroundColor: THEME_COLORS.bg3,
-              borderColor: THEME_COLORS.border,
-            }}
-          >
-            <Icon name="plus" size={16} color={THEME_COLORS.text2} />
-          </Pressable>
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            placeholder={replyTarget ? `Reply to ${replyTarget.user_name}…` : 'Message the group…'}
-            placeholderTextColor={THEME_COLORS.text3}
-            style={{
-              flex: 1, backgroundColor: THEME_COLORS.bg2, borderRadius: 20,
-              paddingHorizontal: 16, paddingVertical: 10,
-              color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14,
-              maxHeight: 100, borderWidth: 1, borderColor: THEME_COLORS.border,
-            }}
-            multiline
-            returnKeyType="send"
-            onSubmitEditing={handleSend}
-          />
-          <Pressable
-            onPress={handleSend}
-            disabled={!text.trim()}
-            style={{
-              width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
-              backgroundColor: text.trim() ? THEME_COLORS.gold : THEME_COLORS.bg3,
-            }}
-          >
-            <Icon name="send" size={14} color={text.trim() ? '#ffffff' : THEME_COLORS.text3} />
-          </Pressable>
+          {voiceRecordingSurface === 'main' ? (
+            <VoiceRecorder onSend={handleVoiceSend} />
+          ) : (
+            <>
+              <Pressable
+                onPress={() => setShowAttachTray((current) => (current === 'main' ? null : 'main'))}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                style={{
+                  width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 1,
+                  backgroundColor: THEME_COLORS.bg3,
+                  borderColor: THEME_COLORS.border,
+                }}
+              >
+                <Icon name="plus" size={16} color={THEME_COLORS.text2} />
+              </Pressable>
+              <TextInput
+                value={text}
+                onChangeText={setText}
+                placeholder={replyTarget ? `Reply to ${replyTarget.user_name}…` : 'Message the group…'}
+                placeholderTextColor={THEME_COLORS.text3}
+                style={{
+                  flex: 1, backgroundColor: THEME_COLORS.bg2, borderRadius: 20,
+                  paddingHorizontal: 16, paddingVertical: 10,
+                  color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14,
+                  maxHeight: 100, borderWidth: 1, borderColor: THEME_COLORS.border,
+                }}
+                multiline
+              />
+              {text.trim() ? (
+                <Pressable
+                  onPress={handleSend}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  style={{
+                    width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: THEME_COLORS.gold,
+                  }}
+                >
+                  <Icon name="send" size={14} color="#ffffff" />
+                </Pressable>
+              ) : (
+                <VoiceRecorder onSend={handleVoiceSend} />
+              )}
+            </>
+          )}
         </View>
       </View>
 

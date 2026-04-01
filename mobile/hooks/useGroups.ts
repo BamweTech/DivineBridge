@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   collection,
   query,
@@ -305,15 +305,35 @@ export function useGroupChat(groupId: string) {
   const [messages, setMessages] = useState<GroupChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user, profile } = useAuthStore();
+  const messagesRef = useRef<GroupChatMessage[]>([]);
 
   useEffect(() => {
     if (!groupId) return;
     let active = true;
+    let firestoreActive = false;
+
+    const setMessagesDeduped = (data: GroupChatMessage[]) => {
+      const prev = messagesRef.current;
+      if (
+        prev.length === data.length &&
+        prev.length > 0 &&
+        prev[prev.length - 1].message_id === data[data.length - 1].message_id &&
+        prev[0].message_id === data[0].message_id
+      ) {
+        return;
+      }
+      messagesRef.current = data;
+      setMessages(data);
+    };
+
     const memoryCached = groupChatMemoryCache.get(groupId);
-    if (memoryCached && memoryCached.length > 0) {
+    const hadMemoryCache = memoryCached && memoryCached.length > 0;
+    if (hadMemoryCache) {
+      messagesRef.current = memoryCached;
       setMessages(memoryCached);
       setIsLoading(false);
     } else {
+      messagesRef.current = [];
       setMessages([]);
       setIsLoading(true);
     }
@@ -332,7 +352,8 @@ export function useGroupChat(groupId: string) {
         .map((d) => ({ message_id: d.id, group_id: groupId, ...d.data({ serverTimestamps: 'estimate' }) } as GroupChatMessage))
       );
       if (!active) return;
-      setMessages(data);
+      firestoreActive = true;
+      setMessagesDeduped(data);
       setIsLoading(false);
       void writeGroupChatCache(groupId, data);
     };
@@ -350,11 +371,13 @@ export function useGroupChat(groupId: string) {
       );
     };
 
-    void readGroupChatCache(groupId).then((cached) => {
-      if (!active || !cached || cached.length === 0) return;
-      setMessages(cached);
-      setIsLoading(false);
-    });
+    if (!hadMemoryCache) {
+      void readGroupChatCache(groupId).then((cached) => {
+        if (!active || firestoreActive || !cached || cached.length === 0) return;
+        setMessagesDeduped(cached);
+        setIsLoading(false);
+      });
+    }
 
     const qOrdered = query(col, orderBy('timestamp', 'desc'), limit(100));
     unsub = onSnapshot(
@@ -365,7 +388,8 @@ export function useGroupChat(groupId: string) {
           .map((d) => ({ message_id: d.id, group_id: groupId, ...d.data({ serverTimestamps: 'estimate' }) } as GroupChatMessage))
         );
         if (!active) return;
-        setMessages(data);
+        firestoreActive = true;
+        setMessagesDeduped(data);
         setIsLoading(false);
         void writeGroupChatCache(groupId, data);
       },

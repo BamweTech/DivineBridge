@@ -28,6 +28,7 @@ service firebase.storage {
         && (
           request.resource.contentType.matches('image/.*')
           || request.resource.contentType.matches('video/.*')
+          || request.resource.contentType.matches('audio/.*')
           || request.resource.contentType == 'application/pdf'
           || request.resource.contentType == 'application/msword'
           || request.resource.contentType == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'

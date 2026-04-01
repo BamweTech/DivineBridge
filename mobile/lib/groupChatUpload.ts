@@ -8,6 +8,7 @@ function isAllowedGroupChatFileType(contentType: string) {
   return (
     contentType.startsWith('image/') ||
     contentType.startsWith('video/') ||
+    contentType.startsWith('audio/') ||
     contentType === 'application/pdf' ||
     contentType === 'application/msword' ||
     contentType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
@@ -27,7 +28,7 @@ export async function uploadGroupChatFile(
   if (!uid) throw new Error('Not signed in');
   if (blob.size > MAX_BYTES) throw new Error('File must be 50 MB or smaller');
   if (!isAllowedGroupChatFileType(contentType)) {
-    throw new Error('Only photos, videos, and supported documents are allowed');
+    throw new Error('Only photos, videos, audio, and supported documents are allowed');
   }
 
   const ext = (fileName.split('.').pop() || 'bin').replace(/[^a-z0-9]/gi, '').toLowerCase() || 'bin';
