@@ -243,7 +243,16 @@ function groupChatCacheKey(groupId: string) {
 }
 
 function normalizeGroupChatMessages(messages: GroupChatMessage[]) {
-  return messages
+  const deduped = new Map<string, GroupChatMessage>();
+  messages.forEach((msg) => {
+    if (!msg?.message_id) return;
+    const prev = deduped.get(msg.message_id);
+    if (!prev || firestoreTimestampMs(msg.timestamp) >= firestoreTimestampMs(prev.timestamp)) {
+      deduped.set(msg.message_id, msg);
+    }
+  });
+
+  return [...deduped.values()]
     .map((msg) => ({
       ...msg,
       timestamp: firestoreTimestampMs(msg.timestamp),
@@ -381,7 +390,7 @@ export function useGroupChat(groupId: string) {
       user_photo: profile?.photoURL ?? null,
       message: body,
       message_type: type,
-      timestamp: serverTimestamp(),
+      timestamp: Date.now(),
       reactions: {},
       read_by: [user.uid],
     };

@@ -1636,14 +1636,14 @@ export default function GroupScreen() {
       attemptInitialMainPosition();
     }
 
-    if (len > prevLen && prevLen > 0 && !mainNeedsInitialScrollRef.current) {
+    if (len > prevLen && prevLen > 0 && !mainNeedsInitialScrollRef.current && isNearBottom) {
       scrollRef.current?.scrollToEnd({ animated: false });
       fsScrollRef.current?.scrollToEnd({ animated: false });
       setIsNearBottom(true);
     }
 
     prevMessageLenRef.current = len;
-  }, [displayedMessages.length, pendingCount, id]);
+  }, [displayedMessages.length, pendingCount, id, isNearBottom]);
 
   useEffect(() => {
     if (!highlightedMessageId) return;
