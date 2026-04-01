@@ -54,6 +54,8 @@ export type IconName =
   | 'hand'
   | 'chat'
   | 'reply'
+  | 'camera'
+  | 'image'
   | 'leave'
   | 'send'
   | 'attach'
@@ -256,6 +258,21 @@ const Icon: React.FC<IconProps> = ({
       <G>
         <Path {...s} d="M9 17l-5-5 5-5" />
         <Path {...s} d="M4 12h9a7 7 0 017 7" />
+      </G>
+    ),
+
+    camera: (
+      <G>
+        <Path {...s} d="M4 7h4l1.4-2h5.2L16 7h4a2 2 0 012 2v9a2 2 0 01-2 2H4a2 2 0 01-2-2V9a2 2 0 012-2z" />
+        <Circle {...s} cx="12" cy="13" r="4" />
+      </G>
+    ),
+
+    image: (
+      <G>
+        <Rect {...s} x="3" y="5" width="18" height="14" rx="2" />
+        <Circle {...s} cx="9" cy="10" r="1.5" />
+        <Path {...s} d="M6 17l4.5-4.5 3 3L16 13l2 4" />
       </G>
     ),
 

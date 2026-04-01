@@ -296,10 +296,42 @@ function AttachmentTray({
   onPickDocument: () => void;
 }) {
   const options = [
-    { key: 'photo', label: 'Photo', sublabel: 'Choose from library', onPress: onPickPhoto },
-    { key: 'camera', label: 'Camera', sublabel: 'Take a photo', onPress: onTakePhoto },
-    { key: 'video', label: 'Video', sublabel: 'Choose a video', onPress: onPickVideo },
-    { key: 'document', label: 'Document', sublabel: 'Share a file', onPress: onPickDocument },
+    {
+      key: 'photo',
+      label: 'Photo',
+      sublabel: 'Choose from library',
+      icon: 'image' as const,
+      iconColor: '#2F7D6B',
+      iconBg: 'rgba(47,125,107,0.14)',
+      onPress: onPickPhoto,
+    },
+    {
+      key: 'camera',
+      label: 'Camera',
+      sublabel: 'Take a photo',
+      icon: 'camera' as const,
+      iconColor: '#C67A12',
+      iconBg: 'rgba(198,122,18,0.14)',
+      onPress: onTakePhoto,
+    },
+    {
+      key: 'video',
+      label: 'Video',
+      sublabel: 'Choose a video',
+      icon: 'video' as const,
+      iconColor: '#8A5CF6',
+      iconBg: 'rgba(138,92,246,0.14)',
+      onPress: onPickVideo,
+    },
+    {
+      key: 'document',
+      label: 'Document',
+      sublabel: 'Share a file',
+      icon: 'scroll' as const,
+      iconColor: '#D3536A',
+      iconBg: 'rgba(211,83,106,0.14)',
+      onPress: onPickDocument,
+    },
   ];
 
   return (
@@ -329,14 +361,31 @@ function AttachmentTray({
               backgroundColor: THEME_COLORS.bg3,
               borderWidth: 1,
               borderColor: THEME_COLORS.border,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
             }}
           >
-            <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 13 }}>
-              {option.label}
-            </Text>
-            <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 11, marginTop: 2 }}>
-              {option.sublabel}
-            </Text>
+            <View
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 19,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: option.iconBg,
+              }}
+            >
+              <Icon name={option.icon} size={18} color={option.iconColor} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 13 }}>
+                {option.label}
+              </Text>
+              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 11, marginTop: 2 }}>
+                {option.sublabel}
+              </Text>
+            </View>
           </Pressable>
         ))}
       </View>
@@ -674,6 +723,7 @@ function GroupChatBubble({
   const reactionEntries = Object.entries(msg.reactions ?? {}).filter(
     ([emoji, users]) => emoji && Array.isArray(users) && users.length > 0,
   );
+  const reactionOffset = reactionEntries.length > 0 ? 18 : 0;
 
   const BUBBLE_W = 264;
   const rTL = 18;
@@ -693,6 +743,10 @@ function GroupChatBubble({
   }
 
   return (
+    <View
+      onLayout={(event) => onLayoutMessage(msg.message_id, event.nativeEvent.layout.y, surface)}
+      style={{ marginTop: reactionOffset }}
+    >
     <Swipeable
       ref={swipeRef}
       overshootLeft={false}
@@ -745,7 +799,6 @@ function GroupChatBubble({
     >
       <Animated.View
         entering={FadeInDown.duration(200)}
-        onLayout={(event) => onLayoutMessage(msg.message_id, event.nativeEvent.layout.y, surface)}
         style={{ marginBottom: showTimestamp ? 12 : 4, alignItems: isMe ? 'flex-end' : 'flex-start' }}
       >
         {!isMe && showSender && (
@@ -850,7 +903,7 @@ function GroupChatBubble({
           <View
             style={{
               position: 'absolute',
-              top: -12,
+              top: -14,
               right: 6,
               flexDirection: 'row',
               flexWrap: 'wrap',
@@ -916,6 +969,7 @@ function GroupChatBubble({
         )}
       </Animated.View>
     </Swipeable>
+    </View>
   );
 }
 
@@ -1189,25 +1243,22 @@ function MessageActionSheet({
                 </Pressable>
               );
             })}
+            <Pressable
+              onPress={() => onOpenEmojiLibrary(msg)}
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: THEME_COLORS.bg3,
+                borderWidth: 1,
+                borderColor: THEME_COLORS.border,
+              }}
+            >
+              <Text style={{ color: THEME_COLORS.text2, fontSize: 26, lineHeight: 26 }}>+</Text>
+            </Pressable>
           </ScrollView>
-
-          <Pressable
-            onPress={() => onOpenEmojiLibrary(msg)}
-            style={{
-              marginTop: 4,
-              alignSelf: 'flex-start',
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              borderRadius: 12,
-              backgroundColor: THEME_COLORS.bg3,
-              borderWidth: 1,
-              borderColor: THEME_COLORS.border,
-            }}
-          >
-            <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
-              More emoji
-            </Text>
-          </Pressable>
 
           <View style={{ marginTop: 12, gap: 10 }}>
             <Pressable
