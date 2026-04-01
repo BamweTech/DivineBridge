@@ -225,6 +225,15 @@ export function useGroupMembers(groupId: string) {
   return { members, isLoading };
 }
 
+/** Milliseconds from Firestore Timestamp, number, or 0 if missing. */
+export function firestoreTimestampMs(val: unknown): number {
+  if (typeof val === 'number' && !Number.isNaN(val)) return val;
+  if (val && typeof val === 'object' && 'toMillis' in val && typeof (val as { toMillis: () => number }).toMillis === 'function') {
+    return (val as { toMillis: () => number }).toMillis();
+  }
+  return 0;
+}
+
 export function useGroupChat(groupId: string) {
   const [messages, setMessages] = useState<GroupChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -232,13 +241,34 @@ export function useGroupChat(groupId: string) {
 
   useEffect(() => {
     if (!groupId) return;
-    const q = query(
-      collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages'),
-      orderBy('timestamp', 'desc'),
-      limit(100)
-    );
-    const unsub = onSnapshot(
-      q,
+
+    const col = collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages');
+    let unsub: (() => void) | undefined;
+
+    const applyFallbackSnapshot = (snap: { docs: { id: string; data: () => Record<string, unknown> }[] }) => {
+      const data = snap.docs
+        .map((d) => ({ message_id: d.id, group_id: groupId, ...d.data() } as GroupChatMessage))
+        .sort((a, b) => firestoreTimestampMs(a.timestamp) - firestoreTimestampMs(b.timestamp));
+      setMessages(data);
+      setIsLoading(false);
+    };
+
+    const attachFallbackListener = () => {
+      unsub?.();
+      const qFallback = query(col, limit(100));
+      unsub = onSnapshot(
+        qFallback,
+        applyFallbackSnapshot,
+        (err2) => {
+          console.warn('[useGroupChat] fallback listener error', groupId, err2);
+          setIsLoading(false);
+        }
+      );
+    };
+
+    const qOrdered = query(col, orderBy('timestamp', 'desc'), limit(100));
+    unsub = onSnapshot(
+      qOrdered,
       (snap) => {
         const data = snap.docs
           .map((d) => ({ message_id: d.id, group_id: groupId, ...d.data() } as GroupChatMessage))
@@ -246,12 +276,15 @@ export function useGroupChat(groupId: string) {
         setMessages(data);
         setIsLoading(false);
       },
-      () => {
-        setMessages([]);
-        setIsLoading(false);
+      (err) => {
+        console.warn('[useGroupChat] ordered query failed; using unsorted limit listener', groupId, err);
+        attachFallbackListener();
       }
     );
-    return unsub;
+
+    return () => {
+      unsub?.();
+    };
   }, [groupId]);
 
   async function sendMessage(
@@ -326,14 +359,6 @@ export function useGroupChat(groupId: string) {
 }
 
 // ── Group chat unread (latest message vs per-group last read on user doc) ─────
-
-export function firestoreTimestampMs(val: unknown): number {
-  if (typeof val === 'number' && !Number.isNaN(val)) return val;
-  if (val && typeof val === 'object' && 'toMillis' in val && typeof (val as { toMillis: () => number }).toMillis === 'function') {
-    return (val as { toMillis: () => number }).toMillis();
-  }
-  return 0;
-}
 
 /** Subscribes to `users/{uid}.group_chat_last_read_at.{groupId}` map (milliseconds). */
 export function useGroupChatLastReads() {
