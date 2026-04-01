@@ -236,6 +236,7 @@ export function firestoreTimestampMs(val: unknown): number {
 }
 
 const GROUP_CHAT_CACHE_LIMIT = 100;
+const groupChatMemoryCache = new Map<string, GroupChatMessage[]>();
 
 function groupChatCacheKey(groupId: string) {
   return `group_chat_cache:${groupId}`;
@@ -261,9 +262,11 @@ async function readGroupChatCache(groupId: string) {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return null;
-    return normalizeGroupChatMessages(
+    const normalized = normalizeGroupChatMessages(
       parsed.filter((item): item is GroupChatMessage => !!item && typeof item === 'object' && 'message_id' in item)
     );
+    groupChatMemoryCache.set(groupId, normalized);
+    return normalized;
   } catch {
     return null;
   }
@@ -271,9 +274,11 @@ async function readGroupChatCache(groupId: string) {
 
 async function writeGroupChatCache(groupId: string, messages: GroupChatMessage[]) {
   try {
+    const normalized = normalizeGroupChatMessages(messages);
+    groupChatMemoryCache.set(groupId, normalized);
     await AsyncStorage.setItem(
       groupChatCacheKey(groupId),
-      JSON.stringify(normalizeGroupChatMessages(messages))
+      JSON.stringify(normalized)
     );
   } catch {
     // Best-effort cache only.
@@ -288,8 +293,14 @@ export function useGroupChat(groupId: string) {
   useEffect(() => {
     if (!groupId) return;
     let active = true;
-    setMessages([]);
-    setIsLoading(true);
+    const memoryCached = groupChatMemoryCache.get(groupId);
+    if (memoryCached && memoryCached.length > 0) {
+      setMessages(memoryCached);
+      setIsLoading(false);
+    } else {
+      setMessages([]);
+      setIsLoading(true);
+    }
 
     const col = collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages');
     let unsub: (() => void) | undefined;
