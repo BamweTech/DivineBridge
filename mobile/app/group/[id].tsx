@@ -734,7 +734,6 @@ function GroupChatBubble({
   const reactionEntries = Object.entries(msg.reactions ?? {}).filter(
     ([emoji, users]) => emoji && Array.isArray(users) && users.length > 0,
   );
-  const reactionOffset = reactionEntries.length > 0 ? 24 : 0;
 
   const BUBBLE_W = 264;
   const rTL = 18;
@@ -760,11 +759,7 @@ function GroupChatBubble({
   return (
     <View
       onLayout={(event) => onLayoutMessage(msg.message_id, event.nativeEvent.layout.y, surface)}
-      style={{
-        marginTop: reactionOffset,
-        position: 'relative',
-        zIndex: reactionEntries.length > 0 ? 20 : 1,
-      }}
+      style={{ position: 'relative' }}
     >
     <Swipeable
       ref={swipeRef}
@@ -976,16 +971,12 @@ function GroupChatBubble({
         {reactionEntries.length > 0 && (
           <View
             style={{
-              position: 'absolute',
-              top: -16,
-              right: 6,
+              marginTop: 6,
+              maxWidth: BUBBLE_W,
               flexDirection: 'row',
               flexWrap: 'wrap',
-              gap: 4,
-              maxWidth: 220,
-              justifyContent: 'flex-end',
-              zIndex: 30,
-              elevation: 8,
+              gap: 6,
+              justifyContent: isMe ? 'flex-end' : 'flex-start',
             }}
           >
             {reactionEntries.map(([emoji, users]) => {
@@ -998,17 +989,17 @@ function GroupChatBubble({
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
-                    gap: 3,
-                    paddingHorizontal: 7,
-                    paddingVertical: 3,
+                    gap: 4,
+                    paddingHorizontal: 9,
+                    paddingVertical: 5,
                     borderRadius: 999,
                     backgroundColor: reactedByMe ? THEME_COLORS.goldDim : THEME_COLORS.bg3,
                     borderWidth: 1,
                     borderColor: reactedByMe ? THEME_COLORS.goldBorder : THEME_COLORS.border,
                   }}
                 >
-                  <Text style={{ fontSize: 12 }}>{emoji}</Text>
-                  <Text style={{ color: reactedByMe ? THEME_COLORS.gold : THEME_COLORS.text3, fontFamily: 'Geist_600SemiBold', fontSize: 11 }}>
+                  <Text style={{ fontSize: 15, lineHeight: 18 }}>{emoji}</Text>
+                  <Text style={{ color: reactedByMe ? THEME_COLORS.gold : THEME_COLORS.text3, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
                     {typedUsers.length}
                   </Text>
                 </Pressable>
@@ -1017,9 +1008,9 @@ function GroupChatBubble({
             <Pressable
               onPress={() => onOpenEmojiLibrary(msg)}
               style={{
-                width: 24,
-                height: 24,
-                borderRadius: 12,
+                width: 30,
+                height: 30,
+                borderRadius: 15,
                 alignItems: 'center',
                 justifyContent: 'center',
                 backgroundColor: THEME_COLORS.bg3,
@@ -1027,7 +1018,7 @@ function GroupChatBubble({
                 borderColor: THEME_COLORS.border,
               }}
             >
-              <Text style={{ color: THEME_COLORS.text3, fontSize: 13 }}>+</Text>
+              <Text style={{ color: THEME_COLORS.text2, fontSize: 18, lineHeight: 18 }}>+</Text>
             </Pressable>
           </View>
         )}
@@ -2270,7 +2261,7 @@ export default function GroupScreen() {
       <ScrollView
         ref={scrollRef}
         style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}
-        contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 8, overflow: 'visible' as const }}
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
@@ -2375,7 +2366,7 @@ export default function GroupScreen() {
                 <ScrollView
                   ref={fsScrollRef}
                   style={{ flex: 1 }}
-                  contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
+                  contentContainerStyle={{ padding: 16, paddingBottom: 8, overflow: 'visible' as const }}
                   showsVerticalScrollIndicator={false}
                   onScroll={handleScroll}
                   scrollEventThrottle={16}
