@@ -1,6 +1,6 @@
 import '../global.css';
 console.log('[DivineBridge] _layout.tsx: JS runtime started');
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Linking,
 } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -30,6 +31,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '@/stores/authStore';
 import { GroupUnreadProvider } from '@/contexts/GroupUnreadContext';
+import { GroupCallNotificationOverlay } from '@/components/group/GroupCallNotificationOverlay';
 import { groupApi } from '@/services/api';
 import { THEME_COLORS } from '@/lib/constants';
 import Icon from '@/components/ui/Icon';
@@ -239,10 +241,21 @@ export default function RootLayout() {
 
   // Hard safety net: dismiss splash after 3 s regardless of font load state
   const [fontTimeout, setFontTimeout] = useState(false);
+  const routerRef = useRef(useRouter());
 
   useEffect(() => {
     const unsubscribe = initialize();
     return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data;
+      if (data?.type === 'group_live' && data?.groupId) {
+        routerRef.current.push(`/group/${data.groupId}` as any);
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   useEffect(() => {
@@ -318,6 +331,8 @@ export default function RootLayout() {
               options={{ animation: 'slide_from_right' }}
             />
           </Stack>
+
+          <GroupCallNotificationOverlay />
 
           {/* Deep link invite modal — shown on top of everything when user is logged in */}
           {pendingInvite && user && (
