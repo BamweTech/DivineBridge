@@ -78,7 +78,7 @@ export function GroupChatBubble({
     ([emoji, users]) => emoji && Array.isArray(users) && users.length > 0,
   );
   const hasMessageBubble =
-    showText || docAtts.length > 0 || audioAtts.length > 0 || !!msg.reply_to || isSpecial || !!msg.link_url;
+    showText || docAtts.length > 0 || !!msg.reply_to || isSpecial || !!msg.link_url;
 
   const rTL = 18;
   const rTR = 18;
@@ -223,7 +223,7 @@ export function GroupChatBubble({
         <View style={{ position: 'relative', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
         {mediaAtts.length > 0 && (
           <Pressable onLongPress={handleLongPress} delayLongPress={400}>
-            <View style={{ gap: 8, marginBottom: hasMessageBubble ? 8 : 0 }}>
+            <View style={{ gap: 8, marginBottom: hasMessageBubble || audioAtts.length > 0 ? 8 : 0 }}>
               {mediaAtts.map((a, idx) => (
                 <MediaAttachmentCard
                   key={`${msg.message_id}-media-${idx}`}
@@ -233,6 +233,17 @@ export function GroupChatBubble({
               ))}
             </View>
           </Pressable>
+        )}
+        {audioAtts.length > 0 && (
+          <View style={{ gap: 6, marginBottom: hasMessageBubble ? 8 : 0 }}>
+            {audioAtts.map((a: GroupChatAttachment, idx: number) => (
+              <AudioMessageBubble
+                key={`${msg.message_id}-audio-${idx}`}
+                uri={a.url}
+                isMe={isMe}
+              />
+            ))}
+          </View>
         )}
         {hasMessageBubble && (
           <View
@@ -289,14 +300,6 @@ export function GroupChatBubble({
                       </Text>
                     </Pressable>
                   )}
-                  {audioAtts.map((a: GroupChatAttachment, idx: number) => (
-                    <View
-                      key={`${msg.message_id}-audio-${idx}`}
-                      style={{ marginBottom: idx < audioAtts.length - 1 || docAtts.length > 0 || showText ? 10 : 0 }}
-                    >
-                      <AudioMessageBubble uri={a.url} isMe={isMe} />
-                    </View>
-                  ))}
                   {docAtts.map((a: GroupChatAttachment, idx: number) => (
                     <Pressable
                       key={`${msg.message_id}-doc-${idx}`}

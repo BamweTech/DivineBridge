@@ -1,10 +1,16 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { Audio, AVPlaybackStatus } from 'expo-av';
+import Svg, { Circle } from 'react-native-svg';
 import Icon from '@/components/ui/Icon';
 import { THEME_COLORS } from '@/lib/constants';
 
 let activeSound: Audio.Sound | null = null;
+
+const CIRCLE_SIZE = 52;
+const STROKE_WIDTH = 3;
+const RADIUS = (CIRCLE_SIZE - STROKE_WIDTH) / 2;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 type AudioMessageBubbleProps = {
   uri: string;
@@ -86,69 +92,63 @@ export function AudioMessageBubble({ uri, isMe }: AudioMessageBubbleProps) {
   }, [uri, onPlaybackStatusUpdate]);
 
   const progress = durationMs > 0 ? positionMs / durationMs : 0;
-  const bg = isMe ? THEME_COLORS.goldDim : THEME_COLORS.bg2;
+  const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
 
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        paddingVertical: 10,
-        paddingHorizontal: 12,
-        borderRadius: 18,
-        backgroundColor: bg,
-        borderWidth: 1,
-        borderColor: THEME_COLORS.border,
-        minWidth: 200,
-        maxWidth: 264,
-      }}
-    >
+    <View style={{ alignItems: isMe ? 'flex-end' : 'flex-start' }}>
       <Pressable
         onPress={togglePlayPause}
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: 20,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: THEME_COLORS.gold,
-        }}
+        style={{ alignItems: 'center', gap: 4 }}
       >
-        <Icon
-          name={playing ? 'pause' : 'play'}
-          size={16}
-          color="#ffffff"
-        />
+        <View style={{ width: CIRCLE_SIZE, height: CIRCLE_SIZE }}>
+          <Svg width={CIRCLE_SIZE} height={CIRCLE_SIZE} style={{ position: 'absolute' }}>
+            {/* Background track */}
+            <Circle
+              cx={CIRCLE_SIZE / 2}
+              cy={CIRCLE_SIZE / 2}
+              r={RADIUS}
+              stroke={THEME_COLORS.border}
+              strokeWidth={STROKE_WIDTH}
+              fill={isMe ? THEME_COLORS.gold : THEME_COLORS.bg3}
+            />
+            {/* Progress ring */}
+            {progress > 0 && (
+              <Circle
+                cx={CIRCLE_SIZE / 2}
+                cy={CIRCLE_SIZE / 2}
+                r={RADIUS}
+                stroke="#ffffff"
+                strokeWidth={STROKE_WIDTH}
+                fill="transparent"
+                strokeDasharray={`${CIRCUMFERENCE}`}
+                strokeDashoffset={strokeDashoffset}
+                strokeLinecap="round"
+                rotation="-90"
+                origin={`${CIRCLE_SIZE / 2}, ${CIRCLE_SIZE / 2}`}
+              />
+            )}
+          </Svg>
+          <View style={{
+            position: 'absolute',
+            top: 0, left: 0, right: 0, bottom: 0,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <Icon
+              name={playing ? 'pause' : 'play'}
+              size={18}
+              color={isMe ? '#ffffff' : THEME_COLORS.text}
+            />
+          </View>
+        </View>
+        <Text style={{
+          color: THEME_COLORS.text3,
+          fontFamily: 'Geist_400Regular',
+          fontSize: 10,
+        }}>
+          {durationMs > 0 ? formatTime(playing ? positionMs : durationMs) : '—'}
+        </Text>
       </Pressable>
-
-      <View style={{ flex: 1, gap: 4 }}>
-        <View
-          style={{
-            height: 4,
-            borderRadius: 2,
-            backgroundColor: THEME_COLORS.bg3,
-            overflow: 'hidden',
-          }}
-        >
-          <View
-            style={{
-              height: '100%',
-              width: `${progress * 100}%`,
-              backgroundColor: THEME_COLORS.gold,
-              borderRadius: 2,
-            }}
-          />
-        </View>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 11 }}>
-            {formatTime(positionMs)}
-          </Text>
-          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 11 }}>
-            {durationMs > 0 ? formatTime(durationMs) : '—'}
-          </Text>
-        </View>
-      </View>
     </View>
   );
 }

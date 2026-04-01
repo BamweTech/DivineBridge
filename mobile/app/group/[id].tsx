@@ -306,6 +306,15 @@ export default function GroupScreen() {
     prevMessageIdsRef.current = currentIds;
   }, [displayedMessages, pendingCount, id, isNearBottom]);
 
+  const initialMarkReadRef = useRef(false);
+  useEffect(() => {
+    if (initialMarkReadRef.current || !id || displayedMessages.length === 0) return;
+    initialMarkReadRef.current = true;
+    const last = displayedMessages[displayedMessages.length - 1];
+    const ts = last ? firestoreTimestampMs(last.timestamp) : undefined;
+    if (ts) void markGroupChatRead(id, ts);
+  }, [id, displayedMessages, markGroupChatRead]);
+
   useEffect(() => {
     if (!highlightedMessageId) return;
     const timeout = setTimeout(() => setHighlightedMessageId(null), 2200);
@@ -839,7 +848,9 @@ export default function GroupScreen() {
     initialScrollAppliedRef.current = true;
     if (firstUnreadIndex >= 0) {
       const unreadItemIndex = chatItems.findIndex((item) => item.kind === 'unread');
-      if (unreadItemIndex >= 0) return unreadItemIndex;
+      if (unreadItemIndex >= 0 && unreadItemIndex > chatItems.length * 0.2) {
+        return unreadItemIndex;
+      }
     }
     return chatItems.length - 1;
   }, [chatItems, firstUnreadIndex]);
