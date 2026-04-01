@@ -3,6 +3,7 @@ import {
   View,
   Text,
   ScrollView,
+  FlatList,
   TextInput,
   Pressable,
   KeyboardAvoidingView,
@@ -85,6 +86,17 @@ type ReactionPopoverState = {
   anchorY: number;
   align: 'left' | 'right';
 };
+
+type ChatListItem =
+  | { key: string; kind: 'unread'; count: number }
+  | {
+      key: string;
+      kind: 'message';
+      msg: GroupChatMessage;
+      showSender: boolean;
+      showTimestamp: boolean;
+    }
+  | { key: string; kind: 'pending'; item: PendingUploadBubble };
 
 const TYPE_COLORS: Record<MessageType, string> = {
   text: 'transparent',
@@ -1435,8 +1447,8 @@ export default function GroupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
-  const scrollRef = useRef<ScrollView>(null);
-  const fsScrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<FlatList<ChatListItem>>(null);
+  const fsScrollRef = useRef<FlatList<ChatListItem>>(null);
 
   const { group } = useGroupDetails(id!);
   const { members, isLoading: isLoadingMembers } = useGroupMembers(id!);
@@ -1557,10 +1569,6 @@ export default function GroupScreen() {
 
   const prevMessageLenRef = useRef(0);
   const prevGroupIdRef = useRef(id);
-  const mainNeedsInitialScrollRef = useRef(true);
-  const fsNeedsInitialScrollRef = useRef(false);
-  const [mainChatReady, setMainChatReady] = useState(false);
-  const [fsChatReady, setFsChatReady] = useState(false);
 
   useEffect(() => {
     if (prevGroupIdRef.current !== id) {
@@ -1568,56 +1576,8 @@ export default function GroupScreen() {
       prevMessageLenRef.current = 0;
       messageLayoutMapRef.current = {};
       fsMessageLayoutMapRef.current = {};
-      mainNeedsInitialScrollRef.current = true;
-      fsNeedsInitialScrollRef.current = false;
-      setMainChatReady(false);
-      setFsChatReady(false);
     }
   }, [id]);
-
-  useEffect(() => {
-    fsNeedsInitialScrollRef.current = avFullscreen;
-    if (avFullscreen) setFsChatReady(false);
-  }, [avFullscreen]);
-
-  function attemptInitialMainPosition() {
-    if (!mainNeedsInitialScrollRef.current) return;
-    if (displayedMessages.length === 0 && pendingCount === 0) return;
-
-    const unreadTarget =
-      firstUnreadIndex >= 0 ? displayedMessages[firstUnreadIndex]?.message_id : undefined;
-
-    if (unreadTarget) {
-      const y = messageLayoutMapRef.current[unreadTarget];
-      if (typeof y !== 'number') return;
-      scrollRef.current?.scrollTo({ y: Math.max(0, y - 72), animated: false });
-      setIsNearBottom(false);
-    } else {
-      scrollRef.current?.scrollToEnd({ animated: false });
-      setIsNearBottom(true);
-      if (id) {
-        const last = displayedMessages[displayedMessages.length - 1];
-        const ts = last ? firestoreTimestampMs(last.timestamp) : undefined;
-        void markGroupChatRead(id, ts);
-      }
-    }
-
-    mainNeedsInitialScrollRef.current = false;
-    requestAnimationFrame(() => setMainChatReady(true));
-  }
-
-  function handleMainContentSizeChange(_w: number, h: number) {
-    if (h <= 0 || !mainNeedsInitialScrollRef.current) return;
-    attemptInitialMainPosition();
-  }
-
-  function handleFsContentSizeChange(_w: number, h: number) {
-    if (h <= 0 || !fsNeedsInitialScrollRef.current) return;
-    if (!avFullscreen || !fsChatOpen) return;
-    fsScrollRef.current?.scrollToEnd({ animated: false });
-    fsNeedsInitialScrollRef.current = false;
-    requestAnimationFrame(() => setFsChatReady(true));
-  }
 
   useEffect(() => {
     const len = displayedMessages.length;
@@ -1625,18 +1585,10 @@ export default function GroupScreen() {
 
     if (len === 0 && pendingCount === 0) {
       prevMessageLenRef.current = 0;
-      mainNeedsInitialScrollRef.current = true;
-      fsNeedsInitialScrollRef.current = avFullscreen;
-      setMainChatReady(false);
-      if (!avFullscreen) setFsChatReady(false);
       return;
     }
 
-    if (mainNeedsInitialScrollRef.current) {
-      attemptInitialMainPosition();
-    }
-
-    if (len > prevLen && prevLen > 0 && !mainNeedsInitialScrollRef.current && isNearBottom) {
+    if (len > prevLen && prevLen > 0 && isNearBottom) {
       scrollRef.current?.scrollToEnd({ animated: false });
       fsScrollRef.current?.scrollToEnd({ animated: false });
       setIsNearBottom(true);
@@ -1691,10 +1643,6 @@ export default function GroupScreen() {
   function registerMessageLayout(messageId: string, y: number, surface: ChatSurface) {
     if (surface === 'fs') fsMessageLayoutMapRef.current[messageId] = y;
     else messageLayoutMapRef.current[messageId] = y;
-
-    if (surface === 'main' && mainNeedsInitialScrollRef.current) {
-      attemptInitialMainPosition();
-    }
   }
 
   function jumpToMessage(messageId: string, surface: ChatSurface) {
@@ -1702,8 +1650,8 @@ export default function GroupScreen() {
     const y = layouts[messageId];
     if (typeof y !== 'number') return;
     const targetY = Math.max(0, y - 120);
-    if (surface === 'fs') fsScrollRef.current?.scrollTo({ y: targetY, animated: true });
-    else scrollRef.current?.scrollTo({ y: targetY, animated: true });
+    if (surface === 'fs') fsScrollRef.current?.scrollToOffset({ offset: targetY, animated: true });
+    else scrollRef.current?.scrollToOffset({ offset: targetY, animated: true });
     setHighlightedMessageId(messageId);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
@@ -2087,8 +2035,8 @@ export default function GroupScreen() {
     setAvFullscreen(false);
   }
 
-  function renderChatItems(surface: ChatSurface) {
-    const nodes: React.ReactNode[] = [];
+  const chatItems = useMemo<ChatListItem[]>(() => {
+    const items: ChatListItem[] = [];
 
     displayedMessages.forEach((msg, idx) => {
       const prev = displayedMessages[idx - 1];
@@ -2097,48 +2045,91 @@ export default function GroupScreen() {
       const showTimestamp = !sameSenderCluster(msg, next);
 
       if (idx === firstUnreadIndex) {
-        nodes.push(<UnreadDivider key={`${surface}-unread-divider`} count={unreadCount} />);
+        items.push({
+          key: 'unread-divider',
+          kind: 'unread',
+          count: unreadCount,
+        });
       }
 
-      nodes.push(
-        <GroupChatBubble
-          key={`${surface}-${msg.message_id}`}
-          msg={msg}
-          surface={surface}
-          userUid={user?.uid}
-          showSender={showSender}
-          showTimestamp={showTimestamp}
-          highlighted={highlightedMessageId === msg.message_id}
-          onOpenMedia={(attachment) =>
-            setViewerMedia({
-              url: attachment.url,
-              contentType: attachment.content_type,
-              fileName: attachment.file_name,
-            })
-          }
-          onOpenDoc={handleOpenDocument}
-          onReply={handleReplyToMessage}
-          onToggleReaction={handleToggleReaction}
-          onOpenReactions={handleOpenReactionPopover}
-          onCopyMessage={(message) => { void handleCopyMessage(message); }}
-          onDeleteMessage={requestDeleteMessage}
-          onJumpToReply={jumpToMessage}
-          onLayoutMessage={registerMessageLayout}
-        />
-      );
+      items.push({
+        key: msg.message_id,
+        kind: 'message',
+        msg,
+        showSender,
+        showTimestamp,
+      });
     });
 
     pendingUploads.forEach((item) => {
-      nodes.push(
-        <PendingUploadChatBubble
-          key={`${surface}-${item.temp_id}`}
-          item={item}
-          userUid={user?.uid}
-        />
-      );
+      items.push({
+        key: `pending-${item.temp_id}`,
+        kind: 'pending',
+        item,
+      });
     });
 
-    return nodes;
+    return items;
+  }, [displayedMessages, firstUnreadIndex, unreadCount, pendingUploads]);
+
+  const initialChatIndex = useMemo(() => {
+    if (chatItems.length === 0) return 0;
+    if (firstUnreadIndex >= 0) {
+      const unreadItemIndex = chatItems.findIndex((item) => item.kind === 'unread');
+      if (unreadItemIndex >= 0) return unreadItemIndex;
+    }
+    return chatItems.length - 1;
+  }, [chatItems, firstUnreadIndex]);
+
+  function renderChatItem(item: ChatListItem, surface: ChatSurface) {
+    if (item.kind === 'unread') {
+      return <UnreadDivider count={item.count} />;
+    }
+    if (item.kind === 'pending') {
+      return <PendingUploadChatBubble item={item.item} userUid={user?.uid} />;
+    }
+    return (
+      <GroupChatBubble
+        msg={item.msg}
+        surface={surface}
+        userUid={user?.uid}
+        showSender={item.showSender}
+        showTimestamp={item.showTimestamp}
+        highlighted={highlightedMessageId === item.msg.message_id}
+        onOpenMedia={(attachment) =>
+          setViewerMedia({
+            url: attachment.url,
+            contentType: attachment.content_type,
+            fileName: attachment.file_name,
+          })
+        }
+        onOpenDoc={handleOpenDocument}
+        onReply={handleReplyToMessage}
+        onToggleReaction={handleToggleReaction}
+        onOpenReactions={handleOpenReactionPopover}
+        onCopyMessage={(message) => { void handleCopyMessage(message); }}
+        onDeleteMessage={requestDeleteMessage}
+        onJumpToReply={jumpToMessage}
+        onLayoutMessage={registerMessageLayout}
+      />
+    );
+  }
+
+  function handleMainScrollToIndexFailed() {
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollToEnd({ animated: false });
+      if (id) {
+        const last = displayedMessages[displayedMessages.length - 1];
+        const ts = last ? firestoreTimestampMs(last.timestamp) : undefined;
+        void markGroupChatRead(id, ts);
+      }
+    });
+  }
+
+  function handleFsScrollToIndexFailed() {
+    requestAnimationFrame(() => {
+      fsScrollRef.current?.scrollToEnd({ animated: false });
+    });
   }
 
   return (
@@ -2233,17 +2224,20 @@ export default function GroupScreen() {
       ) : null}
 
       {/* Messages */}
-      <ScrollView
+      <FlatList
+        key={`main-${id}`}
         ref={scrollRef}
-        style={{ flex: 1, backgroundColor: THEME_COLORS.bg, opacity: mainChatReady ? 1 : 0 }}
-        contentContainerStyle={{ padding: 16, paddingBottom: 8, overflow: 'visible' as const }}
+        data={chatItems}
+        keyExtractor={(item) => item.key}
+        renderItem={({ item }) => renderChatItem(item, 'main')}
+        style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
         showsVerticalScrollIndicator={false}
         onScroll={handleMainScroll}
         scrollEventThrottle={16}
-        onContentSizeChange={handleMainContentSizeChange}
-      >
-        {renderChatItems('main')}
-      </ScrollView>
+        initialScrollIndex={initialChatIndex}
+        onScrollToIndexFailed={handleMainScrollToIndexFailed}
+      />
       {!isNearBottom && <JumpToLatestButton count={unreadCount} onPress={scrollToLatest} />}
 
       {/* Invite sheet */}
@@ -2339,17 +2333,20 @@ export default function GroupScreen() {
 
             {fsChatOpen ? (
               <View style={{ flex: 1, borderTopWidth: 1, borderTopColor: THEME_COLORS.border }}>
-                <ScrollView
+                <FlatList
+                  key={`fs-${id}-${fsChatOpen ? 'open' : 'closed'}`}
                   ref={fsScrollRef}
-                  style={{ flex: 1, opacity: fsChatReady ? 1 : 0 }}
-                  contentContainerStyle={{ padding: 16, paddingBottom: 8, overflow: 'visible' as const }}
+                  data={chatItems}
+                  keyExtractor={(item) => item.key}
+                  renderItem={({ item }) => renderChatItem(item, 'fs')}
+                  style={{ flex: 1 }}
+                  contentContainerStyle={{ padding: 16, paddingBottom: 8 }}
                   showsVerticalScrollIndicator={false}
                   onScroll={handleFsScroll}
                   scrollEventThrottle={16}
-                  onContentSizeChange={handleFsContentSizeChange}
-                >
-                  {renderChatItems('fs')}
-                </ScrollView>
+                  initialScrollIndex={initialChatIndex}
+                  onScrollToIndexFailed={handleFsScrollToIndexFailed}
+                />
                 {!isNearBottom && <JumpToLatestButton count={unreadCount} onPress={scrollToLatest} />}
                 <View style={{ borderTopWidth: 1, borderTopColor: THEME_COLORS.border, backgroundColor: THEME_COLORS.bg }}>
                   {showAttachTray === 'fs' && (
