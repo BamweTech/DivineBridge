@@ -483,10 +483,12 @@ export function useGroupChat(groupId: string) {
 export function useGroupChatLastReads() {
   const { user } = useAuthStore();
   const [reads, setReads] = useState<Record<string, number>>({});
+  const [isReadsReady, setIsReadsReady] = useState(false);
 
   useEffect(() => {
     if (!user) {
       setReads({});
+      setIsReadsReady(true);
       return;
     }
     const ref = doc(db, COLLECTIONS.USERS, user.uid);
@@ -504,8 +506,9 @@ export function useGroupChatLastReads() {
         } else {
           setReads({});
         }
+        setIsReadsReady(true);
       },
-      () => setReads({})
+      () => { setReads({}); setIsReadsReady(true); }
     );
     return unsub;
   }, [user?.uid]);
@@ -529,7 +532,7 @@ export function useGroupChatLastReads() {
     [user?.uid]
   );
 
-  return { reads, markGroupChatRead };
+  return { reads, isReadsReady, markGroupChatRead };
 }
 
 export type GroupLatestMeta = { ts: number; userId: string } | null;

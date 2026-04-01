@@ -134,7 +134,7 @@ export default function GroupScreen() {
   const groupLiveRoom = useGroupLiveRoom(id!);
   const { messages, isLoading: isLoadingChat, sendMessage, toggleReaction, deleteMessage } = useGroupChat(id!);
   const { markGroupChatRead, unreadCountByGroup } = useGroupUnread();
-  const { reads } = useGroupChatLastReads();
+  const { reads, isReadsReady } = useGroupChatLastReads();
   const [text, setText] = useState('');
   const [showInviteSheet, setShowInviteSheet] = useState(false);
   const [replyTarget, setReplyTarget] = useState<GroupChatMessage | null>(null);
@@ -231,7 +231,7 @@ export default function GroupScreen() {
 
   const displayedMessages = useMemo(() => {
     const effectiveJoinedAt =
-      lastReadAt === 0 && memberJoinedAt > 0 ? memberJoinedAt : 0;
+      isReadsReady && lastReadAt === 0 && memberJoinedAt > 0 ? memberJoinedAt : 0;
 
     return messages
       .filter((msg) =>
@@ -241,7 +241,7 @@ export default function GroupScreen() {
         const override = optimisticReactions[msg.message_id];
         return override ? { ...msg, reactions: override } : msg;
       });
-  }, [messages, optimisticReactions, lastReadAt, memberJoinedAt]);
+  }, [messages, optimisticReactions, lastReadAt, memberJoinedAt, isReadsReady]);
 
   const firstUnreadIndex = useMemo(() => {
     if (!user?.uid) return -1;
@@ -836,13 +836,14 @@ export default function GroupScreen() {
   const initialChatIndex = useMemo(() => {
     if (initialScrollAppliedRef.current) return undefined;
     if (chatItems.length === 0) return undefined;
+    if (!isReadsReady) return undefined;
     initialScrollAppliedRef.current = true;
     if (firstUnreadIndex >= 0) {
       const unreadItemIndex = chatItems.findIndex((item) => item.kind === 'unread');
       if (unreadItemIndex >= 0) return unreadItemIndex;
     }
     return chatItems.length - 1;
-  }, [chatItems, firstUnreadIndex]);
+  }, [chatItems, firstUnreadIndex, isReadsReady]);
 
   const didMarkReadOnLandRef = useRef(false);
   useEffect(() => {
