@@ -734,9 +734,8 @@ function GroupChatBubble({
   const reactionEntries = Object.entries(msg.reactions ?? {}).filter(
     ([emoji, users]) => emoji && Array.isArray(users) && users.length > 0,
   );
-  /** Space above the row so absolutely positioned reactions (negative top) stay inside layout and clear ScrollView clipping. */
-  const REACTION_TOP_RESERVE = 22;
-  const REACTION_TOP_OFFSET = -14;
+  const hasMessageBubble =
+    showText || docAtts.length > 0 || !!msg.reply_to || isSpecial || !!msg.link_url;
 
   const BUBBLE_W = 264;
   const rTL = 18;
@@ -762,11 +761,7 @@ function GroupChatBubble({
   return (
     <View
       onLayout={(event) => onLayoutMessage(msg.message_id, event.nativeEvent.layout.y, surface)}
-      style={{
-        position: 'relative',
-        marginTop: reactionEntries.length > 0 ? REACTION_TOP_RESERVE : 0,
-        zIndex: reactionEntries.length > 0 ? 2 : 0,
-      }}
+      style={{ position: 'relative' }}
     >
     <Swipeable
       ref={swipeRef}
@@ -883,16 +878,10 @@ function GroupChatBubble({
             <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_500Medium', fontSize: 11 }}>{msg.user_name}</Text>
           </View>
         )}
-        <View
-          style={{
-            position: 'relative',
-            alignItems: isMe ? 'flex-end' : 'flex-start',
-            overflow: 'visible',
-          }}
-        >
+        <View style={{ position: 'relative', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
         {mediaAtts.length > 0 && (
-          <Pressable onLongPress={handleLongPress} delayLongPress={400} style={{ zIndex: 0, elevation: 0 }}>
-            <View style={{ gap: 8, marginBottom: showText || docAtts.length > 0 || msg.reply_to || isSpecial || msg.link_url ? 8 : 0 }}>
+          <Pressable onLongPress={handleLongPress} delayLongPress={400}>
+            <View style={{ gap: 8, marginBottom: hasMessageBubble ? 8 : 0 }}>
               {mediaAtts.map((a, idx) => (
                 <MediaAttachmentCard
                   key={`${msg.message_id}-media-${idx}`}
@@ -903,12 +892,8 @@ function GroupChatBubble({
             </View>
           </Pressable>
         )}
-        {(showText || docAtts.length > 0 || msg.reply_to || isSpecial || msg.link_url) && (
-          <Pressable
-            onLongPress={handleLongPress}
-            delayLongPress={400}
-            style={{ zIndex: 0, elevation: 0 }}
-          >
+        {hasMessageBubble && (
+          <Pressable onLongPress={handleLongPress} delayLongPress={400}>
             <View style={{
               maxWidth: BUBBLE_W,
               backgroundColor: bg,
@@ -918,8 +903,6 @@ function GroupChatBubble({
               overflow: 'hidden',
               borderWidth: 1,
               borderColor,
-              zIndex: 0,
-              elevation: 0,
             }}>
               <View style={{ padding: 12 }}>
                 {isSpecial && (
@@ -983,29 +966,75 @@ function GroupChatBubble({
                     {msg.message}
                   </Text>
                 ) : null}
+                {reactionEntries.length > 0 && (
+                  <View
+                    style={{
+                      marginTop: 10,
+                      paddingTop: 10,
+                      borderTopWidth: 1,
+                      borderTopColor: isMe ? 'rgba(255,255,255,0.35)' : 'rgba(44,36,22,0.08)',
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                      gap: 6,
+                      justifyContent: isMe ? 'flex-end' : 'flex-start',
+                    }}
+                  >
+                    {reactionEntries.map(([emoji, users]) => {
+                      const typedUsers = users.filter((uid): uid is string => typeof uid === 'string');
+                      const reactedByMe = !!userUid && typedUsers.includes(userUid);
+                      return (
+                        <Pressable
+                          key={`${msg.message_id}-${emoji}`}
+                          onPress={() => onToggleReaction(msg.message_id, emoji)}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
+                            paddingHorizontal: 9,
+                            paddingVertical: 5,
+                            borderRadius: 999,
+                            backgroundColor: reactedByMe ? THEME_COLORS.goldDim : THEME_COLORS.bg3,
+                            borderWidth: 1,
+                            borderColor: reactedByMe ? THEME_COLORS.goldBorder : THEME_COLORS.border,
+                          }}
+                        >
+                          <Text style={{ fontSize: 16, lineHeight: 20 }}>{emoji}</Text>
+                          <Text style={{ color: reactedByMe ? THEME_COLORS.gold : THEME_COLORS.text3, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
+                            {typedUsers.length}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                    <Pressable
+                      onPress={() => onOpenEmojiLibrary(msg)}
+                      style={{
+                        width: 30,
+                        height: 30,
+                        borderRadius: 15,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: THEME_COLORS.bg3,
+                        borderWidth: 1,
+                        borderColor: THEME_COLORS.border,
+                      }}
+                    >
+                      <Text style={{ color: THEME_COLORS.text2, fontSize: 18, lineHeight: 18 }}>+</Text>
+                    </Pressable>
+                  </View>
+                )}
               </View>
             </View>
           </Pressable>
         )}
-        {reactionEntries.length > 0 && (
+        {reactionEntries.length > 0 && mediaAtts.length > 0 && !hasMessageBubble && (
           <View
-            pointerEvents="box-none"
-            collapsable={false}
             style={{
-              position: 'absolute',
-              top: REACTION_TOP_OFFSET,
-              ...(isMe ? { right: 4 } : { left: 4 }),
+              marginTop: 8,
+              maxWidth: BUBBLE_W,
               flexDirection: 'row',
               flexWrap: 'wrap',
               gap: 6,
-              maxWidth: BUBBLE_W,
               justifyContent: isMe ? 'flex-end' : 'flex-start',
-              zIndex: 100,
-              elevation: 24,
-              shadowColor: '#000',
-              shadowOpacity: 0.14,
-              shadowRadius: 6,
-              shadowOffset: { width: 0, height: 3 },
             }}
           >
             {reactionEntries.map(([emoji, users]) => {
@@ -1013,7 +1042,7 @@ function GroupChatBubble({
               const reactedByMe = !!userUid && typedUsers.includes(userUid);
               return (
                 <Pressable
-                  key={`${msg.message_id}-${emoji}`}
+                  key={`${msg.message_id}-media-${emoji}`}
                   onPress={() => onToggleReaction(msg.message_id, emoji)}
                   style={{
                     flexDirection: 'row',
@@ -1022,14 +1051,9 @@ function GroupChatBubble({
                     paddingHorizontal: 9,
                     paddingVertical: 5,
                     borderRadius: 999,
-                    backgroundColor: reactedByMe ? THEME_COLORS.goldDim : THEME_COLORS.bg,
-                    borderWidth: 1.5,
+                    backgroundColor: reactedByMe ? THEME_COLORS.goldDim : THEME_COLORS.bg3,
+                    borderWidth: 1,
                     borderColor: reactedByMe ? THEME_COLORS.goldBorder : THEME_COLORS.border,
-                    shadowColor: '#000',
-                    shadowOpacity: 0.08,
-                    shadowRadius: 3,
-                    shadowOffset: { width: 0, height: 1 },
-                    elevation: 4,
                   }}
                 >
                   <Text style={{ fontSize: 16, lineHeight: 20 }}>{emoji}</Text>
@@ -1047,14 +1071,9 @@ function GroupChatBubble({
                 borderRadius: 15,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: THEME_COLORS.bg,
-                borderWidth: 1.5,
+                backgroundColor: THEME_COLORS.bg3,
+                borderWidth: 1,
                 borderColor: THEME_COLORS.border,
-                shadowColor: '#000',
-                shadowOpacity: 0.08,
-                shadowRadius: 3,
-                shadowOffset: { width: 0, height: 1 },
-                elevation: 4,
               }}
             >
               <Text style={{ color: THEME_COLORS.text2, fontSize: 18, lineHeight: 18 }}>+</Text>
