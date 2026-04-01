@@ -234,6 +234,7 @@ export function useGroupChat(groupId: string) {
     if (!groupId) return;
     const q = query(
       collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages'),
+      orderBy('timestamp', 'desc'),
       limit(100)
     );
     const unsub = onSnapshot(
@@ -241,11 +242,7 @@ export function useGroupChat(groupId: string) {
       (snap) => {
         const data = snap.docs
           .map((d) => ({ message_id: d.id, group_id: groupId, ...d.data() } as GroupChatMessage))
-          .sort((a, b) => {
-            const ta = typeof a.timestamp === 'number' ? a.timestamp : (a.timestamp as any)?.toMillis?.() ?? 0;
-            const tb = typeof b.timestamp === 'number' ? b.timestamp : (b.timestamp as any)?.toMillis?.() ?? 0;
-            return ta - tb;
-          });
+          .reverse();
         setMessages(data);
         setIsLoading(false);
       },

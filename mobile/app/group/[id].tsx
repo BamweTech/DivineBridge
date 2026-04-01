@@ -1561,6 +1561,8 @@ export default function GroupScreen() {
   const mainAnchorBottomPendingRef = useRef(true);
   /** True until fullscreen chat panel has snapped to bottom after the modal opens. */
   const fsAnchorBottomPendingRef = useRef(false);
+  const mainAnchorDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fsAnchorDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useLayoutEffect(() => {
     if (prevGroupIdRef.current !== id) {
@@ -1569,6 +1571,14 @@ export default function GroupScreen() {
       messageLayoutMapRef.current = {};
       fsMessageLayoutMapRef.current = {};
       mainAnchorBottomPendingRef.current = true;
+      if (mainAnchorDebounceRef.current) {
+        clearTimeout(mainAnchorDebounceRef.current);
+        mainAnchorDebounceRef.current = null;
+      }
+      if (fsAnchorDebounceRef.current) {
+        clearTimeout(fsAnchorDebounceRef.current);
+        fsAnchorDebounceRef.current = null;
+      }
     }
   }, [id]);
 
@@ -1584,14 +1594,27 @@ export default function GroupScreen() {
     if (h <= 0 || !mainAnchorBottomPendingRef.current) return;
     scrollRef.current?.scrollToEnd({ animated: false });
     setIsNearBottom(true);
-    mainAnchorBottomPendingRef.current = false;
+    if (mainAnchorDebounceRef.current) clearTimeout(mainAnchorDebounceRef.current);
+    mainAnchorDebounceRef.current = setTimeout(() => {
+      mainAnchorDebounceRef.current = null;
+      if (!mainAnchorBottomPendingRef.current) return;
+      scrollRef.current?.scrollToEnd({ animated: false });
+      setIsNearBottom(true);
+      mainAnchorBottomPendingRef.current = false;
+    }, 180);
   }
 
   function handleFsContentSizeChange(_w: number, h: number) {
     if (h <= 0 || !fsAnchorBottomPendingRef.current) return;
     if (!avFullscreen || !fsChatOpen) return;
     fsScrollRef.current?.scrollToEnd({ animated: false });
-    fsAnchorBottomPendingRef.current = false;
+    if (fsAnchorDebounceRef.current) clearTimeout(fsAnchorDebounceRef.current);
+    fsAnchorDebounceRef.current = setTimeout(() => {
+      fsAnchorDebounceRef.current = null;
+      if (!fsAnchorBottomPendingRef.current) return;
+      fsScrollRef.current?.scrollToEnd({ animated: false });
+      fsAnchorBottomPendingRef.current = false;
+    }, 180);
   }
 
   useLayoutEffect(() => {
@@ -1609,10 +1632,6 @@ export default function GroupScreen() {
       setIsNearBottom(true);
     }
 
-    if (fsAnchorBottomPendingRef.current && avFullscreen && fsChatOpen && (len > 0 || pendingCount > 0)) {
-      fsScrollRef.current?.scrollToEnd({ animated: false });
-    }
-
     if (len > prevLen && prevLen > 0) {
       scrollRef.current?.scrollToEnd({ animated: false });
       fsScrollRef.current?.scrollToEnd({ animated: false });
@@ -1620,7 +1639,15 @@ export default function GroupScreen() {
     }
 
     prevMessageLenRef.current = len;
-  }, [displayedMessages.length, pendingCount, id, avFullscreen, fsChatOpen]);
+  }, [displayedMessages.length, pendingCount, id]);
+
+  useLayoutEffect(() => {
+    const len = displayedMessages.length;
+    if (len === 0 && pendingCount === 0) return;
+    if (fsAnchorBottomPendingRef.current && avFullscreen && fsChatOpen && (len > 0 || pendingCount > 0)) {
+      fsScrollRef.current?.scrollToEnd({ animated: false });
+    }
+  }, [displayedMessages.length, pendingCount, avFullscreen, fsChatOpen]);
 
   useEffect(() => {
     if (!highlightedMessageId) return;
@@ -1628,11 +1655,42 @@ export default function GroupScreen() {
     return () => clearTimeout(timeout);
   }, [highlightedMessageId]);
 
-  function handleScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+  function scrollNearBottomFromEvent(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     const distanceFromBottom = contentSize.height - (contentOffset.y + layoutMeasurement.height);
-    const nearBottom = distanceFromBottom < 72;
+    return distanceFromBottom < 72;
+  }
+
+  function handleMainScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    const nearBottom = scrollNearBottomFromEvent(event);
     setIsNearBottom(nearBottom);
+
+    if (nearBottom && mainAnchorBottomPendingRef.current) {
+      if (mainAnchorDebounceRef.current) {
+        clearTimeout(mainAnchorDebounceRef.current);
+        mainAnchorDebounceRef.current = null;
+      }
+      mainAnchorBottomPendingRef.current = false;
+    }
+
+    if (nearBottom && id) {
+      const last = displayedMessages[displayedMessages.length - 1];
+      const ts = last ? firestoreTimestampMs(last.timestamp) : undefined;
+      void markGroupChatRead(id, ts);
+    }
+  }
+
+  function handleFsScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    const nearBottom = scrollNearBottomFromEvent(event);
+    setIsNearBottom(nearBottom);
+
+    if (nearBottom && fsAnchorBottomPendingRef.current) {
+      if (fsAnchorDebounceRef.current) {
+        clearTimeout(fsAnchorDebounceRef.current);
+        fsAnchorDebounceRef.current = null;
+      }
+      fsAnchorBottomPendingRef.current = false;
+    }
 
     if (nearBottom && id) {
       const last = displayedMessages[displayedMessages.length - 1];
@@ -2198,7 +2256,7 @@ export default function GroupScreen() {
         style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}
         contentContainerStyle={{ padding: 16, paddingBottom: 8, overflow: 'visible' as const }}
         showsVerticalScrollIndicator={false}
-        onScroll={handleScroll}
+        onScroll={handleMainScroll}
         scrollEventThrottle={16}
         onContentSizeChange={handleMainContentSizeChange}
       >
@@ -2304,7 +2362,7 @@ export default function GroupScreen() {
                   style={{ flex: 1 }}
                   contentContainerStyle={{ padding: 16, paddingBottom: 8, overflow: 'visible' as const }}
                   showsVerticalScrollIndicator={false}
-                  onScroll={handleScroll}
+                  onScroll={handleFsScroll}
                   scrollEventThrottle={16}
                   onContentSizeChange={handleFsContentSizeChange}
                 >
