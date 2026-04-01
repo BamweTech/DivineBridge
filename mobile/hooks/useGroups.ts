@@ -14,6 +14,7 @@ import {
   setDoc,
   runTransaction,
 } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db } from '@/lib/firebase';
 import { COLLECTIONS } from '@/lib/constants';
 import { useAuthStore } from '@/stores/authStore';
@@ -234,6 +235,51 @@ export function firestoreTimestampMs(val: unknown): number {
   return 0;
 }
 
+const GROUP_CHAT_CACHE_LIMIT = 100;
+
+function groupChatCacheKey(groupId: string) {
+  return `group_chat_cache:${groupId}`;
+}
+
+function normalizeGroupChatMessages(messages: GroupChatMessage[]) {
+  return messages
+    .map((msg) => ({
+      ...msg,
+      timestamp: firestoreTimestampMs(msg.timestamp),
+      reactions: msg.reactions ?? {},
+      attachments: msg.attachments ?? [],
+      reply_to: msg.reply_to ?? null,
+      read_by: msg.read_by ?? [],
+    }))
+    .sort((a, b) => firestoreTimestampMs(a.timestamp) - firestoreTimestampMs(b.timestamp))
+    .slice(-GROUP_CHAT_CACHE_LIMIT);
+}
+
+async function readGroupChatCache(groupId: string) {
+  try {
+    const raw = await AsyncStorage.getItem(groupChatCacheKey(groupId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return null;
+    return normalizeGroupChatMessages(
+      parsed.filter((item): item is GroupChatMessage => !!item && typeof item === 'object' && 'message_id' in item)
+    );
+  } catch {
+    return null;
+  }
+}
+
+async function writeGroupChatCache(groupId: string, messages: GroupChatMessage[]) {
+  try {
+    await AsyncStorage.setItem(
+      groupChatCacheKey(groupId),
+      JSON.stringify(normalizeGroupChatMessages(messages))
+    );
+  } catch {
+    // Best-effort cache only.
+  }
+}
+
 export function useGroupChat(groupId: string) {
   const [messages, setMessages] = useState<GroupChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -241,16 +287,22 @@ export function useGroupChat(groupId: string) {
 
   useEffect(() => {
     if (!groupId) return;
+    let active = true;
+    setMessages([]);
+    setIsLoading(true);
 
     const col = collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages');
     let unsub: (() => void) | undefined;
 
     const applyFallbackSnapshot = (snap: { docs: { id: string; data: () => Record<string, unknown> }[] }) => {
-      const data = snap.docs
+      const data = normalizeGroupChatMessages(
+        snap.docs
         .map((d) => ({ message_id: d.id, group_id: groupId, ...d.data() } as GroupChatMessage))
-        .sort((a, b) => firestoreTimestampMs(a.timestamp) - firestoreTimestampMs(b.timestamp));
+      );
+      if (!active) return;
       setMessages(data);
       setIsLoading(false);
+      void writeGroupChatCache(groupId, data);
     };
 
     const attachFallbackListener = () => {
@@ -261,20 +313,29 @@ export function useGroupChat(groupId: string) {
         applyFallbackSnapshot,
         (err2) => {
           console.warn('[useGroupChat] fallback listener error', groupId, err2);
-          setIsLoading(false);
+          if (active) setIsLoading(false);
         }
       );
     };
+
+    void readGroupChatCache(groupId).then((cached) => {
+      if (!active || !cached || cached.length === 0) return;
+      setMessages(cached);
+      setIsLoading(false);
+    });
 
     const qOrdered = query(col, orderBy('timestamp', 'desc'), limit(100));
     unsub = onSnapshot(
       qOrdered,
       (snap) => {
-        const data = snap.docs
+        const data = normalizeGroupChatMessages(
+          snap.docs
           .map((d) => ({ message_id: d.id, group_id: groupId, ...d.data() } as GroupChatMessage))
-          .reverse();
+        );
+        if (!active) return;
         setMessages(data);
         setIsLoading(false);
+        void writeGroupChatCache(groupId, data);
       },
       (err) => {
         console.warn('[useGroupChat] ordered query failed; using unsorted limit listener', groupId, err);
@@ -283,6 +344,7 @@ export function useGroupChat(groupId: string) {
     );
 
     return () => {
+      active = false;
       unsub?.();
     };
   }, [groupId]);

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -1557,55 +1557,53 @@ export default function GroupScreen() {
 
   const prevMessageLenRef = useRef(0);
   const prevGroupIdRef = useRef(id);
-  /** true = we still need to do the one-time initial scroll position. */
   const mainNeedsInitialScrollRef = useRef(true);
   const fsNeedsInitialScrollRef = useRef(false);
-  /** Captured once so the target doesn't shift while we wait for layout. */
-  const initialUnreadIndexRef = useRef<number>(-1);
-  const initialUnreadCapturedRef = useRef(false);
+  const [mainChatReady, setMainChatReady] = useState(false);
+  const [fsChatReady, setFsChatReady] = useState(false);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (prevGroupIdRef.current !== id) {
       prevGroupIdRef.current = id;
       prevMessageLenRef.current = 0;
       messageLayoutMapRef.current = {};
       fsMessageLayoutMapRef.current = {};
       mainNeedsInitialScrollRef.current = true;
-      initialUnreadCapturedRef.current = false;
-      initialUnreadIndexRef.current = -1;
+      fsNeedsInitialScrollRef.current = false;
+      setMainChatReady(false);
+      setFsChatReady(false);
     }
   }, [id]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     fsNeedsInitialScrollRef.current = avFullscreen;
+    if (avFullscreen) setFsChatReady(false);
   }, [avFullscreen]);
 
-  function handleMainContentSizeChange(_w: number, h: number) {
-    if (h <= 0 || !mainNeedsInitialScrollRef.current) return;
+  function attemptInitialMainPosition() {
+    if (!mainNeedsInitialScrollRef.current) return;
+    if (displayedMessages.length === 0 && pendingCount === 0) return;
 
-    if (!initialUnreadCapturedRef.current && displayedMessages.length > 0) {
-      initialUnreadCapturedRef.current = true;
-      initialUnreadIndexRef.current = firstUnreadIndex;
-    }
+    const unreadTarget =
+      firstUnreadIndex >= 0 ? displayedMessages[firstUnreadIndex]?.message_id : undefined;
 
-    const targetIdx = initialUnreadIndexRef.current;
-    const hasUnreadTarget = targetIdx >= 0 && targetIdx < displayedMessages.length;
-
-    if (hasUnreadTarget) {
-      const mid = displayedMessages[targetIdx]?.message_id;
-      const y = mid ? messageLayoutMapRef.current[mid] : undefined;
-      if (typeof y === 'number') {
-        scrollRef.current?.scrollTo({ y: Math.max(0, y - 60), animated: false });
-        setIsNearBottom(false);
-        mainNeedsInitialScrollRef.current = false;
-      } else {
-        scrollRef.current?.scrollToEnd({ animated: false });
-      }
+    if (unreadTarget) {
+      const y = messageLayoutMapRef.current[unreadTarget];
+      if (typeof y !== 'number') return;
+      scrollRef.current?.scrollTo({ y: Math.max(0, y - 72), animated: false });
+      setIsNearBottom(false);
     } else {
       scrollRef.current?.scrollToEnd({ animated: false });
       setIsNearBottom(true);
-      mainNeedsInitialScrollRef.current = false;
     }
+
+    mainNeedsInitialScrollRef.current = false;
+    requestAnimationFrame(() => setMainChatReady(true));
+  }
+
+  function handleMainContentSizeChange(_w: number, h: number) {
+    if (h <= 0 || !mainNeedsInitialScrollRef.current) return;
+    attemptInitialMainPosition();
   }
 
   function handleFsContentSizeChange(_w: number, h: number) {
@@ -1613,6 +1611,7 @@ export default function GroupScreen() {
     if (!avFullscreen || !fsChatOpen) return;
     fsScrollRef.current?.scrollToEnd({ animated: false });
     fsNeedsInitialScrollRef.current = false;
+    requestAnimationFrame(() => setFsChatReady(true));
   }
 
   useEffect(() => {
@@ -1622,13 +1621,19 @@ export default function GroupScreen() {
     if (len === 0 && pendingCount === 0) {
       prevMessageLenRef.current = 0;
       mainNeedsInitialScrollRef.current = true;
-      initialUnreadCapturedRef.current = false;
-      initialUnreadIndexRef.current = -1;
+      fsNeedsInitialScrollRef.current = avFullscreen;
+      setMainChatReady(false);
+      if (!avFullscreen) setFsChatReady(false);
       return;
+    }
+
+    if (mainNeedsInitialScrollRef.current) {
+      attemptInitialMainPosition();
     }
 
     if (len > prevLen && prevLen > 0 && !mainNeedsInitialScrollRef.current) {
       scrollRef.current?.scrollToEnd({ animated: false });
+      fsScrollRef.current?.scrollToEnd({ animated: false });
       setIsNearBottom(true);
     }
 
@@ -1681,6 +1686,10 @@ export default function GroupScreen() {
   function registerMessageLayout(messageId: string, y: number, surface: ChatSurface) {
     if (surface === 'fs') fsMessageLayoutMapRef.current[messageId] = y;
     else messageLayoutMapRef.current[messageId] = y;
+
+    if (surface === 'main' && mainNeedsInitialScrollRef.current) {
+      attemptInitialMainPosition();
+    }
   }
 
   function jumpToMessage(messageId: string, surface: ChatSurface) {
@@ -2221,7 +2230,7 @@ export default function GroupScreen() {
       {/* Messages */}
       <ScrollView
         ref={scrollRef}
-        style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}
+        style={{ flex: 1, backgroundColor: THEME_COLORS.bg, opacity: mainChatReady ? 1 : 0 }}
         contentContainerStyle={{ padding: 16, paddingBottom: 8, overflow: 'visible' as const }}
         showsVerticalScrollIndicator={false}
         onScroll={handleMainScroll}
@@ -2327,7 +2336,7 @@ export default function GroupScreen() {
               <View style={{ flex: 1, borderTopWidth: 1, borderTopColor: THEME_COLORS.border }}>
                 <ScrollView
                   ref={fsScrollRef}
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, opacity: fsChatReady ? 1 : 0 }}
                   contentContainerStyle={{ padding: 16, paddingBottom: 8, overflow: 'visible' as const }}
                   showsVerticalScrollIndicator={false}
                   onScroll={handleFsScroll}
