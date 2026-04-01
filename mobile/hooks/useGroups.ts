@@ -242,12 +242,19 @@ function groupChatCacheKey(groupId: string) {
   return `group_chat_cache:${groupId}`;
 }
 
+function groupChatSortTimestamp(message: GroupChatMessage) {
+  const serverTs = firestoreTimestampMs(message.timestamp);
+  if (serverTs > 0) return serverTs;
+  const clientTs = (message as GroupChatMessage & { client_sent_at?: unknown }).client_sent_at;
+  return typeof clientTs === 'number' && !Number.isNaN(clientTs) ? clientTs : 0;
+}
+
 function normalizeGroupChatMessages(messages: GroupChatMessage[]) {
   const deduped = new Map<string, GroupChatMessage>();
   messages.forEach((msg) => {
     if (!msg?.message_id) return;
     const prev = deduped.get(msg.message_id);
-    if (!prev || firestoreTimestampMs(msg.timestamp) >= firestoreTimestampMs(prev.timestamp)) {
+    if (!prev || groupChatSortTimestamp(msg) >= groupChatSortTimestamp(prev)) {
       deduped.set(msg.message_id, msg);
     }
   });
@@ -261,7 +268,7 @@ function normalizeGroupChatMessages(messages: GroupChatMessage[]) {
       reply_to: msg.reply_to ?? null,
       read_by: msg.read_by ?? [],
     }))
-    .sort((a, b) => firestoreTimestampMs(a.timestamp) - firestoreTimestampMs(b.timestamp))
+    .sort((a, b) => groupChatSortTimestamp(a) - groupChatSortTimestamp(b))
     .slice(-GROUP_CHAT_CACHE_LIMIT);
 }
 
@@ -314,10 +321,15 @@ export function useGroupChat(groupId: string) {
     const col = collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages');
     let unsub: (() => void) | undefined;
 
-    const applyFallbackSnapshot = (snap: { docs: { id: string; data: () => Record<string, unknown> }[] }) => {
+    const applyFallbackSnapshot = (snap: {
+      docs: {
+        id: string;
+        data: (options?: { serverTimestamps?: 'estimate' | 'previous' | 'none' }) => Record<string, unknown>;
+      }[];
+    }) => {
       const data = normalizeGroupChatMessages(
         snap.docs
-        .map((d) => ({ message_id: d.id, group_id: groupId, ...d.data() } as GroupChatMessage))
+        .map((d) => ({ message_id: d.id, group_id: groupId, ...d.data({ serverTimestamps: 'estimate' }) } as GroupChatMessage))
       );
       if (!active) return;
       setMessages(data);
@@ -350,7 +362,7 @@ export function useGroupChat(groupId: string) {
       (snap) => {
         const data = normalizeGroupChatMessages(
           snap.docs
-          .map((d) => ({ message_id: d.id, group_id: groupId, ...d.data() } as GroupChatMessage))
+          .map((d) => ({ message_id: d.id, group_id: groupId, ...d.data({ serverTimestamps: 'estimate' }) } as GroupChatMessage))
         );
         if (!active) return;
         setMessages(data);
@@ -390,7 +402,8 @@ export function useGroupChat(groupId: string) {
       user_photo: profile?.photoURL ?? null,
       message: body,
       message_type: type,
-      timestamp: Date.now(),
+      timestamp: serverTimestamp(),
+      client_sent_at: Date.now(),
       reactions: {},
       read_by: [user.uid],
     };
@@ -477,12 +490,17 @@ export function useGroupChatLastReads() {
     async (groupId: string, atLeastTimestamp?: number) => {
       if (!user?.uid) return;
       const t = atLeastTimestamp ?? Date.now();
-      // setDoc+merge: works if user doc is missing; nested map keys merge with existing reads
-      await setDoc(
-        doc(db, COLLECTIONS.USERS, user.uid),
-        { group_chat_last_read_at: { [groupId]: t } },
-        { merge: true }
-      );
+      const ref = doc(db, COLLECTIONS.USERS, user.uid);
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        const rawReads = snap.data()?.group_chat_last_read_at;
+        const nextReads = rawReads && typeof rawReads === 'object' && !Array.isArray(rawReads)
+          ? { ...(rawReads as Record<string, unknown>) }
+          : {};
+        const current = firestoreTimestampMs(nextReads[groupId]);
+        nextReads[groupId] = Math.max(current, t);
+        tx.set(ref, { group_chat_last_read_at: nextReads }, { merge: true });
+      });
     },
     [user?.uid]
   );
