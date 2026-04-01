@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ import {
   NativeScrollEvent,
   Image as RNImage,
 } from 'react-native';
-import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -771,121 +771,129 @@ function GroupChatBubble({
           </Pressable>
         )}
         {hasMessageBubble && (
-          <Pressable onLongPress={handleLongPress} delayLongPress={400}>
-            <View style={{
-              maxWidth: BUBBLE_W,
-              backgroundColor: bg,
-              borderRadius: 18,
-              borderTopLeftRadius: rTL, borderTopRightRadius: rTR,
-              borderBottomRightRadius: rBR, borderBottomLeftRadius: rBL,
-              overflow: 'hidden',
-              borderWidth: 1,
-              borderColor,
-            }}>
-              <View style={{ padding: 12 }}>
-                {isSpecial && (
-                  <Text style={{ fontSize: 10, marginBottom: 4, color: TYPE_LABEL_COLORS[msg.message_type], fontFamily: 'Geist_600SemiBold', letterSpacing: 0.8, textTransform: 'uppercase' }}>
-                    {msg.message_type.replace('_', ' ')}
-                  </Text>
-                )}
-                {msg.reply_to && (
-                  <Pressable
-                    onPress={() => onJumpToReply(msg.reply_to!.message_id, surface)}
-                    style={{
-                      marginBottom: showText || msg.link_url || docAtts.length > 0 ? 10 : 0,
-                      paddingVertical: 8,
-                      paddingHorizontal: 10,
-                      borderRadius: 12,
-                      backgroundColor: isMe ? 'rgba(255,255,255,0.48)' : THEME_COLORS.bg3,
-                      borderLeftWidth: 3,
-                      borderLeftColor: TYPE_LABEL_COLORS[msg.message_type] || THEME_COLORS.gold,
-                    }}
-                  >
-                    <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 11 }}>
-                      {msg.reply_to.user_name}
-                    </Text>
-                    <Text numberOfLines={2} style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 2 }}>
-                      {msg.reply_to.message}
-                    </Text>
-                  </Pressable>
-                )}
-                {!!msg.link_url && (
-                  <Pressable
-                    onPress={() => Linking.openURL(msg.link_url!)}
-                    style={{ marginBottom: showText || docAtts.length ? 8 : 0 }}
-                  >
-                    <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 13, textDecorationLine: 'underline' }} numberOfLines={3}>
-                      {msg.link_url}
-                    </Text>
-                  </Pressable>
-                )}
-                {docAtts.map((a: GroupChatAttachment, idx: number) => (
-                  <Pressable
-                    key={`${msg.message_id}-doc-${idx}`}
-                    onPress={() => onOpenDoc(a.url, a.file_name)}
-                    style={{ marginBottom: idx < docAtts.length - 1 || showText ? 10 : 0 }}
-                  >
-                    <View style={{
-                      paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12,
-                      backgroundColor: THEME_COLORS.bg3, borderWidth: 1, borderColor: THEME_COLORS.border,
-                    }}>
-                      <Text style={{ color: THEME_COLORS.violet, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
-                        {a.file_name?.toLowerCase().endsWith('.pdf') ? 'PDF' : 'File'}
-                      </Text>
-                      <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 4 }} numberOfLines={2}>
-                        {a.file_name}
-                      </Text>
-                      <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_500Medium', fontSize: 11, marginTop: 6 }}>Tap to open</Text>
-                    </View>
-                  </Pressable>
-                ))}
-                {showText ? (
-                  <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 22 }}>
-                    {msg.message}
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-          </Pressable>
-        )}
-        {hasMessageBubble && reactionEntries.length > 0 && (
           <View
             style={{
-              marginTop: 6,
               maxWidth: BUBBLE_W,
               alignSelf: isMe ? 'flex-end' : 'flex-start',
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              gap: 10,
-              alignItems: 'center',
-              justifyContent: isMe ? 'flex-end' : 'flex-start',
+              position: 'relative',
             }}
           >
-            {reactionEntries.map(([emoji, users]) => {
-              const typedUsers = users.filter((uid): uid is string => typeof uid === 'string');
-              const reactedByMe = !!userUid && typedUsers.includes(userUid);
-              return (
-                <Pressable
-                  key={`${msg.message_id}-${emoji}`}
-                  onPress={() => onToggleReaction(msg.message_id, emoji)}
-                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
-                >
-                  <Text style={{ fontSize: 18, lineHeight: 22 }}>{emoji}</Text>
-                  {typedUsers.length > 1 ? (
-                    <Text
+            <Pressable onLongPress={handleLongPress} delayLongPress={400}>
+              <View style={{
+                backgroundColor: bg,
+                borderRadius: 18,
+                borderTopLeftRadius: rTL, borderTopRightRadius: rTR,
+                borderBottomRightRadius: rBR, borderBottomLeftRadius: rBL,
+                overflow: 'hidden',
+                borderWidth: 1,
+                borderColor,
+              }}>
+                <View style={{ padding: 12 }}>
+                  {isSpecial && (
+                    <Text style={{ fontSize: 10, marginBottom: 4, color: TYPE_LABEL_COLORS[msg.message_type], fontFamily: 'Geist_600SemiBold', letterSpacing: 0.8, textTransform: 'uppercase' }}>
+                      {msg.message_type.replace('_', ' ')}
+                    </Text>
+                  )}
+                  {msg.reply_to && (
+                    <Pressable
+                      onPress={() => onJumpToReply(msg.reply_to!.message_id, surface)}
                       style={{
-                        color: reactedByMe ? THEME_COLORS.gold : THEME_COLORS.text3,
-                        fontFamily: 'Geist_600SemiBold',
-                        fontSize: 12,
+                        marginBottom: showText || msg.link_url || docAtts.length > 0 ? 10 : 0,
+                        paddingVertical: 8,
+                        paddingHorizontal: 10,
+                        borderRadius: 12,
+                        backgroundColor: isMe ? 'rgba(255,255,255,0.48)' : THEME_COLORS.bg3,
+                        borderLeftWidth: 3,
+                        borderLeftColor: TYPE_LABEL_COLORS[msg.message_type] || THEME_COLORS.gold,
                       }}
                     >
-                      {typedUsers.length}
+                      <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 11 }}>
+                        {msg.reply_to.user_name}
+                      </Text>
+                      <Text numberOfLines={2} style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 2 }}>
+                        {msg.reply_to.message}
+                      </Text>
+                    </Pressable>
+                  )}
+                  {!!msg.link_url && (
+                    <Pressable
+                      onPress={() => Linking.openURL(msg.link_url!)}
+                      style={{ marginBottom: showText || docAtts.length ? 8 : 0 }}
+                    >
+                      <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 13, textDecorationLine: 'underline' }} numberOfLines={3}>
+                        {msg.link_url}
+                      </Text>
+                    </Pressable>
+                  )}
+                  {docAtts.map((a: GroupChatAttachment, idx: number) => (
+                    <Pressable
+                      key={`${msg.message_id}-doc-${idx}`}
+                      onPress={() => onOpenDoc(a.url, a.file_name)}
+                      style={{ marginBottom: idx < docAtts.length - 1 || showText ? 10 : 0 }}
+                    >
+                      <View style={{
+                        paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12,
+                        backgroundColor: THEME_COLORS.bg3, borderWidth: 1, borderColor: THEME_COLORS.border,
+                      }}>
+                        <Text style={{ color: THEME_COLORS.violet, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
+                          {a.file_name?.toLowerCase().endsWith('.pdf') ? 'PDF' : 'File'}
+                        </Text>
+                        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 4 }} numberOfLines={2}>
+                          {a.file_name}
+                        </Text>
+                        <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_500Medium', fontSize: 11, marginTop: 6 }}>Tap to open</Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                  {showText ? (
+                    <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 22 }}>
+                      {msg.message}
                     </Text>
                   ) : null}
-                </Pressable>
-              );
-            })}
+                </View>
+              </View>
+            </Pressable>
+            {reactionEntries.length > 0 ? (
+              <View
+                style={{
+                  marginTop: -11,
+                  zIndex: 1,
+                  elevation: 2,
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                  alignItems: 'center',
+                  justifyContent: isMe ? 'flex-end' : 'flex-start',
+                  paddingHorizontal: 2,
+                }}
+              >
+                {reactionEntries.map(([emoji, users]) => {
+                  const typedUsers = users.filter((uid): uid is string => typeof uid === 'string');
+                  const reactedByMe = !!userUid && typedUsers.includes(userUid);
+                  return (
+                    <Pressable
+                      key={`${msg.message_id}-${emoji}`}
+                      onPress={() => onToggleReaction(msg.message_id, emoji)}
+                      hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
+                    >
+                      <Text style={{ fontSize: 18, lineHeight: 22 }}>{emoji}</Text>
+                      {typedUsers.length > 1 ? (
+                        <Text
+                          style={{
+                            color: reactedByMe ? THEME_COLORS.gold : THEME_COLORS.text3,
+                            fontFamily: 'Geist_600SemiBold',
+                            fontSize: 12,
+                          }}
+                        >
+                          {typedUsers.length}
+                        </Text>
+                      ) : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
           </View>
         )}
         {reactionEntries.length > 0 && mediaAtts.length > 0 && !hasMessageBubble && (
@@ -1521,7 +1529,10 @@ export default function GroupScreen() {
   );
 
   const firstUnreadIndex = useMemo(() => {
-    if (!lastReadAt || !user?.uid) return -1;
+    if (!user?.uid) return -1;
+    if (lastReadAt === 0) {
+      return displayedMessages.findIndex((msg) => msg.user_id !== user.uid);
+    }
     return displayedMessages.findIndex(
       (msg) => msg.user_id !== user.uid && firestoreTimestampMs(msg.timestamp) > lastReadAt
     );
@@ -1544,26 +1555,68 @@ export default function GroupScreen() {
     });
   }, [messages]);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (!id) return;
-      const last = messages[messages.length - 1];
-      const ts = last ? firestoreTimestampMs(last.timestamp) : undefined;
-      void markGroupChatRead(id, ts);
-    }, [id, messages, markGroupChatRead])
-  );
+  const prevMessageLenRef = useRef(0);
+  const fsChatScrollReadyRef = useRef(false);
+  const mainInitialScrollDoneRef = useRef(false);
 
   useEffect(() => {
-    if (displayedMessages.length > 0 || pendingCount > 0) {
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-    }
-  }, [displayedMessages.length, pendingCount]);
+    prevMessageLenRef.current = 0;
+    fsChatScrollReadyRef.current = false;
+    mainInitialScrollDoneRef.current = false;
+    messageLayoutMapRef.current = {};
+    fsMessageLayoutMapRef.current = {};
+  }, [id]);
 
   useEffect(() => {
-    if (avFullscreen && fsChatOpen && (displayedMessages.length > 0 || pendingCount > 0)) {
-      setTimeout(() => fsScrollRef.current?.scrollToEnd({ animated: true }), 100);
+    const len = displayedMessages.length;
+    const prevLen = prevMessageLenRef.current;
+    const isAppend = len > prevLen && prevLen > 0;
+
+    if (len === 0 && pendingCount === 0) {
+      prevMessageLenRef.current = 0;
+      return;
     }
-  }, [displayedMessages.length, pendingCount, avFullscreen, fsChatOpen]);
+
+    const snapToBottomMain = () => {
+      scrollRef.current?.scrollToEnd({ animated: false });
+      setIsNearBottom(true);
+    };
+
+    if (prevLen === 0 && len > 0 && !mainInitialScrollDoneRef.current) {
+      mainInitialScrollDoneRef.current = true;
+      setTimeout(snapToBottomMain, 80);
+    } else if (prevLen === 0 && len === 0 && pendingCount > 0) {
+      setTimeout(snapToBottomMain, 80);
+    } else if (isAppend) {
+      setTimeout(snapToBottomMain, 0);
+    }
+
+    prevMessageLenRef.current = len;
+  }, [id, displayedMessages.length, pendingCount]);
+
+  useEffect(() => {
+    if (!avFullscreen) {
+      fsChatScrollReadyRef.current = false;
+    }
+  }, [avFullscreen]);
+
+  useEffect(() => {
+    if (!avFullscreen || !fsChatOpen) return;
+    if (fsChatScrollReadyRef.current) return;
+    const len = displayedMessages.length;
+    if (len === 0 && pendingCount === 0) return;
+    if (len === 0) {
+      setTimeout(() => {
+        fsScrollRef.current?.scrollToEnd({ animated: false });
+      }, 80);
+      return;
+    }
+
+    fsChatScrollReadyRef.current = true;
+    setTimeout(() => {
+      fsScrollRef.current?.scrollToEnd({ animated: false });
+    }, 80);
+  }, [avFullscreen, fsChatOpen, displayedMessages.length, pendingCount]);
 
   useEffect(() => {
     if (!highlightedMessageId) return;
