@@ -479,11 +479,25 @@ export function useGroupChat(groupId: string) {
 
 // ── Group chat unread (latest message vs per-group last read on user doc) ─────
 
+const readsMemoryCache = new Map<string, Record<string, number>>();
+
+function parseReadsMap(raw: unknown): Record<string, number> {
+  const result: Record<string, number> = {};
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      if (typeof v === 'number' && !Number.isNaN(v)) result[k] = v;
+      else result[k] = firestoreTimestampMs(v);
+    }
+  }
+  return result;
+}
+
 /** Subscribes to `users/{uid}.group_chat_last_read_at.{groupId}` map (milliseconds). */
 export function useGroupChatLastReads() {
   const { user } = useAuthStore();
-  const [reads, setReads] = useState<Record<string, number>>({});
-  const [isReadsReady, setIsReadsReady] = useState(false);
+  const cached = user?.uid ? readsMemoryCache.get(user.uid) : undefined;
+  const [reads, setReads] = useState<Record<string, number>>(cached ?? {});
+  const [isReadsReady, setIsReadsReady] = useState(!!cached);
 
   useEffect(() => {
     if (!user) {
@@ -491,21 +505,14 @@ export function useGroupChatLastReads() {
       setIsReadsReady(true);
       return;
     }
-    const ref = doc(db, COLLECTIONS.USERS, user.uid);
+    const uid = user.uid;
+    const ref = doc(db, COLLECTIONS.USERS, uid);
     const unsub = onSnapshot(
       ref,
       (snap) => {
-        const raw = snap.data()?.group_chat_last_read_at;
-        if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-          const next: Record<string, number> = {};
-          for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-            if (typeof v === 'number' && !Number.isNaN(v)) next[k] = v;
-            else next[k] = firestoreTimestampMs(v);
-          }
-          setReads(next);
-        } else {
-          setReads({});
-        }
+        const next = parseReadsMap(snap.data()?.group_chat_last_read_at);
+        readsMemoryCache.set(uid, next);
+        setReads(next);
         setIsReadsReady(true);
       },
       () => { setReads({}); setIsReadsReady(true); }

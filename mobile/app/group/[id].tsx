@@ -284,6 +284,8 @@ export default function GroupScreen() {
     }
   }, [id]);
 
+  const mountTimeRef = useRef(Date.now());
+
   useEffect(() => {
     const currentIds = new Set(displayedMessages.map((m) => m.message_id));
     const prevIds = prevMessageIdsRef.current;
@@ -297,7 +299,9 @@ export default function GroupScreen() {
       prevIds.size > 0 &&
       displayedMessages.some((m) => !prevIds.has(m.message_id));
 
-    if (hasGenuinelyNewMessages && isNearBottom) {
+    const isSettling = Date.now() - mountTimeRef.current < 2000;
+
+    if (hasGenuinelyNewMessages && isNearBottom && !isSettling) {
       scrollRef.current?.scrollToEnd({ animated: false });
       fsScrollRef.current?.scrollToEnd({ animated: false });
       setIsNearBottom(true);
@@ -916,11 +920,6 @@ export default function GroupScreen() {
   function handleMainScrollToIndexFailed() {
     requestAnimationFrame(() => {
       scrollRef.current?.scrollToEnd({ animated: false });
-      if (id) {
-        const last = displayedMessages[displayedMessages.length - 1];
-        const ts = last ? firestoreTimestampMs(last.timestamp) : undefined;
-        void markGroupChatRead(id, ts);
-      }
     });
   }
 
@@ -1036,7 +1035,6 @@ export default function GroupScreen() {
           scrollEventThrottle={16}
           initialScrollIndex={initialChatIndex}
           onScrollToIndexFailed={handleMainScrollToIndexFailed}
-          maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
         />
       ) : dataSettled ? (
         chatEmptyComponent
@@ -1154,7 +1152,6 @@ export default function GroupScreen() {
                     scrollEventThrottle={16}
                     initialScrollIndex={initialChatIndex}
                     onScrollToIndexFailed={handleFsScrollToIndexFailed}
-                    maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
                   />
                 ) : dataSettled ? (
                   chatEmptyComponent
