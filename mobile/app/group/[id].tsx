@@ -844,48 +844,49 @@ function GroupChatBubble({
                     {msg.message}
                   </Text>
                 ) : null}
-                {reactionEntries.length > 0 && (
-                  <View
-                    style={{
-                      marginTop: 8,
-                      paddingTop: 6,
-                      flexDirection: 'row',
-                      flexWrap: 'wrap',
-                      gap: 10,
-                      alignItems: 'center',
-                      justifyContent: isMe ? 'flex-end' : 'flex-start',
-                    }}
-                  >
-                    {reactionEntries.map(([emoji, users]) => {
-                      const typedUsers = users.filter((uid): uid is string => typeof uid === 'string');
-                      const reactedByMe = !!userUid && typedUsers.includes(userUid);
-                      return (
-                        <Pressable
-                          key={`${msg.message_id}-${emoji}`}
-                          onPress={() => onToggleReaction(msg.message_id, emoji)}
-                          hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-                          style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
-                        >
-                          <Text style={{ fontSize: 18, lineHeight: 22 }}>{emoji}</Text>
-                          {typedUsers.length > 1 ? (
-                            <Text
-                              style={{
-                                color: reactedByMe ? THEME_COLORS.gold : THEME_COLORS.text3,
-                                fontFamily: 'Geist_600SemiBold',
-                                fontSize: 12,
-                              }}
-                            >
-                              {typedUsers.length}
-                            </Text>
-                          ) : null}
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                )}
               </View>
             </View>
           </Pressable>
+        )}
+        {hasMessageBubble && reactionEntries.length > 0 && (
+          <View
+            style={{
+              marginTop: 6,
+              maxWidth: BUBBLE_W,
+              alignSelf: isMe ? 'flex-end' : 'flex-start',
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: 10,
+              alignItems: 'center',
+              justifyContent: isMe ? 'flex-end' : 'flex-start',
+            }}
+          >
+            {reactionEntries.map(([emoji, users]) => {
+              const typedUsers = users.filter((uid): uid is string => typeof uid === 'string');
+              const reactedByMe = !!userUid && typedUsers.includes(userUid);
+              return (
+                <Pressable
+                  key={`${msg.message_id}-${emoji}`}
+                  onPress={() => onToggleReaction(msg.message_id, emoji)}
+                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}
+                >
+                  <Text style={{ fontSize: 18, lineHeight: 22 }}>{emoji}</Text>
+                  {typedUsers.length > 1 ? (
+                    <Text
+                      style={{
+                        color: reactedByMe ? THEME_COLORS.gold : THEME_COLORS.text3,
+                        fontFamily: 'Geist_600SemiBold',
+                        fontSize: 12,
+                      }}
+                    >
+                      {typedUsers.length}
+                    </Text>
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </View>
         )}
         {reactionEntries.length > 0 && mediaAtts.length > 0 && !hasMessageBubble && (
           <View
