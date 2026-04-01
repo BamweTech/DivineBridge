@@ -28,6 +28,24 @@ def _created_at_sort_ts(row):
     return 0.0
 
 
+def _user_group_member_fields(db, uid: str):
+    """Resolve the user fields we persist on a group member doc."""
+    user_snap = db.collection('users').document(uid).get()
+    data = user_snap.to_dict() or {}
+    first_name = (data.get('firstName') or '').strip()
+    last_name = (data.get('lastName') or '').strip()
+    display_name = ' '.join(part for part in [first_name, last_name] if part).strip()
+    if not display_name:
+        display_name = (data.get('displayName') or '').strip()
+    if not display_name:
+        email = (data.get('email') or '').strip()
+        display_name = email.split('@')[0] if email else 'Unknown'
+    return {
+        'display_name': display_name or 'Unknown',
+        'photo_url': data.get('photoURL') or None,
+    }
+
+
 # ─── Group CRUD ───────────────────────────────────────────────────────────────
 
 @groups_bp.route('', methods=['GET'])
@@ -83,9 +101,7 @@ def create_group():
 
     db = get_firestore_client()
 
-    # Fetch creator's display name
-    user_snap = db.collection('users').document(uid).get()
-    display_name = user_snap.to_dict().get('displayName', 'Unknown') if user_snap.exists else 'Unknown'
+    member_fields = _user_group_member_fields(db, uid)
 
     group_id = str(uuid.uuid4())
     invite_code = str(uuid.uuid4())[:8].upper() if privacy != 'public' else None
@@ -107,7 +123,7 @@ def create_group():
     # Add creator as admin member
     db.collection('group_members').document(group_id).collection('members').document(uid).set({
         'uid': uid,
-        'display_name': display_name,
+        **member_fields,
         'role': 'admin',
         'joined_at': firestore.SERVER_TIMESTAMP,
     })
@@ -163,9 +179,7 @@ def join_group(group_id: str):
         if provided_code != group.get('invite_code', '').upper():
             return jsonify({'error': 'Invalid invite code'}), 403
 
-    # Fetch display name
-    user_snap = db.collection('users').document(uid).get()
-    display_name = user_snap.to_dict().get('displayName', 'Unknown') if user_snap.exists else 'Unknown'
+    member_fields = _user_group_member_fields(db, uid)
 
     ref.update({
         'member_ids': firestore.ArrayUnion([uid]),
@@ -174,7 +188,7 @@ def join_group(group_id: str):
     })
     db.collection('group_members').document(group_id).collection('members').document(uid).set({
         'uid': uid,
-        'display_name': display_name,
+        **member_fields,
         'role': 'member',
         'joined_at': firestore.SERVER_TIMESTAMP,
     })
@@ -212,9 +226,7 @@ def join_by_code():
     if uid in group.get('member_ids', []):
         return jsonify({'success': True, 'message': 'Already a member', 'group_id': group_id, 'group_name': group.get('name', '')}), 200
 
-    # Fetch display name
-    user_snap = db.collection('users').document(uid).get()
-    display_name = user_snap.to_dict().get('displayName', 'Unknown') if user_snap.exists else 'Unknown'
+    member_fields = _user_group_member_fields(db, uid)
 
     ref = db.collection('prayer_groups').document(group_id)
     ref.update({
@@ -224,7 +236,7 @@ def join_by_code():
     })
     db.collection('group_members').document(group_id).collection('members').document(uid).set({
         'uid': uid,
-        'display_name': display_name,
+        **member_fields,
         'role': 'member',
         'joined_at': firestore.SERVER_TIMESTAMP,
     })
@@ -235,6 +247,43 @@ def join_by_code():
         'group_id': group_id,
         'group_name': group.get('name', ''),
     }), 200
+
+
+@groups_bp.route('/<group_id>/members/sync', methods=['POST'])
+@require_auth
+def sync_group_members(group_id: str):
+    """Backfill member profile fields from users docs for this group."""
+    uid = g.user_id
+    db = get_firestore_client()
+    group_ref = db.collection('prayer_groups').document(group_id)
+    group_snap = group_ref.get()
+    if not group_snap.exists:
+        return jsonify({'error': 'Group not found'}), 404
+
+    group = group_snap.to_dict() or {}
+    if uid not in group.get('member_ids', []):
+        return jsonify({'error': 'Forbidden'}), 403
+
+    member_refs = list(db.collection('group_members').document(group_id).collection('members').stream())
+    batch = db.batch()
+    updated = 0
+
+    for member_snap in member_refs:
+        current = member_snap.to_dict() or {}
+        next_fields = _user_group_member_fields(db, member_snap.id)
+        if (
+            current.get('display_name') == next_fields.get('display_name')
+            and current.get('photo_url') == next_fields.get('photo_url')
+        ):
+            continue
+
+        batch.set(member_snap.reference, next_fields, merge=True)
+        updated += 1
+
+    if updated:
+        batch.commit()
+
+    return jsonify({'success': True, 'updated': updated}), 200
 
 
 @groups_bp.route('/<group_id>/leave', methods=['POST'])

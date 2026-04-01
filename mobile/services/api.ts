@@ -181,6 +181,10 @@ export const groupApi = {
       method: 'POST',
       body: JSON.stringify({ code }),
     }),
+  syncMembers: (groupId: string) =>
+    request<any>(`/api/groups/${groupId}/members/sync`, {
+      method: 'POST',
+    }),
 };
 
 // ─── Devotional Plans ─────────────────────────────────────────────────────────

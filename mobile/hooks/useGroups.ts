@@ -27,18 +27,6 @@ import type {
   PrayerRoom,
 } from '@/types';
 
-function resolveUserDisplayName(data: Record<string, unknown> | undefined, fallbackUid: string) {
-  if (!data) return fallbackUid;
-  const first = typeof data.firstName === 'string' ? data.firstName.trim() : '';
-  const last = typeof data.lastName === 'string' ? data.lastName.trim() : '';
-  if (first && last) return `${first} ${last}`;
-  if (first) return first;
-  if (last) return last;
-  if (typeof data.displayName === 'string' && data.displayName.trim()) return data.displayName.trim();
-  if (typeof data.email === 'string' && data.email.trim()) return data.email.trim().split('@')[0] || fallbackUid;
-  return fallbackUid;
-}
-
 // useLiveRooms — real-time Firestore listener for active prayer rooms.
 // Rooms appear instantly when created without polling.
 export function useLiveRooms() {
@@ -213,33 +201,9 @@ export function useGroupMembers(groupId: string) {
     const ref = collection(db, 'group_members', groupId, 'members');
     const unsub = onSnapshot(
       ref,
-      async (snap) => {
-        const rawMembers = snap.docs.map((d) => ({ uid: d.id, ...d.data() } as GroupMember));
-        const data = await Promise.all(
-          rawMembers.map(async (member) => {
-            const hasName =
-              typeof member.display_name === 'string' &&
-              member.display_name.trim() !== '' &&
-              member.display_name.trim().toLowerCase() !== 'unknown';
-            if (hasName) return member;
-
-            try {
-              const userSnap = await getDoc(doc(db, COLLECTIONS.USERS, member.uid));
-              const userData = userSnap.exists() ? (userSnap.data() as Record<string, unknown>) : undefined;
-              return {
-                ...member,
-                display_name: resolveUserDisplayName(userData, member.uid),
-                photo_url:
-                  member.photo_url ||
-                  (typeof userData?.photoURL === 'string' ? userData.photoURL : undefined),
-              };
-            } catch {
-              return { ...member, display_name: member.uid };
-            }
-          })
-        );
-
-        data
+      (snap) => {
+        const data = snap.docs
+          .map((d) => ({ uid: d.id, ...d.data() } as GroupMember))
           .sort((a, b) => {
             const roleScore = (role: GroupMember['role']) => (role === 'admin' ? 0 : 1);
             const byRole = roleScore(a.role) - roleScore(b.role);

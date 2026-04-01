@@ -45,7 +45,7 @@ import {
 import { uploadGroupChatFile } from '@/lib/groupChatUpload';
 import { useGroupUnread } from '@/contexts/GroupUnreadContext';
 import { usePrayerRoom } from '@/hooks/usePrayerRoom';
-import { roomApi } from '@/services/api';
+import { groupApi, roomApi } from '@/services/api';
 import { isWebRTCAvailable } from '@/lib/sfu';
 import { GroupLiveAvPanel } from '@/components/group/GroupLiveAvPanel';
 import { Avatar } from '@/components/ui/Avatar';
@@ -77,6 +77,13 @@ type ViewerMedia = {
   url: string;
   contentType: string;
   fileName: string;
+};
+
+type ReactionPopoverState = {
+  message: GroupChatMessage;
+  anchorX: number;
+  anchorY: number;
+  align: 'left' | 'right';
 };
 
 const TYPE_COLORS: Record<MessageType, string> = {
@@ -679,8 +686,10 @@ function GroupChatBubble({
   onOpenDoc,
   onReply,
   onToggleReaction,
-  onOpenActions,
+  onOpenReactions,
   onOpenEmojiLibrary,
+  onCopyMessage,
+  onDeleteMessage,
   onJumpToReply,
   onLayoutMessage,
 }: {
@@ -694,8 +703,10 @@ function GroupChatBubble({
   onOpenDoc: (url: string, fileName: string) => void;
   onReply: (message: GroupChatMessage) => void;
   onToggleReaction: (messageId: string, emoji: string) => void;
-  onOpenActions: (message: GroupChatMessage) => void;
+  onOpenReactions: (message: GroupChatMessage, anchor: { x: number; y: number; align: 'left' | 'right' }) => void;
   onOpenEmojiLibrary: (message: GroupChatMessage) => void;
+  onCopyMessage: (message: GroupChatMessage) => void;
+  onDeleteMessage: (messageId: string) => void;
   onJumpToReply: (messageId: string, surface: ChatSurface) => void;
   onLayoutMessage: (messageId: string, y: number, surface: ChatSurface) => void;
 }) {
@@ -723,7 +734,7 @@ function GroupChatBubble({
   const reactionEntries = Object.entries(msg.reactions ?? {}).filter(
     ([emoji, users]) => emoji && Array.isArray(users) && users.length > 0,
   );
-  const reactionOffset = reactionEntries.length > 0 ? 18 : 0;
+  const reactionOffset = reactionEntries.length > 0 ? 24 : 0;
 
   const BUBBLE_W = 264;
   const rTL = 18;
@@ -731,9 +742,13 @@ function GroupChatBubble({
   const rBR = isMe ? 4 : 18;
   const rBL = isMe ? 18 : 4;
 
-  function handleLongPress() {
+  function handleLongPress(event: { nativeEvent: { pageX: number; pageY: number } }) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onOpenActions(msg);
+    onOpenReactions(msg, {
+      x: event.nativeEvent.pageX,
+      y: event.nativeEvent.pageY,
+      align: isMe ? 'right' : 'left',
+    });
   }
 
   function handleSwipeReply() {
@@ -745,12 +760,18 @@ function GroupChatBubble({
   return (
     <View
       onLayout={(event) => onLayoutMessage(msg.message_id, event.nativeEvent.layout.y, surface)}
-      style={{ marginTop: reactionOffset }}
+      style={{
+        marginTop: reactionOffset,
+        position: 'relative',
+        zIndex: reactionEntries.length > 0 ? 20 : 1,
+      }}
     >
     <Swipeable
       ref={swipeRef}
       overshootLeft={false}
+      overshootRight={false}
       leftThreshold={36}
+      rightThreshold={44}
       friction={2}
       renderLeftActions={(_, dragX) => (
         <View style={{ justifyContent: 'center', paddingHorizontal: 8, marginBottom: showTimestamp ? 12 : 4 }}>
@@ -795,7 +816,60 @@ function GroupChatBubble({
           </RNAnimated.View>
         </View>
       )}
-      onSwipeableOpen={handleSwipeReply}
+      renderRightActions={() => (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            gap: 8,
+            paddingLeft: 10,
+            marginBottom: showTimestamp ? 12 : 4,
+          }}
+        >
+          <Pressable
+            onPress={() => {
+              swipeRef.current?.close();
+              onCopyMessage(msg);
+            }}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 14,
+              backgroundColor: THEME_COLORS.bg3,
+              borderWidth: 1,
+              borderColor: THEME_COLORS.border,
+            }}
+          >
+            <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
+              Copy
+            </Text>
+          </Pressable>
+          {isMe ? (
+            <Pressable
+              onPress={() => {
+                swipeRef.current?.close();
+                onDeleteMessage(msg.message_id);
+              }}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 14,
+                backgroundColor: 'rgba(176,90,80,0.08)',
+                borderWidth: 1,
+                borderColor: 'rgba(176,90,80,0.16)',
+              }}
+            >
+              <Text style={{ color: THEME_COLORS.rose, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
+                Delete
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      )}
+      onSwipeableOpen={(direction) => {
+        if (direction === 'left') handleSwipeReply();
+      }}
     >
       <Animated.View
         entering={FadeInDown.duration(200)}
@@ -903,13 +977,15 @@ function GroupChatBubble({
           <View
             style={{
               position: 'absolute',
-              top: -14,
+              top: -16,
               right: 6,
               flexDirection: 'row',
               flexWrap: 'wrap',
               gap: 4,
               maxWidth: 220,
               justifyContent: 'flex-end',
+              zIndex: 30,
+              elevation: 8,
             }}
           >
             {reactionEntries.map(([emoji, users]) => {
@@ -1161,166 +1237,112 @@ function JumpToLatestButton({
   );
 }
 
-function MessageActionSheet({
+function MessageReactionPopover({
   visible,
-  msg,
+  state,
   userUid,
+  topInset,
   onClose,
-  onReply,
   onReact,
   onOpenEmojiLibrary,
-  onDelete,
 }: {
   visible: boolean;
-  msg: GroupChatMessage | null;
+  state: ReactionPopoverState | null;
   userUid?: string;
+  topInset: number;
   onClose: () => void;
-  onReply: (message: GroupChatMessage) => void;
   onReact: (messageId: string, emoji: string) => void;
   onOpenEmojiLibrary: (message: GroupChatMessage) => void;
-  onDelete: (messageId: string) => void;
 }) {
-  if (!msg) return null;
+  if (!state) return null;
 
-  const isMe = msg.user_id === userUid;
-  const copyValue = (msg.message ?? '').trim() || msg.link_url?.trim() || buildReplyPreviewText(msg);
+  const { width, height } = Dimensions.get('window');
+  const pickerWidth = Math.min(width - 24, 320);
+  const preferredLeft = state.align === 'right'
+    ? state.anchorX - pickerWidth + 32
+    : state.anchorX - 32;
+  const left = Math.min(Math.max(12, preferredLeft), width - pickerWidth - 12);
+  const top = state.anchorY > 98
+    ? Math.max(topInset + 8, state.anchorY - 70)
+    : Math.min(height - 82, state.anchorY + 18);
 
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose} statusBarTranslucent>
       <Pressable
-        style={{ flex: 1, backgroundColor: 'rgba(44,36,22,0.45)', justifyContent: 'flex-end' }}
+        style={{ flex: 1 }}
         onPress={onClose}
       >
-        <Pressable
-          onPress={() => {}}
-          style={{
-            backgroundColor: THEME_COLORS.bg,
-            borderTopLeftRadius: 28,
-            borderTopRightRadius: 28,
-            paddingHorizontal: 20,
-            paddingTop: 14,
-            paddingBottom: 32,
-          }}
-        >
-          <View style={{ width: 36, height: 4, backgroundColor: THEME_COLORS.border, borderRadius: 2, alignSelf: 'center', marginBottom: 18 }} />
-
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18 }}>
-            {isMe ? 'Your message' : msg.user_name}
-          </Text>
-          <Text
-            numberOfLines={3}
-            style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 6, lineHeight: 20 }}
+        <View pointerEvents="box-none" style={{ flex: 1 }}>
+          <Pressable
+            onPress={() => {}}
+            style={{
+              position: 'absolute',
+              top,
+              left,
+              width: pickerWidth,
+              paddingHorizontal: 10,
+              paddingVertical: 10,
+              borderRadius: 18,
+              backgroundColor: THEME_COLORS.bg,
+              borderWidth: 1,
+              borderColor: THEME_COLORS.border,
+              shadowColor: '#000',
+              shadowOpacity: 0.14,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 6 },
+              elevation: 12,
+            }}
           >
-            {buildReplyPreviewText(msg)}
-          </Text>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingTop: 18, paddingBottom: 8, gap: 10 }}
-          >
-            {REACTION_OPTIONS.map((emoji) => {
-              const reactedByMe = !!userUid && (msg.reactions?.[emoji] ?? []).includes(userUid);
-              return (
-                <Pressable
-                  key={`${msg.message_id}-picker-${emoji}`}
-                  onPress={() => {
-                    onReact(msg.message_id, emoji);
-                    onClose();
-                  }}
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 24,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: reactedByMe ? THEME_COLORS.goldDim : THEME_COLORS.bg3,
-                    borderWidth: 1,
-                    borderColor: reactedByMe ? THEME_COLORS.goldBorder : THEME_COLORS.border,
-                  }}
-                >
-                  <Text style={{ fontSize: 22 }}>{emoji}</Text>
-                </Pressable>
-              );
-            })}
-            <Pressable
-              onPress={() => onOpenEmojiLibrary(msg)}
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 24,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: THEME_COLORS.bg3,
-                borderWidth: 1,
-                borderColor: THEME_COLORS.border,
-              }}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 8 }}
             >
-              <Text style={{ color: THEME_COLORS.text2, fontSize: 26, lineHeight: 26 }}>+</Text>
-            </Pressable>
-          </ScrollView>
-
-          <View style={{ marginTop: 12, gap: 10 }}>
-            <Pressable
-              onPress={() => {
-                onReply(msg);
-                onClose();
-              }}
-              style={{
-                paddingVertical: 14,
-                paddingHorizontal: 16,
-                borderRadius: 16,
-                backgroundColor: THEME_COLORS.bg3,
-                borderWidth: 1,
-                borderColor: THEME_COLORS.border,
-              }}
-            >
-              <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_600SemiBold', fontSize: 14 }}>
-                Reply with quote
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => {
-                void Clipboard.setStringAsync(copyValue);
-                onClose();
-              }}
-              style={{
-                paddingVertical: 14,
-                paddingHorizontal: 16,
-                borderRadius: 16,
-                backgroundColor: THEME_COLORS.bg3,
-                borderWidth: 1,
-                borderColor: THEME_COLORS.border,
-              }}
-            >
-              <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_600SemiBold', fontSize: 14 }}>
-                Copy
-              </Text>
-            </Pressable>
-
-            {isMe && (
+              {REACTION_OPTIONS.map((emoji) => {
+                const reactedByMe = !!userUid && (state.message.reactions?.[emoji] ?? []).includes(userUid);
+                return (
+                  <Pressable
+                    key={`${state.message.message_id}-picker-${emoji}`}
+                    onPress={() => {
+                      onReact(state.message.message_id, emoji);
+                      onClose();
+                    }}
+                    style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 21,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: reactedByMe ? THEME_COLORS.goldDim : THEME_COLORS.bg3,
+                      borderWidth: 1,
+                      borderColor: reactedByMe ? THEME_COLORS.goldBorder : THEME_COLORS.border,
+                    }}
+                  >
+                    <Text style={{ fontSize: 20 }}>{emoji}</Text>
+                  </Pressable>
+                );
+              })}
               <Pressable
                 onPress={() => {
-                  onDelete(msg.message_id);
+                  onOpenEmojiLibrary(state.message);
                   onClose();
                 }}
                 style={{
-                  paddingVertical: 14,
-                  paddingHorizontal: 16,
-                  borderRadius: 16,
-                  backgroundColor: 'rgba(176,90,80,0.08)',
+                  width: 42,
+                  height: 42,
+                  borderRadius: 21,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: THEME_COLORS.bg3,
                   borderWidth: 1,
-                  borderColor: 'rgba(176,90,80,0.16)',
+                  borderColor: THEME_COLORS.border,
                 }}
               >
-                <Text style={{ color: THEME_COLORS.rose, fontFamily: 'Geist_600SemiBold', fontSize: 14 }}>
-                  Delete message
-                </Text>
+                <Text style={{ color: THEME_COLORS.text2, fontSize: 24, lineHeight: 24 }}>+</Text>
               </Pressable>
-            )}
-          </View>
-        </Pressable>
+            </ScrollView>
+          </Pressable>
+        </View>
       </Pressable>
     </Modal>
   );
@@ -1541,7 +1563,7 @@ export default function GroupScreen() {
   const [text, setText] = useState('');
   const [showInviteSheet, setShowInviteSheet] = useState(false);
   const [replyTarget, setReplyTarget] = useState<GroupChatMessage | null>(null);
-  const [activeMessage, setActiveMessage] = useState<GroupChatMessage | null>(null);
+  const [reactionPopover, setReactionPopover] = useState<ReactionPopoverState | null>(null);
   const [showMembersSheet, setShowMembersSheet] = useState(false);
   const [emojiLibraryMessage, setEmojiLibraryMessage] = useState<GroupChatMessage | null>(null);
   const [optimisticReactions, setOptimisticReactions] = useState<Record<string, Record<string, string[]>>>({});
@@ -1561,6 +1583,7 @@ export default function GroupScreen() {
   const [showAttachTray, setShowAttachTray] = useState<'main' | 'fs' | null>(null);
   const [viewerMedia, setViewerMedia] = useState<ViewerMedia | null>(null);
   const [mediaActionBusy, setMediaActionBusy] = useState<'share' | 'save' | null>(null);
+  const memberSyncRequestedRef = useRef(false);
 
   const prayer = usePrayerRoom(liveRoomId ?? '');
   const joinRef = useRef(prayer.join);
@@ -1599,6 +1622,19 @@ export default function GroupScreen() {
   const pendingCount = pendingUploads.length;
   const lastReadAt = id ? reads[id] ?? 0 : 0;
   const unreadCount = id ? unreadCountByGroup[id] ?? 0 : 0;
+
+  useEffect(() => {
+    if (!id || isLoadingMembers || members.length === 0 || memberSyncRequestedRef.current) return;
+    const needsSync = members.some((member) => {
+      const name = member.display_name?.trim();
+      return !name || name.toLowerCase() === 'unknown' || name === member.uid;
+    });
+    if (!needsSync) return;
+    memberSyncRequestedRef.current = true;
+    groupApi.syncMembers(id).catch(() => {
+      memberSyncRequestedRef.current = false;
+    });
+  }, [id, isLoadingMembers, members]);
 
   const displayedMessages = useMemo(
     () =>
@@ -1806,13 +1842,27 @@ export default function GroupScreen() {
     setReplyTarget(message);
   }
 
-  function handleOpenMessageActions(message: GroupChatMessage) {
-    setActiveMessage(message);
+  function handleOpenReactionPopover(
+    message: GroupChatMessage,
+    anchor: { x: number; y: number; align: 'left' | 'right' }
+  ) {
+    setReactionPopover({
+      message,
+      anchorX: anchor.x,
+      anchorY: anchor.y,
+      align: anchor.align,
+    });
   }
 
   function handleOpenEmojiLibrary(message: GroupChatMessage) {
-    setActiveMessage(null);
+    setReactionPopover(null);
     setEmojiLibraryMessage(message);
+  }
+
+  async function handleCopyMessage(message: GroupChatMessage) {
+    const copyValue = (message.message ?? '').trim() || message.link_url?.trim() || buildReplyPreviewText(message);
+    await Clipboard.setStringAsync(copyValue);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
   async function handleToggleReaction(messageId: string, emoji: string) {
@@ -2102,8 +2152,10 @@ export default function GroupScreen() {
           onOpenDoc={handleOpenDocument}
           onReply={handleReplyToMessage}
           onToggleReaction={handleToggleReaction}
-          onOpenActions={handleOpenMessageActions}
+          onOpenReactions={handleOpenReactionPopover}
           onOpenEmojiLibrary={handleOpenEmojiLibrary}
+          onCopyMessage={(message) => { void handleCopyMessage(message); }}
+          onDeleteMessage={requestDeleteMessage}
           onJumpToReply={jumpToMessage}
           onLayoutMessage={registerMessageLayout}
         />
@@ -2466,15 +2518,14 @@ export default function GroupScreen() {
         </View>
       </View>
 
-      <MessageActionSheet
-        visible={!!activeMessage}
-        msg={activeMessage}
+      <MessageReactionPopover
+        visible={!!reactionPopover}
+        state={reactionPopover}
         userUid={user?.uid}
-        onClose={() => setActiveMessage(null)}
-        onReply={handleReplyToMessage}
+        topInset={insets.top}
+        onClose={() => setReactionPopover(null)}
         onReact={handleToggleReaction}
         onOpenEmojiLibrary={handleOpenEmojiLibrary}
-        onDelete={requestDeleteMessage}
       />
 
       <EmojiLibraryModal
