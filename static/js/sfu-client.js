@@ -113,6 +113,10 @@ class SfuClient {
    * @param {{ videoEnabled?: boolean }} opts
    */
   async start({ videoEnabled = false } = {}) {
+    if (!this.token || this.token.split('.').length !== 3) {
+      throw new Error('[sfu] Invalid Firebase ID token — aborting SFU connection');
+    }
+
     await this._connectWs();
 
     // 1. Join room → routerRtpCapabilities + current peer list + mode

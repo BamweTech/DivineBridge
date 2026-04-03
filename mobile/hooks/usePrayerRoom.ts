@@ -113,8 +113,8 @@ export function usePrayerRoom(roomId: string) {
       const resp = await roomApi.sfuToken(roomId);
       const sfuUrl = SFU_URL;
       console.log('[room] SFU URL:', sfuUrl);
-      await signInWithCustomToken(auth, resp.customToken);
-      const token = await auth.currentUser!.getIdToken();
+      const userCred = await signInWithCustomToken(auth, resp.customToken);
+      const token = await userCred.user.getIdToken();
 
       // 3. Boot SFU engine
       const engine = new SfuEngine({

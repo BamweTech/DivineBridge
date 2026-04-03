@@ -72,6 +72,13 @@ async function _initFirebase() {
  * @throws if the token is invalid or expired
  */
 async function verifyToken(idToken, expectedRoomId) {
+  if (!idToken || typeof idToken !== 'string' || idToken.split('.').length !== 3) {
+    const preview = typeof idToken === 'string' ? idToken.slice(0, 20) : String(idToken);
+    throw new Error(
+      `Invalid token format (type=${typeof idToken}, len=${idToken?.length ?? 0}, preview="${preview}…")`
+    );
+  }
+
   const isDev = process.env.DEV_MODE === 'true' || process.env.NODE_ENV === 'development';
 
   if (isDev) {

@@ -136,6 +136,10 @@ export class SfuEngine {
       return;
     }
 
+    if (!this.token || this.token.split('.').length !== 3) {
+      throw new Error('[sfu] Invalid Firebase ID token — aborting SFU connection');
+    }
+
     await this._connectWs();
 
     // 1. Join room → get routerRtpCapabilities + current peers
