@@ -6,6 +6,8 @@ import { THEME_COLORS } from '@/lib/constants';
 import Icon from '@/components/ui/Icon';
 import type { GroupChatAttachment } from '@/types';
 
+const imageDimensionCache = new Map<string, number>();
+
 function AdaptiveImagePreview({
   uri,
   accessibilityLabel,
@@ -13,20 +15,24 @@ function AdaptiveImagePreview({
   uri: string;
   accessibilityLabel: string;
 }) {
-  const [ratio, setRatio] = useState(4 / 3);
+  const cached = imageDimensionCache.get(uri);
+  const [ratio, setRatio] = useState(cached ?? 4 / 3);
 
   useEffect(() => {
+    if (imageDimensionCache.has(uri)) return;
     let active = true;
     RNImage.getSize(
       uri,
       (width, height) => {
-        if (active && width > 0 && height > 0) setRatio(width / height);
+        if (active && width > 0 && height > 0) {
+          const r = width / height;
+          imageDimensionCache.set(uri, r);
+          setRatio(r);
+        }
       },
-      () => {}
+      () => {},
     );
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [uri]);
 
   return (
@@ -34,6 +40,8 @@ function AdaptiveImagePreview({
       source={{ uri }}
       style={{ width: 264, aspectRatio: ratio, backgroundColor: THEME_COLORS.bg3 }}
       contentFit="contain"
+      cachePolicy="memory-disk"
+      recyclingKey={uri}
       accessibilityLabel={accessibilityLabel}
     />
   );

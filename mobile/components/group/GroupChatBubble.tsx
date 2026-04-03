@@ -1,7 +1,6 @@
 import { useRef } from 'react';
 import { View, Text, Pressable, Linking, Animated as RNAnimated } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
-import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import dayjs from 'dayjs';
 import type { ChatSurface } from '@/components/group/groupChatUtils';
@@ -210,8 +209,7 @@ export function GroupChatBubble({
         if (direction === 'left') handleSwipeReply();
       }}
     >
-      <Animated.View
-        entering={FadeInDown.duration(200)}
+      <View
         style={{ marginBottom: showTimestamp ? 12 : 4, alignItems: isMe ? 'flex-end' : 'flex-start' }}
       >
         {!isMe && showSender && (
@@ -422,7 +420,7 @@ export function GroupChatBubble({
               : ''}
           </Text>
         )}
-      </Animated.View>
+      </View>
     </Swipeable>
     </View>
   );
