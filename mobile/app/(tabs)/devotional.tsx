@@ -193,9 +193,19 @@ function DayCard({
         <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 22, fontStyle: 'italic', marginBottom: 6 }}>
           &ldquo;{day.scripture}&rdquo;
         </Text>
-        <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 11, letterSpacing: 0.5 }}>
-          &mdash; {day.scripture_reference}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 11, letterSpacing: 0.5 }}>
+            &mdash; {day.scripture_reference}
+          </Text>
+          <Pressable
+            onPress={() => { Share.share({ message: `\u201c${day.scripture}\u201d\n\u2014 ${day.scripture_reference}\n\nDivine Bridge` }).catch(() => null); }}
+            hitSlop={8}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 8, backgroundColor: THEME_COLORS.goldDim }}
+          >
+            <Icon name="share" size={10} color={THEME_COLORS.gold} />
+            <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_500Medium', fontSize: 10 }}>Share verse</Text>
+          </Pressable>
+        </View>
       </View>
 
       {/* Reflection */}
@@ -294,9 +304,19 @@ function ReadingMode({ day, onClose }: { day: DevotionalDay; onClose: () => void
             <Text style={{ color: '#f5edd8', fontFamily: 'Geist_400Regular', fontSize: 18, lineHeight: 30, fontStyle: 'italic', marginBottom: 10 }}>
               &ldquo;{day.scripture}&rdquo;
             </Text>
-            <Text style={{ color: '#b07d20', fontFamily: 'Geist_600SemiBold', fontSize: 13, letterSpacing: 0.5 }}>
-              &mdash; {day.scripture_reference}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text style={{ color: '#b07d20', fontFamily: 'Geist_600SemiBold', fontSize: 13, letterSpacing: 0.5 }}>
+                &mdash; {day.scripture_reference}
+              </Text>
+              <Pressable
+                onPress={() => { Share.share({ message: `\u201c${day.scripture}\u201d\n\u2014 ${day.scripture_reference}\n\nDivine Bridge` }).catch(() => null); }}
+                hitSlop={8}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, backgroundColor: 'rgba(176,125,32,0.2)' }}
+              >
+                <Icon name="share" size={11} color="#b07d20" />
+                <Text style={{ color: '#b07d20', fontFamily: 'Geist_500Medium', fontSize: 11 }}>Share verse</Text>
+              </Pressable>
+            </View>
           </View>
 
           <Text style={{ color: '#c9bea8', fontFamily: 'Geist_400Regular', fontSize: 18, lineHeight: 32, marginBottom: 28 }}>{day.reflection}</Text>
