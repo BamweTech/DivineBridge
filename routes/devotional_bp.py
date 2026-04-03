@@ -110,7 +110,7 @@ def generate_devotional():
 @devotional_bp.route('/<plan_id>/checkin', methods=['POST'])
 @require_auth
 def check_in(plan_id: str):
-    """Mark a day as complete and update streak."""
+    """Mark a day as complete and update streak with calendar integrity."""
     data = request.get_json(silent=True) or {}
     day = data.get('day')
     uid = g.user_id
@@ -129,16 +129,76 @@ def check_in(plan_id: str):
         return jsonify({'error': 'Forbidden'}), 403
 
     days = plan.get('days', [])
+    already_done = False
     for d in days:
         if d.get('day') == day:
+            already_done = d.get('completed', False)
             d['completed'] = True
             d['completed_at'] = datetime.now(timezone.utc).isoformat()
             break
 
-    ref.update({
+    now = datetime.now(timezone.utc)
+    update = {
         'days': days,
         'current_day': min(day + 1, plan['duration']),
-        'streak': plan.get('streak', 0) + 1,
         'last_completed_at': firestore.SERVER_TIMESTAMP,
-    })
+    }
+
+    if not already_done:
+        last_raw = plan.get('last_completed_at')
+        if last_raw is not None:
+            if hasattr(last_raw, 'timestamp'):
+                last_dt = last_raw
+            elif isinstance(last_raw, str):
+                last_dt = datetime.fromisoformat(last_raw.replace('Z', '+00:00'))
+            else:
+                last_dt = None
+            gap_too_large = last_dt and (now - last_dt).total_seconds() > 48 * 3600
+        else:
+            gap_too_large = False
+        update['streak'] = 1 if gap_too_large else plan.get('streak', 0) + 1
+
+    if day >= plan.get('duration', 0):
+        update['completed_at'] = firestore.SERVER_TIMESTAMP
+
+    ref.update(update)
+    return jsonify({'success': True, 'plan_completed': day >= plan.get('duration', 0)}), 200
+
+
+@devotional_bp.route('/<plan_id>/journal', methods=['POST'])
+@require_auth
+def save_journal(plan_id: str):
+    """Save a personal journal entry for a specific day."""
+    data = request.get_json(silent=True) or {}
+    day = data.get('day')
+    text = data.get('text', '')
+    uid = g.user_id
+
+    if not isinstance(day, int) or day < 1:
+        return jsonify({'error': 'day must be a positive integer'}), 400
+    if len(text) > 2000:
+        return jsonify({'error': 'Journal text must be 2000 characters or fewer'}), 400
+
+    db = get_firestore_client()
+    ref = db.collection('devotional_plans').document(plan_id)
+    snap = ref.get()
+    if not snap.exists:
+        return jsonify({'error': 'Plan not found'}), 404
+
+    plan = snap.to_dict()
+    if plan.get('uid') != uid:
+        return jsonify({'error': 'Forbidden'}), 403
+
+    days = plan.get('days', [])
+    found = False
+    for d in days:
+        if d.get('day') == day:
+            d['journal'] = text
+            found = True
+            break
+
+    if not found:
+        return jsonify({'error': 'Day not found in plan'}), 404
+
+    ref.update({'days': days})
     return jsonify({'success': True}), 200

@@ -200,6 +200,11 @@ export const devotionalApi = {
       method: 'POST',
       body: JSON.stringify({ day }),
     }),
+  saveJournal: (planId: string, day: number, text: string) =>
+    request<any>(`/api/devotional/${planId}/journal`, {
+      method: 'POST',
+      body: JSON.stringify({ day, text }),
+    }),
 };
 
 // ─── Global Prayer Watch ─────────────────────────────────────────────────────

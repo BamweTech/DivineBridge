@@ -19,6 +19,8 @@ export interface UserProfile {
   notifyDailyVerse?: boolean;
   /** Preference for future session reminder push/in-app (Firestore). */
   sessionRemindersEnabled?: boolean;
+  /** Devotional daily reminder (Firestore + scheduled local notification). */
+  notifyDevotional?: boolean;
   createdAt?: number;
   groups?: string[];
 }
@@ -195,6 +197,7 @@ export interface DevotionalDay {
   prayer: string;
   completed: boolean;
   completed_at?: number;
+  journal?: string;
 }
 
 export interface DevotionalPlan {
@@ -208,6 +211,7 @@ export interface DevotionalPlan {
   current_day: number;
   streak: number;
   last_completed_at?: number;
+  completed_at?: number;
 }
 
 // ─── WebRTC Signaling ─────────────────────────────────────────────────────────
