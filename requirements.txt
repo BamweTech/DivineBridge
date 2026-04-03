@@ -25,4 +25,4 @@ Flask-WTF==1.2.1
 Pillow>=10.0.0
 qrcode[pil]>=7.4.2
 sentry-sdk[flask]>=2.0.0
-expo-server-sdk>=2.1.0
+exponent-server-sdk>=2.1.0
