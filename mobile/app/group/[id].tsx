@@ -551,6 +551,7 @@ export default function GroupScreen() {
       const blob = await res.blob();
       const name = asset.fileName || `photo_${Date.now()}.jpg`;
       const att = await uploadGroupChatFile(id, blob, mime, name);
+      if (asset.width && asset.height) { att.width = asset.width; att.height = asset.height; }
       await sendMessage(caption, 'text', {
         attachments: [att],
         replyTo: replyTarget ? toReplyRef(replyTarget) : null,
@@ -597,6 +598,7 @@ export default function GroupScreen() {
       const blob = await res.blob();
       const name = asset.fileName || `photo_${Date.now()}.jpg`;
       const att = await uploadGroupChatFile(id, blob, mime, name);
+      if (asset.width && asset.height) { att.width = asset.width; att.height = asset.height; }
       await sendMessage(caption, 'text', {
         attachments: [att],
         replyTo: replyTarget ? toReplyRef(replyTarget) : null,

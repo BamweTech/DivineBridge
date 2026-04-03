@@ -130,6 +130,9 @@ export interface GroupChatAttachment {
   content_type: string;
   file_name: string;
   size_bytes?: number;
+  /** Pixel dimensions captured at upload time for instant layout. */
+  width?: number;
+  height?: number;
 }
 
 export interface GroupChatReplyRef {

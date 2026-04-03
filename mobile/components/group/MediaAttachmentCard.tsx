@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { View, Pressable, Image as RNImage } from 'react-native';
-import { Image } from 'expo-image';
+import { useCallback, useState } from 'react';
+import { View, Pressable, ActivityIndicator } from 'react-native';
+import { Image, ImageLoadEventData } from 'expo-image';
 import { ResizeMode, Video } from 'expo-av';
 import { THEME_COLORS } from '@/lib/constants';
 import Icon from '@/components/ui/Icon';
@@ -10,40 +10,48 @@ const imageDimensionCache = new Map<string, number>();
 
 function AdaptiveImagePreview({
   uri,
+  knownWidth,
+  knownHeight,
   accessibilityLabel,
 }: {
   uri: string;
+  knownWidth?: number;
+  knownHeight?: number;
   accessibilityLabel: string;
 }) {
-  const cached = imageDimensionCache.get(uri);
+  const storedRatio =
+    knownWidth && knownHeight ? knownWidth / knownHeight : undefined;
+  const cached = storedRatio ?? imageDimensionCache.get(uri);
   const [ratio, setRatio] = useState(cached ?? 4 / 3);
+  const [loaded, setLoaded] = useState(!!cached);
 
-  useEffect(() => {
-    if (imageDimensionCache.has(uri)) return;
-    let active = true;
-    RNImage.getSize(
-      uri,
-      (width, height) => {
-        if (active && width > 0 && height > 0) {
-          const r = width / height;
-          imageDimensionCache.set(uri, r);
-          setRatio(r);
-        }
-      },
-      () => {},
-    );
-    return () => { active = false; };
-  }, [uri]);
+  const handleLoad = useCallback(
+    (e: ImageLoadEventData) => {
+      const { width, height } = e.source;
+      if (!imageDimensionCache.has(uri) && width > 0 && height > 0) {
+        const r = width / height;
+        imageDimensionCache.set(uri, r);
+        setRatio(r);
+      }
+      setLoaded(true);
+    },
+    [uri],
+  );
 
   return (
-    <Image
-      source={{ uri }}
-      style={{ width: 264, aspectRatio: ratio, backgroundColor: THEME_COLORS.bg3 }}
-      contentFit="contain"
-      cachePolicy="memory-disk"
-      recyclingKey={uri}
-      accessibilityLabel={accessibilityLabel}
-    />
+    <View style={{ width: 264, aspectRatio: ratio, backgroundColor: THEME_COLORS.bg3, justifyContent: 'center', alignItems: 'center' }}>
+      {!loaded && <ActivityIndicator size="small" color={THEME_COLORS.accent} style={{ position: 'absolute' }} />}
+      <Image
+        source={{ uri }}
+        style={{ width: '100%', height: '100%' }}
+        contentFit="contain"
+        cachePolicy="memory-disk"
+        recyclingKey={uri}
+        transition={cached ? 0 : 150}
+        onLoad={handleLoad}
+        accessibilityLabel={accessibilityLabel}
+      />
+    </View>
   );
 }
 
@@ -104,7 +112,12 @@ export function MediaAttachmentCard({
           </View>
         </View>
       ) : (
-        <AdaptiveImagePreview uri={attachment.url} accessibilityLabel={attachment.file_name} />
+        <AdaptiveImagePreview
+          uri={attachment.url}
+          knownWidth={attachment.width}
+          knownHeight={attachment.height}
+          accessibilityLabel={attachment.file_name}
+        />
       )}
     </Pressable>
   );
