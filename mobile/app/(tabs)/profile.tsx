@@ -404,8 +404,7 @@ export default function ProfileScreen() {
                 backgroundColor: THEME_COLORS.bg3,
                 alignItems: 'center',
                 justifyContent: 'center',
-                borderWidth: 2,
-                borderColor: THEME_COLORS.goldBorder,
+                borderWidth: 0,
                 overflow: 'hidden',
               }}
             >
