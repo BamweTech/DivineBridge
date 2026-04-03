@@ -365,70 +365,125 @@ function CompletionCelebration({ plan, onNewPlan, onDismiss }: { plan: Devotiona
   );
 }
 
-// ─── Past Plans List ─────────────────────────────────────────────────────────
+// ─── Plans Hub (default landing — list of all plans) ─────────────────────────
 
-function PastPlansList({ plans, activePlanId, onSelect, onClose }: {
+function PlansHub({ plans, onSelect, onCreateNew, reminderOn, onToggleReminder }: {
   plans: DevotionalPlan[];
-  activePlanId: string;
   onSelect: (plan: DevotionalPlan) => void;
-  onClose: () => void;
+  onCreateNew: () => void;
+  reminderOn: boolean;
+  onToggleReminder: () => void;
 }) {
   const insets = useSafeAreaInsets();
+
+  const sorted = useMemo(() => {
+    const incomplete = plans.filter((p) => {
+      const done = p.days.filter((d) => d.completed).length;
+      return !p.completed_at && done < p.duration;
+    });
+    const completed = plans.filter((p) => {
+      const done = p.days.filter((d) => d.completed).length;
+      return !!p.completed_at || done >= p.duration;
+    });
+    return [...incomplete, ...completed];
+  }, [plans]);
+
   return (
-    <Modal visible animationType="slide" transparent={false}>
-      <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}>
-        <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 22, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Pressable onPress={onClose} style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: THEME_COLORS.bg3, borderWidth: 1, borderColor: THEME_COLORS.border, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="back" size={16} color={THEME_COLORS.text2} />
+    <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}>
+      {/* Header */}
+      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 22, paddingBottom: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: THEME_COLORS.violetDim, borderWidth: 1, borderColor: 'rgba(112,64,184,0.2)', borderRadius: 50, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start', marginBottom: 6 }}>
+              <Icon name="sparkle" size={9} color={THEME_COLORS.violet} />
+              <Text style={{ color: THEME_COLORS.violet, fontFamily: 'Geist_500Medium', fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase' }}>AI-Powered</Text>
+            </View>
+            <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 24, letterSpacing: -0.5 }}>My Devotionals</Text>
+          </View>
+          <Pressable onPress={onToggleReminder} style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: reminderOn ? THEME_COLORS.goldDim : THEME_COLORS.bg3, borderWidth: 1, borderColor: reminderOn ? THEME_COLORS.goldBorder : THEME_COLORS.border, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="bell" size={17} color={reminderOn ? THEME_COLORS.gold : THEME_COLORS.text3} />
           </Pressable>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 20, flex: 1 }}>My Plans</Text>
         </View>
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: insets.bottom + 40 }}>
-          {plans.map((p) => {
-            const doneCount = p.days.filter((d) => d.completed).length;
-            const isActive = p.plan_id === activePlanId;
-            const isComplete = !!p.completed_at || doneCount === p.duration;
-            return (
-              <Pressable
-                key={p.plan_id}
-                onPress={() => { onSelect(p); onClose(); }}
-                style={{
-                  backgroundColor: isActive ? THEME_COLORS.goldDim : THEME_COLORS.bg2,
-                  borderWidth: 1, borderColor: isActive ? THEME_COLORS.goldBorder : THEME_COLORS.border,
-                  borderRadius: 16, padding: 16, marginBottom: 10,
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, flex: 1 }} numberOfLines={1}>{p.title || p.theme}</Text>
-                  {isComplete && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 8 }}>
-                      <Icon name="cross" size={10} color={THEME_COLORS.sage} />
-                      <Text style={{ color: THEME_COLORS.sage, fontFamily: 'Geist_500Medium', fontSize: 11 }}>Done</Text>
-                    </View>
-                  )}
-                  {isActive && !isComplete && (
-                    <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: THEME_COLORS.goldDim, marginLeft: 8 }}>
-                      <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 10 }}>Active</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12, marginBottom: 8 }}>{p.theme}</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_500Medium', fontSize: 12 }}>{doneCount}/{p.duration} days</Text>
-                  <View style={{ flex: 1, height: 3, backgroundColor: THEME_COLORS.bg3, borderRadius: 1.5, overflow: 'hidden' }}>
-                    <View style={{ height: 3, borderRadius: 1.5, backgroundColor: THEME_COLORS.gold, width: `${Math.round((doneCount / p.duration) * 100)}%` }} />
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                    <Icon name="flame" size={12} color={THEME_COLORS.gold} />
-                    <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>{p.streak}</Text>
-                  </View>
-                </View>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
       </View>
-    </Modal>
+
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
+        {/* Create new plan CTA */}
+        <Pressable
+          onPress={onCreateNew}
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 12,
+            backgroundColor: THEME_COLORS.goldDim, borderWidth: 1, borderColor: THEME_COLORS.goldBorder,
+            borderRadius: 16, padding: 16, marginBottom: 20,
+          }}
+        >
+          <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: THEME_COLORS.gold, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="plus" size={20} color="#fff" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16 }}>Create New Plan</Text>
+            <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 2 }}>AI-generated scripture, reflection & prayer</Text>
+          </View>
+          <Icon name="chevron-r" size={16} color={THEME_COLORS.gold} />
+        </Pressable>
+
+        {sorted.length === 0 && (
+          <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+            <Icon name="book" size={32} color={THEME_COLORS.text3} style={{ marginBottom: 12 }} />
+            <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 14, textAlign: 'center', lineHeight: 22 }}>
+              No plans yet. Create your first{'\n'}devotional plan above.
+            </Text>
+          </View>
+        )}
+
+        {sorted.length > 0 && (
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, marginBottom: 12 }}>
+            {sorted.length === 1 ? 'Your Plan' : 'Your Plans'}
+          </Text>
+        )}
+
+        {sorted.map((p) => {
+          const doneCount = p.days.filter((d) => d.completed).length;
+          const isComplete = !!p.completed_at || doneCount >= p.duration;
+          const progressPct = Math.round((doneCount / p.duration) * 100);
+          return (
+            <Pressable
+              key={p.plan_id}
+              onPress={() => onSelect(p)}
+              style={{
+                backgroundColor: !isComplete ? THEME_COLORS.bg2 : THEME_COLORS.bg3,
+                borderWidth: 1, borderColor: !isComplete ? THEME_COLORS.goldBorder : THEME_COLORS.border,
+                borderRadius: 16, padding: 16, marginBottom: 10,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, flex: 1 }} numberOfLines={1}>{p.title || p.theme}</Text>
+                {isComplete ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 8 }}>
+                    <Icon name="cross" size={10} color={THEME_COLORS.sage} />
+                    <Text style={{ color: THEME_COLORS.sage, fontFamily: 'Geist_500Medium', fontSize: 11 }}>Complete</Text>
+                  </View>
+                ) : (
+                  <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: THEME_COLORS.goldDim, marginLeft: 8 }}>
+                    <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 10 }}>Day {p.current_day}</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12, marginBottom: 10 }}>{p.theme}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_500Medium', fontSize: 12 }}>{doneCount}/{p.duration} days</Text>
+                <View style={{ flex: 1, height: 4, backgroundColor: THEME_COLORS.bg3, borderRadius: 2, overflow: 'hidden' }}>
+                  <View style={{ height: 4, borderRadius: 2, backgroundColor: isComplete ? THEME_COLORS.sage : THEME_COLORS.gold, width: `${progressPct}%` }} />
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <Icon name="flame" size={12} color={THEME_COLORS.gold} />
+                  <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>{p.streak}</Text>
+                </View>
+              </View>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -529,11 +584,13 @@ export default function DevotionalScreen() {
   const { user, profile } = useAuthStore();
 
   const [allPlans, setAllPlans] = useState<DevotionalPlan[]>([]);
-  const [activePlan, setActivePlan] = useState<DevotionalPlan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refresh, setRefresh] = useState(0);
-  const [showNewPlanFlow, setShowNewPlanFlow] = useState(false);
-  const [showPastPlans, setShowPastPlans] = useState(false);
+
+  // Navigation: null = plans hub, plan = detail view, 'generate' = create flow
+  const [viewingPlan, setViewingPlan] = useState<DevotionalPlan | null>(null);
+  const [showGenerateFlow, setShowGenerateFlow] = useState(false);
+
   const [selectedDay, setSelectedDay] = useState(1);
   const [readingDay, setReadingDay] = useState<DevotionalDay | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
@@ -544,7 +601,11 @@ export default function DevotionalScreen() {
 
   const { toggle: speechToggle, stop: stopSpeech, isSpeaking, activeSource } = useSpeechPlayback();
 
-  const plan = activePlan;
+  // Keep viewingPlan in sync with Firestore updates
+  const plan = useMemo(() => {
+    if (!viewingPlan) return null;
+    return allPlans.find((p) => p.plan_id === viewingPlan.plan_id) ?? viewingPlan;
+  }, [viewingPlan, allPlans]);
 
   useFocusEffect(
     useCallback(() => {
@@ -561,8 +622,6 @@ export default function DevotionalScreen() {
     void readDevotionalCache(user.uid).then((cached) => {
       if (!firestoreReady && cached && cached.length > 0) {
         setAllPlans(cached);
-        const sorted = [...cached].sort((a, b) => tsToMs(b.created_at) - tsToMs(a.created_at));
-        setActivePlan(sorted[0]);
         setIsLoading(false);
       }
     });
@@ -570,18 +629,14 @@ export default function DevotionalScreen() {
     const q = query(collection(db, COLLECTIONS.DEVOTIONAL_PLANS), where('uid', '==', user.uid), limit(20));
     const unsub = onSnapshot(q, (snap) => {
       firestoreReady = true;
-      if (snap.empty) { setAllPlans([]); setActivePlan(null); setIsLoading(false); return; }
+      if (snap.empty) { setAllPlans([]); setIsLoading(false); return; }
       const plans = snap.docs
         .map((d) => ({ plan_id: d.id, ...d.data() } as DevotionalPlan))
         .sort((a, b) => tsToMs(b.created_at) - tsToMs(a.created_at));
       setAllPlans(plans);
-      setActivePlan((prev) => {
-        const match = prev ? plans.find((p) => p.plan_id === prev.plan_id) : null;
-        return match ?? plans[0];
-      });
       setIsLoading(false);
       void writeDevotionalCache(user.uid, plans);
-    }, () => { setAllPlans([]); setActivePlan(null); setIsLoading(false); });
+    }, () => { setAllPlans([]); setIsLoading(false); });
     return unsub;
   }, [user?.uid, refresh]);
 
@@ -623,6 +678,12 @@ export default function DevotionalScreen() {
     }
   }
 
+  function openPlan(p: DevotionalPlan) {
+    setViewingPlan(p);
+    setSelectedDay(p.current_day);
+    prevCompletedAtRef.current = p.completed_at ? tsToMs(p.completed_at) : undefined;
+  }
+
   // Sync pager when selectedDay changes from strip tap
   useEffect(() => {
     if (plan) {
@@ -644,20 +705,8 @@ export default function DevotionalScreen() {
         onListen={() => handleListenDay(day)}
         onOpenReading={() => setReadingDay(day)}
       />
-
-      {day.day === (plan?.current_day ?? 1) && selectedDay === day.day && (
-        <View style={{ gap: 8 }}>
-          <Button label="Start a New Plan" onPress={() => setShowNewPlanFlow(true)} variant="secondary" fullWidth />
-          {allPlans.length > 1 && (
-            <Pressable onPress={() => setShowPastPlans(true)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12 }}>
-              <Icon name="book" size={13} color={THEME_COLORS.text3} />
-              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_500Medium', fontSize: 13 }}>View past plans ({allPlans.length})</Text>
-            </Pressable>
-          )}
-        </View>
-      )}
     </ScrollView>
-  ), [plan, selectedDay, activeSource, isSpeaking, allPlans.length, screenWidth, insets.bottom]);
+  ), [plan, activeSource, isSpeaking, screenWidth, insets.bottom]);
 
   const getItemLayout = useCallback((_: any, index: number) => ({ length: screenWidth, offset: screenWidth * index, index }), [screenWidth]);
 
@@ -676,65 +725,79 @@ export default function DevotionalScreen() {
     );
   }
 
-  if (!plan) {
+  // Generate flow (create new plan)
+  if (showGenerateFlow) {
+    const exitGenerate = () => { setShowGenerateFlow(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
     return (
-      <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg, paddingTop: insets.top + 16 }}>
-        <GeneratePlanScreen onGenerated={() => setRefresh((v) => v + 1)} />
+      <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}>
+        <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 22, paddingBottom: 4, flexDirection: 'row', alignItems: 'center' }}>
+          <Pressable onPress={exitGenerate} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingRight: 16 }} accessibilityRole="button" accessibilityLabel="Back to plans">
+            <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: THEME_COLORS.bg3, borderWidth: 1, borderColor: THEME_COLORS.border, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="back" size={16} color={THEME_COLORS.text2} />
+            </View>
+            <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 15 }}>Back to my plans</Text>
+          </Pressable>
+        </View>
+        <GeneratePlanScreen
+          onGenerated={() => { setRefresh((v) => v + 1); setShowGenerateFlow(false); }}
+          onDismiss={exitGenerate}
+        />
       </View>
     );
   }
 
-  if (showNewPlanFlow) {
-    const exitNewPlan = () => { setShowNewPlanFlow(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); };
-    return (
-      <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}>
-        <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 22, paddingBottom: 4, flexDirection: 'row', alignItems: 'center' }}>
-          <Pressable onPress={exitNewPlan} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingRight: 16 }} accessibilityRole="button" accessibilityLabel="Back to current devotional plan">
-            <View style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: THEME_COLORS.bg3, borderWidth: 1, borderColor: THEME_COLORS.border, alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="back" size={16} color={THEME_COLORS.text2} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 15 }}>Back to current plan</Text>
-              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 2 }} numberOfLines={1}>{plan.theme}</Text>
-            </View>
-          </Pressable>
+  // Plans hub (default landing)
+  if (!viewingPlan) {
+    // If no plans at all, show generate screen directly
+    if (allPlans.length === 0) {
+      return (
+        <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg, paddingTop: insets.top + 16 }}>
+          <GeneratePlanScreen onGenerated={() => setRefresh((v) => v + 1)} />
         </View>
-        <GeneratePlanScreen onGenerated={() => { setRefresh((v) => v + 1); setShowNewPlanFlow(false); }} onDismiss={exitNewPlan} />
-      </View>
+      );
+    }
+    return (
+      <PlansHub
+        plans={allPlans}
+        onSelect={openPlan}
+        onCreateNew={() => setShowGenerateFlow(true)}
+        reminderOn={reminderOn}
+        onToggleReminder={toggleReminder}
+      />
     );
   }
+
+  // ─── Plan detail view ──────────────────────────────────────────────────────
+
+  if (!plan) return null;
 
   const progressPct = Math.round((plan.current_day / plan.duration) * 100);
 
   return (
     <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}>
-      {/* Header */}
-      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 22, paddingBottom: 12 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+      {/* Header with back button */}
+      <View style={{ paddingTop: insets.top + 12, paddingHorizontal: 22, paddingBottom: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+          <Pressable
+            onPress={() => { setViewingPlan(null); stopSpeech(); }}
+            style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: THEME_COLORS.bg3, borderWidth: 1, borderColor: THEME_COLORS.border, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}
+          >
+            <Icon name="back" size={16} color={THEME_COLORS.text2} />
+          </Pressable>
           <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: THEME_COLORS.violetDim, borderWidth: 1, borderColor: 'rgba(112,64,184,0.2)', borderRadius: 50, paddingHorizontal: 10, paddingVertical: 3 }}>
-                <Icon name="sparkle" size={9} color={THEME_COLORS.violet} />
-                <Text style={{ color: THEME_COLORS.violet, fontFamily: 'Geist_500Medium', fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase' }}>AI Plan</Text>
-              </View>
-            </View>
-            <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 22, letterSpacing: -0.5 }}>My Devotional</Text>
-            <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 2 }}>{plan.theme}</Text>
+            <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18, letterSpacing: -0.3 }} numberOfLines={1}>{plan.title || plan.theme}</Text>
+            <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 1 }}>{plan.theme}</Text>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Pressable onPress={toggleReminder} style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: reminderOn ? THEME_COLORS.goldDim : THEME_COLORS.bg3, borderWidth: 1, borderColor: reminderOn ? THEME_COLORS.goldBorder : THEME_COLORS.border, alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="bell" size={16} color={reminderOn ? THEME_COLORS.gold : THEME_COLORS.text3} />
-            </Pressable>
-            <View style={{ alignItems: 'center', backgroundColor: THEME_COLORS.goldDim, borderWidth: 1, borderColor: THEME_COLORS.goldBorder, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Icon name="flame" size={16} color={THEME_COLORS.gold} />
-                <Text style={{ color: THEME_COLORS.gold, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18 }}>{plan.streak}</Text>
-              </View>
-              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 10 }}>day streak</Text>
+          <View style={{ alignItems: 'center', backgroundColor: THEME_COLORS.goldDim, borderWidth: 1, borderColor: THEME_COLORS.goldBorder, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+              <Icon name="flame" size={14} color={THEME_COLORS.gold} />
+              <Text style={{ color: THEME_COLORS.gold, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16 }}>{plan.streak}</Text>
             </View>
+            <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 9 }}>streak</Text>
           </View>
         </View>
 
+        {/* Progress bar */}
         <View style={{ height: 4, backgroundColor: THEME_COLORS.bg3, borderRadius: 2, overflow: 'hidden', marginBottom: 6 }}>
           <View style={{ height: 4, borderRadius: 2, backgroundColor: THEME_COLORS.gold, width: `${progressPct}%` }} />
         </View>
@@ -781,19 +844,11 @@ export default function DevotionalScreen() {
 
       {/* Modals */}
       {readingDay && <ReadingMode day={readingDay} onClose={() => setReadingDay(null)} />}
-      {showCelebration && plan && (
+      {showCelebration && (
         <CompletionCelebration
           plan={plan}
-          onNewPlan={() => { setShowCelebration(false); setShowNewPlanFlow(true); }}
+          onNewPlan={() => { setShowCelebration(false); setViewingPlan(null); setShowGenerateFlow(true); }}
           onDismiss={() => setShowCelebration(false)}
-        />
-      )}
-      {showPastPlans && (
-        <PastPlansList
-          plans={allPlans}
-          activePlanId={plan.plan_id}
-          onSelect={(p) => setActivePlan(p)}
-          onClose={() => setShowPastPlans(false)}
         />
       )}
     </View>
