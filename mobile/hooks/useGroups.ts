@@ -305,35 +305,18 @@ export function useGroupChat(groupId: string) {
   const [messages, setMessages] = useState<GroupChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user, profile } = useAuthStore();
-  const messagesRef = useRef<GroupChatMessage[]>([]);
 
   useEffect(() => {
     if (!groupId) return;
     let active = true;
     let firestoreActive = false;
 
-    const setMessagesDeduped = (data: GroupChatMessage[]) => {
-      const prev = messagesRef.current;
-      if (
-        prev.length === data.length &&
-        prev.length > 0 &&
-        prev[prev.length - 1].message_id === data[data.length - 1].message_id &&
-        prev[0].message_id === data[0].message_id
-      ) {
-        return;
-      }
-      messagesRef.current = data;
-      setMessages(data);
-    };
-
     const memoryCached = groupChatMemoryCache.get(groupId);
     const hadMemoryCache = memoryCached && memoryCached.length > 0;
     if (hadMemoryCache) {
-      messagesRef.current = memoryCached;
       setMessages(memoryCached);
       setIsLoading(false);
     } else {
-      messagesRef.current = [];
       setMessages([]);
       setIsLoading(true);
     }
@@ -341,40 +324,44 @@ export function useGroupChat(groupId: string) {
     const col = collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages');
     let unsub: (() => void) | undefined;
 
-    const applyFallbackSnapshot = (snap: {
-      docs: {
-        id: string;
-        data: (options?: { serverTimestamps?: 'estimate' | 'previous' | 'none' }) => Record<string, unknown>;
-      }[];
-    }) => {
-      const data = normalizeGroupChatMessages(
-        snap.docs
-        .map((d) => ({ message_id: d.id, group_id: groupId, ...d.data({ serverTimestamps: 'estimate' }) } as GroupChatMessage))
+    function applySnapshot(
+      snap: {
+        docs: {
+          id: string;
+          data: (options?: { serverTimestamps?: 'estimate' | 'previous' | 'none' }) => Record<string, unknown>;
+        }[];
+      },
+      merge: boolean,
+    ) {
+      const incoming = normalizeGroupChatMessages(
+        snap.docs.map((d) => ({
+          message_id: d.id,
+          group_id: groupId,
+          ...d.data({ serverTimestamps: 'estimate' }),
+        } as GroupChatMessage)),
       );
       if (!active) return;
       firestoreActive = true;
-      setMessagesDeduped(data);
-      setIsLoading(false);
-      void writeGroupChatCache(groupId, data);
-    };
 
-    const attachFallbackListener = () => {
-      unsub?.();
-      const qFallback = query(col, limit(100));
-      unsub = onSnapshot(
-        qFallback,
-        applyFallbackSnapshot,
-        (err2) => {
-          console.warn('[useGroupChat] fallback listener error', groupId, err2);
-          if (active) setIsLoading(false);
-        }
-      );
-    };
+      if (merge) {
+        setMessages((prev) => {
+          const merged = normalizeGroupChatMessages([...prev, ...incoming]);
+          groupChatMemoryCache.set(groupId, merged);
+          void writeGroupChatCache(groupId, merged);
+          return merged;
+        });
+      } else {
+        groupChatMemoryCache.set(groupId, incoming);
+        setMessages(incoming);
+        void writeGroupChatCache(groupId, incoming);
+      }
+      setIsLoading(false);
+    }
 
     if (!hadMemoryCache) {
       void readGroupChatCache(groupId).then((cached) => {
         if (!active || firestoreActive || !cached || cached.length === 0) return;
-        setMessagesDeduped(cached);
+        setMessages(cached);
         setIsLoading(false);
       });
     }
@@ -382,21 +369,20 @@ export function useGroupChat(groupId: string) {
     const qOrdered = query(col, orderBy('timestamp', 'desc'), limit(100));
     unsub = onSnapshot(
       qOrdered,
-      (snap) => {
-        const data = normalizeGroupChatMessages(
-          snap.docs
-          .map((d) => ({ message_id: d.id, group_id: groupId, ...d.data({ serverTimestamps: 'estimate' }) } as GroupChatMessage))
-        );
-        if (!active) return;
-        firestoreActive = true;
-        setMessagesDeduped(data);
-        setIsLoading(false);
-        void writeGroupChatCache(groupId, data);
-      },
+      (snap) => applySnapshot(snap, true),
       (err) => {
         console.warn('[useGroupChat] ordered query failed; using unsorted limit listener', groupId, err);
-        attachFallbackListener();
-      }
+        unsub?.();
+        const qFallback = query(col, limit(100));
+        unsub = onSnapshot(
+          qFallback,
+          (snap) => applySnapshot(snap, true),
+          (err2) => {
+            console.warn('[useGroupChat] fallback listener error', groupId, err2);
+            if (active) setIsLoading(false);
+          },
+        );
+      },
     );
 
     return () => {
