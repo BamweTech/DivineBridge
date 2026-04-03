@@ -230,8 +230,9 @@ export default function GroupScreen() {
   }, [id, isLoadingMembers, members]);
 
   const displayedMessages = useMemo(() => {
+    const isRecentJoiner = memberJoinedAt > 0 && (Date.now() - memberJoinedAt < 300_000);
     const effectiveJoinedAt =
-      isReadsReady && lastReadAt === 0 && memberJoinedAt > 0 ? memberJoinedAt : 0;
+      isReadsReady && lastReadAt === 0 && isRecentJoiner ? memberJoinedAt : 0;
 
     return messages
       .filter((msg) =>
