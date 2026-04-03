@@ -133,6 +133,8 @@ export default {
         },
       ],
       './plugins/withATS.js',
+      '@sentry/react-native/expo',
+      'expo-web-browser',
     ],
     experiments: {
       typedRoutes: true,
