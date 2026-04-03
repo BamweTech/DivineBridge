@@ -20,8 +20,9 @@ firebase-admin==6.4.0
 Flask-Session==0.5.0
 Flask-SocketIO==5.3.6
 eventlet==0.36.1
-gunicorn==21.2.0
 Flask-CORS==4.0.0
 Flask-WTF==1.2.1
 Pillow>=10.0.0
 qrcode[pil]>=7.4.2
+sentry-sdk[flask]>=2.0.0
+expo-server-sdk>=2.1.0

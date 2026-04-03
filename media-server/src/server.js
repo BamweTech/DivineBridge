@@ -9,6 +9,7 @@ const mediasoup = require('mediasoup');
 const { verifyToken } = require('./auth');
 const config = require('./config');
 const { Room, Peer } = require('./Room');
+const roomRegistry = require('./roomRegistry');
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -45,6 +46,7 @@ async function getOrCreateRoom(roomId) {
   if (rooms.has(roomId)) return rooms.get(roomId);
   const room = await Room.create(getNextWorker(), roomId);
   rooms.set(roomId, room);
+  roomRegistry.registerRoom(roomId);
   console.log(`[sfu] room ${roomId} created`);
   return room;
 }
@@ -54,6 +56,7 @@ function cleanupRoomIfEmpty(roomId) {
   if (room && room.isEmpty()) {
     room.close();
     rooms.delete(roomId);
+    roomRegistry.unregisterRoom(roomId);
     console.log(`[sfu] room ${roomId} closed (empty)`);
   }
 }
@@ -288,18 +291,28 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/health', (_req, res) => {
+  const totalPeers = Array.from(rooms.values()).reduce((n, r) => n + r.peers.size, 0);
+  roomRegistry.heartbeat(totalPeers);
   res.json({
     ok: true,
     workers: workers.length,
     rooms: rooms.size,
-    peers: Array.from(rooms.values()).reduce((n, r) => n + r.peers.size, 0),
+    peers: totalPeers,
     announcedIp: config.webRtcTransportOptions.listenInfos[0]?.announcedAddress,
   });
+});
+
+app.get('/room-lookup/:roomId', async (req, res) => {
+  const instance = await roomRegistry.lookupRoom(req.params.roomId);
+  res.json({ roomId: req.params.roomId, instance: instance || null });
 });
 
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
 
 async function main() {
+  // Initialize Redis room registry for multi-instance routing
+  await roomRegistry.init();
+
   // Resolve the public IP for ICE candidates before anything else.
   // On GCE this auto-detects from the metadata server; locally it stays 127.0.0.1.
   const announcedIp = await config.resolveAnnouncedIp();

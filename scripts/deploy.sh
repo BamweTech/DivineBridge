@@ -119,11 +119,14 @@ deploy_cloud_run_source() {
     --region "${GCP_REGION}" \
     --platform managed \
     --allow-unauthenticated \
-    --memory 512Mi \
-    --cpu 1 \
+    --memory 1Gi \
+    --cpu 2 \
     --timeout 300 \
-    --max-instances 10 \
-    --min-instances 0 \
+    --concurrency 16 \
+    --max-instances "${MAX_INSTANCES:-50}" \
+    --min-instances "${MIN_INSTANCES:-2}" \
+    --cpu-boost \
+    --vpc-connector "${VPC_CONNECTOR:-divinebridge-vpc}" \
     --port "${CLOUD_RUN_PORT}"
 }
 
@@ -142,11 +145,14 @@ deploy_cloud_run_image() {
     --region "${GCP_REGION}" \
     --platform managed \
     --allow-unauthenticated \
-    --memory 512Mi \
-    --cpu 1 \
+    --memory 1Gi \
+    --cpu 2 \
     --timeout 300 \
-    --max-instances 10 \
-    --min-instances 0 \
+    --concurrency 16 \
+    --max-instances "${MAX_INSTANCES:-50}" \
+    --min-instances "${MIN_INSTANCES:-2}" \
+    --cpu-boost \
+    --vpc-connector "${VPC_CONNECTOR:-divinebridge-vpc}" \
     --port "${CLOUD_RUN_PORT}"
 }
 

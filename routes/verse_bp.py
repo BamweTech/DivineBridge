@@ -397,4 +397,62 @@ def get_upcoming_verses():
         return jsonify({
             'success': False,
             'error': 'Failed to get upcoming verses'
-        }), 500 
+        }), 500
+
+
+@verse_bp.route('/home-bundle', methods=['GET'])
+def home_bundle():
+    """Return today's verse + prayer + metrics in a single CDN-cacheable response.
+
+    Mobile and web clients call this once on startup instead of making
+    separate requests. The response is cached at the CDN edge for 5 minutes.
+    """
+    try:
+        import json as _json
+        client_date = request.args.get('client_date')
+
+        if client_date:
+            try:
+                client_datetime = datetime.strptime(client_date, '%Y-%m-%d')
+                day_of_year = client_datetime.timetuple().tm_yday
+                today = client_date
+            except ValueError:
+                today = datetime.now().strftime('%Y-%m-%d')
+                day_of_year = datetime.now().timetuple().tm_yday
+        else:
+            today = datetime.now().strftime('%Y-%m-%d')
+            day_of_year = datetime.now().timetuple().tm_yday
+
+        verse = current_app.verse_cache.get_today_verse(day_of_year=day_of_year)
+        verse_data = verse if verse else {
+            'verse': 'For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.',
+            'reference': 'John 3:16',
+        }
+
+        # Reuse the app-level cached daily prayer function
+        from app import get_daily_prayer_for_date
+        prayer = get_daily_prayer_for_date(today)
+
+        import re
+        prayer_data = None
+        if prayer and prayer.get('content'):
+            content = prayer['content']
+            content = re.sub(r'\[\d+\]', '', content)
+            content = re.sub(r'[ \t]+', ' ', content).strip()
+            prayer_data = {
+                'content': content,
+                'date': prayer.get('date', today),
+            }
+
+        response = jsonify({
+            'success': True,
+            'date': today,
+            'verse': verse_data,
+            'prayer': prayer_data,
+        })
+        response.headers['Cache-Control'] = 'public, max-age=300, s-maxage=300'
+        return response, 200
+
+    except Exception as e:
+        logger.error(f"Error building home bundle: {e}")
+        return jsonify({'success': False, 'error': 'Failed to build home bundle'}), 500

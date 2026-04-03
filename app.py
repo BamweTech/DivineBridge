@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, redirect, session, send_file, Response
 import io
+import json as _json
 import qrcode
 import logging
 from datetime import datetime, timedelta
@@ -26,6 +27,22 @@ from firebase_auth import initialize_firebase
 from verse_generator import verse_generator
 import threading
 import time
+
+# Initialize Sentry for error tracking and performance monitoring (Phase 3)
+try:
+    import sentry_sdk
+    from sentry_sdk.integrations.flask import FlaskIntegration
+    _sentry_dsn = os.getenv('SENTRY_DSN')
+    if _sentry_dsn:
+        sentry_sdk.init(
+            dsn=_sentry_dsn,
+            integrations=[FlaskIntegration()],
+            traces_sample_rate=0.1,
+            profiles_sample_rate=0.1,
+            environment=os.getenv('FLASK_ENV', 'production'),
+        )
+except ImportError:
+    pass
 
 def get_user_based_key():
     """Get user-based key for rate limiting (preferred over IP)"""
@@ -89,33 +106,51 @@ def create_app():
     app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB limit
     
     # Session configuration
-    # Determine environment
     is_production = os.getenv('FLASK_ENV') == 'production' or os.getenv('GAE_ENV', '').startswith('standard')
-    
-    # Load secret key from Secret Manager
+
     app.config['SECRET_KEY'] = config.session_secret_key
-    app.config['SESSION_TYPE'] = 'filesystem'
     app.config['SESSION_PERMANENT'] = True
     app.config['SESSION_USE_SIGNER'] = True
-    # Secure session cookies in production
-    is_production = os.getenv('FLASK_ENV') == 'production' or os.getenv('GAE_ENV', '').startswith('standard')
     app.config['SESSION_COOKIE_SECURE'] = is_production
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
-    app.config['SESSION_FILE_DIR'] = os.path.join(app.root_path, 'flask_session')
-    app.config['SESSION_FILE_THRESHOLD'] = 500  # Maximum number of sessions to store
-    app.config['SESSION_FILE_MODE'] = 0o600  # Secure file permissions
-    app.config['SESSION_REFRESH_EACH_REQUEST'] = False  # Don't refresh session on each request
-    app.config['SESSION_COOKIE_NAME'] = 'divinebridge_session'  # Custom session cookie name
-    app.config['SESSION_COOKIE_PATH'] = '/'  # Ensure cookie is available for all paths
-    app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow cookie for all domains in development
-    
-    # Create session directory if it doesn't exist
-    if not os.path.exists(app.config['SESSION_FILE_DIR']):
-        os.makedirs(app.config['SESSION_FILE_DIR'], mode=0o700)
-    
-    # Initialize Flask-Session before other extensions
+    app.config['SESSION_REFRESH_EACH_REQUEST'] = False
+    app.config['SESSION_COOKIE_NAME'] = 'divinebridge_session'
+    app.config['SESSION_COOKIE_PATH'] = '/'
+    app.config['SESSION_COOKIE_DOMAIN'] = None
+
+    # Use Redis sessions for multi-instance consistency; fall back to filesystem for local dev
+    _redis_host = os.getenv('REDIS_HOST')
+    if _redis_host:
+        try:
+            _session_redis = redis.Redis(
+                host=_redis_host,
+                port=int(os.getenv('REDIS_PORT', 6379)),
+                password=os.getenv('REDIS_PASSWORD'),
+                decode_responses=False,
+                socket_connect_timeout=2,
+            )
+            _session_redis.ping()
+            app.config['SESSION_TYPE'] = 'redis'
+            app.config['SESSION_REDIS'] = _session_redis
+            logger.info("Using Redis for session storage (multi-instance safe)")
+        except Exception as e:
+            logger.warning(f"Redis session init failed, falling back to filesystem: {e}")
+            app.config['SESSION_TYPE'] = 'filesystem'
+            app.config['SESSION_FILE_DIR'] = os.path.join(app.root_path, 'flask_session')
+            app.config['SESSION_FILE_THRESHOLD'] = 500
+            app.config['SESSION_FILE_MODE'] = 0o600
+            if not os.path.exists(app.config['SESSION_FILE_DIR']):
+                os.makedirs(app.config['SESSION_FILE_DIR'], mode=0o700)
+    else:
+        app.config['SESSION_TYPE'] = 'filesystem'
+        app.config['SESSION_FILE_DIR'] = os.path.join(app.root_path, 'flask_session')
+        app.config['SESSION_FILE_THRESHOLD'] = 500
+        app.config['SESSION_FILE_MODE'] = 0o600
+        if not os.path.exists(app.config['SESSION_FILE_DIR']):
+            os.makedirs(app.config['SESSION_FILE_DIR'], mode=0o700)
+
     Session(app)
     
     # Initialize CSRF protection
@@ -184,20 +219,17 @@ def create_app():
             if request.is_secure:
                 response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
         
-        # Performance: Enable compression (Cloud Run handles this, but ensure it's enabled)
-        # Add caching headers for static content
+        # CDN and cache headers — Cloud CDN respects Cache-Control for edge caching
         if request.endpoint == 'static' or request.path.startswith('/static/'):
-            # Cache static assets for 1 year (with versioning)
             response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
-        elif response.content_type and 'text/html' in response.content_type:
-            # HTML should not be cached aggressively, but allow short cache for faster navigation
-            response.headers['Cache-Control'] = 'public, max-age=60, must-revalidate'
         elif request.path.startswith('/api/prayer-room/'):
-            # Live room data (participants, roles, signaling) must not be cached — otherwise
-            # browsers reuse stale JSON for minutes and the web UI (speaker list, etc.) lags.
             response.headers['Cache-Control'] = 'private, no-store'
+        elif request.path.startswith('/api/prayer/prayer/') or request.path.startswith('/api/today-verse'):
+            # Daily content: identical for all users, cache at CDN edge for 5 min
+            response.headers['Cache-Control'] = 'public, max-age=300, s-maxage=300'
+        elif response.content_type and 'text/html' in response.content_type:
+            response.headers['Cache-Control'] = 'public, max-age=60, must-revalidate'
         elif response.content_type and ('application/json' in response.content_type or 'text/javascript' in response.content_type):
-            # API responses and JS - short cache
             response.headers['Cache-Control'] = 'public, max-age=300'
         
         # Content Security Policy
@@ -690,37 +722,65 @@ def create_app():
 # Create the Flask application
 app = create_app()
 
-# Simple cache for daily prayer (resets daily)
-_daily_prayer_cache = {}
-_daily_prayer_cache_date = None
+# Daily prayer cache: Redis-backed with in-process fallback.
+# Ensures all Cloud Run instances serve the same cached prayer.
+_daily_prayer_local_cache = {}
+_daily_prayer_local_date = None
+
+def _get_prayer_redis():
+    """Return a Redis client for prayer caching, or None."""
+    try:
+        host = os.getenv('REDIS_HOST')
+        if not host:
+            return None
+        client = redis.Redis(
+            host=host,
+            port=int(os.getenv('REDIS_PORT', 6379)),
+            password=os.getenv('REDIS_PASSWORD'),
+            decode_responses=True,
+            socket_connect_timeout=2,
+        )
+        client.ping()
+        return client
+    except Exception:
+        return None
+
+_prayer_redis = _get_prayer_redis()
 
 def get_daily_prayer_for_date(date_str):
     """Get daily prayer for a specific date with caching.
     If prayer doesn't exist and it's today's date, attempt to generate it."""
-    global _daily_prayer_cache, _daily_prayer_cache_date
-    
-    # Reset cache if date changed
-    if _daily_prayer_cache_date != date_str:
-        _daily_prayer_cache = {}
-        _daily_prayer_cache_date = date_str
-    
-    # Check cache
-    if date_str in _daily_prayer_cache:
-        return _daily_prayer_cache[date_str]
-    
-    # Fetch prayer from storage using get_prayer for specific date lookup
+    global _daily_prayer_local_cache, _daily_prayer_local_date
+
+    # Reset local cache on date change
+    if _daily_prayer_local_date != date_str:
+        _daily_prayer_local_cache = {}
+        _daily_prayer_local_date = date_str
+
+    # Fast path: in-process cache
+    if date_str in _daily_prayer_local_cache:
+        return _daily_prayer_local_cache[date_str]
+
+    # Shared path: Redis cache (available to all instances)
+    redis_key = f"divinebridge:prayer:{date_str}"
+    if _prayer_redis:
+        try:
+            raw = _prayer_redis.get(redis_key)
+            if raw:
+                cached = _json.loads(raw)
+                _daily_prayer_local_cache[date_str] = cached
+                return cached
+        except Exception:
+            pass
+
     try:
-        # Use get_prayer(date) to directly fetch prayer for the specific date
-        # This is more efficient and reliable than searching through recent prayers
         daily_prayer = app.storage_handler.get_prayer(date_str)
-        
-        # If no prayer found and it's today's date, try to generate one
+
         if not daily_prayer:
             today = datetime.now().strftime('%Y-%m-%d')
             if date_str == today:
                 logger.info(f"No prayer found for today ({date_str}), attempting to generate one...")
                 try:
-                    # Generate prayer using the app's prayer generator
                     new_prayer = app.prayer_generator.generate_prayer()
                     if new_prayer:
                         logger.info(f"Successfully generated prayer for {date_str}")
@@ -731,25 +791,29 @@ def get_daily_prayer_for_date(date_str):
                     logger.error(f"Error generating prayer for {date_str}: {gen_error}", exc_info=True)
             else:
                 logger.info(f"No prayer found in storage for date: {date_str} (not today, won't auto-generate)")
-        
+
         if daily_prayer:
-            # Verify it's a daily prayer (source='generated' and no title)
             is_daily_prayer = daily_prayer.get('source') == 'generated' and not daily_prayer.get('title')
-            
+
             if is_daily_prayer:
-                # Remove citations and normalize content
                 if 'content' in daily_prayer and daily_prayer['content']:
                     import re
                     daily_prayer['content'] = re.sub(r'\[\d+\]', '', daily_prayer['content'])
                     daily_prayer['content'] = re.sub(r'[ \t]+', ' ', daily_prayer['content'])
                     daily_prayer['content'] = daily_prayer['content'].strip()
             else:
-                # Not a daily prayer, return None
                 logger.warning(f"Prayer found for {date_str} but it's not a daily prayer (source={daily_prayer.get('source')}, title={daily_prayer.get('title')})")
                 daily_prayer = None
-        
-        # Cache the result (even if None)
-        _daily_prayer_cache[date_str] = daily_prayer
+
+        _daily_prayer_local_cache[date_str] = daily_prayer
+
+        # Store in Redis for other instances (TTL: 24 hours)
+        if _prayer_redis and daily_prayer:
+            try:
+                _prayer_redis.setex(redis_key, 86400, _json.dumps(daily_prayer))
+            except Exception:
+                pass
+
         return daily_prayer
     except Exception as e:
         logger.error(f"Error fetching daily prayer for {date_str}: {e}", exc_info=True)

@@ -670,4 +670,43 @@ def update_business_card():
     except Exception as e:
         logger.error(f"Error updating business card: {e}")
         logger.error(traceback.format_exc())
-        return jsonify({'error': 'Failed to update business card'}), 500 
+        return jsonify({'error': 'Failed to update business card'}), 500
+
+
+# ─── Push Token Registration (Phase 2D) ─────────────────────────────────────
+
+@auth_bp.route('/push-token', methods=['POST'])
+def register_push_token():
+    """Register an Expo push token for the authenticated user."""
+    try:
+        auth_header = request.headers.get('Authorization', '')
+        if not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Authentication required'}), 401
+
+        token = auth_header.split('Bearer ')[1]
+        decoded = verify_token(token)
+        if not decoded:
+            return jsonify({'error': 'Invalid token'}), 401
+        user_id = decoded.get('uid')
+
+        data = request.get_json()
+        push_token = data.get('pushToken', '').strip()
+        platform = data.get('platform', 'unknown')
+
+        if not push_token:
+            return jsonify({'error': 'pushToken is required'}), 400
+
+        from firebase_admin import firestore
+        db = firestore.client()
+        db.collection('users').document(user_id).set({
+            'pushToken': push_token,
+            'pushPlatform': platform,
+            'pushTokenUpdatedAt': datetime.utcnow().isoformat(),
+        }, merge=True)
+
+        logger.info(f"Push token registered for user {user_id}")
+        return jsonify({'message': 'Push token registered'}), 200
+
+    except Exception as e:
+        logger.error(f"Error registering push token: {e}")
+        return jsonify({'error': 'Failed to register push token'}), 500

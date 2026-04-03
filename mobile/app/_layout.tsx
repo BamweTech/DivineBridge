@@ -12,7 +12,10 @@ import {
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
+import NetInfo from '@react-native-community/netinfo';
 import {
   useFonts,
   PlusJakartaSans_400Regular,
@@ -29,13 +32,30 @@ import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
+import * as Sentry from '@sentry/react-native';
 import { useAuthStore } from '@/stores/authStore';
 import { GroupUnreadProvider } from '@/contexts/GroupUnreadContext';
 import { GroupCallNotificationOverlay } from '@/components/group/GroupCallNotificationOverlay';
+import { OfflineBanner } from '@/components/OfflineBanner';
+import { usePushToken } from '@/hooks/usePushToken';
 import { groupApi } from '@/services/api';
 import { THEME_COLORS } from '@/lib/constants';
 import Icon from '@/components/ui/Icon';
 import BrandedSplashOverlay from '@/components/BrandedSplashOverlay';
+
+// Sentry crash reporting and performance monitoring
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN ?? '',
+  tracesSampleRate: 0.2,
+  enabled: !!process.env.EXPO_PUBLIC_SENTRY_DSN,
+});
+
+// Let React Query know about connectivity for automatic refetch-on-reconnect
+onlineManager.setEventListener((setOnline) => {
+  return NetInfo.addEventListener((state) => {
+    setOnline(!!state.isConnected);
+  });
+});
 
 SplashScreen.preventAutoHideAsync();
 
@@ -46,8 +66,14 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
       retry: 2,
+      gcTime: 1000 * 60 * 60 * 24, // Keep in garbage-collection window for 24h (persisted)
     },
   },
+});
+
+const asyncStoragePersister = createAsyncStoragePersister({
+  storage: AsyncStorage,
+  key: 'DIVINEBRIDGE_QUERY_CACHE',
 });
 
 // Parse a deep link URL and extract groupId + code.
@@ -221,13 +247,16 @@ function AuthGuard() {
 
 // ─── RootLayout ───────────────────────────────────────────────────────────────
 
-export default function RootLayout() {
+function RootLayoutInner() {
   console.log('[DivineBridge] RootLayout: component mounted');
   const initialize = useAuthStore((s) => s.initialize);
   const { user, isInitialized } = useAuthStore();
   const [pendingInvite, setPendingInvite] = useState<{ groupId: string; code: string } | null>(null);
   const [showBrandedSplash, setShowBrandedSplash] = useState(true);
   const onBrandedSplashFinish = useCallback(() => setShowBrandedSplash(false), []);
+
+  // Register push token when user is signed in
+  usePushToken(user?.uid);
 
   const [fontsLoaded, fontError] = useFonts({
     PlusJakartaSans_400Regular,
@@ -311,10 +340,14 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <QueryClientProvider client={queryClient}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{ persister: asyncStoragePersister, maxAge: 1000 * 60 * 60 * 24 }}
+      >
         <GroupUnreadProvider>
           <AuthGuard />
           <StatusBar style="dark" backgroundColor="#faf6ef" />
+          <OfflineBanner />
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#faf6ef' } }}>
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
@@ -334,7 +367,6 @@ export default function RootLayout() {
 
           <GroupCallNotificationOverlay />
 
-          {/* Deep link invite modal — shown on top of everything when user is logged in */}
           {pendingInvite && user && (
             <JoinGroupModal
               groupId={pendingInvite.groupId}
@@ -345,7 +377,13 @@ export default function RootLayout() {
 
           {showBrandedSplash && <BrandedSplashOverlay onFinish={onBrandedSplashFinish} />}
         </GroupUnreadProvider>
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
     </GestureHandlerRootView>
   );
+}
+
+// Wrap with Sentry for crash reporting
+const RootLayoutWrapped = Sentry.wrap(RootLayoutInner);
+export default function RootLayout() {
+  return <RootLayoutWrapped />;
 }

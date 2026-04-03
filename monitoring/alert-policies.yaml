@@ -1,0 +1,76 @@
+# Cloud Monitoring alert policies for DivineBridge at scale.
+#
+# Apply with:
+#   gcloud alpha monitoring policies create --policy-from-file=monitoring/alert-policies.yaml
+#
+# Notification channels must be created separately:
+#   gcloud alpha monitoring channels create --type=email --display-name="Ops Team" \
+#       --channel-labels=email_address=ops@divinebridge.io
+
+# --- High error rate on Cloud Run ---
+- displayName: "DivineBridge – Error Rate > 1%"
+  combiner: OR
+  conditions:
+    - displayName: "Cloud Run 5xx rate exceeds 1%"
+      conditionThreshold:
+        filter: >
+          resource.type="cloud_run_revision"
+          AND resource.labels.service_name="divinebridge"
+          AND metric.type="run.googleapis.com/request_count"
+          AND metric.labels.response_code_class="5xx"
+        aggregations:
+          - alignmentPeriod: "300s"
+            perSeriesAligner: ALIGN_RATE
+        comparison: COMPARISON_GT
+        thresholdValue: 0.01
+        duration: "300s"
+
+# --- High latency (p95 > 2s) ---
+- displayName: "DivineBridge – p95 Latency > 2s"
+  combiner: OR
+  conditions:
+    - displayName: "Cloud Run p95 latency exceeds 2000ms"
+      conditionThreshold:
+        filter: >
+          resource.type="cloud_run_revision"
+          AND resource.labels.service_name="divinebridge"
+          AND metric.type="run.googleapis.com/request_latencies"
+        aggregations:
+          - alignmentPeriod: "300s"
+            perSeriesAligner: ALIGN_PERCENTILE_95
+        comparison: COMPARISON_GT
+        thresholdValue: 2000
+        duration: "300s"
+
+# --- Instance count approaching max ---
+- displayName: "DivineBridge – Instance Count > 40 (max 50)"
+  combiner: OR
+  conditions:
+    - displayName: "Active instances nearing max scale"
+      conditionThreshold:
+        filter: >
+          resource.type="cloud_run_revision"
+          AND resource.labels.service_name="divinebridge"
+          AND metric.type="run.googleapis.com/container/instance_count"
+        aggregations:
+          - alignmentPeriod: "60s"
+            perSeriesAligner: ALIGN_MAX
+        comparison: COMPARISON_GT
+        thresholdValue: 40
+        duration: "300s"
+
+# --- Redis memory usage > 80% ---
+- displayName: "DivineBridge – Redis Memory > 80%"
+  combiner: OR
+  conditions:
+    - displayName: "Memorystore Redis memory ratio exceeds 80%"
+      conditionThreshold:
+        filter: >
+          resource.type="redis_instance"
+          AND metric.type="redis.googleapis.com/stats/memory/usage_ratio"
+        aggregations:
+          - alignmentPeriod: "300s"
+            perSeriesAligner: ALIGN_MEAN
+        comparison: COMPARISON_GT
+        thresholdValue: 0.8
+        duration: "300s"

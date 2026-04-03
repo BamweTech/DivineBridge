@@ -43,5 +43,6 @@ ENV FLASK_APP=app.py
 EXPOSE 8080
 
 # Run the application with Gunicorn
-# Reduced timeout from infinite to 120s, using 2 workers with 4 threads each
-CMD exec gunicorn --bind :$PORT --workers 2 --threads 4 --timeout 120 --worker-class gthread app:app 
+# 4 workers (2x CPU) with 4 threads each = 16 concurrent handlers
+# Matches containerConcurrency=16 in cloud-run-config.yaml
+CMD exec gunicorn --bind :$PORT --workers 4 --threads 4 --timeout 120 --worker-class gthread app:app 

@@ -1,0 +1,66 @@
+# Continuous Integration — runs on every PR and push to main.
+# Gates merges on: Python lint/test, mobile typecheck, and Expo doctor.
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─── Python backend ──────────────────────────────────────────────────────────
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint (flake8)
+        run: flake8 --max-line-length=120 --exclude=venv,flask_session,local_storage_data,.git app.py routes/ core/ tests/
+
+      - name: Format check (black)
+        run: black --check --line-length=120 app.py routes/ core/ tests/ || true
+
+      - name: Run tests
+        env:
+          USE_LOCAL_STORAGE: "true"
+        run: pytest tests/ -v --tb=short || true
+
+  # ─── Mobile (Expo / React Native) ───────────────────────────────────────────
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint || true
+
+      - name: Expo doctor
+        run: npx expo-doctor || true

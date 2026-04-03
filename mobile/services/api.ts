@@ -60,6 +60,18 @@ async function request<T>(
   return json as T;
 }
 
+// ─── Home Bundle (single CDN-cached request for daily content) ──────────────
+
+export const homeBundleApi = {
+  get: (date: string) =>
+    request<{
+      success: boolean;
+      date: string;
+      verse: { verse: string; reference: string };
+      prayer: { content: string; date: string } | null;
+    }>(`/api/home-bundle?client_date=${encodeURIComponent(date)}`),
+};
+
 // ─── Daily Content ─────────────────────────────────────────────────────────────
 
 export const prayerApi = {
