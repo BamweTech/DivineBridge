@@ -331,6 +331,104 @@ To unsubscribe: https://divinebridge.io/unsubscribe?email={recipient_email}
 """
 
 
+    def send_easter_email(self, recipient_email, first_name):
+        """
+        Send the Easter 2026 email using the pre-designed HTML template
+        with the hero graphic embedded as a CID image attachment.
+
+        Args:
+            recipient_email: Subscriber's email
+            first_name: Subscriber's first name (kept for logging)
+
+        Returns:
+            bool: True if sent successfully
+        """
+        try:
+            msg = MIMEMultipart('related')
+            msg['From'] = formataddr(("Divine Bridge", self.sender_email))
+            msg['To'] = recipient_email
+            msg['Subject'] = "He Is Risen \u2014 Happy Easter from Divine Bridge"
+
+            msg['List-Unsubscribe'] = f"<https://divinebridge.io/unsubscribe?email={recipient_email}>"
+            msg['List-Unsubscribe-Post'] = "List-Unsubscribe=One-Click"
+            msg['Precedence'] = "bulk"
+
+            unsubscribe_url = f"https://divinebridge.io/unsubscribe?email={recipient_email}"
+
+            plain_text = f"""\
+He Is Risen \u2014 Happy Easter!
+
+Easter Sunday - April 5, 2026
+
+A Message of Hope
+
+This Easter, we celebrate the greatest morning in all of history.
+
+The stone was rolled away. The grave could not hold Him.
+What seemed like the end became the beginning of everything \u2014
+hope restored, death defeated, and a path opened for all who believe.
+
+On behalf of the entire Divine Bridge community, we want to
+wish you and your family a blessed and joy-filled Easter.
+May this season deepen your faith and remind you that
+you are never alone on this journey.
+
+"I am the resurrection and the life. Whoever believes in me,
+though he die, yet shall he live."
+\u2014 John 11:25
+
+Whether you are celebrating with family, gathering with your church,
+or spending quiet time in prayer \u2014 we invite you to join thousands
+of believers around the world today on Divine Bridge.
+
+Join the Easter Prayer Room: https://divinebridge.io/prayers
+Open the App: https://divinebridge.io
+
+Blessings,
+The Divine Bridge Team
+
+Unsubscribe: {unsubscribe_url}
+\u00a9 2026 Divine Bridge. All rights reserved.
+"""
+
+            template_path = os.path.join(
+                os.path.dirname(__file__), 'templates', 'emails', 'easter-2026.html'
+            )
+            with open(template_path, 'r', encoding='utf-8') as f:
+                html_body = f.read()
+
+            html_body = html_body.replace('{{unsubscribe_url}}', unsubscribe_url)
+
+            msg_alternative = MIMEMultipart('alternative')
+            msg.attach(msg_alternative)
+
+            msg_alternative.attach(MIMEText(plain_text, 'plain', 'utf-8'))
+            msg_alternative.attach(MIMEText(html_body, 'html', 'utf-8'))
+
+            hero_path = os.path.join(
+                os.path.dirname(__file__), 'assets', 'emails', 'easter-2026-hero.png'
+            )
+            try:
+                with open(hero_path, 'rb') as img:
+                    hero_img = MIMEImage(img.read())
+                    hero_img.add_header('Content-ID', '<easter_hero>')
+                    hero_img.add_header('Content-Disposition', 'inline', filename='easter-hero.png')
+                    msg.attach(hero_img)
+            except Exception as e:
+                logger.warning(f"Could not attach Easter hero image: {e}")
+
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                server.starttls()
+                server.login(self.sender_email, self.sender_password)
+                server.send_message(msg)
+
+            logger.info(f"Easter email sent to: {recipient_email}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error sending Easter email to {recipient_email}: {e}")
+            return False
+
     def send_new_user_notification(self, admin_email, user_name, user_email, user_id, signup_date, auth_provider='email'):
         """
         Send notification email to admin when a new user signs up

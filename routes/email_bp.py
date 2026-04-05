@@ -210,6 +210,101 @@ def send_daily_emails():
         return jsonify({'error': str(e)}), 500
 
 
+@email_bp.route('/send-easter-email', methods=['POST'])
+def send_easter_email():
+    """
+    Send Easter 2026 email to all subscribers.
+    Triggered by Cloud Scheduler at 5 AM CST on April 5, 2026.
+    """
+    try:
+        db = _get_firestore_client()
+        from email_service_v2 import get_email_service
+
+        user_agent = request.headers.get('User-Agent', '')
+        is_scheduler = 'Google-Cloud-Scheduler' in user_agent
+        is_local = request.remote_addr in ['127.0.0.1', 'localhost']
+        auth_header = request.headers.get('Authorization', '')
+        has_token = auth_header.startswith('Bearer ')
+
+        if not (is_scheduler or is_local or has_token):
+            logger.warning(f"Unauthorized Easter email send attempt from: {user_agent}")
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        logger.info("Starting Easter 2026 email send job...")
+
+        subscribers = []
+        try:
+            users_ref = db.collection('users')
+            query = users_ref.where('email_subscribed', '==', True).stream()
+
+            for doc in query:
+                user_data = doc.to_dict()
+                if user_data.get('email') and user_data.get('firstName'):
+                    subscribers.append({
+                        'doc_id': doc.id,
+                        'email': user_data.get('email'),
+                        'firstName': user_data.get('firstName'),
+                        'easter_2026_email_sent': user_data.get('easter_2026_email_sent', False)
+                    })
+        except Exception as e:
+            logger.error(f"Error fetching subscribers for Easter email: {e}")
+            return jsonify({'error': 'Failed to fetch subscribers'}), 500
+
+        logger.info(f"Found {len(subscribers)} subscribers for Easter email")
+
+        email_service = get_email_service()
+        sent_count = 0
+        failed_count = 0
+        skipped_count = 0
+
+        for subscriber in subscribers:
+            if subscriber['easter_2026_email_sent']:
+                logger.info(f"Skipping {subscriber['email']} — Easter email already sent")
+                skipped_count += 1
+                continue
+
+            try:
+                success = email_service.send_easter_email(
+                    recipient_email=subscriber['email'],
+                    first_name=subscriber['firstName']
+                )
+
+                if success:
+                    sent_count += 1
+                    try:
+                        db.collection('users').document(subscriber['doc_id']).set(
+                            {'easter_2026_email_sent': True},
+                            merge=True
+                        )
+                    except Exception as update_err:
+                        logger.warning(
+                            f"Could not mark Easter email sent for {subscriber['email']}: {update_err}"
+                        )
+                else:
+                    failed_count += 1
+
+            except Exception as e:
+                logger.error(f"Error sending Easter email to {subscriber['email']}: {e}")
+                failed_count += 1
+
+        logger.info(
+            f"Easter email job complete: {sent_count} sent, "
+            f"{skipped_count} skipped (already sent), {failed_count} failed"
+        )
+
+        return jsonify({
+            'message': 'Easter 2026 emails sent',
+            'sent': sent_count,
+            'skipped_already_sent': skipped_count,
+            'failed': failed_count,
+            'total_subscribers': len(subscribers)
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error in send_easter_email: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @email_bp.route('/test-email', methods=['POST'])
 def test_email():
     """
