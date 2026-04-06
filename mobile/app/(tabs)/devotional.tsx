@@ -616,6 +616,10 @@ export default function DevotionalScreen() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [reminderOn, setReminderOn] = useState(profile?.notifyDevotional ?? false);
 
+  useEffect(() => {
+    if (profile?.notifyDevotional !== undefined) setReminderOn(profile.notifyDevotional);
+  }, [profile?.notifyDevotional]);
+
   const prevCompletedAtRef = useRef<number | undefined>(undefined);
   const pagerRef = useRef<FlatList>(null);
 
@@ -791,7 +795,8 @@ export default function DevotionalScreen() {
 
   if (!plan) return null;
 
-  const progressPct = Math.round((plan.current_day / plan.duration) * 100);
+  const completedDayCount = plan.days.filter((d) => d.completed).length;
+  const progressPct = Math.round((completedDayCount / plan.duration) * 100);
 
   return (
     <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}>
@@ -822,7 +827,7 @@ export default function DevotionalScreen() {
           <View style={{ height: 4, borderRadius: 2, backgroundColor: THEME_COLORS.gold, width: `${progressPct}%` }} />
         </View>
         <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12 }}>
-          Day {plan.current_day} of {plan.duration} · {progressPct}% complete
+          Day {plan.current_day} of {plan.duration} · {completedDayCount}/{plan.duration} done ({progressPct}%)
         </Text>
       </View>
 

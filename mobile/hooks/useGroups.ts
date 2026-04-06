@@ -9,7 +9,6 @@ import {
   deleteDoc,
   serverTimestamp,
   limit,
-  getDoc,
   orderBy,
   setDoc,
   runTransaction,
@@ -18,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db } from '@/lib/firebase';
 import { COLLECTIONS } from '@/lib/constants';
 import { useAuthStore } from '@/stores/authStore';
+import { useLiveRoomsContext } from '@/contexts/LiveRoomsContext';
 import { getDisplayName } from '@/lib/userDisplayName';
 import type {
   PrayerGroup,
@@ -28,41 +28,9 @@ import type {
   PrayerRoom,
 } from '@/types';
 
-// useLiveRooms — real-time Firestore listener for active prayer rooms.
-// Rooms appear instantly when created without polling.
+// useLiveRooms — reads from the shared LiveRoomsContext (single Firestore listener).
 export function useLiveRooms() {
-  const [rooms, setRooms] = useState<PrayerRoom[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const q = query(
-      collection(db, COLLECTIONS.PRAYER_ROOMS),
-      where('is_active', '==', true)
-    );
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const data: PrayerRoom[] = snap.docs.map((d) => {
-          const raw = d.data();
-          return {
-            ...raw,
-            room_id: d.id,
-          } as PrayerRoom;
-        });
-        // Sort newest first client-side (avoids composite index requirement)
-        data.sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
-        setRooms(data);
-        setIsLoading(false);
-      },
-      () => {
-        setRooms([]);
-        setIsLoading(false);
-      }
-    );
-    return unsub;
-  }, []);
-
-  return { rooms, isLoading };
+  return useLiveRoomsContext();
 }
 
 // useGroupLiveRooms — real-time map of group_id → active PrayerRoom (if any).
@@ -165,7 +133,7 @@ export function usePublicGroups() {
   return { groups, isLoading };
 }
 
-// useGroupDetails — fetches a single group document by ID.
+// useGroupDetails — real-time listener for a single group document by ID.
 export function useGroupDetails(groupId: string) {
   const [group, setGroup] = useState<PrayerGroup | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -175,14 +143,19 @@ export function useGroupDetails(groupId: string) {
       setIsLoading(false);
       return;
     }
-    getDoc(doc(db, COLLECTIONS.PRAYER_GROUPS, groupId))
-      .then((snap) => {
+    const unsub = onSnapshot(
+      doc(db, COLLECTIONS.PRAYER_GROUPS, groupId),
+      (snap) => {
         if (snap.exists()) {
           setGroup({ group_id: snap.id, ...snap.data() } as PrayerGroup);
+        } else {
+          setGroup(null);
         }
         setIsLoading(false);
-      })
-      .catch(() => setIsLoading(false));
+      },
+      () => setIsLoading(false),
+    );
+    return unsub;
   }, [groupId]);
 
   return { group, isLoading };

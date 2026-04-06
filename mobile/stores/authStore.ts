@@ -56,6 +56,7 @@ function normalizeProfile(uid: string, data: Record<string, unknown>): UserProfi
     linkedIn,
     emailSubscribed: Boolean(data.email_subscribed),
     notifyDailyVerse: Boolean(data.notify_daily_verse),
+    notifyDevotional: Boolean(data.notify_devotional),
     sessionRemindersEnabled: Boolean(data.session_reminders_enabled),
     createdAt: createdNum,
     groups: (data.groups as string[] | undefined) ?? [],

@@ -35,6 +35,7 @@ import * as Haptics from 'expo-haptics';
 import * as Sentry from '@sentry/react-native';
 import { useAuthStore } from '@/stores/authStore';
 import { GroupUnreadProvider } from '@/contexts/GroupUnreadContext';
+import { LiveRoomsProvider } from '@/contexts/LiveRoomsContext';
 import { GroupCallNotificationOverlay } from '@/components/group/GroupCallNotificationOverlay';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { usePushToken } from '@/hooks/usePushToken';
@@ -344,6 +345,7 @@ function RootLayoutInner() {
         client={queryClient}
         persistOptions={{ persister: asyncStoragePersister, maxAge: 1000 * 60 * 60 * 24 }}
       >
+        <LiveRoomsProvider>
         <GroupUnreadProvider>
           <AuthGuard />
           <StatusBar style="dark" backgroundColor="#faf6ef" />
@@ -377,6 +379,7 @@ function RootLayoutInner() {
 
           {showBrandedSplash && <BrandedSplashOverlay onFinish={onBrandedSplashFinish} />}
         </GroupUnreadProvider>
+        </LiveRoomsProvider>
       </PersistQueryClientProvider>
     </GestureHandlerRootView>
   );

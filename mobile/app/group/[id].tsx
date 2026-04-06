@@ -155,7 +155,6 @@ export default function GroupScreen() {
   const [fsChatOpen, setFsChatOpen] = useState(true);
   const [fsChatText, setFsChatText] = useState('');
   const [showAttachTray, setShowAttachTray] = useState<'main' | 'fs' | null>(null);
-  const [voiceRecordingSurface, setVoiceRecordingSurface] = useState<'main' | 'fs' | null>(null);
   const [viewerMedia, setViewerMedia] = useState<ViewerMedia | null>(null);
   const [mediaActionBusy, setMediaActionBusy] = useState<'share' | 'save' | null>(null);
   const memberSyncRequestedRef = useRef(false);
@@ -1132,65 +1131,59 @@ export default function GroupScreen() {
                     gap: 8,
                     backgroundColor: THEME_COLORS.bg,
                   }}>
-                    {voiceRecordingSurface === 'fs' ? (
-                      <VoiceRecorder onSend={handleVoiceSend} />
+                    <Pressable
+                      onPress={() => setShowAttachTray((current) => (current === 'fs' ? null : 'fs'))}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 11,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        backgroundColor: THEME_COLORS.bg3,
+                        borderColor: THEME_COLORS.border,
+                      }}
+                    >
+                      <Icon name="plus" size={16} color={THEME_COLORS.text2} />
+                    </Pressable>
+                    <TextInput
+                      value={fsChatText}
+                      onChangeText={setFsChatText}
+                      placeholder={replyTarget ? `Reply to ${replyTarget.user_name}…` : 'Message the group…'}
+                      placeholderTextColor={THEME_COLORS.text3}
+                      style={{
+                        flex: 1,
+                        backgroundColor: THEME_COLORS.bg2,
+                        borderRadius: 20,
+                        paddingHorizontal: 16,
+                        paddingVertical: 10,
+                        color: THEME_COLORS.text,
+                        fontFamily: 'Geist_400Regular',
+                        fontSize: 14,
+                        maxHeight: 88,
+                        borderWidth: 1,
+                        borderColor: THEME_COLORS.border,
+                      }}
+                      multiline
+                    />
+                    {fsChatText.trim() ? (
+                      <Pressable
+                        onPress={handleFsSend}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: THEME_COLORS.gold,
+                        }}
+                      >
+                        <Icon name="send" size={14} color="#ffffff" />
+                      </Pressable>
                     ) : (
-                      <>
-                        <Pressable
-                          onPress={() => setShowAttachTray((current) => (current === 'fs' ? null : 'fs'))}
-                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                          style={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: 11,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            borderWidth: 1,
-                            backgroundColor: THEME_COLORS.bg3,
-                            borderColor: THEME_COLORS.border,
-                          }}
-                        >
-                          <Icon name="plus" size={16} color={THEME_COLORS.text2} />
-                        </Pressable>
-                        <TextInput
-                          value={fsChatText}
-                          onChangeText={setFsChatText}
-                          placeholder={replyTarget ? `Reply to ${replyTarget.user_name}…` : 'Message the group…'}
-                          placeholderTextColor={THEME_COLORS.text3}
-                          style={{
-                            flex: 1,
-                            backgroundColor: THEME_COLORS.bg2,
-                            borderRadius: 20,
-                            paddingHorizontal: 16,
-                            paddingVertical: 10,
-                            color: THEME_COLORS.text,
-                            fontFamily: 'Geist_400Regular',
-                            fontSize: 14,
-                            maxHeight: 88,
-                            borderWidth: 1,
-                            borderColor: THEME_COLORS.border,
-                          }}
-                          multiline
-                        />
-                        {fsChatText.trim() ? (
-                          <Pressable
-                            onPress={handleFsSend}
-                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                            style={{
-                              width: 36,
-                              height: 36,
-                              borderRadius: 18,
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              backgroundColor: THEME_COLORS.gold,
-                            }}
-                          >
-                            <Icon name="send" size={14} color="#ffffff" />
-                          </Pressable>
-                        ) : (
-                          <VoiceRecorder onSend={handleVoiceSend} />
-                        )}
-                      </>
+                      <VoiceRecorder onSend={handleVoiceSend} />
                     )}
                   </View>
                 </View>
@@ -1220,49 +1213,43 @@ export default function GroupScreen() {
           padding: 12, paddingBottom: insets.bottom + 8, gap: 8,
           backgroundColor: THEME_COLORS.bg,
         }}>
-          {voiceRecordingSurface === 'main' ? (
-            <VoiceRecorder onSend={handleVoiceSend} />
+          <Pressable
+            onPress={() => setShowAttachTray((current) => (current === 'main' ? null : 'main'))}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            style={{
+              width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 1,
+              backgroundColor: THEME_COLORS.bg3,
+              borderColor: THEME_COLORS.border,
+            }}
+          >
+            <Icon name="plus" size={16} color={THEME_COLORS.text2} />
+          </Pressable>
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            placeholder={replyTarget ? `Reply to ${replyTarget.user_name}…` : 'Message the group…'}
+            placeholderTextColor={THEME_COLORS.text3}
+            style={{
+              flex: 1, backgroundColor: THEME_COLORS.bg2, borderRadius: 20,
+              paddingHorizontal: 16, paddingVertical: 10,
+              color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14,
+              maxHeight: 100, borderWidth: 1, borderColor: THEME_COLORS.border,
+            }}
+            multiline
+          />
+          {text.trim() ? (
+            <Pressable
+              onPress={handleSend}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              style={{
+                width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
+                backgroundColor: THEME_COLORS.gold,
+              }}
+            >
+              <Icon name="send" size={14} color="#ffffff" />
+            </Pressable>
           ) : (
-            <>
-              <Pressable
-                onPress={() => setShowAttachTray((current) => (current === 'main' ? null : 'main'))}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                style={{
-                  width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', borderWidth: 1,
-                  backgroundColor: THEME_COLORS.bg3,
-                  borderColor: THEME_COLORS.border,
-                }}
-              >
-                <Icon name="plus" size={16} color={THEME_COLORS.text2} />
-              </Pressable>
-              <TextInput
-                value={text}
-                onChangeText={setText}
-                placeholder={replyTarget ? `Reply to ${replyTarget.user_name}…` : 'Message the group…'}
-                placeholderTextColor={THEME_COLORS.text3}
-                style={{
-                  flex: 1, backgroundColor: THEME_COLORS.bg2, borderRadius: 20,
-                  paddingHorizontal: 16, paddingVertical: 10,
-                  color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14,
-                  maxHeight: 100, borderWidth: 1, borderColor: THEME_COLORS.border,
-                }}
-                multiline
-              />
-              {text.trim() ? (
-                <Pressable
-                  onPress={handleSend}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  style={{
-                    width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
-                    backgroundColor: THEME_COLORS.gold,
-                  }}
-                >
-                  <Icon name="send" size={14} color="#ffffff" />
-                </Pressable>
-              ) : (
-                <VoiceRecorder onSend={handleVoiceSend} />
-              )}
-            </>
+            <VoiceRecorder onSend={handleVoiceSend} />
           )}
         </View>
       </View>

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Alert } from 'react-native';
+import { useState, useCallback } from 'react';
+import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -129,30 +129,96 @@ function ScheduledCard({ session, onRsvp }: { session: ScheduledSession; onRsvp:
   );
 }
 
+function CreateRoomModal({ onCreated, onClose }: { onCreated: (roomId: string) => void; onClose: () => void }) {
+  const [name, setName] = useState('');
+  const [privacy, setPrivacy] = useState<'public' | 'private'>('public');
+  const [isCreating, setIsCreating] = useState(false);
+
+  async function handleCreate() {
+    if (name.trim().length < 3) {
+      Alert.alert('Room name must be at least 3 characters');
+      return;
+    }
+    setIsCreating(true);
+    try {
+      const result = await roomApi.create(name.trim(), privacy);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      onCreated(result.room_id);
+    } catch (err: any) {
+      Alert.alert('Failed to create room', err.message);
+    } finally {
+      setIsCreating(false);
+    }
+  }
+
+  return (
+    <View style={{ padding: 24 }}>
+      <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 22, marginBottom: 20 }}>
+        Create a Prayer Room
+      </Text>
+      <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_500Medium', fontSize: 13, marginBottom: 6 }}>Room Name</Text>
+      <TextInput
+        value={name}
+        onChangeText={setName}
+        placeholder="e.g. Evening Worship"
+        placeholderTextColor={THEME_COLORS.text3}
+        maxLength={60}
+        style={{ backgroundColor: THEME_COLORS.bg2, borderRadius: 14, borderWidth: 1, borderColor: THEME_COLORS.border, color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 15, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 16 }}
+      />
+      <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_500Medium', fontSize: 13, marginBottom: 8 }}>Privacy</Text>
+      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 24 }}>
+        {(['public', 'private'] as const).map((opt) => (
+          <Pressable
+            key={opt}
+            onPress={() => setPrivacy(opt)}
+            style={{
+              flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
+              backgroundColor: privacy === opt ? THEME_COLORS.sageDim : THEME_COLORS.bg2,
+              borderWidth: 1,
+              borderColor: privacy === opt ? THEME_COLORS.sage : THEME_COLORS.border,
+            }}
+          >
+            <Text style={{
+              color: privacy === opt ? THEME_COLORS.sage : THEME_COLORS.text2,
+              fontFamily: privacy === opt ? 'Geist_600SemiBold' : 'Geist_400Regular', fontSize: 14,
+              textTransform: 'capitalize',
+            }}>
+              {opt}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      <Button label="Create Room" onPress={handleCreate} isLoading={isCreating} fullWidth />
+      <Button label="Cancel" onPress={onClose} variant="ghost" fullWidth style={{ marginTop: 8 }} />
+    </View>
+  );
+}
+
 export default function RoomsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const [tab, setTab] = useState<'live' | 'scheduled'>('live');
+  const [liveRefreshing, setLiveRefreshing] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
 
   // Real-time Firestore listener — no polling delay
   const { rooms: liveRooms, isLoading: liveLoading } = useLiveRooms();
+
+  const onRefreshLive = useCallback(() => {
+    setLiveRefreshing(true);
+    setTimeout(() => setLiveRefreshing(false), 600);
+  }, []);
 
   const scheduledQuery = useQuery({
     queryKey: ['scheduled-sessions'],
     queryFn: () => scheduledApi.list({ time: 'all', sort: 'soonest' }),
   });
 
-  async function handleCreateRoom() {
+  function handleCreateRoom() {
     if (!user) { Alert.alert('Sign in to create a room'); return; }
-    try {
-      const result = await roomApi.create('Prayer Room', 'public');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.push(`/room/${result.room_id}`);
-    } catch (err: any) {
-      Alert.alert('Failed to create room', err.message);
-    }
+    setShowCreate(true);
   }
 
   async function handleJoinRoom(roomId: string) {
@@ -175,6 +241,21 @@ export default function RoomsScreen() {
   }
 
   const sessions: ScheduledSession[] = scheduledQuery.data?.sessions ?? [];
+
+  if (showCreate) {
+    return (
+      <ScrollView
+        style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}
+        contentContainerStyle={{ paddingTop: insets.top + 16 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <CreateRoomModal
+          onCreated={(roomId) => { setShowCreate(false); router.push(`/room/${roomId}`); }}
+          onClose={() => setShowCreate(false)}
+        />
+      </ScrollView>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}>
@@ -225,8 +306,11 @@ export default function RoomsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={tab === 'live' ? liveLoading : scheduledQuery.isFetching}
-            onRefresh={() => { if (tab !== 'live') queryClient.invalidateQueries({ queryKey: ['scheduled-sessions'] }); }}
+            refreshing={tab === 'live' ? liveRefreshing : scheduledQuery.isFetching}
+            onRefresh={() => {
+              if (tab === 'live') onRefreshLive();
+              else queryClient.invalidateQueries({ queryKey: ['scheduled-sessions'] });
+            }}
             tintColor={THEME_COLORS.gold}
           />
         }
