@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, session, render_template, current
 from firebase_auth import get_firestore_client, get_rtdb_client
 from input_validation import validate_data, sanitize_string
 from auth_decorators import verify_cloud_scheduler
+from google.api_core.retry import Retry
 import logging
 from datetime import datetime, timedelta
 import uuid
@@ -4055,18 +4056,16 @@ def cleanup_inactive_sessions():
         db = get_firestore_client()
         cutoff_time = datetime.utcnow() - timedelta(hours=1)
         
-        # Get all rooms
         all_rooms_ref = db.collection('prayer_rooms')
-        all_rooms = all_rooms_ref.stream()
+        all_rooms = all_rooms_ref.stream(retry=Retry())
         
         cleaned_count = 0
         for room_doc in all_rooms:
-            # Get all inactive sessions and filter by timestamp in Python
             inactive_sessions_ref = room_doc.reference\
                 .collection('device_sessions')\
                 .where('is_active', '==', False)
             
-            for session_doc in inactive_sessions_ref.stream():
+            for session_doc in inactive_sessions_ref.stream(retry=Retry()):
                 session_data = session_doc.to_dict()
                 ended_at = session_data.get('ended_at')
                 if ended_at:
@@ -4091,35 +4090,29 @@ def cleanup_signaling_artifacts():
     """Clean up old WebRTC signaling artifacts (offers, answers, candidates)"""
     try:
         db = get_firestore_client()
-        cutoff_time = datetime.utcnow() - timedelta(minutes=30)  # 30 minutes TTL
+        cutoff_time = datetime.utcnow() - timedelta(minutes=30)
         
-        # Get all rooms
         all_rooms_ref = db.collection('prayer_rooms')
-        all_rooms = all_rooms_ref.stream()
+        all_rooms = all_rooms_ref.stream(retry=Retry())
         
         cleaned_count = 0
         
         for room_doc in all_rooms:
-            room_id = room_doc.id
-            
-            # Clean up old offers
             offers_ref = room_doc.reference.collection('webrtc_offers')\
                 .where('timestamp', '<', cutoff_time)
-            for offer_doc in offers_ref.stream():
+            for offer_doc in offers_ref.stream(retry=Retry()):
                 offer_doc.reference.delete()
                 cleaned_count += 1
             
-            # Clean up old answers
             answers_ref = room_doc.reference.collection('webrtc_answers')\
                 .where('timestamp', '<', cutoff_time)
-            for answer_doc in answers_ref.stream():
+            for answer_doc in answers_ref.stream(retry=Retry()):
                 answer_doc.reference.delete()
                 cleaned_count += 1
             
-            # Clean up old candidates
             candidates_ref = room_doc.reference.collection('webrtc_candidates')\
                 .where('timestamp', '<', cutoff_time)
-            for candidate_doc in candidates_ref.stream():
+            for candidate_doc in candidates_ref.stream(retry=Retry()):
                 candidate_doc.reference.delete()
                 cleaned_count += 1
         
@@ -4135,21 +4128,19 @@ def cleanup_old_chat_messages():
     try:
         db = get_firestore_client()
         
-        # Get all rooms
         all_rooms_ref = db.collection('prayer_rooms')
-        all_rooms = all_rooms_ref.stream()
+        all_rooms = all_rooms_ref.stream(retry=Retry())
         
         cleaned_count = 0
         
         for room_doc in all_rooms:
             room_id = room_doc.id
             
-            # Get chat messages for this room, ordered by timestamp
             chat_messages_ref = db.collection('chat_messages')\
                 .where('room_id', '==', room_id)\
                 .order_by('timestamp', direction='DESCENDING')
             
-            messages = list(chat_messages_ref.stream())
+            messages = list(chat_messages_ref.stream(retry=Retry()))
             
             # Keep only the last 1000 messages
             if len(messages) > 1000:
