@@ -1,6 +1,7 @@
 """
 Devotional plan routes — AI-powered personalized devotional plans via Perplexity.
 """
+import json
 import uuid
 import logging
 from datetime import datetime, timezone
@@ -20,17 +21,30 @@ VALID_THEMES = {
     'Spiritual Growth', 'Hope & Perseverance',
 }
 
+BATCH_SIZE = 7
 
-def _build_devotional_prompt(theme: str, duration: int, tradition: str) -> str:
-    return f"""Create a {duration}-day personal devotional plan on the theme of "{theme}".
 
+def _build_batch_prompt(theme: str, batch_start: int, batch_end: int,
+                        total_duration: int, tradition: str,
+                        prior_titles: list[str] | None = None) -> str:
+    """Build a prompt for a single batch of days within a larger plan."""
+    count = batch_end - batch_start + 1
+    context = ""
+    if prior_titles:
+        summary = "; ".join(f"Day {i+1}: {t}" for i, t in enumerate(prior_titles))
+        context = (
+            f"\nThis is part of a {total_duration}-day plan. "
+            f"Days already written: [{summary}]. "
+            f"Continue building on those themes — do not repeat the same scriptures.\n"
+        )
+
+    return f"""Create days {batch_start} through {batch_end} of a {total_duration}-day personal devotional plan on the theme of "{theme}".
+{context}
 Return a JSON object with this exact structure — no markdown, no explanation, pure JSON:
 {{
-  "title": "Plan title",
-  "theme": "{theme}",
   "days": [
     {{
-      "day": 1,
+      "day": {batch_start},
       "title": "Day title",
       "scripture": "Full scripture text",
       "scripture_reference": "Book Chapter:Verse",
@@ -42,13 +56,56 @@ Return a JSON object with this exact structure — no markdown, no explanation, 
 }}
 
 Requirements:
-- Exactly {duration} day objects in the "days" array
+- Exactly {count} day objects in the "days" array (days {batch_start}–{batch_end})
 - Each reflection must be 150-200 words, personal and encouraging
 - Each prayer must be 50-80 words, addressed to God, intimate and sincere
 - Scripture must be from the {tradition} tradition
 - Each day must build meaningfully on the previous one
 - Tone: warm, pastoral, accessible to everyday believers
 """
+
+
+def _parse_ai_response(text: str) -> dict:
+    """Strip markdown fences and parse JSON from the AI response."""
+    text = text.strip()
+    if text.startswith('```'):
+        text = text.split('\n', 1)[1].rsplit('```', 1)[0].strip()
+    return json.loads(text)
+
+
+def _generate_plan_batched(client, theme: str, duration: int, tradition: str) -> dict:
+    """Generate a devotional plan in batches of BATCH_SIZE days."""
+    all_days = []
+    prior_titles = []
+    batch_start = 1
+
+    while batch_start <= duration:
+        batch_end = min(batch_start + BATCH_SIZE - 1, duration)
+        prompt = _build_batch_prompt(
+            theme, batch_start, batch_end, duration, tradition,
+            prior_titles=prior_titles if prior_titles else None,
+        )
+
+        timeout = 120.0
+        response = client.query_with_timeout(prompt, timeout=timeout)
+        batch_data = _parse_ai_response(response)
+
+        batch_days = batch_data.get('days', [])
+        if len(batch_days) != (batch_end - batch_start + 1):
+            raise ValueError(
+                f"Batch {batch_start}-{batch_end}: expected {batch_end - batch_start + 1} days, "
+                f"got {len(batch_days)}"
+            )
+
+        all_days.extend(batch_days)
+        prior_titles.extend(d.get('title', '') for d in batch_days)
+        batch_start = batch_end + 1
+
+    return {
+        'title': f'{theme} — {duration}-Day Plan',
+        'theme': theme,
+        'days': all_days,
+    }
 
 
 @devotional_bp.route('/generate', methods=['POST'])
@@ -70,21 +127,13 @@ def generate_devotional():
     uid = g.user_id
     set_client_model('sonar-pro')
     client = get_perplexity_client()
-    prompt = _build_devotional_prompt(theme, duration, tradition)
 
     try:
-        response = client.query(prompt)
-        import json
-        # Strip markdown fences if present
-        text = response.strip()
-        if text.startswith('```'):
-            text = text.split('\n', 1)[1].rsplit('```', 1)[0].strip()
-        plan_data = json.loads(text)
+        plan_data = _generate_plan_batched(client, theme, duration, tradition)
     except Exception as exc:
         logger.error('Devotional generation failed: %s', exc)
         return jsonify({'error': 'Failed to generate plan. Please try again.'}), 500
 
-    # Validate basic structure
     if 'days' not in plan_data or len(plan_data['days']) != duration:
         return jsonify({'error': 'Generated plan has incorrect structure. Please try again.'}), 500
 

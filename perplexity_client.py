@@ -4,9 +4,13 @@ Lazy initialization pattern - client only created when first used
 """
 
 import logging
+from openai import OpenAI
 from config import get_config
 
 logger = logging.getLogger(__name__)
+
+PERPLEXITY_API_URL = 'https://api.perplexity.ai'
+DEFAULT_TIMEOUT = 30.0
 
 # Global singleton instance
 _perplexity_client = None
@@ -15,15 +19,15 @@ _client_lock = False
 
 class LazyPerplexityClient:
     """
-    Wrapper for PerplexityClient that delays initialization until first use
-    This avoids slow test queries during app startup
+    Wrapper for PerplexityClient that delays initialization until first use.
+    This avoids slow test queries during app startup.
     """
     
     def __init__(self, api_key, model="sonar-reasoning-pro"):
         self.api_key = api_key
         self._model = model
         self._client = None
-        logger.debug(f"LazyPerplexityClient created (not initialized yet)")
+        self._openai_client = None
     
     @property
     def model(self):
@@ -44,10 +48,27 @@ class LazyPerplexityClient:
             self._client.model = self._model
             logger.info("Perplexity client initialized")
     
+    def _ensure_openai_client(self):
+        if self._openai_client is None:
+            self._openai_client = OpenAI(
+                api_key=self.api_key,
+                base_url=PERPLEXITY_API_URL,
+                timeout=DEFAULT_TIMEOUT,
+            )
+    
     def query(self, prompt):
-        """Execute query (initializes client if needed)"""
+        """Execute query using perplexipy (30s default timeout)"""
         self._ensure_initialized()
         return self._client.query(prompt)
+    
+    def query_with_timeout(self, prompt, timeout=120.0):
+        """Execute query with a custom timeout, bypassing perplexipy's 30s cap."""
+        self._ensure_openai_client()
+        response = self._openai_client.with_options(timeout=timeout).chat.completions.create(
+            model=self._model,
+            messages=[{'role': 'user', 'content': prompt}],
+        )
+        return response.choices[0].message.content
 
 
 def get_perplexity_client(model="sonar-reasoning-pro"):
