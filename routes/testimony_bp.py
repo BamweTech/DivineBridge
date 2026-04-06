@@ -8,18 +8,11 @@ import logging
 import os
 from datetime import datetime
 import uuid
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+from extensions import limiter
 
 logger = logging.getLogger(__name__)
 
 testimony_bp = Blueprint('testimony', __name__)
-
-# Initialize rate limiter
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=["1000 per day", "100 per hour"]
-)
 
 # Determine which storage handler to use
 USE_LOCAL_STORAGE = os.getenv('USE_LOCAL_STORAGE', 'false').lower() == 'true'

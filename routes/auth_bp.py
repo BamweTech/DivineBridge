@@ -6,12 +6,12 @@ from firebase_auth import (
     send_verification_email,
     verify_email_token
 )
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 from email_service import EmailService
 from config import get_config
+from extensions import limiter
 import json
 import logging
+import os
 from firebase_admin import auth
 import traceback
 from datetime import datetime, timedelta
@@ -21,11 +21,6 @@ auth_bp = Blueprint('auth', __name__)
 
 logger = logging.getLogger(__name__)
 
-# Initialize rate limiter
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"]
-)
 
 @auth_bp.route('/firebase-config')
 def get_firebase_config():
@@ -33,8 +28,6 @@ def get_firebase_config():
     try:
         # Get client config from Secret Manager
         config = get_config()
-        logger.info("Serving Firebase configuration")
-        logger.info(f"Firebase config keys: {list(config.FIREBASE_CLIENT_CONFIG.keys())}")
         return jsonify(config.FIREBASE_CLIENT_CONFIG)
     except Exception as e:
         logger.error(f"Error serving Firebase configuration: {e}")
@@ -47,10 +40,6 @@ def login():
     try:
         data = request.get_json()
         logger.info("Login attempt received")
-        logger.info(f"Request headers: {dict(request.headers)}")
-        logger.info(f"Request data: {data}")
-        logger.info(f"Session data before login: {dict(session)}")
-        logger.info(f"Session cookie settings: {current_app.config.get('SESSION_COOKIE_SECURE')}, {current_app.config.get('SESSION_COOKIE_HTTPONLY')}, {current_app.config.get('SESSION_COOKIE_SAMESITE')}")
         
         id_token = data.get('idToken')
         if not id_token:
@@ -59,46 +48,31 @@ def login():
             
         # Verify the token
         try:
-            logger.info("Attempting to verify token...")
-            # Ensure Firebase is initialized
             if not initialize_firebase():
                 logger.error("Firebase not initialized, cannot verify token")
                 return jsonify({'error': 'Authentication service unavailable'}), 503
-                
-            logger.info("Firebase initialized, proceeding with token verification")
             
-            # Add token format validation
             if not isinstance(id_token, str):
-                logger.error(f"Invalid token type: {type(id_token)}")
+                logger.error("Invalid token type received")
                 return jsonify({'error': 'Invalid token format'}), 400
                 
             if len(id_token.split('.')) != 3:
                 logger.error("Invalid token format: not a valid JWT")
                 return jsonify({'error': 'Invalid token format'}), 400
-                
-            logger.info("Token format validation passed")
-            logger.info(f"Token length: {len(id_token)}, Token preview: {id_token[:50]}...")
             
             decoded_token = verify_token(id_token)
             
             if not decoded_token:
-                logger.warning(f"Token verification failed - token preview: {id_token[:50] if id_token else 'None'}...")
-                logger.warning("This might be due to token not being ready yet after user creation")
+                logger.warning("Token verification failed")
                 return jsonify({'error': 'Token verification failed. Please try signing in again.'}), 401
-                
-            logger.info(f"Token verified successfully. Decoded token: {decoded_token}")
             
-            # Get additional user info from Firebase
             try:
                 user = auth.get_user(decoded_token['uid'])
-                logger.info(f"Retrieved user data from Firebase: {user.__dict__}")
             except Exception as e:
                 logger.error(f"Error getting user info from Firebase: {e}")
                 user = None
             
-            # Store user info in session
-            logger.info("Clearing existing session data...")
-            session.clear()  # Clear any existing session data
+            session.clear()
             
             # Check if this is an OAuth signup or email/password signup (create Firestore profile if needed)
             is_oauth_signup = data.get('isOAuthSignup', False)
@@ -166,7 +140,6 @@ def login():
                 except Exception as e:
                     logger.error(f"Error creating OAuth Firestore profile: {e}")
             
-            logger.info("Setting up new session data...")
             session['user'] = {
                 'uid': decoded_token['uid'],
                 'email': decoded_token.get('email', ''),
@@ -178,13 +151,7 @@ def login():
             session.permanent = True
             session.modified = True
             
-            # Log session details after login
             logger.info(f"User logged in successfully: {decoded_token['uid']}")
-            logger.info(f"Session data after login: {dict(session)}")
-            logger.info(f"Session ID: {session.sid if hasattr(session, 'sid') else 'No session ID'}")
-            logger.info(f"Session permanent: {session.permanent}")
-            logger.info(f"Session modified: {session.modified}")
-            logger.info(f"Session cookie settings: {current_app.config.get('SESSION_COOKIE_SECURE')}, {current_app.config.get('SESSION_COOKIE_HTTPONLY')}, {current_app.config.get('SESSION_COOKIE_SAMESITE')}")
             
             # Create response with session cookie
             response = jsonify({
@@ -193,15 +160,16 @@ def login():
             })
             
             # Set session cookie with proper configuration
+            is_prod = os.getenv('FLASK_ENV') == 'production' or os.getenv('K_SERVICE') is not None
             response.set_cookie(
                 'divinebridge_session',
                 session.sid if hasattr(session, 'sid') else '',
                 httponly=True,
                 samesite='Lax',
-                secure=False,  # Set to False for local development
+                secure=is_prod,
                 path='/',
                 max_age=timedelta(days=7).total_seconds(),
-                domain=None  # Allow cookie for all domains in development
+                domain=None
             )
             
             return response, 200
@@ -473,7 +441,10 @@ def reset_password():
 
 @auth_bp.route('/debug-session')
 def debug_session():
-    """Debug session information"""
+    """Debug session information - disabled in production"""
+    is_prod = os.getenv('FLASK_ENV') == 'production' or os.getenv('K_SERVICE') is not None
+    if is_prod:
+        return jsonify({'error': 'Not available'}), 404
     try:
         return jsonify({
             'session_data': dict(session),
@@ -493,34 +464,15 @@ def debug_session():
 def auth_status():
     """Check if user is authenticated"""
     try:
-        # Log the entire session for debugging
-        logger.info("Checking auth status...")
-        logger.info(f"Full session data: {dict(session)}")
-        logger.info(f"Session ID: {session.sid if hasattr(session, 'sid') else 'No session ID'}")
-        logger.info(f"Session permanent: {session.permanent}")
-        logger.info(f"Session modified: {session.modified}")
-        logger.info(f"Session cookie settings: {current_app.config.get('SESSION_COOKIE_SECURE')}, {current_app.config.get('SESSION_COOKIE_HTTPONLY')}, {current_app.config.get('SESSION_COOKIE_SAMESITE')}")
-        
         if 'user' in session:
-            logger.info(f"User found in session: {session['user']}")
-            # Get additional user info from Firebase
             try:
                 user = auth.get_user(session['user']['uid'])
-                logger.info(f"User authenticated: {session['user']['uid']}")
-                logger.info(f"User data from Firebase: {user.__dict__}")
-                
-                # Update session with latest user data
-                logger.info("Updating session with latest user data...")
                 session['user'].update({
                     'emailVerified': user.email_verified,
                     'photoURL': user.photo_url if hasattr(user, 'photo_url') else None,
                     'lastSignIn': user.user_metadata.last_sign_in_timestamp if hasattr(user.user_metadata, 'last_sign_in_timestamp') else None
                 })
                 session.modified = True
-                
-                # Session changes are automatically saved by Flask-Session
-                logger.info("Session updated successfully")
-                logger.info(f"Updated session data: {dict(session)}")
                 
                 return jsonify({
                     'authenticated': True,
@@ -535,22 +487,13 @@ def auth_status():
                 }), 200
             except Exception as e:
                 logger.error(f"Error getting user info from Firebase: {e}")
-                logger.error(f"Error type: {type(e)}")
-                logger.error(f"Error args: {e.args}")
-                logger.error(f"Error traceback: {traceback.format_exc()}")
-                # Return session data if Firebase fetch fails
-                logger.info(f"Using session data for user: {session['user']}")
                 return jsonify({
                     'authenticated': True,
                     'user': session['user']
                 }), 200
-        logger.info("No user in session")
         return jsonify({'authenticated': False}), 200
     except Exception as e:
         logger.error(f"Error checking auth status: {e}")
-        logger.error(f"Error type: {type(e)}")
-        logger.error(f"Error args: {e.args}")
-        logger.error(f"Error traceback: {traceback.format_exc()}")
         return jsonify({'authenticated': False}), 200
 
 @auth_bp.route('/logout', methods=['POST'])

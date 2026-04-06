@@ -1,7 +1,5 @@
 from flask import Blueprint, request, jsonify, session, render_template, current_app
 from firebase_auth import get_firestore_client, get_rtdb_client
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 from input_validation import validate_data, sanitize_string
 from auth_decorators import verify_cloud_scheduler
 import logging

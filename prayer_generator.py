@@ -12,8 +12,6 @@ import random
 from google.cloud.storage import Client
 from typing import Optional, Dict
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 DAILY_PRAYER_LOOKBACK_HOURS = 48

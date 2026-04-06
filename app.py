@@ -11,7 +11,7 @@ from verse_cache import verse_cache
 from flask_session import Session
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
-from flask_limiter import Limiter
+from extensions import limiter
 from flask_limiter.util import get_remote_address
 import redis
 try:
@@ -80,13 +80,7 @@ def login_required(f):
             logger.warning("No user in session, redirecting to login")
             redirect_path = request.path
             return redirect(f'/login?redirect={redirect_path}')
-            
-        try:
-            return f(*args, **kwargs)
-        except Exception as e:
-            logger.error(f"Error verifying session: {e}")
-            session.clear()
-            return redirect('/login')
+        return f(*args, **kwargs)
     return decorated_function
 
 # Get configuration
@@ -185,12 +179,10 @@ def create_app():
         logger.warning(f"Redis not available, using memory storage: {e}")
         storage_uri = "memory://"
     
-    limiter = Limiter(
-        app,
-        key_func=get_user_based_key,  # Use user-based keys instead of IP
-        default_limits=["10000 per day", "2000 per hour", "100 per minute"],
-        storage_uri=storage_uri
-    )
+    app.config['RATELIMIT_STORAGE_URI'] = storage_uri
+    app.config['RATELIMIT_KEY_FUNC'] = get_user_based_key
+    app.config['RATELIMIT_DEFAULT'] = "10000 per day;2000 per hour;100 per minute"
+    limiter.init_app(app)
     
     # Add session middleware
     @app.before_request
@@ -198,9 +190,6 @@ def create_app():
         session.permanent = True
         if 'user' in session:
             session.modified = True
-            logger.info(f"Session contains user: {session['user'].get('uid', 'unknown')}")
-        else:
-            logger.info("No user in session")
     
     @app.after_request
     def set_security_headers(response):

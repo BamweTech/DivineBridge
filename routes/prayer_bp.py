@@ -2,8 +2,7 @@ from flask import Blueprint, request, jsonify, current_app, send_file
 from datetime import datetime, timedelta
 import logging
 import os
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+from extensions import limiter
 from input_validation import validate_request, sanitize_string
 from auth_decorators import verify_cloud_scheduler
 from auth_helpers import get_user_from_session
@@ -19,11 +18,6 @@ if USE_LOCAL_STORAGE:
 else:
     logger.info("Prayer BP: Using cloud storage for production")
 
-# Initialize rate limiter
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=["1000 per day", "100 per hour"]
-)
 
 @prayer_bp.route('/prayer/<date>', methods=['GET'])
 def get_prayer(date):

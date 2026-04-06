@@ -1,5 +1,6 @@
-# Use Python 3.9 slim image
-FROM python:3.9-slim
+# Use Python 3.11 slim image (3.9 has SSL session reuse bugs causing
+# SSLZeroReturnError on long-lived gRPC/Firestore connections)
+FROM python:3.11-slim
 
 # Set working directory
 WORKDIR /app

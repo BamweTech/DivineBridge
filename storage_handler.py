@@ -21,13 +21,6 @@ from typing import Optional, Tuple, Set
 
 # Set up logging
 logger = logging.getLogger(__name__)
-logger.propagate = False  # Prevent duplicate logs
-if not logger.handlers:  # Only add handler if none exists
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
 
 class StorageHandler:
     def __init__(self):
