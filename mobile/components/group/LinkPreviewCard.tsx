@@ -12,43 +12,110 @@ type OgData = {
 
 const cache = new Map<string, OgData | null>();
 
+const BROWSER_UA =
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
+function getMeta(html: string, property: string): string | undefined {
+  const propFirst = new RegExp(
+    `<meta[^>]*property=["']${property}["'][^>]*content=["']([^"']+)["']`,
+    'i',
+  );
+  const contentFirst = new RegExp(
+    `<meta[^>]*content=["']([^"']+)["'][^>]*property=["']${property}["']`,
+    'i',
+  );
+  const nameFirst = new RegExp(
+    `<meta[^>]*name=["']${property}["'][^>]*content=["']([^"']+)["']`,
+    'i',
+  );
+  const nameAlt = new RegExp(
+    `<meta[^>]*content=["']([^"']+)["'][^>]*name=["']${property}["']`,
+    'i',
+  );
+  return (
+    propFirst.exec(html)?.[1] ??
+    contentFirst.exec(html)?.[1] ??
+    nameFirst.exec(html)?.[1] ??
+    nameAlt.exec(html)?.[1]
+  );
+}
+
+function isYouTubeUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    return host === 'youtube.com' || host === 'youtu.be' || host === 'm.youtube.com';
+  } catch {
+    return false;
+  }
+}
+
+async function fetchViaOEmbed(url: string): Promise<OgData | null> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    const endpoint = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+    const res = await fetch(endpoint, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    const json = await res.json();
+    return {
+      title: json.title,
+      description: json.author_name ? `by ${json.author_name}` : undefined,
+      image: json.thumbnail_url,
+      siteName: 'YouTube',
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function fetchOgData(url: string): Promise<OgData | null> {
   if (cache.has(url)) return cache.get(url)!;
   try {
+    if (isYouTubeUrl(url)) {
+      const oembed = await fetchViaOEmbed(url);
+      if (oembed) { cache.set(url, oembed); return oembed; }
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(url, {
       signal: controller.signal,
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DivineBridge/1.0)' },
+      headers: {
+        'User-Agent': BROWSER_UA,
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      redirect: 'follow',
     });
     clearTimeout(timeout);
     if (!res.ok) { cache.set(url, null); return null; }
 
     const contentType = res.headers.get('content-type') ?? '';
-    if (!contentType.includes('text/html')) { cache.set(url, null); return null; }
+    if (!contentType.includes('text/html') && !contentType.includes('application/xhtml')) {
+      cache.set(url, null);
+      return null;
+    }
 
     const html = await res.text();
-    const snippet = html.slice(0, 30_000);
-
-    const get = (property: string): string | undefined => {
-      const re = new RegExp(
-        `<meta[^>]*property=["']og:${property}["'][^>]*content=["']([^"']+)["']`,
-        'i',
-      );
-      const alt = new RegExp(
-        `<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:${property}["']`,
-        'i',
-      );
-      return re.exec(snippet)?.[1] ?? alt.exec(snippet)?.[1];
-    };
+    const snippet = html.slice(0, 60_000);
 
     const titleTag = /<title[^>]*>([^<]+)<\/title>/i.exec(snippet)?.[1];
 
     const data: OgData = {
-      title: get('title') ?? titleTag?.trim(),
-      description: get('description'),
-      image: get('image'),
-      siteName: get('site_name'),
+      title:
+        getMeta(snippet, 'og:title') ??
+        getMeta(snippet, 'twitter:title') ??
+        titleTag?.trim(),
+      description:
+        getMeta(snippet, 'og:description') ??
+        getMeta(snippet, 'twitter:description') ??
+        getMeta(snippet, 'description'),
+      image:
+        getMeta(snippet, 'og:image') ??
+        getMeta(snippet, 'twitter:image'),
+      siteName:
+        getMeta(snippet, 'og:site_name'),
     };
 
     if (!data.title && !data.description && !data.image) {
@@ -85,10 +152,12 @@ export function LinkPreviewCard({ url, isMe }: Props) {
 
   useEffect(() => {
     mountedRef.current = true;
-    if (cache.has(url)) {
-      setOg(cache.get(url));
+    const cached = cache.get(url);
+    if (cached !== undefined && cached !== null) {
+      setOg(cached);
       return;
     }
+    cache.delete(url);
     fetchOgData(url).then((data) => {
       if (mountedRef.current) setOg(data);
     });
@@ -104,21 +173,7 @@ export function LinkPreviewCard({ url, isMe }: Props) {
   }
 
   if (og === null) {
-    return (
-      <Pressable onPress={() => Linking.openURL(url)}>
-        <Text
-          style={{
-            color: THEME_COLORS.gold,
-            fontFamily: 'Geist_600SemiBold',
-            fontSize: 13,
-            textDecorationLine: 'underline',
-          }}
-          numberOfLines={3}
-        >
-          {url}
-        </Text>
-      </Pressable>
-    );
+    return null;
   }
 
   return (
