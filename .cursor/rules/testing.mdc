@@ -1,0 +1,35 @@
+---
+description: Testing conventions for Divine Bridge
+globs: "tests/**/*.py,mobile/**/*.test.*"
+alwaysApply: false
+---
+
+# Testing Conventions
+
+## Python (Flask backend)
+
+- Tests live in `tests/` and run with `pytest tests/ -v --tb=short`.
+- Set `USE_LOCAL_STORAGE=true` to avoid GCS dependencies in tests.
+- Dev dependencies are in `requirements-dev.txt`.
+- Lint: `flake8 --max-line-length=120` on `app.py routes/ core/ tests/`.
+- Format: `black --line-length=120`.
+
+## Mobile (Expo / React Native)
+
+- TypeScript check: `npx tsc --noEmit` in `mobile/`.
+- Lint: `npm run lint` in `mobile/`.
+- Health: `npx expo-doctor` in `mobile/`.
+
+## CI pipeline (.github/workflows/ci.yml)
+
+The CI runs on every PR and push to main/develop:
+
+1. **Python job**: Install `requirements-dev.txt`, flake8, black --check, pytest (all with `|| true` soft-fail currently).
+2. **Mobile job**: `npm ci`, tsc, eslint, expo-doctor.
+
+## Writing tests
+
+- Mock Firebase with test fixtures; use `USE_LOCAL_STORAGE=true` for storage.
+- Test API routes by importing the Flask app and using the test client.
+- Keep tests focused -- one assertion concept per test function.
+- Name test files `test_<module>.py` matching the module under test.

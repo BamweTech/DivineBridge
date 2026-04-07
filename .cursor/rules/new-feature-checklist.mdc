@@ -1,0 +1,28 @@
+---
+description: Checklist for adding cross-stack features to Divine Bridge
+alwaysApply: true
+---
+
+# New Feature Checklist
+
+When adding a feature that spans multiple parts of the stack, follow this checklist:
+
+## Before coding
+
+1. Read `docs/ARCHITECTURE.md` to understand where the feature fits.
+2. Check existing code for similar functionality -- avoid duplication.
+3. Identify all layers the feature touches: Flask routes, mobile screens, Firestore collections, web templates, SFU signals.
+
+## Implementation
+
+4. **Flask route**: Follow blueprint pattern in `routes/`. Register in `app.py` with `csrf.exempt()` and `url_prefix`.
+5. **Mobile screen**: Add file in `mobile/app/`, register in `_layout.tsx`, add API call in `mobile/services/api.ts`.
+6. **Firestore**: If adding a new collection, update `firestore.rules` and `firestore.indexes.json`.
+7. **Web template**: Extend `base.html`, wire route in `app.py` or the relevant blueprint.
+
+## After coding
+
+8. Add tests: pytest for Flask, tsc check for mobile.
+9. Update `docs/ARCHITECTURE.md` if the feature introduces new architectural patterns.
+10. Update the relevant `AGENTS.md` file if the directory conventions changed.
+11. Update `.env.example` if new environment variables were added.

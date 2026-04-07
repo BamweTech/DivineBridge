@@ -1,0 +1,39 @@
+---
+description: Firebase patterns and Firestore security rules for Divine Bridge
+globs: "**/*.rules,**/firebase*.py,**/firebase*.ts,firestore.indexes.json"
+alwaysApply: false
+---
+
+# Firebase Conventions
+
+## Firestore collections (from firestore.rules)
+
+- `users` — profiles, preferences, admin flags
+- `prayer_rooms`, `scheduled_rooms`, `scheduled_room_rsvps` — live room metadata
+- `chat_messages`, `group_chat_messages/{id}/messages` — room and group chat
+- `prayer_groups`, `group_members` — small group communities
+- `prayer_requests`, `testimonies` — prayer wall, thanksgiving wall
+- `devotional_plans` — personalized devotional content
+
+## Server-side access
+
+- Python: `firebase_admin` initialized in `firebase_auth.py`. Use `get_firestore_client()` for DB access.
+- Node (SFU): `firebase-admin` in `media-server/src/auth.js` for token verification.
+
+## Client-side access
+
+- Web: Firebase JS SDK loaded in templates, configured via `FIREBASE_CLIENT_CONFIG` from Secret Manager.
+- Mobile: `mobile/lib/firebase.ts` exports the Firestore instance.
+
+## Security rules
+
+- Rules live in `firestore.rules` at repo root. Deploy with `firebase deploy --only firestore`.
+- Indexes in `firestore.indexes.json`.
+- Storage rules in `storage.rules`.
+- Always test rules changes locally before deploying.
+
+## Key patterns
+
+- Avoid composite indexes where possible -- use client-side sorting (see `groups_bp.py` pattern).
+- Use `merge=True` for partial updates (Python) / `{ merge: true }` (JS).
+- RTDB is used for low-latency live room state; Firestore for persistent data.

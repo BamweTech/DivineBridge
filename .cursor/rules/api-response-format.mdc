@@ -1,0 +1,48 @@
+---
+description: Standardize API JSON response format across all Flask routes
+globs: "routes/**/*.py"
+alwaysApply: false
+---
+
+# API Response Format
+
+## Standard shape
+
+All API routes should return JSON in this consistent format:
+
+### Success
+
+```python
+return jsonify({'success': True, 'data': result}), 200
+```
+
+### Error
+
+```python
+return jsonify({'success': False, 'error': 'Human-readable message'}), 4xx
+```
+
+### List endpoints
+
+```python
+return jsonify({'success': True, 'data': items, 'count': len(items)}), 200
+```
+
+## Migration note
+
+The codebase currently has a mix of response shapes (`{error}`, `{message}`, `{success, groups}`, etc.). When modifying an existing route, standardize its responses to the format above. Do not refactor responses in routes you are not otherwise changing to avoid regressions.
+
+## HTTP status codes
+
+- `200` — success
+- `201` — resource created
+- `400` — bad request / validation error
+- `401` — authentication required
+- `403` — forbidden
+- `404` — not found
+- `429` — rate limited
+- `500` — internal server error
+
+## Mobile client compatibility
+
+The mobile API client (`mobile/services/api.ts`) parses errors from `json.error`, `json.message`, and `json.reason` fields. Ensure the `error` field is always a string when present.

@@ -1,0 +1,41 @@
+---
+description: Deployment safety checks and workflow for Divine Bridge
+globs: "scripts/**,.github/workflows/**,cloud-run-config.yaml,Dockerfile"
+alwaysApply: false
+---
+
+# Deployment Safety
+
+## Pre-deploy checklist
+
+1. All changes committed and pushed.
+2. CI passes (Python lint + tests, mobile tsc + eslint + expo-doctor).
+3. Changes reviewed and approved.
+4. Review recent deployment history before promoting.
+
+## Deployment targets
+
+- **Flask app**: Google Cloud Run via `scripts/deploy.sh` or GitHub Actions.
+  - Source deploy: `gcloud run deploy divinebridge --source .`
+  - Image deploy: Cloud Build → `gcr.io/divinebridge/divinebridge`
+  - Health check: `/_ah/health` on port 8080.
+- **Firestore rules + indexes**: `firebase deploy --only firestore`
+- **Storage rules**: `firebase deploy --only storage` (requires `DEPLOY_FIREBASE_STORAGE=1`)
+- **Media SFU**: Separate Node deployment, not in the Flask container.
+
+## Staging first
+
+- Push to `develop` triggers `deploy-staging.yml` → `divinebridge-staging` on Cloud Run.
+- Manual `deploy.yml` promotes to production.
+- Never deploy directly to production without staging verification.
+
+## Scripts
+
+- `scripts/deploy.sh` supports `--dry-run`, `--firestore-only`, `--cloud-run-only`.
+- Environment config in `scripts/deploy.env` (not committed; see `deploy.env.example`).
+
+## CI workflows
+
+- `ci.yml`: Runs on PR/push to main/develop. Python lint (flake8), format (black), pytest, mobile tsc/lint/expo-doctor.
+- `deploy.yml`: Manual workflow_dispatch for production.
+- `deploy-staging.yml`: Auto-deploy on push to develop.

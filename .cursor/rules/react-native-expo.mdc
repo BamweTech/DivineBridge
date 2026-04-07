@@ -1,0 +1,41 @@
+---
+description: Expo / React Native conventions for the Divine Bridge mobile app
+globs: "mobile/**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# Mobile App Conventions (Expo / React Native)
+
+## Navigation
+
+- Uses **expo-router** file-based routing under `mobile/app/`.
+- Tab screens live in `mobile/app/(tabs)/`. Auth screens in `mobile/app/(auth)/`.
+- Dynamic routes use bracket syntax: `room/[id].tsx`, `group/[id].tsx`.
+- Register new screens in the nearest `_layout.tsx` Stack or Tabs if custom options are needed.
+
+## Data layer
+
+- **REST API**: All HTTP calls go through `mobile/services/api.ts` which handles Firebase Bearer token auth, 401 retry, and error parsing.
+- **TanStack Query**: Server state is managed with query hooks in `mobile/hooks/` (e.g. `useHomeBundle.ts`).
+- **Firestore**: Real-time data (groups chat, room state) uses Firebase SDK directly with `onSnapshot` in hooks.
+- **Zustand**: Local UI state lives in `mobile/stores/` (e.g. `authStore.ts`).
+
+## Styling
+
+- **NativeWind** (Tailwind for React Native). Use `className` prop with Tailwind utilities.
+- Theme colors are in `mobile/lib/constants.ts` as `THEME_COLORS`.
+- Global CSS is imported in `mobile/app/_layout.tsx`.
+
+## Conventions
+
+- API base URL and SFU WebSocket URL come from `mobile/lib/constants.ts`.
+- Firebase is initialized in `mobile/lib/firebase.ts`.
+- Backend auth bridge: `mobile/lib/backendAuth.ts` syncs Firebase auth with the Flask session.
+- Icons use `mobile/components/ui/Icon.tsx`.
+- Fonts: Plus Jakarta Sans and Geist, loaded in root layout.
+
+## Adding a new API endpoint call
+
+1. Add the method to the relevant object in `mobile/services/api.ts`.
+2. Create a TanStack Query hook in `mobile/hooks/` if it needs caching/refetching.
+3. Type the response explicitly -- do not use `any`.

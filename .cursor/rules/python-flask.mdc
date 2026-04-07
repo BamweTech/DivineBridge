@@ -1,0 +1,45 @@
+---
+description: Flask backend conventions for Divine Bridge
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Flask / Python Conventions
+
+## Blueprint structure
+
+- Each feature area lives in its own file under `routes/` as a Flask Blueprint.
+- Business logic lives in root-level service modules (e.g. `prayer_generator.py`, `storage_handler.py`), not inside route handlers.
+- Blueprints are registered in `app.py` inside `create_app()` with a `url_prefix` and `csrf.exempt()` for API routes.
+
+## Route pattern
+
+```python
+from flask import Blueprint, request, jsonify, g
+from auth_helpers import require_auth
+from firebase_auth import get_firestore_client
+
+bp = Blueprint('feature', __name__, url_prefix='/api/feature')
+
+@bp.route('', methods=['GET'])
+@require_auth
+def list_items():
+    db = get_firestore_client()
+    # ...
+    return jsonify({'success': True, 'data': items}), 200
+```
+
+## Key conventions
+
+- Use `@require_auth` for authenticated endpoints; the user ID is on `g.user_id`.
+- Use `get_firestore_client()` from `firebase_auth` for Firestore access.
+- Use `get_config()` singleton from `config.py` for secrets -- never read env vars directly for secrets.
+- Rate limiting uses `extensions.limiter`; prayer room endpoints are exempted in `app.py`.
+- Local dev swaps storage via `USE_LOCAL_STORAGE=true` → `local_storage.py`.
+- Logging: use `logging.getLogger(__name__)` -- structured JSON in production via `logging_config.py`.
+
+## Error handling
+
+- Always return JSON with appropriate HTTP status codes.
+- Catch specific exceptions; log with `logger.error()` including `exc_info=True` for stack traces.
+- Never expose internal error details to clients in production.

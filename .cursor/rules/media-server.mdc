@@ -1,0 +1,40 @@
+---
+description: Media server (mediasoup SFU) conventions for Divine Bridge
+globs: "media-server/**/*.{js,ts}"
+alwaysApply: false
+---
+
+# Media Server (SFU) Conventions
+
+## Stack
+
+- Node.js (>=18), Express HTTP server, WebSocket signaling (`ws`), mediasoup.
+- Entry: `media-server/src/server.js`.
+- Auth: `media-server/src/auth.js` verifies Firebase ID tokens.
+- Config: `media-server/src/config.js` for worker settings, codecs, transport options.
+- Room model: `media-server/src/Room.js` — in-memory `Room`/`Peer` objects.
+
+## Architecture
+
+- Worker pool: Multiple mediasoup workers, round-robin assignment.
+- Room registry: `media-server/src/roomRegistry.js` tracks active rooms.
+- WebSocket protocol: JSON request/response (`join`, `createTransport`, `produce`, `consume`, etc.).
+- Rooms auto-cleanup when empty.
+
+## Auth
+
+- Production: Firebase ID token verification via `firebase-admin`.
+- Credentials: `FIREBASE_CREDENTIALS` from Google Secret Manager or local key file.
+- Development: `DEV_MODE=true` allows base64-encoded JSON "tokens" for local testing.
+
+## Key patterns
+
+- WebSocket connection → `join` with room ID + auth token → create transports → produce/consume media.
+- Protocol parity between web (`static/js/sfu-client.js`) and mobile (`mobile/lib/sfu.ts`).
+- Redis used for pub/sub signaling in multi-instance deployments.
+- Separate deployment from Flask container; different scaling characteristics.
+
+## Room modes (from mobile/lib/constants.ts)
+
+- **Group call**: Small participant cap, full mesh-style media.
+- **Prayer room**: Larger gatherings, speaker caps, spotlight video.
