@@ -4051,107 +4051,124 @@ def get_metrics():
         return jsonify({'error': 'Failed to get metrics'}), 500
 
 def cleanup_inactive_sessions():
-    """Clean up inactive sessions older than 1 hour"""
+    """Clean up inactive device sessions older than 1 hour.
+    Batched deletes with per-room isolation."""
     try:
         db = get_firestore_client()
         cutoff_time = datetime.utcnow() - timedelta(hours=1)
-        
-        all_rooms_ref = db.collection('prayer_rooms')
-        all_rooms = all_rooms_ref.stream(retry=Retry())
-        
+
+        all_rooms = db.collection('prayer_rooms').stream(retry=Retry())
+
         cleaned_count = 0
         for room_doc in all_rooms:
-            inactive_sessions_ref = room_doc.reference\
-                .collection('device_sessions')\
-                .where('is_active', '==', False)
-            
-            for session_doc in inactive_sessions_ref.stream(retry=Retry()):
-                session_data = session_doc.to_dict()
-                ended_at = session_data.get('ended_at')
-                if ended_at:
-                    try:
-                        ended = ended_at
-                        if hasattr(ended_at, 'tzinfo') and ended_at.tzinfo is not None:
-                            ended = ended_at.replace(tzinfo=None)
-                        if ended < cutoff_time:
-                            session_doc.reference.delete()
-                            cleaned_count += 1
-                    except Exception:
+            try:
+                stale = []
+                inactive_docs = room_doc.reference \
+                    .collection('device_sessions') \
+                    .where('is_active', '==', False) \
+                    .stream(retry=Retry())
+
+                for session_doc in inactive_docs:
+                    ended_at = session_doc.to_dict().get('ended_at')
+                    if not ended_at:
                         continue
-        
-        logging.info(f"Cleaned up {cleaned_count} inactive sessions")
+                    if hasattr(ended_at, 'tzinfo') and ended_at.tzinfo is not None:
+                        ended_at = ended_at.replace(tzinfo=None)
+                    if ended_at < cutoff_time:
+                        stale.append(session_doc.reference)
+
+                for i in range(0, len(stale), 500):
+                    batch = db.batch()
+                    for ref in stale[i:i + 500]:
+                        batch.delete(ref)
+                    batch.commit()
+                    cleaned_count += len(stale[i:i + 500])
+            except Exception as room_err:
+                logging.warning(f"Session cleanup skipped room {room_doc.id}: {room_err}")
+
+        if cleaned_count:
+            logging.info(f"Cleaned up {cleaned_count} inactive sessions")
         return cleaned_count
-        
+
     except Exception as e:
         logging.error(f"Error cleaning up inactive sessions: {str(e)}")
         return 0
 
 def cleanup_signaling_artifacts():
-    """Clean up old WebRTC signaling artifacts (offers, answers, candidates)"""
+    """Clean up old WebRTC signaling artifacts (offers, answers, candidates).
+    Uses batched deletes and per-room isolation so one slow room can't
+    timeout the entire sweep."""
     try:
         db = get_firestore_client()
         cutoff_time = datetime.utcnow() - timedelta(minutes=30)
-        
-        all_rooms_ref = db.collection('prayer_rooms')
-        all_rooms = all_rooms_ref.stream(retry=Retry())
-        
+
+        all_rooms = db.collection('prayer_rooms').stream(retry=Retry())
+
         cleaned_count = 0
-        
+        subcollections = ('webrtc_offers', 'webrtc_answers', 'webrtc_candidates')
+
         for room_doc in all_rooms:
-            offers_ref = room_doc.reference.collection('webrtc_offers')\
-                .where('timestamp', '<', cutoff_time)
-            for offer_doc in offers_ref.stream(retry=Retry()):
-                offer_doc.reference.delete()
-                cleaned_count += 1
-            
-            answers_ref = room_doc.reference.collection('webrtc_answers')\
-                .where('timestamp', '<', cutoff_time)
-            for answer_doc in answers_ref.stream(retry=Retry()):
-                answer_doc.reference.delete()
-                cleaned_count += 1
-            
-            candidates_ref = room_doc.reference.collection('webrtc_candidates')\
-                .where('timestamp', '<', cutoff_time)
-            for candidate_doc in candidates_ref.stream(retry=Retry()):
-                candidate_doc.reference.delete()
-                cleaned_count += 1
-        
-        logging.info(f"Cleaned up {cleaned_count} signaling artifacts")
+            for sub in subcollections:
+                try:
+                    stale_docs = list(
+                        room_doc.reference.collection(sub)
+                        .where('timestamp', '<', cutoff_time)
+                        .limit(500)
+                        .stream(retry=Retry())
+                    )
+                    if not stale_docs:
+                        continue
+                    for i in range(0, len(stale_docs), 500):
+                        batch = db.batch()
+                        for doc in stale_docs[i:i + 500]:
+                            batch.delete(doc.reference)
+                        batch.commit()
+                        cleaned_count += len(stale_docs[i:i + 500])
+                except Exception as sub_err:
+                    logging.warning(f"Signaling cleanup skipped {sub} in room {room_doc.id}: {sub_err}")
+
+        if cleaned_count:
+            logging.info(f"Cleaned up {cleaned_count} signaling artifacts")
         return cleaned_count
-        
+
     except Exception as e:
         logging.error(f"Error cleaning up signaling artifacts: {str(e)}")
         return 0
 
 def cleanup_old_chat_messages():
-    """Clean up old chat messages (keep last 1000 per room)"""
+    """Clean up old chat messages (keep last 1000 per room).
+    Batched deletes with per-room isolation."""
     try:
         db = get_firestore_client()
-        
-        all_rooms_ref = db.collection('prayer_rooms')
-        all_rooms = all_rooms_ref.stream(retry=Retry())
-        
+
+        all_rooms = db.collection('prayer_rooms').stream(retry=Retry())
+
         cleaned_count = 0
-        
         for room_doc in all_rooms:
-            room_id = room_doc.id
-            
-            chat_messages_ref = db.collection('chat_messages')\
-                .where('room_id', '==', room_id)\
-                .order_by('timestamp', direction='DESCENDING')
-            
-            messages = list(chat_messages_ref.stream(retry=Retry()))
-            
-            # Keep only the last 1000 messages
-            if len(messages) > 1000:
-                messages_to_delete = messages[1000:]
-                for message_doc in messages_to_delete:
-                    message_doc.reference.delete()
-                    cleaned_count += 1
-        
-        logging.info(f"Cleaned up {cleaned_count} old chat messages")
+            try:
+                messages = list(
+                    db.collection('chat_messages')
+                    .where('room_id', '==', room_doc.id)
+                    .order_by('timestamp', direction='DESCENDING')
+                    .stream(retry=Retry())
+                )
+                if len(messages) <= 1000:
+                    continue
+
+                to_delete = messages[1000:]
+                for i in range(0, len(to_delete), 500):
+                    batch = db.batch()
+                    for msg_doc in to_delete[i:i + 500]:
+                        batch.delete(msg_doc.reference)
+                    batch.commit()
+                    cleaned_count += len(to_delete[i:i + 500])
+            except Exception as room_err:
+                logging.warning(f"Chat cleanup skipped room {room_doc.id}: {room_err}")
+
+        if cleaned_count:
+            logging.info(f"Cleaned up {cleaned_count} old chat messages")
         return cleaned_count
-        
+
     except Exception as e:
         logging.error(f"Error cleaning up old chat messages: {str(e)}")
         return 0
