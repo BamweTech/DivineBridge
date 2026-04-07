@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, session, render_template, current
 from firebase_auth import get_firestore_client, get_rtdb_client
 from input_validation import validate_data, sanitize_string
 from auth_decorators import verify_cloud_scheduler
+from push_service import send_push_to_group
 from google.api_core.retry import Retry
 import logging
 from datetime import datetime, timedelta
@@ -534,6 +535,19 @@ def ensure_group_prayer_session():
         }
 
         db.collection('prayer_rooms').document(room_id).set(room_data)
+
+        try:
+            send_push_to_group(
+                group_id,
+                title=f'{gname} \u2014 Live Prayer',
+                body=f'{host_name} started a live prayer session. Tap to join.',
+                data={'type': 'group_live', 'groupId': group_id, 'roomId': room_id},
+                exclude_user=uid,
+                priority='high',
+                channel_id='group-live',
+            )
+        except Exception as push_err:
+            logging.warning(f'Group session push failed (non-fatal): {push_err}')
 
         return jsonify({
             'success': True,

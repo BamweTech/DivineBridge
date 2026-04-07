@@ -26,7 +26,8 @@ def _get_client():
         return None
 
 
-def send_push(tokens, title, body, data=None, badge=None):
+def send_push(tokens, title, body, data=None, badge=None,
+              priority=None, channel_id=None):
     """Send a push notification to one or more Expo push tokens.
 
     Args:
@@ -35,6 +36,8 @@ def send_push(tokens, title, body, data=None, badge=None):
         body: Notification body text.
         data: Optional dict of extra data attached to the notification.
         badge: Optional badge count.
+        priority: 'default', 'normal', or 'high'. High wakes Android devices.
+        channel_id: Android notification channel ID (e.g. 'group-live').
     """
     client = _get_client()
     if client is None:
@@ -58,6 +61,8 @@ def send_push(tokens, title, body, data=None, badge=None):
                 data=data or {},
                 badge=badge,
                 sound='default',
+                priority=priority or 'high',
+                channel_id=channel_id,
             )
             for token in tokens
         ]
@@ -85,7 +90,8 @@ def send_push_to_user(user_id, title, body, data=None):
         logger.error(f"Error sending push to user {user_id}: {e}")
 
 
-def send_push_to_group(group_id, title, body, data=None, exclude_user=None):
+def send_push_to_group(group_id, title, body, data=None, exclude_user=None,
+                       priority=None, channel_id=None):
     """Send push notification to all members of a prayer group."""
     try:
         from firebase_admin import firestore
@@ -106,6 +112,7 @@ def send_push_to_group(group_id, title, body, data=None, exclude_user=None):
                     tokens.append(token)
 
         if tokens:
-            send_push(tokens, title, body, data)
+            send_push(tokens, title, body, data,
+                      priority=priority, channel_id=channel_id)
     except Exception as e:
         logger.error(f"Error sending push to group {group_id}: {e}")

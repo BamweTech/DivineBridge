@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { AppState } from 'react-native';
 import { useAuthStore } from '@/stores/authStore';
 import { useLiveRooms, useMyGroups } from '@/hooks/useGroups';
-import { presentGroupCallNotification } from '@/lib/groupCallNotify';
-import type { PrayerRoom, PrayerGroup } from '@/types';
+import type { PrayerGroup } from '@/types';
 
 export type ActiveCallBanner = {
   groupId: string;
@@ -12,8 +10,9 @@ export type ActiveCallBanner = {
 };
 
 /**
- * Monitors live rooms for the user's groups and fires a local notification
- * + returns banner data when someone else starts a call.
+ * Monitors live rooms for the user's groups and shows an in-app banner
+ * when someone else starts a call. Server-side push (via push_service)
+ * handles background/system notifications, so no local notification here.
  */
 export function useGroupCallNotifications() {
   const { user } = useAuthStore();
@@ -52,12 +51,6 @@ export function useGroupCallNotifications() {
       const hostName = room.host_name || 'Someone';
 
       setBanner({ groupId: room.group_id!, groupName, hostName });
-
-      if (AppState.currentState !== 'active') {
-        void presentGroupCallNotification(groupName, hostName, room.group_id!);
-      } else {
-        void presentGroupCallNotification(groupName, hostName, room.group_id!);
-      }
     }
 
     const activeIds = new Set(myGroupRooms.map((r) => r.room_id));
