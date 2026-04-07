@@ -52,11 +52,10 @@ DISASTER_TYPES = [
     'building collapse', 'bridge collapse', 'industrial accident', 'explosion',
 ]
 
-# Global Prayer Watch is the active-event feed on the mobile prayer wall, so discovery should
-# stay close to breaking-news cadence while still allowing a short tail for active response.
-DISASTER_DISCOVERY_MAX_AGE_DAYS = 3
-BREAKING_EVENT_PRIORITY_HOURS = 24
-ACTIVE_EVENT_MAX_AGE_HOURS = 72
+# Global Prayer Watch: wide enough to keep major crises visible for several days (humanitarian
+# response, aftershocks, rising tolls) without the feed going stale for weeks.
+DISASTER_DISCOVERY_MAX_AGE_DAYS = 5
+ACTIVE_EVENT_MAX_AGE_HOURS = 120  # 5 days; must stay in sync with discovery window above
 # Summaries sometimes repeat the onset date ("on March 10…") while an event is still active; keep
 # a modest buffer for prose dates, but much tighter than the daily prayer's broader summary scope.
 DISASTER_TEXT_DATE_MAX_AGE_DAYS = 10
@@ -108,7 +107,8 @@ CURRENT TIME: {current_time}
 ROLLING WINDOW: Only events (or clearly documented **new** developments) from **on or after {window_start}** through **{window_end}** — about the last **{max_age_days} days**. Use real-time search; do not invent dates.
 
 CRITICAL RELEVANCE:
-- Include items only when there is a **current** response, warning, rescue, evacuation, new impact, or credible **new** reporting inside the window.
+- Include items when there is **meaningful current reporting** inside the window: response, warnings, new impact, verified updates, humanitarian scale, or official figures still moving.
+- **Large-scale crises** (major quakes, floods, conflicts, mass-casualty accidents) often stay newsworthy for **several days** (aftershocks, relief, rising tolls, newly reached areas). If substantive coverage is still active inside the window, **include them** — do not drop a major story only because the first impact was a few days ago.
 - Omit items whose main story is old recap, anniversary, or "on this day" content.
 - Omit anything you cannot time to the window.
 - When searching, you may consider many hazard keywords (storms, quakes, conflicts, accidents, etc.), but each JSON row must use a **canonical type** from the list below.
@@ -116,7 +116,7 @@ CRITICAL RELEVANCE:
 DEDUPLICATION & LIMITS:
 - **At most one object per distinct ongoing incident** (merge multiple articles into one `news_summary`).
 - Return **at most {DISCOVERY_MAX_ITEMS}** objects total, ordered by **recency of the development** you use for `timestamp`, then by human impact.
-- Prefer the **last 6–24 hours**; use the full {max_age_days}-day window only for clearly ongoing situations with **new** developments in that period.
+- Prefer very recent items for **smaller** events; use the full **{max_age_days}-day** window freely for **major** ongoing situations with sustained coverage.
 
 SEARCH: Use varied queries, e.g. breaking news last {max_age_days} days, "today" + hazard + region, official alerts, wires and local outlets. Today's date anchor: {today_tokens}.
 Cast a wide net with keywords such as: {hazard_search_hints} — but each JSON row's `type` must still be one **canonical slug** from the list below (map hurricanes/cyclones/storms to typhoon, wildfires to fire, etc.).
@@ -305,15 +305,6 @@ Do not emit stale recap items (e.g. storms whose main story is months old with n
                             f"{disaster.get('country')}"
                         )
                         continue
-                    if (
-                        age.total_seconds() > BREAKING_EVENT_PRIORITY_HOURS * 3600
-                        and not self._summary_indicates_active_response(combined_text)
-                    ):
-                        logger.warning(
-                            f"Rejected stale non-active disaster: {disaster.get('type')} in "
-                            f"{disaster.get('country')}"
-                        )
-                        continue
 
                     # Normalize disaster type
                     disaster['type'] = self._normalize_disaster_type(disaster.get('type', ''))
@@ -345,36 +336,6 @@ Do not emit stale recap items (e.g. storms whose main story is months old with n
             logger.error(f"Traceback: {traceback.format_exc()}")
             return []
 
-    @staticmethod
-    def _summary_indicates_active_response(text: str) -> bool:
-        """Heuristic for whether a writeup still reads like an active breaking event."""
-        lowered = (text or '').lower()
-        active_markers = (
-            'rescue',
-            'search and rescue',
-            'emergency',
-            'evacuat',
-            'warning',
-            'alert',
-            'responders',
-            'response',
-            'underway',
-            'ongoing',
-            'continuing',
-            'still burning',
-            'still missing',
-            'aftershock',
-            'landfall',
-            'shelter',
-            'hospital',
-            'recover',
-            'crews',
-            'authorities said',
-            'officials said',
-            'declared',
-        )
-        return any(marker in lowered for marker in active_markers)
-    
     def _normalize_disaster_type(self, disaster_type: str) -> str:
         """Normalize disaster type to standard format"""
         disaster_type = disaster_type.lower().strip()
