@@ -36,9 +36,7 @@ Full WhatsApp/Telegram incoming call experience using `react-native-callkeep`:
 - [ ] Configure distribution certificate for non-interactive iOS builds
 - [ ] Automate iOS builds in CI/CD pipeline
 
-### Group Chat Push Notifications (Server-Side)
-- [ ] Wire `send_push_to_group()` for new group chat messages (currently local-only via Firestore listener)
-- [ ] Rate-limit push sends to avoid spamming during active conversations
+### Group Chat Notification Preferences
 - [ ] Add mute/notification preferences per group per user
 
 ---
@@ -59,6 +57,12 @@ Full WhatsApp/Telegram incoming call experience using `react-native-callkeep`:
 ---
 
 ## Completed
+
+### Group Chat Server Push (Apr 2026)
+- [x] Add `POST /api/groups/<id>/notify-message` endpoint with 30s per-group rate limiting
+- [x] Call notify endpoint from mobile `sendMessage` after Firestore write (fire-and-forget)
+- [x] Remove duplicate local notification from `useGroupChatNotifications` — haptic only
+- [x] Server sends Expo push to all group members (excl. sender) via `group-chat` channel
 
 ### Background Call Notifications — Phase 1 (Apr 2026)
 - [x] Enhance `push_service.py` with priority and channel_id support

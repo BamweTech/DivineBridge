@@ -197,6 +197,11 @@ export const groupApi = {
     request<any>(`/api/groups/${groupId}/members/sync`, {
       method: 'POST',
     }),
+  notifyMessage: (groupId: string, senderName: string, preview: string) =>
+    request<{ success: boolean; throttled: boolean }>(
+      `/api/groups/${groupId}/notify-message`,
+      { method: 'POST', body: JSON.stringify({ sender_name: senderName, preview }) },
+    ),
 };
 
 // ─── Devotional Plans ─────────────────────────────────────────────────────────

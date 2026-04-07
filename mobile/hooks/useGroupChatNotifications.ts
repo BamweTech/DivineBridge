@@ -13,21 +13,19 @@ import { COLLECTIONS } from '@/lib/constants';
 import { useAuthStore } from '@/stores/authStore';
 import { useMyGroups, firestoreTimestampMs } from '@/hooks/useGroups';
 import { getActiveGroup } from '@/lib/activeGroupStore';
-import { presentGroupChatNotification } from '@/lib/groupChatNotify';
 
 type LatestMsg = {
   ts: number;
   userId: string;
-  userName: string;
-  message: string;
 };
 
 const DEBOUNCE_MS = 3000;
 
 /**
- * Monitors all of the user's groups for new chat messages and fires a local
- * notification + haptic when a message arrives from someone else — unless
- * that group screen is currently active.
+ * Monitors all of the user's groups for new chat messages and fires a
+ * haptic when a message arrives from someone else while the app is in the
+ * foreground. Server-side push (via push_service) handles background/system
+ * notifications — no local notification is fired here.
  */
 export function useGroupChatNotifications(): void {
   const { user } = useAuthStore();
@@ -45,7 +43,6 @@ export function useGroupChatNotifications(): void {
       return;
     }
 
-    const groupMap = new Map(groups.map((g) => [g.group_id, g]));
     const unsubs: Array<() => void> = [];
 
     for (const gid of groupIds) {
@@ -64,11 +61,9 @@ export function useGroupChatNotifications(): void {
           const d = snap.docs[0].data();
           const ts = firestoreTimestampMs(d.timestamp);
           const userId = typeof d.user_id === 'string' ? d.user_id : '';
-          const userName = typeof d.user_name === 'string' ? d.user_name : '';
-          const message = typeof d.message === 'string' ? d.message : '';
 
           const prev = latestRef.current[gid];
-          latestRef.current[gid] = { ts, userId, userName, message };
+          latestRef.current[gid] = { ts, userId };
 
           if (!initialised.current) return;
           if (!prev || ts <= prev.ts) return;
@@ -82,11 +77,7 @@ export function useGroupChatNotifications(): void {
           if (now - lastNotified < DEBOUNCE_MS) return;
           lastNotifiedAt.current[gid] = now;
 
-          const groupName = groupMap.get(gid)?.name ?? 'Prayer Group';
-          const preview = message.length > 80 ? message.slice(0, 77) + '…' : message;
-
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          void presentGroupChatNotification(groupName, userName, preview, gid);
         },
         () => {
           latestRef.current[gid] = null;

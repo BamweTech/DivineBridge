@@ -18,6 +18,7 @@ import { db } from '@/lib/firebase';
 import { COLLECTIONS } from '@/lib/constants';
 import { useAuthStore } from '@/stores/authStore';
 import { useLiveRoomsContext } from '@/contexts/LiveRoomsContext';
+import { groupApi } from '@/services/api';
 import { getDisplayName } from '@/lib/userDisplayName';
 import type {
   PrayerGroup,
@@ -395,6 +396,10 @@ export function useGroupChat(groupId: string) {
     if (options?.replyTo) payload.reply_to = options.replyTo;
 
     await addDoc(collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages'), payload);
+
+    const senderName = getDisplayName(profile, user);
+    const preview = body.length > 80 ? body.slice(0, 77) + '…' : body;
+    groupApi.notifyMessage(groupId, senderName, preview).catch(() => {});
   }
 
   async function toggleReaction(messageId: string, emoji: string) {

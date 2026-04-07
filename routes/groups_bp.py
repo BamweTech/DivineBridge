@@ -3,12 +3,14 @@ Prayer Groups routes — CRUD for small prayer communities.
 Designed per docs/PRAYER_GROUPS_BRAINSTORM.md.
 """
 import datetime
+import time
 import uuid
 import logging
 from flask import Blueprint, request, jsonify, g
 from firebase_admin import firestore
 from firebase_auth import get_firestore_client
 from auth_helpers import require_auth
+from push_service import send_push_to_group
 
 logger = logging.getLogger(__name__)
 groups_bp = Blueprint('groups', __name__, url_prefix='/api/groups')
@@ -312,3 +314,52 @@ def leave_group(group_id: str):
     db.collection('group_members').document(group_id).collection('members').document(uid).delete()
 
     return jsonify({'success': True, 'message': 'Left the group'}), 200
+
+
+# ── Group chat message push notifications ─────────────────────────────────────
+
+_chat_push_cooldown: dict[str, float] = {}
+CHAT_PUSH_COOLDOWN_SEC = 30
+
+
+@groups_bp.route('/<group_id>/notify-message', methods=['POST'])
+@require_auth
+def notify_group_message(group_id: str):
+    """Send a push notification to group members for a new chat message.
+
+    Rate-limited to one push per group per 30 seconds so active
+    conversations don't spam members.
+    """
+    uid = g.user_id
+    data = request.get_json(silent=True) or {}
+    sender_name = (data.get('sender_name') or 'Someone')[:30]
+    preview = (data.get('preview') or '')[:100]
+
+    now = time.monotonic()
+    last_push = _chat_push_cooldown.get(group_id, 0)
+    if now - last_push < CHAT_PUSH_COOLDOWN_SEC:
+        return jsonify({'success': True, 'throttled': True}), 200
+    _chat_push_cooldown[group_id] = now
+
+    db = get_firestore_client()
+    group_snap = db.collection('prayer_groups').document(group_id).get()
+    group_name = 'Prayer Group'
+    if group_snap.exists:
+        group_name = (group_snap.to_dict().get('name') or group_name).strip()
+
+    body = f'{sender_name}: {preview}' if preview else f'{sender_name} sent a message'
+
+    try:
+        send_push_to_group(
+            group_id,
+            title=group_name,
+            body=body,
+            data={'type': 'group_chat', 'groupId': group_id},
+            exclude_user=uid,
+            priority='high',
+            channel_id='group-chat',
+        )
+    except Exception as e:
+        logger.warning(f'Group chat push failed (non-fatal): {e}')
+
+    return jsonify({'success': True, 'throttled': False}), 200
