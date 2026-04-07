@@ -14,6 +14,21 @@ from storage_handler import StorageHandler
 
 logger = logging.getLogger(__name__)
 
+
+def _parse_first_json_object(text: str) -> Optional[Dict]:
+    """Parse the first JSON object in text; ignores trailing prose after valid JSON."""
+    if not text:
+        return None
+    start = text.find('{')
+    if start < 0:
+        return None
+    try:
+        value, _ = json.JSONDecoder().raw_decode(text[start:])
+        return value if isinstance(value, dict) else None
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
 # Disaster types to monitor (from daily prayer prompt)
 DISASTER_TYPES = [
     'typhoon', 'hurricane', 'cyclone',
@@ -47,6 +62,12 @@ ACTIVE_EVENT_MAX_AGE_HOURS = 72
 DISASTER_TEXT_DATE_MAX_AGE_DAYS = 10
 # "March 2026" without a day: treat as stale only if that month is well behind "now"
 DISASTER_TEXT_MONTH_ONLY_MIN_AGE_DAYS = 45
+# JSON `type` values must match slugs after _normalize_disaster_type (search may use broader terms).
+DISCOVERY_JSON_TYPE_SLUGS = (
+    "typhoon, earthquake, flood, landslide, drought, fire, tornado, tsunami, volcano, "
+    "conflict, epidemic, famine, mass_shooting, major_accident"
+)
+DISCOVERY_MAX_ITEMS = 12
 
 
 class DisasterPrayerService:
@@ -71,7 +92,7 @@ class DisasterPrayerService:
             List of disaster dictionaries with news details
         """
         try:
-            disaster_types_str = ", ".join(DISASTER_TYPES)
+            hazard_search_hints = ", ".join(DISASTER_TYPES)
             now = datetime.now()
             max_age_days = DISASTER_DISCOVERY_MAX_AGE_DAYS
             current_time = now.strftime("%B %d, %Y %H:%M (local server)")
@@ -79,70 +100,69 @@ class DisasterPrayerService:
             window_end = now.strftime("%B %d, %Y")
             cutoff_iso = (now - timedelta(days=max_age_days)).strftime("%Y-%m-%dT%H:%M:%S")
             example_ts = (now - timedelta(hours=6)).strftime("%Y-%m-%dT%H:%M:%SZ")
-            reject_ts = (now - timedelta(days=max_age_days + 14)).strftime("%Y-%m-%dT%H:%M:%SZ")
             today_tokens = f"{now.strftime('%B')} {now.day}, {now.year}"
 
-            prompt = f"""You are the Global Prayer Watch news monitor searching for ACTIVE breaking events worldwide.
+            prompt = f"""You are the Global Prayer Watch news monitor. Find situations worldwide that are **actively developing now** and belong in a calm, factual prayer feed.
 
 CURRENT TIME: {current_time}
-ROLLING WINDOW: Include only events (or clearly documented major breaking updates) from **on or after {window_start}** through **{window_end}** — approximately the last **{max_age_days} days**. Do not anchor examples to a fixed calendar month; use real-time search.
+ROLLING WINDOW: Only events (or clearly documented **new** developments) from **on or after {window_start}** through **{window_end}** — about the last **{max_age_days} days**. Use real-time search; do not invent dates.
 
 CRITICAL RELEVANCE:
-- Global Prayer Watch is for active, breaking-style situations people should be praying about right now.
-- Favor events that are still unfolding: rescues underway, evacuations, emergency declarations, active response operations, major aftershocks/new impacts, fast-rising casualty counts, or fresh official warnings.
-- If an event happened inside the window but no longer has an active response or meaningful new development, omit it.
-- Do NOT include named storms, earthquakes, or conflicts whose **main** reporting is months old (e.g. summaries that say the event was in a past month/year like "October {now.year - 1}" unless there is a verifiable **new** development inside the window above).
-- Do NOT recycle background articles: the **news_summary** must read as current breaking context, not a historical recap.
-- If you cannot verify timing within the window, omit the item.
+- Include items only when there is a **current** response, warning, rescue, evacuation, new impact, or credible **new** reporting inside the window.
+- Omit items whose main story is old recap, anniversary, or "on this day" content.
+- Omit anything you cannot time to the window.
+- When searching, you may consider many hazard keywords (storms, quakes, conflicts, accidents, etc.), but each JSON row must use a **canonical type** from the list below.
 
-SEARCH INSTRUCTIONS:
-1. Search the web for BREAKING NEWS. Prefer queries such as:
-   - "natural disaster breaking news last {max_age_days} days"
-   - "disaster breaking news last 24 hours"
-   - "earthquake today" / "flood [region] today" / "wildfire breaking news"
-   - "plane crash today" / "airport incident breaking news" / "aviation accident today"
-   - "train derailment breaking" / "building collapse today" / "major explosion"
-   - "emergency alert" + today's date ({today_tokens})
+DEDUPLICATION & LIMITS:
+- **At most one object per distinct ongoing incident** (merge multiple articles into one `news_summary`).
+- Return **at most {DISCOVERY_MAX_ITEMS}** objects total, ordered by **recency of the development** you use for `timestamp`, then by human impact.
+- Prefer the **last 6–24 hours**; use the full {max_age_days}-day window only for clearly ongoing situations with **new** developments in that period.
 
-2. Use diverse sources: major wires, local outlets, government alerts, verified humanitarian updates.
+SEARCH: Use varied queries, e.g. breaking news last {max_age_days} days, "today" + hazard + region, official alerts, wires and local outlets. Today's date anchor: {today_tokens}.
+Cast a wide net with keywords such as: {hazard_search_hints} — but each JSON row's `type` must still be one **canonical slug** from the list below (map hurricanes/cyclones/storms to typhoon, wildfires to fire, etc.).
 
-3. Event types to cover (include **major human-impact accidents**, not only weather):
-   {disaster_types_str}
-   For airport/runway/tarmac incidents, passenger jet emergencies, and serious aviation accidents, use type **major_accident**.
+CANONICAL `type` (use exactly one string per row, lowercase):
+{DISCOVERY_JSON_TYPE_SLUGS}
+- Hurricanes, cyclones, and broad "storm" systems → **typhoon**.
+- Wildfires → **fire**. Wars and ongoing large-scale violence → **conflict**. Aviation, rail, structural, industrial, explosion incidents → **major_accident**.
 
-4. TIME WINDOW:
-   - Highest priority: last 6–24 hours.
-   - Also allow the full {max_age_days}-day window only for genuinely active emergencies with **new** developments in that period.
-   - EXCLUDE: anniversaries, "on this day", old recaps, stories whose primary dates fall **before** the window.
+LOCATION:
+- `country`: sovereign state in English (**United States**, not USA).
+- `location`: city/region as reported (e.g. "City, State" where helpful). For cross-border impact, set `country` to the primary state and mention other areas briefly in `news_summary`.
 
-For each qualifying disaster, return a JSON array with this EXACT structure:
+TONE & FACTS (mandatory):
+- **news_summary**: 2–4 short sentences, **plain and factual**. No hype, no emotional padding, no words like "catastrophic", "unprecedented", "devastating", "massive", "nightmare" unless **directly quoted** from a named source.
+- Do **not** speculate. State only what sources report.
+- No numbered citations like [1], [2]. No markdown.
+
+SEVERITY & CASUALTIES:
+- `severity`: **conservative** scale — `minor` | `moderate` | `severe` | `catastrophic`. Use **moderate** when unsure. Reserve `severe` / `catastrophic` for well-sourced reports of large loss of life, widespread displacement, or declared large-scale emergency. **Do not inflate.**
+- `casualties`: integer only if sources give a **specific** dead/injured count you are reporting; otherwise **null**. Never guess; do not use 0 for "unknown".
+
+TIMESTAMP (mandatory):
+- `timestamp`: ISO 8601 UTC (**YYYY-MM-DDTHH:MM:SSZ** or valid offset) for the **specific development this row is based on** — e.g. time of the breaking update, alert, or first credible report you rely on. If only the article time is known, use that. **Do not** use a years-old "event start" date as `timestamp` if the row is about a new update (the timestamp must fall in the allowed window).
+- Must be on or after **{cutoff_iso}**, not in the future, with a plausible year (e.g. **{now.year}** when the window does not cross New Year).
+
+JSON ARRAY — exact keys (return ONLY this array, no markdown or prose):
 [
   {{
-    "type": "one of: typhoon, hurricane, earthquake, flood, landslide, drought, wildfire, tornado, tsunami, volcano, conflict, war, epidemic, pandemic, famine, storm, mass_shooting, major_accident",
-    "country": "Full country name (e.g., 'Japan', 'United States')",
-    "location": "City/region if known",
+    "type": "<one canonical slug from the list above>",
+    "country": "<English country name>",
+    "location": "<city/region or repeat country>",
     "severity": "minor" | "moderate" | "severe" | "catastrophic",
-    "casualties": number or null,
-    "news_summary": "2–4 sentences; explain why the event is active right now; must not cite a primary event date outside the allowed window unless clearly labeled as a **new** update in-window",
-    "news_source": "Outlet name or URL",
-    "timestamp": "ISO 8601 UTC when the event or the reported breaking update occurred (YYYY-MM-DDTHH:MM:SSZ)"
+    "casualties": <integer or null>,
+    "news_summary": "<2–4 factual sentences, calm tone>",
+    "news_source": "<primary outlet name or URL>",
+    "timestamp": "<ISO 8601 in window>"
   }}
 ]
 
-TIMESTAMPS (mandatory):
-- Every item MUST have a parseable **timestamp** on or after **{cutoff_iso}** (UTC or with offset).
-- EXCLUDE future timestamps, missing timestamps, or timestamps older than the window.
-- The calendar **year** in the timestamp must match reality for that event (use **{now.year}** or the correct year if the window crosses New Year — still must fall inside the rolling window).
+If nothing qualifies, return [].
 
-OUTPUT:
-- Return ONLY a valid JSON array, no markdown or prose.
-- If nothing qualifies, return [].
+Minimal valid example (values illustrative only; your `timestamp` must satisfy the window):
+[{{"type":"earthquake","country":"Japan","location":"Tokyo","severity":"moderate","casualties":null,"news_summary":"Officials report strong shaking in the capital region. Agencies issued safety guidance. Response teams are assessing damage.","news_source":"https://example.com","timestamp":"{example_ts}"}}]
 
-EXAMPLE SHAPE (replace timestamp with a real value from your search that satisfies the window):
-[{{"type":"earthquake","country":"Japan","location":"Tokyo","severity":"severe","casualties":150,"news_summary":"Brief current breaking summary with no historical month/year outside the window.","news_source":"Reuters","timestamp":"{example_ts}"}}]
-
-REJECT (too old — do not emit items like this):
-[{{"type":"storm","country":"France","location":"Brittany","severity":"moderate","casualties":null,"news_summary":"Storm named months ago; recap only.","news_source":"Example","timestamp":"{reject_ts}"}}]"""
+Do not emit stale recap items (e.g. storms whose main story is months old with no new development in the window)."""
 
             response = self.client.query(prompt)
             
@@ -154,7 +174,6 @@ REJECT (too old — do not emit items like this):
                 logger.info(f"Perplexity RAW response (last 500 chars): {response[-500:]}")
             
             # Log the cleaned response (after removing think tags) for better readability
-            import re
             cleaned_for_log = re.sub(r'<think>.*?</think>', '[reasoning removed]', response, flags=re.DOTALL | re.IGNORECASE)
             logger.info(f"Perplexity response (first 1000 chars, cleaned): {cleaned_for_log[:1000]}")
             logger.debug(f"Perplexity full response (cleaned): {cleaned_for_log}")
@@ -182,7 +201,6 @@ REJECT (too old — do not emit items like this):
             logger.debug(f"Parsing disaster response. Length: {len(response)}, starts with: {response[:50]}")
             
             # Remove <think> tags if present (Perplexity sometimes includes these)
-            import re
             if '<think>' in response.lower():
                 logger.debug("Removing <think> tags from response")
                 response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL | re.IGNORECASE)
@@ -413,7 +431,6 @@ REJECT (too old — do not emit items like this):
             country = disaster.get('country', '')
             location = disaster.get('location', '')
             news_summary = disaster.get('news_summary', '')
-            casualties = disaster.get('casualties')
             
             # Build location string
             if location and location != country:
@@ -422,64 +439,31 @@ REJECT (too old — do not emit items like this):
                 location_str = country
             
             # Build prompt for customized prayer
-            prompt = f"""You are a compassionate prayer leader writing a customized prayer for those affected by BREAKING NEWS about {disaster_type} in {location_str}.
+            prompt = f"""You are a prayer leader writing for those affected by {disaster_type} in {location_str}. Stay **close to the facts** below; do not dramatize, exaggerate casualty figures, or add details not in the summary.
 
-BREAKING NEWS DETAILS (use these specific details in your prayer):
+SITUATION SUMMARY (only basis for specifics):
 {news_summary}
 
 PRAYER REQUIREMENTS:
 - Start with "Heavenly Father," (not "Dear Heavenly Father")
-- ⚠️ CRITICAL: Start with PRAISE - acknowledge God's goodness, faithfulness, sovereignty, love, or power before making any requests
-- Examples of praise: "we praise you for your unfailing love", "we thank you for your faithfulness", "we worship you as the sovereign Lord", "we acknowledge your goodness"
-- Length: 60-100 words (concise and focused)
-- Reference the SPECIFIC situation described in the news summary above - mention specific details like the location, what happened, the impact
-- Mention {location_str} and {disaster_type} specifically by name
-- Address the specific needs based on THIS breaking news event:
-  * Those directly affected by this specific {disaster_type} in {location_str}
-  * Families who lost loved ones or are searching for missing family members
-  * Those injured and receiving medical care right now
-  * Children who are scared and traumatized by this event
-  * Rescue workers and first responders currently on the scene
-  * Medical teams treating the injured at this moment
-  * Government leaders coordinating response efforts for this crisis
-  * Communities coming together to help those affected
-- Include a brief biblical reference or promise (no citation needed) - something relevant to this situation
-- Call on Jesus Christ and the Holy Spirit by name
-- End with hope rooted in Christ
-- End with "In Jesus-Christ's name we pray. Amen!" (EXACTLY this ending)
-- Compassionate, specific, and heartfelt tone
-- Write as if leading a prayer gathering for THIS specific breaking news RIGHT NOW
-- Make it feel urgent and relevant to THIS specific event - reference the news details
-- Use "we" and "our" throughout (praying as a community)
-- Natural, conversational language (like speaking to a friend)
-- Authentic emotion - let the weight of this specific crisis show through
-- NO explanations, NO thinking tags, NO commentary - just the prayer text
-- NO numbered citations or references like [1], [2], [3]
+- Start with brief **praise** — God's goodness, faithfulness, sovereignty, love, or power — before requests
+- Length: 60-100 words
+- Name **{location_str}** and **{disaster_type}** plainly
+- Weave in **only** factual threads from the summary (places, type of event, reported needs). If casualties are unknown, pray generally for the hurt and missing without inventing numbers
+- Intercede for: affected people and families, responders, medical workers, leaders, communities — as fits what the summary actually says
+- One brief biblical comfort or promise (no verse citation needed)
+- Name Jesus Christ and the Holy Spirit
+- End with hope in Christ; close with "In Jesus-Christ's name we pray. Amen!" (exactly)
+- Tone: **warm, steady, and sincere** — not alarmist, not theatrical. No words like "catastrophic," "unprecedented," or "devastating" unless they appear in the summary above
+- Use "we" / "our" throughout
+- NO thinking tags, NO commentary, NO [1] citations
 
-VOICE & TONE:
-✅ Natural, conversational language (like speaking to a friend)
-✅ Personal and relational (varies sentence length for natural rhythm)
-✅ Authentic emotion (let compassion show)
-✅ Balance reverence with warmth
-✅ Accessible to all Christians (avoid theological jargon)
-✅ Flows naturally when read aloud
-✅ Specific to THIS breaking news event
+❌ No rhyming poems; no archaic language ("thee," "thou"); no generic filler without ties to this situation
 
-❌ No rhyming poems (too artificial)
-❌ No stiff, formal corporate prayer language
-❌ No generic platitudes without specifics
-❌ No overly flowery or archaic language ("thee," "thou")
-❌ No repetitive phrases or clichés
-❌ NO thinking process, explanations, or reasoning (PRAYER TEXT ONLY)
-❌ No special characters or formatting
-❌ NO numbered citations or references like [1], [2], [3]
-
-CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no commentary. Just the prayer as if you're speaking it aloud to lead a community in prayer for this specific breaking news event."""
-
+Return ONLY the prayer text."""
             response = self.client.query(prompt)
             
             # Clean the response
-            import re
             prayer = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL).strip()
             # Remove citation markers from prayer
             prayer = re.sub(r'\[\d+\]', '', prayer).strip()
@@ -1031,18 +1015,22 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                 for area in affected_areas
             ])
             
-            prompt = f"""You are analyzing {disaster_type} disasters affecting multiple countries/regions.
+            prompt = f"""You are analyzing {disaster_type} situations affecting multiple countries/regions for a Christian prayer app. Be **factual and restrained** — no sensational language.
 
 CURRENT TIME: {current_time}
 
 AFFECTED AREAS AND NEWS DETAILS:
 {areas_list}
 
-TASK: Analyze all the information above and provide a comprehensive summary that includes:
+TASK: Synthesize only what the lines above support. Include:
 1. All affected countries/regions
-2. Overall impact and severity
-3. Key details from the news about what happened
-4. Current situation status
+2. Overall impact in **measured** terms (no hype words like "catastrophic", "unprecedented", "devastating" unless a named source uses them — prefer plain description)
+3. Key facts from the news (what happened, who is responding, what is known / unknown)
+4. Current situation as reported
+
+SEVERITY & CASUALTIES:
+- `overall_severity`: **minor** | **moderate** | **severe** | **catastrophic**. Default toward **moderate** when unclear. Reserve higher levels for well-supported large-scale harm; do not inflate.
+- `total_casualties`: sum or aggregate **only if** the inputs give explicit numbers; otherwise **null**. Never invent counts.
 
 Return a JSON object with this structure:
 {{
@@ -1050,23 +1038,20 @@ Return a JSON object with this structure:
     "affected_regions": ["Region1, Country1", "Region2, Country2", ...],
     "overall_severity": "minor|moderate|severe|catastrophic",
     "total_casualties": number or null,
-    "comprehensive_summary": "Detailed summary (3-5 sentences) covering all affected areas and the overall situation",
-    "key_details": ["Detail 1", "Detail 2", "Detail 3"]
+    "comprehensive_summary": "3-5 sentences, calm and specific, no exaggeration",
+    "key_details": ["Short factual bullet 1", "Short factual bullet 2", "Short factual bullet 3"]
 }}
 
-Return ONLY valid JSON, no explanations."""
+Return ONLY valid JSON, no markdown, no [1] citations."""
             
             response = self.client.query(prompt)
             
             # Parse response
-            import re
             cleaned_response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL | re.IGNORECASE).strip()
             
-            # Extract JSON
-            json_match = re.search(r'\{.*\}', cleaned_response, re.DOTALL)
-            if json_match:
-                info = json.loads(json_match.group())
-                
+            # Extract JSON (raw_decode: first balanced object, not greedy regex)
+            info = _parse_first_json_object(cleaned_response)
+            if info:
                 # Remove citation markers from comprehensive_summary if present
                 if 'comprehensive_summary' in info and info['comprehensive_summary']:
                     info['comprehensive_summary'] = re.sub(r'\[\d+\]', '', info['comprehensive_summary']).strip()
@@ -1354,10 +1339,11 @@ Return ONLY valid JSON, no explanations."""
             ])
             
             # Query 2: Generate summary
-            summary_prompt = f"""Based on the following information about {disaster_type} disasters affecting multiple countries, generate a brief, compassionate summary (2-3 sentences) that:
-- Mentions all affected countries/regions
-- Describes the overall impact
-- Is suitable for display on a prayer card
+            summary_prompt = f"""Write a **short, factual** prayer-card summary (2-3 sentences) about {disaster_type} affecting multiple countries. Calm tone: no hype, no exaggerated numbers, no words like "catastrophic" or "unprecedented" unless directly reflecting a named source in the text below.
+
+- Mention the affected countries/regions
+- State impact in measured, plain language
+- Suitable for people who want truth without sensationalism
 
 AFFECTED COUNTRIES: {countries_str}
 
@@ -1367,7 +1353,7 @@ AFFECTED REGIONS:
 DETAILED NEWS FROM ALL AREAS:
 {all_summaries}
 
-Return ONLY the summary text (2-3 sentences), no explanations, no JSON."""
+Return ONLY the summary text (2-3 sentences), no JSON, no bullet list."""
             
             summary_response = self.client.query(summary_prompt)
             summary = re.sub(r'<think>.*?</think>', '', summary_response, flags=re.DOTALL | re.IGNORECASE).strip()
@@ -1377,43 +1363,30 @@ Return ONLY the summary text (2-3 sentences), no explanations, no JSON."""
             summary = re.sub(r'\s+', ' ', summary).strip()
             
             # Query 3: Generate prayer
-            prayer_prompt = f"""You are a compassionate prayer leader writing a customized prayer for those affected by {disaster_type} in multiple countries/regions.
+            prayer_prompt = f"""You are a prayer leader for people affected by {disaster_type} in multiple countries. Ground every concrete detail in the text below; **do not** invent casualties, scale, or drama.
 
 AFFECTED COUNTRIES AND REGIONS:
 {countries_str}
 
-DETAILED NEWS FROM ALL AFFECTED AREAS (use these specific details in your prayer):
+NEWS FROM AFFECTED AREAS (only source for specifics):
 {all_summaries}
 
 COMPREHENSIVE SUMMARY:
 {info.get('comprehensive_summary', '')}
 
 PRAYER REQUIREMENTS:
-- Start with "Heavenly Father," (not "Dear Heavenly Father")
-- ⚠️ CRITICAL: Start with PRAISE - acknowledge God's goodness, faithfulness, sovereignty, love, or power before making any requests
-- Length: 80-120 words (concise and focused)
-- Mention ALL affected countries/regions specifically by name: {countries_str}
-- Reference the SPECIFIC situations described in the news summaries above
-- Address the needs of:
-  * All those directly affected by {disaster_type} in {countries_str}
-  * Families who lost loved ones or are searching for missing family members across all affected areas
-  * Those injured and receiving medical care
-  * Children who are scared and traumatized
-  * Rescue workers and first responders in all affected regions
-  * Medical teams treating the injured
-  * Government leaders coordinating response efforts
-  * Communities coming together to help
-- Include a brief biblical reference or promise relevant to this situation
-- Call on Jesus Christ and the Holy Spirit by name
-- End with hope rooted in Christ
-- End with "In Jesus-Christ's name we pray. Amen!" (EXACTLY this ending)
-- Make it feel urgent and relevant to THIS specific multi-country crisis
-- Use "we" and "our" throughout (praying as a community)
-- Natural, conversational language
-- Authentic emotion - let the weight of this crisis show through
-- NO explanations, NO thinking tags, NO commentary - just the prayer text
+- Start with "Heavenly Father," then brief **praise** before intercession
+- Length: 80-120 words
+- Name these places explicitly: {countries_str}
+- Intercede for needs that **match** the summaries (affected people, families, responders, leaders, healing, peace — as appropriate). If harm is uncertain, pray with humility without stating unreported facts
+- Brief biblical comfort or promise (no verse citation)
+- Name Jesus Christ and the Holy Spirit; end with hope in Christ
+- Closing exactly: "In Jesus-Christ's name we pray. Amen!"
+- Tone: **steady, compassionate, factual** — not alarmist. Avoid exaggerated language and unverified superlatives
+- Use "we" / "our" throughout
+- NO thinking tags, NO commentary
 
-CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no commentary."""
+Return ONLY the prayer text."""
             
             prayer_response = self.client.query(prayer_prompt)
             prayer = re.sub(r'<think>.*?</think>', '', prayer_response, flags=re.DOTALL | re.IGNORECASE).strip()
@@ -1455,9 +1428,8 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
         This is NOT the long intercessory prayer — it's a concise, human, community-voice post
         that calls out the specific event, location, and a short prayerful statement.
 
-        Example output:
-        "Praying for the people of California after a 7.7-magnitude earthquake. May God be
-        close to everyone affected and bring swift rescue and comfort. 🙏"
+        Example output (factual, not hyped):
+        "Praying for California after reported strong earthquake activity. May those affected find safety and support. 🙏"
         """
         try:
             countries_str = ", ".join(info.get('affected_countries', []))
@@ -1465,30 +1437,26 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
             first_area = (info.get('all_areas') or [{}])[0]
             key_detail = first_area.get('news_summary', '')[:300]  # just enough context
 
-            prompt = f"""You are writing a short prayer post for a Christian prayer social-media wall (like Twitter/Threads).
+            prompt = f"""You are writing a short prayer post for a Christian prayer wall (e.g. Threads-style). **Factual and gentle** — no sensational words or unverified numbers.
 
 EVENT: {disaster_type.replace('_', ' ').title()} affecting {countries_str}
 NEWS DETAIL: {key_detail}
 
-TASK: Write a 1-2 sentence prayer post that:
-- Reads like a heartfelt community post, NOT a formal prayer
-- Mentions the specific location(s) and the type of disaster
-- Includes at least one specific detail from the news (e.g., magnitude, casualties, scale)
-- Ends with a prayerful statement of hope or compassion
-- Is warm, natural, and personal (written in community voice: "Praying for...", "Standing with...", "Lifting up...")
-- Can optionally end with a 🙏 or ✝️ emoji (one only)
-- Maximum 2 sentences, maximum 200 characters total
+TASK: 1-2 sentences, max 200 characters total:
+- Community voice ("Praying for...", "Standing with...", "Lifting up...")
+- Name the location(s) and event type in plain language
+- **One** concrete detail from the news only if it is stated above (e.g. region, advisory, reported response) — do NOT invent magnitude, death tolls, or superlatives
+- End with a simple prayerful wish (comfort, safety, strength)
+- Optional single 🙏 or ✝️ at the end
+- No "Heavenly Father" opener; no hype words ("catastrophic", "unprecedented", "devastating") unless they appear verbatim in NEWS DETAIL
 
 GOOD EXAMPLES:
-"Praying for the people of California after a 7.7-magnitude earthquake. May God be close to everyone affected and bring swift rescue and comfort. 🙏"
-"Standing with the communities in Queensland as Cyclone Narelle approaches. May God's protection cover every family in its path. 🙏"
-"Lifting up the families in Ethiopia after devastating landslides took over 250 lives. May God bring comfort to those grieving today. ✝️"
+"Praying for California as officials assess earthquake impacts. May neighbors find safety and help. 🙏"
+"Standing with Queensland communities under cyclone watch. May families stay safe. 🙏"
 
-BAD EXAMPLES (too long, too formal, starts with "Heavenly Father"):
-- "Heavenly Father, we come before you..." (too formal)
-- Anything over 2 sentences
+BAD: invented stats, alarmist tone, more than 2 sentences, formal liturgical opening.
 
-Return ONLY the post text. No quotes, no labels, no explanations."""
+Return ONLY the post text. No quotes or labels."""
 
             response = self.client.query(prompt)
             wall_prayer = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL | re.IGNORECASE).strip()

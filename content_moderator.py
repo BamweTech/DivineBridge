@@ -3,6 +3,7 @@ AI-Powered Content Moderation for Divine Bridge
 Uses Perplexity AI to review prayer requests and testimonies
 """
 
+import json
 import logging
 from typing import Dict, Tuple
 from perplexity_client import get_perplexity_client, set_client_model
@@ -100,8 +101,6 @@ Guidelines:
             response = self.client.query(prompt)
             
             # Parse JSON response
-            import json
-            
             # Clean response
             response = response.strip()
             if response.startswith('```'):
