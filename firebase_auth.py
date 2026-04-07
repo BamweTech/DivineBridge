@@ -13,9 +13,24 @@ import sys
 from google.cloud import secretmanager
 import traceback
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def _build_retry_session():
+    """Build a requests.Session with automatic retry on transient errors.
+    Used for Google auth token refreshes so a single network blip doesn't
+    cascade into gRPC / Firestore failures."""
+    retry_strategy = Retry(
+        total=3,
+        backoff_factor=0.5,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET", "POST"],
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    s = requests.Session()
+    s.mount("https://", adapter)
+    s.mount("http://", adapter)
+    return s
 
 def get_secret(secret_id):
     """Get a secret from Secret Manager."""
@@ -84,6 +99,20 @@ def initialize_firebase():
                     'databaseURL': f"https://{firebase_project_id}-default-rtdb.firebaseio.com",
                 })
                 
+                # Patch the credential's HTTP transport so token refreshes
+                # use a retry-enabled session instead of a bare one.
+                try:
+                    import google.auth.transport.requests as _ga_transport
+                    app_cred = firebase_admin.get_app().credential
+                    if hasattr(app_cred, '_g_credential'):
+                        g_cred = app_cred._g_credential
+                        retry_session = _build_retry_session()
+                        _request = _ga_transport.Request(session=retry_session)
+                        g_cred.refresh(_request)
+                        logger.info("Credential refresh transport configured with retry session")
+                except Exception as patch_err:
+                    logger.warning(f"Could not patch credential transport (non-fatal): {patch_err}")
+
                 logger.info("Firebase initialized successfully")
                 print("STDERR_DEBUG: Firebase initialized successfully", file=sys.stderr)
                 return True

@@ -289,16 +289,19 @@ def create_combined_task_list(admin_tasks_list, logs_summary, analysis):
     for error in errors[:20]:  # Limit to 20 most recent errors
         error_msg = error.get('message', '')[:200]
         
-        # Categorize error
+        # Categorize error — order matters: more specific patterns first
+        lower_msg = error_msg.lower()
         category = 'general'
-        if any(kw in error_msg.lower() for kw in ['auth', 'login', 'token', 'session']):
-            category = 'authentication'
-        elif any(kw in error_msg.lower() for kw in ['audio', 'webrtc', 'peer', 'connection']):
-            category = 'audio'
-        elif any(kw in error_msg.lower() for kw in ['scheduler', 'cron', 'job']):
-            category = 'scheduler'
-        elif any(kw in error_msg.lower() for kw in ['firestore', 'database', 'query', 'index']):
+        if any(kw in lower_msg for kw in ['firestore', 'database', 'query', 'index']):
             category = 'database'
+        elif any(kw in lower_msg for kw in ['auth', 'login', 'token', 'session', 'credential']):
+            category = 'authentication'
+        elif any(kw in lower_msg for kw in ['audio', 'webrtc', 'peer', 'mediasoup', 'sfu']):
+            category = 'audio'
+        elif any(kw in lower_msg for kw in ['scheduler', 'cron', 'job']):
+            category = 'scheduler'
+        elif any(kw in lower_msg for kw in ['connectionpool', 'urlopen', 'requests.adapters']):
+            category = 'network'
         
         task_list.append({
             'type': 'error',

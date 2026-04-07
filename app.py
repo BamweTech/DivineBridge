@@ -44,6 +44,12 @@ try:
 except ImportError:
     pass
 
+# gRPC keepalive: prevent VPC NAT / load-balancer from killing idle Firestore
+# connections.  Must be set before any gRPC channel is created.
+os.environ.setdefault('GRPC_KEEPALIVE_TIME_MS', '30000')         # ping every 30s
+os.environ.setdefault('GRPC_KEEPALIVE_TIMEOUT_MS', '10000')      # wait 10s for pong
+os.environ.setdefault('GRPC_KEEPALIVE_PERMIT_WITHOUT_CALLS', '1')  # ping even when idle
+
 def get_user_based_key():
     """Get user-based key for rate limiting (preferred over IP)"""
     user = session.get('user')
@@ -60,17 +66,9 @@ else:
     from storage_handler import StorageHandler
     print("☁️  Using CloudStorageHandler for production")
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('app.log', mode='a')
-    ]
-)
-
-# Create logger
+# Configure structured logging (JSON in production for Cloud Run, text locally)
+from logging_config import setup_logging
+_loggers = setup_logging()
 logger = logging.getLogger(__name__)
 
 def login_required(f):

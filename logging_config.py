@@ -40,7 +40,7 @@ def setup_logging():
         'handlers': {
             'console': {
                 'class': 'logging.StreamHandler',
-                'formatter': 'cloud_run' if os.getenv('ENV') == 'production' else 'standard',
+                'formatter': 'cloud_run' if os.getenv('FLASK_ENV') == 'production' or os.getenv('K_SERVICE') else 'standard',
                 'stream': 'ext://sys.stdout'
             }
         },
