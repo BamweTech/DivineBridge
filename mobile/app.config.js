@@ -56,6 +56,7 @@ export default {
         'android.permission.ACCESS_NETWORK_STATE',
         'android.permission.VIBRATE',
         'android.permission.RECEIVE_BOOT_COMPLETED',
+        'android.permission.WAKE_LOCK',
         'android.permission.READ_EXTERNAL_STORAGE',
         'android.permission.WRITE_EXTERNAL_STORAGE',
         'android.permission.READ_MEDIA_VISUAL_USER_SELECTED',

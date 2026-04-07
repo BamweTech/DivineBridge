@@ -35,7 +35,7 @@ export async function setLiveRoomAudioRoute(route: LiveRoomAudioRoute): Promise<
   await Audio.setAudioModeAsync({
     allowsRecordingIOS: true,
     playsInSilentModeIOS: true,
-    staysActiveInBackground: false,
+    staysActiveInBackground: true,
     interruptionModeIOS: InterruptionModeIOS.DoNotMix,
     interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
     shouldDuckAndroid: true,

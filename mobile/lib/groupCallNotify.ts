@@ -10,9 +10,12 @@ async function ensureChannel() {
   channelReady = true;
   await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
     name: 'Group prayer calls',
-    importance: Notifications.AndroidImportance.HIGH,
+    importance: Notifications.AndroidImportance.MAX,
     sound: 'default',
-    vibrationPattern: [0, 250, 250, 250],
+    vibrationPattern: [0, 800, 400, 800, 400, 800, 2000],
+    enableVibrate: true,
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    bypassDnd: true,
   });
 }
 

@@ -39,6 +39,7 @@ import { useGroupUnread } from '@/contexts/GroupUnreadContext';
 import { usePrayerRoom } from '@/hooks/usePrayerRoom';
 import { groupApi, roomApi } from '@/services/api';
 import { isWebRTCAvailable } from '@/lib/sfu';
+import { setActiveGroup } from '@/lib/activeGroupStore';
 import { GroupLiveAvPanel } from '@/components/group/GroupLiveAvPanel';
 import { GroupMembersSheet } from '@/components/group/GroupMembersSheet';
 import { VoiceRecorder } from '@/components/group/VoiceRecorder';
@@ -189,6 +190,11 @@ export default function GroupScreen() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    setActiveGroup(id ?? null);
+    return () => setActiveGroup(null);
+  }, [id]);
 
   const participants = prayer.room?.participants ?? [];
   const currentParticipant = participants.find((p) => p.user_id === user?.uid);

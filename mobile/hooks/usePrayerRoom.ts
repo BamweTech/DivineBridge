@@ -25,6 +25,7 @@ import {
   resetLiveRoomAudio,
   type LiveRoomAudioRoute,
 } from '@/lib/liveRoomAudio';
+import { startCallKeepAlive, stopCallKeepAlive } from '@/lib/callKeepAlive';
 
 // Always use the hardcoded SFU_URL constant — Flask's sfuUrl response defaults
 // to localhost when SFU_URL env var is not set on Cloud Run, which would break
@@ -60,14 +61,17 @@ export function usePrayerRoom(roomId: string) {
       const updatedRoom: PrayerRoom = { room_id: roomId, ...data };
       setRoom(updatedRoom);
 
-      // Let the SFU engine know participant count changed (drives mode transitions)
       if (engineRef.current) {
         const count = updatedRoom.participants?.length ?? 0;
         engineRef.current.updateParticipantCount(count);
       }
+
+      if (isJoined && updatedRoom.room_name) {
+        void startCallKeepAlive(updatedRoom.room_name);
+      }
     });
     return unsub;
-  }, [roomId]);
+  }, [roomId, isJoined]);
 
   // ── Watch chat via RTDB (full snapshot, last 100) — same source as web fast path.
   //    onValue avoids treating the initial history as N separate “new” events (onChildAdded would).
@@ -148,6 +152,8 @@ export function usePrayerRoom(roomId: string) {
       setAudioOutputRouteState('speaker');
       await setLiveRoomAudioRoute('speaker');
       setIsJoined(true);
+
+      void startCallKeepAlive('Prayer Room');
     } catch (err) {
       console.error('[room] Failed to join:', err);
       throw err;
@@ -163,6 +169,7 @@ export function usePrayerRoom(roomId: string) {
     setIsJoined(false);
     audioOutputRouteRef.current = 'speaker';
     setAudioOutputRouteState('speaker');
+    await stopCallKeepAlive();
     await resetLiveRoomAudio();
     await roomApi.leave(roomId).catch(() => null);
   }, [roomId]);
@@ -228,6 +235,7 @@ export function usePrayerRoom(roomId: string) {
     return () => {
       engineRef.current?.destroy();
       engineRef.current = null;
+      void stopCallKeepAlive();
       resetLiveRoomAudio().catch(() => null);
     };
   }, []);

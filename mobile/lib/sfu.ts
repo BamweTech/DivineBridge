@@ -107,6 +107,7 @@ export class SfuEngine {
 
   private pending = new Map<string, { resolve: (v: any) => void; reject: (e: Error) => void }>();
   private reqCounter = 0;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
   onPeersChanged?: OnPeersChanged;
   onModeChanged?: OnModeChanged;
@@ -274,6 +275,7 @@ export class SfuEngine {
   }
 
   destroy() {
+    this._stopHeartbeat();
     this.audioProducer?.close();
     this.videoProducer?.close();
     for (const c of this.consumers.values()) c.close();
@@ -301,14 +303,34 @@ export class SfuEngine {
       const ws = new WebSocket(this.sfuUrl);
       this.ws = ws;
 
-      ws.onopen = () => resolve();
+      ws.onopen = () => {
+        this._startHeartbeat();
+        resolve();
+      };
       ws.onerror = (e: any) => reject(new Error(`WS error: ${e.message ?? 'connection failed'}`));
       ws.onclose = () => {
+        this._stopHeartbeat();
         this.pending.forEach(({ reject: rej }) => rej(new Error('WebSocket closed')));
         this.pending.clear();
       };
       ws.onmessage = (e: MessageEvent) => this._onWsMessage(e.data);
     });
+  }
+
+  private _startHeartbeat() {
+    this._stopHeartbeat();
+    this.heartbeatTimer = setInterval(() => {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ action: 'ping' }));
+      }
+    }, 25_000);
+  }
+
+  private _stopHeartbeat() {
+    if (this.heartbeatTimer !== null) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
   }
 
   private _onWsMessage(raw: string) {

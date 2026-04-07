@@ -1,5 +1,5 @@
-import { useRef } from 'react';
-import { View, Text, Pressable, Linking, Animated as RNAnimated } from 'react-native';
+import { useRef, useMemo } from 'react';
+import { View, Text, Pressable, Animated as RNAnimated } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import * as Haptics from 'expo-haptics';
 import dayjs from 'dayjs';
@@ -13,10 +13,14 @@ import {
 } from '@/components/group/groupChatUtils';
 import { MediaAttachmentCard } from '@/components/group/MediaAttachmentCard';
 import { AudioMessageBubble } from '@/components/group/AudioMessageBubble';
+import { LinkPreviewCard } from '@/components/group/LinkPreviewCard';
 import { Avatar } from '@/components/ui/Avatar';
+import { LinkifiedText } from '@/components/ui/LinkifiedText';
 import Icon from '@/components/ui/Icon';
 import { THEME_COLORS } from '@/lib/constants';
 import type { GroupChatAttachment, GroupChatMessage } from '@/types';
+
+const URL_DETECT = /(?:https?:\/\/|www\.)[\w\-._~:/?#[\]@!$&'()*+,;=%]+[\w\-/=]/i;
 
 export function GroupChatBubble({
   msg,
@@ -54,6 +58,14 @@ export function GroupChatBubble({
   const swipeRef = useRef<Swipeable | null>(null);
   const isMe = msg.user_id === userUid;
   const isSpecial = msg.message_type !== 'text';
+
+  const previewUrl = useMemo(() => {
+    if (msg.link_url) return msg.link_url;
+    const match = (msg.message ?? '').match(URL_DETECT);
+    if (!match) return null;
+    const raw = match[0];
+    return raw.startsWith('http') ? raw : `https://${raw}`;
+  }, [msg.link_url, msg.message]);
   const bg = highlighted
     ? 'rgba(212, 168, 75, 0.18)'
     : isSpecial
@@ -77,7 +89,7 @@ export function GroupChatBubble({
     ([emoji, users]) => emoji && Array.isArray(users) && users.length > 0,
   );
   const hasMessageBubble =
-    showText || docAtts.length > 0 || !!msg.reply_to || isSpecial || !!msg.link_url;
+    showText || docAtts.length > 0 || !!msg.reply_to || isSpecial || !!previewUrl;
 
   const rTL = 18;
   const rTR = 18;
@@ -288,15 +300,10 @@ export function GroupChatBubble({
                       </Text>
                     </Pressable>
                   )}
-                  {!!msg.link_url && (
-                    <Pressable
-                      onPress={() => Linking.openURL(msg.link_url!)}
-                      style={{ marginBottom: showText || docAtts.length ? 8 : 0 }}
-                    >
-                      <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 13, textDecorationLine: 'underline' }} numberOfLines={3}>
-                        {msg.link_url}
-                      </Text>
-                    </Pressable>
+                  {!!previewUrl && (
+                    <View style={{ marginBottom: showText || docAtts.length ? 8 : 0 }}>
+                      <LinkPreviewCard url={previewUrl} isMe={isMe} />
+                    </View>
                   )}
                   {docAtts.map((a: GroupChatAttachment, idx: number) => (
                     <Pressable
@@ -319,9 +326,12 @@ export function GroupChatBubble({
                     </Pressable>
                   ))}
                   {showText ? (
-                    <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 22 }}>
+                    <LinkifiedText
+                      style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 22 }}
+                      linkStyle={{ color: THEME_COLORS.gold }}
+                    >
                       {msg.message}
-                    </Text>
+                    </LinkifiedText>
                   ) : null}
                 </View>
               </View>

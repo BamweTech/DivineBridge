@@ -37,6 +37,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { GroupUnreadProvider } from '@/contexts/GroupUnreadContext';
 import { LiveRoomsProvider } from '@/contexts/LiveRoomsContext';
 import { GroupCallNotificationOverlay } from '@/components/group/GroupCallNotificationOverlay';
+import { useGroupChatNotifications } from '@/hooks/useGroupChatNotifications';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { usePushToken } from '@/hooks/usePushToken';
 import { groupApi } from '@/services/api';
@@ -259,6 +260,9 @@ function RootLayoutInner() {
   // Register push token when user is signed in
   usePushToken(user?.uid);
 
+  // Monitor group chats for new messages and fire local notifications
+  useGroupChatNotifications();
+
   const [fontsLoaded, fontError] = useFonts({
     PlusJakartaSans_400Regular,
     PlusJakartaSans_600SemiBold,
@@ -281,7 +285,7 @@ function RootLayoutInner() {
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data;
-      if (data?.type === 'group_live' && data?.groupId) {
+      if ((data?.type === 'group_live' || data?.type === 'group_chat') && data?.groupId) {
         routerRef.current.push(`/group/${data.groupId}` as any);
       }
     });

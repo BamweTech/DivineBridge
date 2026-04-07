@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { View, Text, Pressable, Animated, Easing } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { startCallRingtone, stopCallRingtone } from '@/lib/callRingtone';
 import Icon from '@/components/ui/Icon';
 import { THEME_COLORS } from '@/lib/constants';
 
@@ -16,8 +16,14 @@ export function GroupCallBanner({ groupId, groupName, hostName, onDismiss }: Pro
   const router = useRouter();
   const pulse = useRef(new Animated.Value(1)).current;
 
+  const dismiss = useCallback(() => {
+    stopCallRingtone();
+    onDismiss();
+  }, [onDismiss]);
+
   useEffect(() => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    startCallRingtone();
+
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1.15, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
@@ -25,8 +31,11 @@ export function GroupCallBanner({ groupId, groupName, hostName, onDismiss }: Pro
       ]),
     ).start();
 
-    const timeout = setTimeout(onDismiss, 15000);
-    return () => clearTimeout(timeout);
+    const timeout = setTimeout(dismiss, 15000);
+    return () => {
+      clearTimeout(timeout);
+      stopCallRingtone();
+    };
   }, []);
 
   return (
@@ -71,7 +80,7 @@ export function GroupCallBanner({ groupId, groupName, hostName, onDismiss }: Pro
 
       <Pressable
         onPress={() => {
-          onDismiss();
+          dismiss();
           router.push(`/group/${groupId}`);
         }}
         style={{
@@ -85,7 +94,7 @@ export function GroupCallBanner({ groupId, groupName, hostName, onDismiss }: Pro
         <Text style={{ color: '#fff', fontFamily: 'Geist_600SemiBold', fontSize: 13 }}>Join</Text>
       </Pressable>
 
-      <Pressable onPress={onDismiss} hitSlop={8}>
+      <Pressable onPress={dismiss} hitSlop={8}>
         <Icon name="cross" size={16} color={THEME_COLORS.text3} />
       </Pressable>
     </View>
