@@ -320,12 +320,11 @@ export function useGroupChat(groupId: string) {
         for (const row of incoming) {
           pendingOptimisticIdsRef.current.delete(row.message_id);
         }
-        const pendingKeep = prev.filter(
-          (m) =>
-            pendingOptimisticIdsRef.current.has(m.message_id) &&
-            !incoming.some((i) => i.message_id === m.message_id),
-        );
-        const merged = normalizeGroupChatMessages([...incoming, ...pendingKeep]);
+        // Merge prior UI state (memory / AsyncStorage / optimistic) with the query snapshot.
+        // Incoming-only replace dropped cached rows when the first snapshot was partial or lagged
+        // behind persistence, which looked like messages "disappearing" on cold launch.
+        // normalizeGroupChatMessages dedupes by id and keeps the row with the newer sort timestamp.
+        const merged = normalizeGroupChatMessages([...prev, ...incoming]);
         groupChatMemoryCache.set(groupId, merged);
         void writeGroupChatCache(groupId, merged);
         return merged;
