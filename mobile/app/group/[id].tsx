@@ -1401,14 +1401,21 @@ export default function GroupScreen() {
                   imageGalleryRef.current?.scrollToOffset({ offset: w * index, animated: false });
                 }}
                 renderItem={({ item }) => {
-                  const w = Dimensions.get('window').width;
-                  const h = Dimensions.get('window').height * 0.72;
+                  const { width: winW, height: winH } = Dimensions.get('window');
+                  const stageH = winH * 0.72;
                   return (
-                    <View style={{ width: w, height: h, justifyContent: 'center', alignItems: 'center' }}>
+                    <View
+                      style={{
+                        width: winW,
+                        height: winH,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                    >
                       <ZoomableImage
                         uri={item.url}
-                        width={w}
-                        height={h}
+                        width={winW}
+                        height={stageH}
                         onZoomActiveChange={setImageGalleryScrollLocked}
                       />
                     </View>
