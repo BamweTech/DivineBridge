@@ -5,7 +5,6 @@ import {
   onSnapshot,
   where,
   doc,
-  addDoc,
   deleteDoc,
   serverTimestamp,
   limit,
@@ -279,11 +278,14 @@ export function useGroupChat(groupId: string) {
   const [messages, setMessages] = useState<GroupChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user, profile } = useAuthStore();
+  /** Message IDs still waiting to appear in the ordered Firestore query (serverTimestamp ordering gap). */
+  const pendingOptimisticIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
     if (!groupId) return;
     let active = true;
     let firestoreActive = false;
+    pendingOptimisticIdsRef.current.clear();
 
     const memoryCached = groupChatMemoryCache.get(groupId);
     const hadMemoryCache = memoryCached && memoryCached.length > 0;
@@ -298,15 +300,12 @@ export function useGroupChat(groupId: string) {
     const col = collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages');
     let unsub: (() => void) | undefined;
 
-    function applySnapshot(
-      snap: {
-        docs: {
-          id: string;
-          data: (options?: { serverTimestamps?: 'estimate' | 'previous' | 'none' }) => Record<string, unknown>;
-        }[];
-      },
-      merge: boolean,
-    ) {
+    function applySnapshot(snap: {
+      docs: {
+        id: string;
+        data: (options?: { serverTimestamps?: 'estimate' | 'previous' | 'none' }) => Record<string, unknown>;
+      }[];
+    }) {
       const incoming = normalizeGroupChatMessages(
         snap.docs.map((d) => ({
           message_id: d.id,
@@ -317,18 +316,20 @@ export function useGroupChat(groupId: string) {
       if (!active) return;
       firestoreActive = true;
 
-      if (merge) {
-        setMessages((prev) => {
-          const merged = normalizeGroupChatMessages([...prev, ...incoming]);
-          groupChatMemoryCache.set(groupId, merged);
-          void writeGroupChatCache(groupId, merged);
-          return merged;
-        });
-      } else {
-        groupChatMemoryCache.set(groupId, incoming);
-        setMessages(incoming);
-        void writeGroupChatCache(groupId, incoming);
-      }
+      setMessages((prev) => {
+        for (const row of incoming) {
+          pendingOptimisticIdsRef.current.delete(row.message_id);
+        }
+        const pendingKeep = prev.filter(
+          (m) =>
+            pendingOptimisticIdsRef.current.has(m.message_id) &&
+            !incoming.some((i) => i.message_id === m.message_id),
+        );
+        const merged = normalizeGroupChatMessages([...incoming, ...pendingKeep]);
+        groupChatMemoryCache.set(groupId, merged);
+        void writeGroupChatCache(groupId, merged);
+        return merged;
+      });
       setIsLoading(false);
     }
 
@@ -343,14 +344,14 @@ export function useGroupChat(groupId: string) {
     const qOrdered = query(col, orderBy('timestamp', 'desc'), limit(100));
     unsub = onSnapshot(
       qOrdered,
-      (snap) => applySnapshot(snap, true),
+      (snap) => applySnapshot(snap),
       (err) => {
         console.warn('[useGroupChat] ordered query failed; using unsorted limit listener', groupId, err);
         unsub?.();
         const qFallback = query(col, limit(100));
         unsub = onSnapshot(
           qFallback,
-          (snap) => applySnapshot(snap, true),
+          (snap) => applySnapshot(snap),
           (err2) => {
             console.warn('[useGroupChat] fallback listener error', groupId, err2);
             if (active) setIsLoading(false);
@@ -380,6 +381,7 @@ export function useGroupChat(groupId: string) {
     const atts = options?.attachments?.filter((a) => a?.url && a?.content_type && a?.file_name) ?? [];
     if (!body && !link && atts.length === 0) return;
 
+    const clientSentAt = Date.now();
     const payload: Record<string, unknown> = {
       user_id: user.uid,
       user_name: getDisplayName(profile, user),
@@ -387,7 +389,7 @@ export function useGroupChat(groupId: string) {
       message: body,
       message_type: type,
       timestamp: serverTimestamp(),
-      client_sent_at: Date.now(),
+      client_sent_at: clientSentAt,
       reactions: {},
       read_by: [user.uid],
     };
@@ -395,7 +397,46 @@ export function useGroupChat(groupId: string) {
     if (atts.length > 0) payload.attachments = atts;
     if (options?.replyTo) payload.reply_to = options.replyTo;
 
-    await addDoc(collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages'), payload);
+    const messageRef = doc(collection(db, COLLECTIONS.GROUP_CHAT_MESSAGES, groupId, 'messages'));
+    const mid = messageRef.id;
+    pendingOptimisticIdsRef.current.add(mid);
+
+    const optimisticRow = {
+      message_id: mid,
+      group_id: groupId,
+      user_id: user.uid,
+      user_name: getDisplayName(profile, user),
+      user_photo: profile?.photoURL ?? undefined,
+      message: body,
+      message_type: type,
+      timestamp: Date.now(),
+      client_sent_at: clientSentAt,
+      reactions: {},
+      read_by: [user.uid],
+      ...(link ? { link_url: link } : {}),
+      ...(atts.length > 0 ? { attachments: atts } : {}),
+      ...(options?.replyTo ? { reply_to: options.replyTo } : {}),
+    } as GroupChatMessage;
+
+    setMessages((prev) => {
+      const merged = normalizeGroupChatMessages([...prev, optimisticRow]);
+      groupChatMemoryCache.set(groupId, merged);
+      void writeGroupChatCache(groupId, merged);
+      return merged;
+    });
+
+    try {
+      await setDoc(messageRef, payload);
+    } catch (e) {
+      pendingOptimisticIdsRef.current.delete(mid);
+      setMessages((prev) => {
+        const merged = normalizeGroupChatMessages(prev.filter((m) => m.message_id !== mid));
+        groupChatMemoryCache.set(groupId, merged);
+        void writeGroupChatCache(groupId, merged);
+        return merged;
+      });
+      throw e;
+    }
 
     const senderName = getDisplayName(profile, user);
     const preview = body.length > 80 ? body.slice(0, 77) + '…' : body;

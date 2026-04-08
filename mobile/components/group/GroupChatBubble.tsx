@@ -6,7 +6,9 @@ import dayjs from 'dayjs';
 import type { ChatSurface } from '@/components/group/groupChatUtils';
 import {
   BUBBLE_W,
+  chatPreviewUrl,
   isVisualAttachment,
+  stripMatchingPreviewUrl,
   TYPE_BORDER_COLORS,
   TYPE_COLORS,
   TYPE_LABEL_COLORS,
@@ -19,8 +21,6 @@ import { LinkifiedText } from '@/components/ui/LinkifiedText';
 import Icon from '@/components/ui/Icon';
 import { THEME_COLORS } from '@/lib/constants';
 import type { GroupChatAttachment, GroupChatMessage } from '@/types';
-
-const URL_DETECT = /(?:https?:\/\/|www\.)[\w\-._~:/?#[\]@!$&'()*+,;=%]+[\w\-/=]/i;
 
 export function GroupChatBubble({
   msg,
@@ -59,13 +59,15 @@ export function GroupChatBubble({
   const isMe = msg.user_id === userUid;
   const isSpecial = msg.message_type !== 'text';
 
-  const previewUrl = useMemo(() => {
-    if (msg.link_url) return msg.link_url;
-    const match = (msg.message ?? '').match(URL_DETECT);
-    if (!match) return null;
-    const raw = match[0];
-    return raw.startsWith('http') ? raw : `https://${raw}`;
-  }, [msg.link_url, msg.message]);
+  const previewUrl = useMemo(
+    () => chatPreviewUrl(msg.link_url, msg.message ?? ''),
+    [msg.link_url, msg.message],
+  );
+  const displayMessage = useMemo(() => {
+    const raw = msg.message ?? '';
+    if (!previewUrl) return raw;
+    return stripMatchingPreviewUrl(raw, previewUrl);
+  }, [msg.message, previewUrl]);
   const bg = highlighted
     ? 'rgba(212, 168, 75, 0.18)'
     : isSpecial
@@ -81,7 +83,7 @@ export function GroupChatBubble({
         ? THEME_COLORS.goldBorder
         : THEME_COLORS.border;
   const attachments = msg.attachments ?? [];
-  const showText = (msg.message ?? '').trim().length > 0;
+  const showText = displayMessage.trim().length > 0;
   const mediaAtts = attachments.filter(isVisualAttachment);
   const audioAtts = attachments.filter((a) => a.content_type.startsWith('audio/'));
   const docAtts = attachments.filter((a) => !isVisualAttachment(a) && !a.content_type.startsWith('audio/'));
@@ -89,7 +91,7 @@ export function GroupChatBubble({
     ([emoji, users]) => emoji && Array.isArray(users) && users.length > 0,
   );
   const hasMessageBubble =
-    showText || docAtts.length > 0 || !!msg.reply_to || isSpecial || !!previewUrl;
+    showText || docAtts.length > 0 || !!msg.reply_to || isSpecial;
 
   const rTL = 18;
   const rTR = 18;
@@ -233,7 +235,7 @@ export function GroupChatBubble({
         <View style={{ position: 'relative', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
         {mediaAtts.length > 0 && (
           <Pressable onLongPress={handleLongPress} delayLongPress={400}>
-            <View style={{ gap: 8, marginBottom: hasMessageBubble || audioAtts.length > 0 ? 8 : 0 }}>
+            <View style={{ gap: 8, marginBottom: hasMessageBubble || audioAtts.length > 0 || previewUrl ? 8 : 0 }}>
               {mediaAtts.map((a, idx) => (
                 <MediaAttachmentCard
                   key={`${msg.message_id}-media-${idx}`}
@@ -245,7 +247,7 @@ export function GroupChatBubble({
           </Pressable>
         )}
         {audioAtts.length > 0 && (
-          <View style={{ gap: 6, marginBottom: hasMessageBubble ? 8 : 0 }}>
+          <View style={{ gap: 6, marginBottom: hasMessageBubble || previewUrl ? 8 : 0 }}>
             {audioAtts.map((a: GroupChatAttachment, idx: number) => (
               <AudioMessageBubble
                 key={`${msg.message_id}-audio-${idx}`}
@@ -254,6 +256,19 @@ export function GroupChatBubble({
               />
             ))}
           </View>
+        )}
+        {!!previewUrl && (
+          <Pressable
+            onLongPress={handleLongPress}
+            delayLongPress={400}
+            style={{
+              maxWidth: BUBBLE_W,
+              alignSelf: isMe ? 'flex-end' : 'flex-start',
+              marginBottom: hasMessageBubble ? 8 : 0,
+            }}
+          >
+            <LinkPreviewCard url={previewUrl} />
+          </Pressable>
         )}
         {hasMessageBubble && (
           <View
@@ -283,7 +298,7 @@ export function GroupChatBubble({
                     <Pressable
                       onPress={() => onJumpToReply(msg.reply_to!.message_id, surface)}
                       style={{
-                        marginBottom: showText || msg.link_url || docAtts.length > 0 ? 10 : 0,
+                        marginBottom: showText || previewUrl || docAtts.length > 0 ? 10 : 0,
                         paddingVertical: 8,
                         paddingHorizontal: 10,
                         borderRadius: 12,
@@ -299,11 +314,6 @@ export function GroupChatBubble({
                         {msg.reply_to.message}
                       </Text>
                     </Pressable>
-                  )}
-                  {!!previewUrl && (
-                    <View style={{ marginBottom: showText || docAtts.length ? 8 : 0 }}>
-                      <LinkPreviewCard url={previewUrl} isMe={isMe} />
-                    </View>
                   )}
                   {docAtts.map((a: GroupChatAttachment, idx: number) => (
                     <Pressable
@@ -330,7 +340,7 @@ export function GroupChatBubble({
                       style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 22 }}
                       linkStyle={{ color: THEME_COLORS.gold }}
                     >
-                      {msg.message}
+                      {displayMessage}
                     </LinkifiedText>
                   ) : null}
                 </View>
@@ -379,7 +389,7 @@ export function GroupChatBubble({
             ) : null}
           </View>
         )}
-        {reactionEntries.length > 0 && mediaAtts.length > 0 && !hasMessageBubble && (
+        {reactionEntries.length > 0 && !hasMessageBubble && (mediaAtts.length > 0 || !!previewUrl) && (
           <View
             style={{
               marginTop: 8,

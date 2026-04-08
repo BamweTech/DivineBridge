@@ -40,7 +40,7 @@ function AdaptiveImagePreview({
 
   return (
     <View style={{ width: 264, aspectRatio: ratio, backgroundColor: THEME_COLORS.bg3, justifyContent: 'center', alignItems: 'center' }}>
-      {!loaded && <ActivityIndicator size="small" color={THEME_COLORS.accent} style={{ position: 'absolute' }} />}
+      {!loaded && <ActivityIndicator size="small" color={THEME_COLORS.gold} style={{ position: 'absolute' }} />}
       <Image
         source={{ uri }}
         style={{ width: '100%', height: '100%' }}

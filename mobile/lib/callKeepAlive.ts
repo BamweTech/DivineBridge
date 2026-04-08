@@ -48,10 +48,10 @@ export async function startCallKeepAlive(groupName: string): Promise<void> {
       body: `In call — ${groupName}`,
       sticky: true,
       autoDismiss: false,
-      channelId: CHANNEL_ID,
       data: { type: 'call_keep_alive' },
     },
-    trigger: null,
+    // Android 8+: channel is required; `channelId` belongs on the trigger, not `content`.
+    trigger: { channelId: CHANNEL_ID },
   });
 }
 

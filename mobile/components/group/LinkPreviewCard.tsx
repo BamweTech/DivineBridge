@@ -131,20 +131,11 @@ async function fetchOgData(url: string): Promise<OgData | null> {
   }
 }
 
-function hostFromUrl(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return url;
-  }
-}
-
 type Props = {
   url: string;
-  isMe?: boolean;
 };
 
-export function LinkPreviewCard({ url, isMe }: Props) {
+export function LinkPreviewCard({ url }: Props) {
   const [og, setOg] = useState<OgData | null | undefined>(
     cache.has(url) ? cache.get(url) : undefined,
   );
@@ -166,27 +157,33 @@ export function LinkPreviewCard({ url, isMe }: Props) {
 
   if (og === undefined) {
     return (
-      <View style={{ paddingVertical: 10, alignItems: 'center' }}>
+      <View style={{ paddingVertical: 6, alignItems: 'flex-start' }}>
         <ActivityIndicator size="small" color={THEME_COLORS.text3} />
       </View>
     );
   }
 
   if (og === null) {
-    return null;
+    return (
+      <Pressable onPress={() => Linking.openURL(url)} hitSlop={8}>
+        <Text
+          numberOfLines={4}
+          style={{
+            color: THEME_COLORS.gold,
+            fontFamily: 'Geist_500Medium',
+            fontSize: 14,
+            lineHeight: 20,
+            textDecorationLine: 'underline',
+          }}
+        >
+          {url}
+        </Text>
+      </Pressable>
+    );
   }
 
   return (
-    <Pressable
-      onPress={() => Linking.openURL(url)}
-      style={{
-        borderRadius: 12,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: isMe ? THEME_COLORS.goldBorder : THEME_COLORS.border,
-        backgroundColor: isMe ? 'rgba(255,255,255,0.48)' : THEME_COLORS.bg3,
-      }}
-    >
+    <Pressable onPress={() => Linking.openURL(url)} style={{ borderRadius: 12, overflow: 'hidden' }}>
       {og.image ? (
         <Image
           source={{ uri: og.image }}
@@ -194,7 +191,7 @@ export function LinkPreviewCard({ url, isMe }: Props) {
           contentFit="cover"
         />
       ) : null}
-      <View style={{ padding: 10, gap: 3 }}>
+      <View style={{ padding: 10, gap: 3, backgroundColor: THEME_COLORS.bg3 }}>
         {og.siteName ? (
           <Text
             style={{
@@ -208,18 +205,7 @@ export function LinkPreviewCard({ url, isMe }: Props) {
           >
             {og.siteName}
           </Text>
-        ) : (
-          <Text
-            style={{
-              color: THEME_COLORS.text3,
-              fontFamily: 'Geist_400Regular',
-              fontSize: 10,
-            }}
-            numberOfLines={1}
-          >
-            {hostFromUrl(url)}
-          </Text>
-        )}
+        ) : null}
         {og.title ? (
           <Text
             style={{

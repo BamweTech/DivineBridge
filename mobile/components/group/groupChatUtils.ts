@@ -77,6 +77,30 @@ export type ChatSurface = 'main' | 'fs';
 
 export const BUBBLE_W = 264;
 
+/** First HTTP(S) or www… URL in a chat line (same heuristic as bubble link preview). */
+export const GROUP_CHAT_URL_DETECT =
+  /(?:https?:\/\/|www\.)[\w\-._~:/?#[\]@!$&'()*+,;=%]+[\w\-/=]/i;
+
+export function chatPreviewUrl(linkUrl: string | undefined, message: string): string | null {
+  const trimmed = linkUrl?.trim();
+  if (trimmed) return trimmed;
+  const match = message.match(GROUP_CHAT_URL_DETECT);
+  if (!match) return null;
+  const raw = match[0];
+  return raw.startsWith('http') ? raw : `https://${raw}`;
+}
+
+/** Removes the first detected URL from `message` when it matches `previewUrl` (avoids duplicating the link under a preview card). */
+export function stripMatchingPreviewUrl(message: string, previewUrl: string): string {
+  const match = message.match(GROUP_CHAT_URL_DETECT);
+  if (!match) return message;
+  const raw = match[0];
+  const candidate = raw.startsWith('http') ? raw : `https://${raw}`;
+  if (candidate !== previewUrl) return message;
+  const i = match.index ?? 0;
+  return `${message.slice(0, i)}${message.slice(i + raw.length)}`.replace(/\s{2,}/g, ' ').trim();
+}
+
 export function buildReplyPreviewText(msg: Pick<GroupChatMessage, 'message' | 'link_url' | 'attachments' | 'message_type'>) {
   const body = (msg.message ?? '').trim().replace(/\s+/g, ' ');
   if (body) return body;
