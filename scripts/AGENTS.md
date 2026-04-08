@@ -24,6 +24,18 @@ Key variables: `GCP_PROJECT`, `GCP_REGION`, `CLOUD_RUN_SERVICE`, `FIREBASE_PROJE
 
 Helper to set `CLOUDSDK_PYTHON` for gcloud SDK compatibility.
 
+### Metro VM (Expo bundler on GCE)
+
+After pushing **mobile** (or shared JS) changes to `main`, or when the user asks to refresh the bundler VM:
+
+```bash
+./scripts/gcp-metro-update.sh            # git pull main + restart metro.service
+./scripts/gcp-metro-update.sh --reinstall # also rm mobile/node_modules && npm install
+./scripts/gcp-metro-update.sh --status    # systemd + Metro health
+```
+
+Requires `gcloud` auth and access to project `divinebridge`, VM `divinebridge-metro` (default zone `us-central1-a`). See also `gcp-metro-vm.sh`, `gcp-metro-tunnel.sh`, `gcp-metro-allow-my-ip.sh`.
+
 ## Migrations
 
 Migration scripts are one-off Python scripts for Firestore data changes. They are not part of a formal migration framework.

@@ -9,3 +9,4 @@ Always review recent changes and deployment history before suggesting deployment
 - Only create new classes/methods when absolutely necessary
 - Prioritize improving overall codebase structure
 - All changes must be tested and validated before deployment
+- After pushing mobile (Expo) changes to main or completing a deploy that includes mobile, run `./scripts/gcp-metro-update.sh` to pull main on the Metro GCE VM and restart Metro unless the user opts out

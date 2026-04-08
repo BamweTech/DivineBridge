@@ -52,6 +52,7 @@ Ask the user which deployment target:
 2. Verify the response is `{"status": "healthy", ...}`.
 3. If deploying Firestore rules, verify in Firebase Console that rules are updated.
 4. Report the Cloud Run URL and deployment status.
+5. **Metro VM:** If `mobile/` (or anything the Expo bundler serves) changed on `main`, run `./scripts/gcp-metro-update.sh` so the GCE Metro host pulls `main` and restarts `metro.service`. Use `--reinstall` only when native deps or lockfile require it.
 
 ## Staging deploy
 

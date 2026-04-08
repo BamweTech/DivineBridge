@@ -48,3 +48,7 @@ To add a new screen, create a file in `app/` and register in the nearest `_layou
 - Use TanStack Query for cacheable server data, Zustand for ephemeral UI state.
 - Firestore `onSnapshot` for real-time features (chat, room state, groups).
 - Error tracking via Sentry (`@sentry/react-native`).
+
+## Metro VM
+
+Device builds that load JS from the team GCE bundler need the VM on **`main`**. After mobile-related commits land on `main`, run from repo root: `./scripts/gcp-metro-update.sh` (see `scripts/AGENTS.md`).
