@@ -25,7 +25,6 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
 import { ResizeMode, Video } from 'expo-av';
-import { Image } from 'expo-image';
 import {
   useGroupChat,
   useGroupDetails,
@@ -51,9 +50,12 @@ import { PendingUploadChatBubble } from '@/components/group/PendingUploadChatBub
 import { MessageReactionPopover } from '@/components/group/MessageReactionPopover';
 import { InviteSheet } from '@/components/group/InviteSheet';
 import { JumpToLatestButton } from '@/components/group/JumpToLatestButton';
+import { ZoomableImage } from '@/components/group/ZoomableImage';
 import {
   applyReactionMutation,
+  buildChatImageGallery,
   buildReplyPreviewText,
+  type ChatImageGalleryItem,
   type ChatListItem,
   type ChatSurface,
   downloadAttachmentToCache,
@@ -69,7 +71,7 @@ import { PulsingDot } from '@/components/ui/PulsingDot';
 import { useAuthStore } from '@/stores/authStore';
 import { THEME_COLORS } from '@/lib/constants';
 import Icon from '@/components/ui/Icon';
-import type { PrayerGroup, GroupChatMessage, GroupChatReplyRef } from '@/types';
+import type { PrayerGroup, GroupChatAttachment, GroupChatMessage, GroupChatReplyRef } from '@/types';
 
 function LiveSessionBanner({
   participantCount,
@@ -156,7 +158,14 @@ export default function GroupScreen() {
   const [fsChatOpen, setFsChatOpen] = useState(true);
   const [fsChatText, setFsChatText] = useState('');
   const [showAttachTray, setShowAttachTray] = useState<'main' | 'fs' | null>(null);
-  const [viewerMedia, setViewerMedia] = useState<ViewerMedia | null>(null);
+  const [videoViewer, setVideoViewer] = useState<ViewerMedia | null>(null);
+  const [imageViewerOpen, setImageViewerOpen] = useState<{
+    items: ChatImageGalleryItem[];
+    initialIndex: number;
+  } | null>(null);
+  const [imageGalleryIndex, setImageGalleryIndex] = useState(0);
+  const [imageGalleryScrollLocked, setImageGalleryScrollLocked] = useState(false);
+  const imageGalleryRef = useRef<FlatList<ChatImageGalleryItem>>(null);
   const [mediaActionBusy, setMediaActionBusy] = useState<'share' | 'save' | null>(null);
   const memberSyncRequestedRef = useRef(false);
 
@@ -248,6 +257,74 @@ export default function GroupScreen() {
         return override ? { ...msg, reactions: override } : msg;
       });
   }, [messages, optimisticReactions, lastReadAt, memberJoinedAt, isReadsReady]);
+
+  const viewerMediaActive = useMemo((): ViewerMedia | null => {
+    if (videoViewer) return videoViewer;
+    if (imageViewerOpen?.items.length) {
+      const item = imageViewerOpen.items[imageGalleryIndex];
+      if (!item) return null;
+      return {
+        url: item.url,
+        contentType: item.contentType,
+        fileName: item.fileName,
+      };
+    }
+    return null;
+  }, [videoViewer, imageViewerOpen, imageGalleryIndex]);
+
+  const openGroupMedia = useCallback(
+    (attachment: GroupChatAttachment, sourceMessage: GroupChatMessage) => {
+      if (attachment.content_type.startsWith('video/')) {
+        setImageViewerOpen(null);
+        setImageGalleryScrollLocked(false);
+        setVideoViewer({
+          url: attachment.url,
+          contentType: attachment.content_type,
+          fileName: attachment.file_name,
+        });
+        return;
+      }
+      if (!attachment.content_type.startsWith('image/')) return;
+      setVideoViewer(null);
+      const rawIdx = (sourceMessage.attachments ?? []).findIndex(
+        (a) => a.url === attachment.url && a.file_name === attachment.file_name,
+      );
+      const ai = rawIdx >= 0 ? rawIdx : 0;
+      const key = `${sourceMessage.message_id}-${ai}`;
+      let items = buildChatImageGallery(displayedMessages);
+      let initialIndex = items.findIndex((g) => g.key === key);
+      if (initialIndex < 0) {
+        items = [
+          {
+            key,
+            url: attachment.url,
+            contentType: attachment.content_type,
+            fileName: attachment.file_name,
+          },
+        ];
+        initialIndex = 0;
+      }
+      setImageGalleryScrollLocked(false);
+      setImageGalleryIndex(initialIndex);
+      setImageViewerOpen({ items, initialIndex });
+    },
+    [displayedMessages],
+  );
+
+  const closeGroupMediaViewer = useCallback(() => {
+    setVideoViewer(null);
+    setImageViewerOpen(null);
+    setImageGalleryScrollLocked(false);
+  }, []);
+
+  useEffect(() => {
+    if (!imageViewerOpen?.items.length) return;
+    const idx = Math.min(imageViewerOpen.initialIndex, imageViewerOpen.items.length - 1);
+    const t = setTimeout(() => {
+      imageGalleryRef.current?.scrollToIndex({ index: idx, animated: false });
+    }, 32);
+    return () => clearTimeout(t);
+  }, [imageViewerOpen]);
 
   const firstUnreadIndex = useMemo(() => {
     if (!user?.uid) return -1;
@@ -399,22 +476,22 @@ export default function GroupScreen() {
   }
 
   async function handleShareMedia() {
-    if (!viewerMedia) return;
+    if (!viewerMediaActive) return;
     try {
       setMediaActionBusy('share');
       const localUri = await downloadAttachmentToCache({
-        url: viewerMedia.url,
-        file_name: viewerMedia.fileName,
-        content_type: viewerMedia.contentType,
+        url: viewerMediaActive.url,
+        file_name: viewerMediaActive.fileName,
+        content_type: viewerMediaActive.contentType,
       });
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
         await Sharing.shareAsync(localUri, {
-          mimeType: viewerMedia.contentType,
+          mimeType: viewerMediaActive.contentType,
           dialogTitle: 'Share media',
         });
       } else {
-        await Share.share({ url: localUri, message: viewerMedia.fileName });
+        await Share.share({ url: localUri, message: viewerMediaActive.fileName });
       }
     } catch {
       Alert.alert('Could not share file', 'Please try again.');
@@ -424,7 +501,7 @@ export default function GroupScreen() {
   }
 
   async function handleSaveMedia() {
-    if (!viewerMedia) return;
+    if (!viewerMediaActive) return;
     try {
       setMediaActionBusy('save');
       const MediaLibrary = await getMediaLibraryModule();
@@ -434,9 +511,9 @@ export default function GroupScreen() {
         return;
       }
       const localUri = await downloadAttachmentToCache({
-        url: viewerMedia.url,
-        file_name: viewerMedia.fileName,
-        content_type: viewerMedia.contentType,
+        url: viewerMediaActive.url,
+        file_name: viewerMediaActive.fileName,
+        content_type: viewerMediaActive.contentType,
       });
       await MediaLibrary.saveToLibraryAsync(localUri);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -884,13 +961,7 @@ export default function GroupScreen() {
         showSender={item.showSender}
         showTimestamp={item.showTimestamp}
         highlighted={highlightedMessageId === item.msg.message_id}
-        onOpenMedia={(attachment) =>
-          setViewerMedia({
-            url: attachment.url,
-            contentType: attachment.content_type,
-            fileName: attachment.file_name,
-          })
-        }
+        onOpenMedia={openGroupMedia}
         onOpenDoc={handleOpenDocument}
         onReply={handleReplyToMessage}
         onToggleReaction={handleToggleReaction}
@@ -1269,51 +1340,97 @@ export default function GroupScreen() {
         onReact={handleToggleReaction}
       />
 
-      {/* Fullscreen media viewer */}
+      {/* Fullscreen media viewer (images: pinch-zoom + horizontal gallery; video: player) */}
       <Modal
-        visible={!!viewerMedia}
+        visible={!!videoViewer || !!imageViewerOpen}
         transparent
         animationType="fade"
-        onRequestClose={() => setViewerMedia(null)}
+        onRequestClose={closeGroupMediaViewer}
         statusBarTranslucent
       >
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' }}>
           <Pressable
-            onPress={() => setViewerMedia(null)}
+            onPress={closeGroupMediaViewer}
             style={{
               position: 'absolute', top: insets.top + 8, right: 16, zIndex: 10,
               width: 36, height: 36, borderRadius: 18,
               backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center',
             }}
             accessibilityRole="button"
-            accessibilityLabel="Close image"
+            accessibilityLabel="Close media viewer"
           >
             <Icon name="cross" size={14} color="#fff" />
           </Pressable>
-          {viewerMedia && (
-            viewerMedia.contentType.startsWith('video/') ? (
-              <Video
-                source={{ uri: viewerMedia.url }}
-                style={{
-                  width: Dimensions.get('window').width,
-                  height: Dimensions.get('window').height * 0.72,
-                  backgroundColor: '#000',
+          {videoViewer ? (
+            <Video
+              source={{ uri: videoViewer.url }}
+              style={{
+                width: Dimensions.get('window').width,
+                height: Dimensions.get('window').height * 0.72,
+                backgroundColor: '#000',
+              }}
+              useNativeControls
+              resizeMode={ResizeMode.CONTAIN}
+            />
+          ) : imageViewerOpen && imageViewerOpen.items.length > 0 ? (
+            <View style={{ flex: 1, width: '100%', justifyContent: 'center' }}>
+              <FlatList
+                ref={imageGalleryRef}
+                data={imageViewerOpen.items}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                scrollEnabled={!imageGalleryScrollLocked}
+                keyExtractor={(it) => it.key}
+                extraData={imageGalleryScrollLocked}
+                getItemLayout={(_, index) => {
+                  const w = Dimensions.get('window').width;
+                  return { length: w, offset: w * index, index };
                 }}
-                useNativeControls
-                resizeMode={ResizeMode.CONTAIN}
-              />
-            ) : (
-              <Image
-                source={{ uri: viewerMedia.url }}
-                style={{
-                  width: Dimensions.get('window').width,
-                  height: Dimensions.get('window').height * 0.75,
+                initialNumToRender={3}
+                windowSize={5}
+                onMomentumScrollEnd={(e) => {
+                  const w = Dimensions.get('window').width;
+                  const x = e.nativeEvent.contentOffset.x;
+                  const idx = Math.round(x / w);
+                  const max = imageViewerOpen.items.length - 1;
+                  setImageGalleryIndex(Math.min(Math.max(0, idx), max));
                 }}
-                contentFit="contain"
-                accessibilityLabel="Full-size image"
+                onScrollToIndexFailed={({ index }) => {
+                  const w = Dimensions.get('window').width;
+                  imageGalleryRef.current?.scrollToOffset({ offset: w * index, animated: false });
+                }}
+                renderItem={({ item }) => {
+                  const w = Dimensions.get('window').width;
+                  const h = Dimensions.get('window').height * 0.72;
+                  return (
+                    <View style={{ width: w, height: h, justifyContent: 'center', alignItems: 'center' }}>
+                      <ZoomableImage
+                        uri={item.url}
+                        width={w}
+                        height={h}
+                        onZoomActiveChange={setImageGalleryScrollLocked}
+                      />
+                    </View>
+                  );
+                }}
               />
-            )
-          )}
+              {imageViewerOpen.items.length > 1 ? (
+                <Text
+                  style={{
+                    position: 'absolute',
+                    top: insets.top + 48,
+                    alignSelf: 'center',
+                    color: 'rgba(255,255,255,0.75)',
+                    fontFamily: 'Geist_500Medium',
+                    fontSize: 13,
+                  }}
+                >
+                  {imageGalleryIndex + 1} / {imageViewerOpen.items.length}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
           <View
             style={{
               position: 'absolute',

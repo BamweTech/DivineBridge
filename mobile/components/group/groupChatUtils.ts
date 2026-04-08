@@ -25,6 +25,26 @@ export type ViewerMedia = {
   fileName: string;
 };
 
+/** Stable id for paging the group chat image gallery (message + attachment index). */
+export type ChatImageGalleryItem = ViewerMedia & { key: string };
+
+export function buildChatImageGallery(messages: GroupChatMessage[]): ChatImageGalleryItem[] {
+  const items: ChatImageGalleryItem[] = [];
+  for (const msg of messages) {
+    (msg.attachments ?? []).forEach((att, ai) => {
+      if (att.content_type.startsWith('image/')) {
+        items.push({
+          key: `${msg.message_id}-${ai}`,
+          url: att.url,
+          contentType: att.content_type,
+          fileName: att.file_name,
+        });
+      }
+    });
+  }
+  return items;
+}
+
 export type ReactionPopoverState = {
   message: GroupChatMessage;
   anchorX: number;

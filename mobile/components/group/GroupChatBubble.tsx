@@ -45,7 +45,7 @@ export function GroupChatBubble({
   showSender: boolean;
   showTimestamp: boolean;
   highlighted?: boolean;
-  onOpenMedia: (attachment: GroupChatAttachment) => void;
+  onOpenMedia: (attachment: GroupChatAttachment, sourceMessage: GroupChatMessage) => void;
   onOpenDoc: (url: string, fileName: string) => void;
   onReply: (message: GroupChatMessage) => void;
   onToggleReaction: (messageId: string, emoji: string) => void;
@@ -240,7 +240,7 @@ export function GroupChatBubble({
                 <MediaAttachmentCard
                   key={`${msg.message_id}-media-${idx}`}
                   attachment={a}
-                  onOpen={onOpenMedia}
+                  onOpen={(att) => onOpenMedia(att, msg)}
                 />
               ))}
             </View>
