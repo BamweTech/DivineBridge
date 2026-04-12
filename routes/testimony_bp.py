@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 import uuid
 from extensions import limiter
+from qa_wall_filters import is_hidden_production_test_wall_item
 
 logger = logging.getLogger(__name__)
 
@@ -135,14 +136,20 @@ def get_testimonies():
         # Get all testimonies from Cloud Storage
         testimonies = current_app.storage_handler.get_all_testimonies(limit=limit)
         
-        # Filter for approved only
-        approved_testimonies = [t for t in testimonies if t.get('approved', False)]
-        
+        # Filter for approved only; never surface QA / production-test artifacts
+        approved_testimonies = [
+            t for t in testimonies
+            if t.get('approved', False) and not is_hidden_production_test_wall_item(t)
+        ]
+
         logger.info(f"Returning {len(approved_testimonies)} approved testimonies")
-        
-        return jsonify({
+
+        response = jsonify({
             'testimonies': approved_testimonies[:limit]
-        }), 200
+        })
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        return response, 200
         
     except Exception as e:
         logger.error(f"Error getting testimonies: {e}")
@@ -156,6 +163,9 @@ def get_testimony(testimony_id):
         testimony = current_app.storage_handler.get_testimony(testimony_id)
         
         if not testimony:
+            return jsonify({'error': 'Testimony not found'}), 404
+
+        if is_hidden_production_test_wall_item(testimony):
             return jsonify({'error': 'Testimony not found'}), 404
         
         # Only return if approved

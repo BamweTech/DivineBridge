@@ -106,10 +106,19 @@ In Jesus-Christ's name we pray. Amen.""",
                 }
                 logger.info("Using fallback prayer")
         
+        if isinstance(prayer, dict):
+            from prayer_generator import PrayerGenerator
+            pg = PrayerGenerator(storage_handler)
+            prayer = pg.merge_email_intro_if_missing(prayer, today, verse)
+
         prayer_data = {
             'content': prayer.get('content', '') if isinstance(prayer, dict) else prayer,
-            'date': today
+            'date': today,
         }
+        if isinstance(prayer, dict):
+            intro = prayer.get('email_intro') or prayer.get('weekly_email_intro')
+            if intro:
+                prayer_data['email_intro'] = intro
         
         logger.info(f"Prayer: {prayer_data['content'][:50]}...")
         

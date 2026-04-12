@@ -27,6 +27,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { PulsingDot } from '@/components/ui/PulsingDot';
 import { THEME_COLORS } from '@/lib/constants';
 import { filterGlobalWatchForFeed } from '@/lib/globalWatchFeed';
+import { isHiddenProductionTestWallItem } from '@/lib/qaWallFilters';
 import Icon from '@/components/ui/Icon';
 import { useAuthStore } from '@/stores/authStore';
 import type { PrayerGroup, ScheduledSession } from '@/types';
@@ -662,9 +663,10 @@ function PrayerWallFeed({ currentUserId, onCompose }: { currentUserId?: string; 
     },
   });
 
-  // Community posts — exclude AI daily prayers (source === 'generated')
+  // Community posts — exclude AI daily prayers (source === 'generated'); hide QA fingerprints
   const communityPosts: PrayerPost[] = (communityData?.prayers ?? []).filter(
-    (p: any) => !(p.source === 'generated' && !p.user_id)
+    (p: any) =>
+      !(p.source === 'generated' && !p.user_id) && !isHiddenProductionTestWallItem(p as Record<string, unknown>)
   );
 
   // Global watch: max 10, drop AI/meta junk, one card per event (dedupe)

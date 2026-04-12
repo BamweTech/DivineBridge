@@ -59,6 +59,12 @@ for doc in db.collection('users').stream():
 
 Example: `migrate_users_to_firestore.py`.
 
+## Admin / GCS utilities
+
+| Script | Purpose |
+|--------|---------|
+| `delete_production_test_testimonies.py` | Remove QA posts from GCS: `testimonies/` **and** `prayer_requests/` (mobile Community / `/api/prayer/prayers` uses the latter). `--dry-run` to list only. |
+
 ## Conventions
 
 - Always use `set -euo pipefail` in bash scripts.

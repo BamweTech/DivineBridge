@@ -239,6 +239,18 @@ class LocalStorageHandler:
                 return True
         
         return False
+
+    def delete_testimony(self, testimony_id):
+        """Remove a testimony file by id (searches all date folders)."""
+        for date_dir in self.testimonies_path.iterdir():
+            if not date_dir.is_dir():
+                continue
+            file_path = date_dir / f"{testimony_id}.json"
+            if file_path.exists():
+                file_path.unlink()
+                logger.info(f"Deleted testimony: {file_path}")
+                return True
+        return False
     
     # Daily Prayer Methods
     def save_prayer(self, date_str, prayer_text):

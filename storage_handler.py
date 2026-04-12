@@ -469,6 +469,21 @@ class StorageHandler:
         except Exception as e:
             logger.error(f"Error getting prayer request {request_id}: {e}")
             return None
+
+    def delete_prayer_request(self, request_id: str) -> bool:
+        """Delete a prayer request JSON blob from Cloud Storage by id."""
+        try:
+            blobs = list(self.bucket.list_blobs(prefix="prayer_requests/"))
+            for blob in blobs:
+                if request_id in blob.name and blob.name.endswith(".json"):
+                    blob.delete()
+                    logger.info("Deleted prayer request blob: %s", blob.name)
+                    return True
+            logger.warning("No prayer request blob found for id %s", request_id)
+            return False
+        except Exception as e:
+            logger.error(f"Error deleting prayer request {request_id}: {e}")
+            return False
     
     def get_user_prayed_prayers(self, user_id: str) -> list:
         """
@@ -1039,4 +1054,19 @@ class StorageHandler:
             
         except Exception as e:
             logger.error(f"Error updating testimony {testimony_id}: {e}")
-            return False 
+            return False
+
+    def delete_testimony(self, testimony_id: str) -> bool:
+        """Delete a testimony JSON blob from Cloud Storage by id."""
+        try:
+            blobs = list(self.bucket.list_blobs(prefix="testimonies/"))
+            for blob in blobs:
+                if testimony_id in blob.name and blob.name.endswith(".json"):
+                    blob.delete()
+                    logger.info("Deleted testimony blob: %s", blob.name)
+                    return True
+            logger.warning("No testimony blob found for id %s", testimony_id)
+            return False
+        except Exception as e:
+            logger.error(f"Error deleting testimony {testimony_id}: {e}")
+            return False

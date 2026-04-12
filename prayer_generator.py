@@ -12,6 +12,8 @@ import random
 from google.cloud.storage import Client
 from typing import Optional, Dict
 
+from verse_cache import verse_cache
+
 logger = logging.getLogger(__name__)
 
 DAILY_PRAYER_LOOKBACK_HOURS = 48
@@ -218,6 +220,130 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
         
         logger.info(f"Prayer validation passed: {word_count} words")
         return response
+
+    def _normalize_email_intro_text(self, raw: Optional[str]) -> Optional[str]:
+        """Strip model noise, keep a single paragraph, enforce rough length bounds."""
+        if not raw or not str(raw).strip():
+            return None
+        text = str(raw).strip()
+        if "<redacted_thinking>" in text:
+            import re
+            text = re.sub(
+                r"<redacted_thinking>.*?</redacted_thinking>", "", text, flags=re.DOTALL
+            ).strip()
+        text = self._remove_citations(text)
+        # One paragraph only (email template expects a single block)
+        para = text.split("\n\n")[0].strip()
+        para = " ".join(para.split())
+        if not para:
+            return None
+        word_count = len(para.split())
+        if word_count < 35:
+            logger.warning("email_intro too short after normalize (%s words); discarding", word_count)
+            return None
+        if word_count > 175:
+            para = " ".join(para.split()[:155]) + "…"
+            logger.info("email_intro truncated to ~155 words")
+        if len(para) > 1600:
+            para = para[:1597] + "…"
+        return para
+
+    def _generate_email_intro_text(
+        self,
+        verse_reference: str,
+        verse_text: str,
+        prayer_content: str,
+        max_retries: int = 2,
+    ) -> Optional[str]:
+        """
+        Ask the model for one warm paragraph for the weekly HTML email (email_intro).
+        The text must stand alone: a reader should need nothing else to grasp the message.
+        """
+        ref = (verse_reference or "").strip()
+        vtext = (verse_text or "").strip()
+        body = (prayer_content or "").strip()
+        if not body:
+            return None
+        # Cap prayer excerpt so the prompt stays bounded
+        prayer_excerpt = body[:2800]
+        if len(body) > len(prayer_excerpt):
+            prayer_excerpt = prayer_excerpt.rstrip() + "…"
+
+        base_prompt = f"""You write ONE opening paragraph for a Christian community email.
+
+The email already says "Dear [name],". Your paragraph comes next. Some readers may skim only your paragraph, so it must be COMPLETE ON ITS OWN: do not assume they will read anything else. Do not say "below", "later in this email", "as you will see", "the attached prayer", or similar.
+
+Use this material to inform what you write (the reader will not necessarily see these exact sections):
+- Verse for today ({ref}): "{vtext}"
+- The community's prayer this week (for your sense of themes and burdens — paraphrase in your own words; do not copy long phrases):
+{prayer_excerpt}
+
+Requirements for your paragraph (one block, 5–8 sentences, roughly 75–120 words):
+- Warm, inclusive "we" voice.
+- Make the encouragement and spiritual point clear without referring to other parts of the email. You may briefly paraphrase the heart of the verse or a key idea (not a long quote).
+- Name at least one concrete theme from the prayer's concerns (e.g. comfort for the grieving, peace for the anxious, strength for the suffering) in plain language so the paragraph feels grounded, not generic.
+- End with a clear invitation to unity in prayer with believers around the world (without saying "read on").
+- Reverent, hopeful, accessible to all Christians; avoid theological jargon.
+- Do NOT start with "Dear". NO markdown, bullets, title line, or [1]-style citations.
+- Output ONLY the paragraph — no preamble or explanation."""
+
+        last_err = None
+        for attempt in range(1, max_retries + 1):
+            try:
+                prompt = base_prompt
+                if attempt > 1 and last_err:
+                    prompt = f"""{base_prompt}
+
+Previous attempt was rejected: {last_err}
+Fix this and output ONLY the corrected paragraph."""
+
+                raw = self.client.query_with_timeout(prompt, timeout=90.0)
+                normalized = self._normalize_email_intro_text(raw)
+                if normalized:
+                    return normalized
+                last_err = "Output empty, too short, or failed normalization"
+            except Exception as e:
+                last_err = str(e)
+                logger.warning("email_intro generation attempt %s failed: %s", attempt, e)
+        logger.error("email_intro generation failed after retries: %s", last_err)
+        return None
+
+    def merge_email_intro_if_missing(
+        self,
+        prayer: Optional[Dict],
+        date_str: str,
+        verse: Optional[Dict] = None,
+    ) -> Optional[Dict]:
+        """
+        If prayer dict has no email_intro, generate one from verse + prayer and save a new storage blob.
+
+        Returns the prayer dict to use (with email_intro set when generation succeeds).
+        """
+        if not prayer or not isinstance(prayer, dict):
+            return prayer
+        existing = (prayer.get("email_intro") or prayer.get("weekly_email_intro") or "").strip()
+        if existing:
+            return prayer
+
+        verse = verse or verse_cache.get_today_verse()
+        if not verse:
+            logger.warning("merge_email_intro_if_missing: no verse available")
+            return prayer
+
+        ref = verse.get("reference", "")
+        vtext = verse.get("verse", verse.get("text", ""))
+        content = prayer.get("content", "")
+        intro = self._generate_email_intro_text(ref, vtext, content)
+        if not intro:
+            return prayer
+
+        updated = {**prayer, "email_intro": intro}
+        try:
+            self.storage.save_prayer(updated, date_str)
+            logger.info("Saved prayer with generated email_intro for %s", date_str)
+        except Exception as e:
+            logger.error("Could not save prayer with email_intro: %s", e)
+        return updated
         
     def generate_prayer(self, max_retries=5):
         """Generate a new prayer and save it to storage with retry logic.
@@ -240,6 +366,10 @@ CRITICAL: Return ONLY the prayer text. No <think> tags, no explanations, no comm
                     logger.info(f"Cleaned citations from existing prayer for {today}")
                 elif isinstance(existing_prayer, str):
                     existing_prayer = self._remove_citations(existing_prayer)
+                if isinstance(existing_prayer, dict):
+                    existing_prayer = self.merge_email_intro_if_missing(
+                        existing_prayer, today, verse=None
+                    )
                 logger.info(f"Using existing prayer for {today}")
                 return existing_prayer
             
@@ -339,6 +469,21 @@ DO NOT use "In Jesus' name" or "In the name of Jesus" or any other variation."""
                 'created_at': datetime.now().isoformat(),
                 'source': 'generated'
             }
+
+            try:
+                verse = verse_cache.get_today_verse()
+                if verse:
+                    intro = self._generate_email_intro_text(
+                        verse.get("reference", ""),
+                        verse.get("verse", verse.get("text", "")),
+                        response,
+                    )
+                    if intro:
+                        prayer_data["email_intro"] = intro
+                else:
+                    logger.warning("No verse in cache; skipping email_intro generation for new prayer")
+            except Exception as intro_err:
+                logger.warning("email_intro not generated for new prayer: %s", intro_err)
             
             # Extract disaster metadata from prayer
             try:

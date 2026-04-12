@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your Weekly Blessings – Divine Bridge</title>
+<!--[if !mso]><!-->
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Cormorant+SC:wght@300;400;500&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<!--<![endif]-->
+<style>
+  body { margin: 0; padding: 0; background: #0e0a1a; -webkit-font-smoothing: antialiased; }
+  img { border: 0; display: block; outline: none; text-decoration: none; }
+  table { border-collapse: collapse; }
+</style>
+</head>
+<body style="margin:0; padding:0; background:#0e0a1a; font-family:'Cormorant Garamond', Georgia, 'Times New Roman', serif;">
+
+<table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#0e0a1a;">
+<tr><td align="center">
+
+<table cellpadding="0" cellspacing="0" border="0" width="620" style="max-width:620px; background:#0e0a1a;">
+
+  <!-- Header -->
+  <tr>
+    <td style="background:#12082a; padding:48px 48px 36px; text-align:center;">
+      <img src="cid:logo_image" alt="Divine Bridge" width="72" height="72" style="width:72px; height:72px; margin:0 auto 20px; display:block;" />
+      <p style="font-family:'Cormorant SC', Georgia, serif; font-size:10px; letter-spacing:6px; color:rgba(196,162,101,0.65); margin:0 0 16px 0; text-transform:uppercase;">Your Weekly Blessings</p>
+      <h1 style="font-family:'Cormorant Garamond', Georgia, 'Times New Roman', serif; font-size:32px; font-weight:300; color:#f0e8d0; line-height:1.25; margin:0; letter-spacing:-0.5px;">
+        {{date_str}}
+      </h1>
+    </td>
+  </tr>
+
+  <!-- Greeting + intro -->
+  <tr>
+    <td style="background:#faf6ee; padding:56px 56px 40px; font-family:'Cormorant Garamond', Georgia, 'Times New Roman', serif;">
+      <p style="font-family:'Cormorant Garamond', Georgia, 'Times New Roman', serif; font-size:20px; font-weight:400; color:#1a1208; margin:0 0 20px 0;">
+        Dear {{first_name}},
+      </p>
+      <p style="font-family:'Cormorant Garamond', Georgia, 'Times New Roman', serif; font-size:18px; font-weight:300; line-height:1.85; color:#3a2d18; margin:0;">
+        {{intro_paragraph}}
+      </p>
+    </td>
+  </tr>
+
+  <!-- Verse -->
+  <tr>
+    <td style="background:#faf6ee; padding:0 56px 48px;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+          <td style="border-left:2px solid #c4a265; padding:28px 36px; background-color:rgba(196,162,101,0.04);">
+            <p style="font-family:'IM Fell English', Georgia, 'Times New Roman', serif; font-size:21px; font-style:italic; color:#2a1e0a; line-height:1.55; margin:0 0 12px 0;">
+              &ldquo;{{verse_text}}&rdquo;
+            </p>
+            <p style="font-family:'Cormorant SC', Georgia, serif; font-size:11px; letter-spacing:3px; color:#9b7a3a; margin:0; text-transform:uppercase;">{{verse_reference}}</p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Divider -->
+  <tr>
+    <td style="background:#faf6ee; padding:0 56px 40px;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%">
+        <tr>
+          <td style="height:1px; background:linear-gradient(90deg, transparent, rgba(160,125,70,0.35)); font-size:0;">&nbsp;</td>
+          <td width="40" align="center" style="color:#c4a265; font-size:14px; opacity:0.5;">&#10010;</td>
+          <td style="height:1px; background:linear-gradient(90deg, rgba(160,125,70,0.35), transparent); font-size:0;">&nbsp;</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Prayer -->
+  <tr>
+    <td style="background:#faf6ee; padding:0 56px 56px;">
+      <p style="font-family:'Cormorant SC', Georgia, serif; font-size:11px; letter-spacing:5px; color:#9b7a3a; margin:0 0 20px 0; text-transform:uppercase; text-align:center;">This Week&rsquo;s Global Prayer</p>
+      <div style="font-family:'Cormorant Garamond', Georgia, 'Times New Roman', serif; font-size:17px; font-weight:300; line-height:1.85; color:#3a2d18; text-align:left;">
+        {{prayer_html}}
+      </div>
+    </td>
+  </tr>
+
+  <!-- CTA -->
+  <tr>
+    <td style="background:#12082a; padding:52px 56px; text-align:center;">
+      <p style="font-family:'Cormorant SC', Georgia, serif; font-size:10px; letter-spacing:6px; color:rgba(196,162,101,0.6); margin:0 0 18px 0; text-transform:uppercase;">The Divine Bridge Community</p>
+      <p style="font-family:'Cormorant Garamond', Georgia, 'Times New Roman', serif; font-size:17px; font-weight:300; color:rgba(240,232,208,0.72); line-height:1.75; max-width:400px; margin:0 auto 32px;">
+        Join prayer rooms, share requests, and walk in faith with believers around the world.
+      </p>
+      <a href="https://divinebridge.io/prayers" style="display:inline-block; padding:16px 48px; background:#1a0e3a; color:#f5c842; font-family:'Cormorant SC', Georgia, serif; font-size:12px; letter-spacing:5px; text-decoration:none; border:1px solid rgba(196,162,101,0.3); text-transform:uppercase;">Open Prayer Wall</a>
+    </td>
+  </tr>
+
+  <!-- Footer -->
+  <tr>
+    <td style="background:#080510; padding:36px 48px; text-align:center; border-top:1px solid rgba(196,162,101,0.08);">
+      <table cellpadding="0" cellspacing="0" border="0" width="60" style="margin:0 auto 24px;">
+        <tr><td style="height:1px; background:#c4a265; opacity:0.4; font-size:0;">&nbsp;</td></tr>
+      </table>
+      <p style="font-family:'Cormorant SC', Georgia, serif; font-size:12px; letter-spacing:4px; color:rgba(196,162,101,0.5); margin:0 0 14px 0;">Divine Bridge</p>
+      <p style="font-family:'Cormorant Garamond', Georgia, 'Times New Roman', serif; font-size:13px; color:rgba(255,255,255,0.22); margin:0 0 12px 0;">
+        <a href="https://divinebridge.io" style="color:rgba(196,162,101,0.35); text-decoration:none; margin:0 10px;">divinebridge.io</a>
+        <a href="{{unsubscribe_url}}" style="color:rgba(196,162,101,0.35); text-decoration:none; margin:0 10px;">Unsubscribe</a>
+        <a href="https://divinebridge.io/privacy-policy" style="color:rgba(196,162,101,0.35); text-decoration:none; margin:0 10px;">Privacy</a>
+      </p>
+      <p style="font-family:'Cormorant Garamond', Georgia, 'Times New Roman', serif; font-size:11px; color:rgba(255,255,255,0.15); line-height:1.7; font-style:italic; margin:0;">
+        Blessings,<br>The Divine Bridge Team<br><br>
+        &copy; 2026 Divine Bridge. All rights reserved.
+      </p>
+    </td>
+  </tr>
+
+</table>
+
+</td></tr>
+</table>
+
+</body>
+</html>

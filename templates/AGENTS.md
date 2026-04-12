@@ -48,6 +48,15 @@ def feature():
 | `profile.html` | `/profile` | User profile |
 | `public_card.html` | `/card/<user_id>` | Public business card |
 
+## Transactional / marketing HTML (not Jinja pages)
+
+These files live under `templates/emails/` and are loaded by `email_service_v2.py` with string substitution (not `render_template`).
+
+| Template | Used by | Purpose |
+|----------|---------|---------|
+| `emails/weekly-blessings.html` | `send_daily_content` | Monday subscriber email (verse + prayer + optional `email_intro`) |
+| `emails/easter-2026.html` | `send_easter_email` | One-off Easter campaign |
+
 ## Static assets
 
 - CSS in `static/css/`

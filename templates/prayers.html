@@ -1899,7 +1899,7 @@
         
         // Now fetch prayers after cache is loaded
         try {
-            const response = await fetch(`/api/prayer/prayers?client_date=${clientDate}`);
+            const response = await fetch(`/api/prayer/prayers?client_date=${clientDate}`, { cache: 'no-store' });
             const data = await response.json();
             
             if (data.prayers) {
@@ -2269,7 +2269,7 @@
     async function loadMorePrayers(count) {
         try {
             const clientDate = getClientLocalDate();
-            const response = await fetch(`/api/prayer/prayers?client_date=${clientDate}`);
+            const response = await fetch(`/api/prayer/prayers?client_date=${clientDate}`, { cache: 'no-store' });
             const data = await response.json();
             
             if (data.prayers && currentUser) {
@@ -2521,7 +2521,7 @@
             document.getElementById('prayers-list').style.display = 'none';
             
             const clientDate = getClientLocalDate();
-            const response = await fetch(`/api/prayer/prayers?client_date=${clientDate}`);
+            const response = await fetch(`/api/prayer/prayers?client_date=${clientDate}`, { cache: 'no-store' });
             if (debugInfo) debugInfo.innerHTML = `API Response: ${response.status} ${response.statusText}`;
             
             // Hide skeleton loaders
@@ -3105,13 +3105,33 @@
 
     // Load testimonies and combine with prayers
     let cachedTestimonies = [];
+
+    /** Match qa_wall_filters.is_hidden_production_test_wall_item (never show QA wall posts). */
+    function filterOutProductionTestWallItems(list) {
+        const marker = 'test testimony for production readiness.';
+        return (list || []).filter((t) => {
+            const title = (t && t.title ? String(t.title) : '').trim();
+            const titleLower = title.toLowerCase();
+            const content = (t && t.content ? String(t.content) : '').toLowerCase();
+            const uid = (t && t.user_id ? String(t.user_id) : '').trim();
+            if (title === 'Production Test Testimony') return false;
+            if (titleLower.includes('production test testimony')) return false;
+            if (content.includes(marker)) return false;
+            if (uid === 'test-user-123') return false;
+            return true;
+        });
+    }
     
     async function loadTestimonies() {
         try {
-            const response = await fetch('/api/testimony/testimonies');
+            const response = await fetch('/api/testimony/testimonies', { cache: 'no-store' });
             if (response.ok) {
                 const data = await response.json();
-                cachedTestimonies = data.testimonies || [];
+                const raw = data.testimonies || [];
+                cachedTestimonies = filterOutProductionTestWallItems(raw);
+                if (raw.length !== cachedTestimonies.length) {
+                    console.warn('Filtered production-test entries from testimonies list');
+                }
                 console.log(`Loaded ${cachedTestimonies.length} testimonies`);
             }
         } catch (error) {

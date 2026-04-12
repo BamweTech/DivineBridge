@@ -7,6 +7,7 @@ from input_validation import validate_request, sanitize_string
 from auth_decorators import verify_cloud_scheduler
 from auth_helpers import get_user_from_session
 from firebase_auth import get_firestore_client
+from qa_wall_filters import is_hidden_production_test_wall_item
 
 logger = logging.getLogger(__name__)
 prayer_bp = Blueprint('prayer', __name__)
@@ -162,7 +163,10 @@ def get_prayers():
         
         # Filter out any invalid items (must be dicts with get method)
         valid_prayers = [p for p in prayers if isinstance(p, dict)]
-        valid_requests = [r for r in prayer_requests if isinstance(r, dict)]
+        valid_requests = [
+            r for r in prayer_requests
+            if isinstance(r, dict) and not is_hidden_production_test_wall_item(r)
+        ]
         
         # For daily prayers (AI-generated), only include prayer matching client's local date
         # For prayer requests (user-submitted), include recent ones
@@ -190,8 +194,11 @@ def get_prayers():
         # Combine filtered daily prayer with prayer requests and sort
         all_items = filtered_prayers + valid_requests
         all_items.sort(key=lambda x: x.get('created_at', ''), reverse=True)
-        
-        return jsonify({'prayers': all_items}), 200
+
+        response = jsonify({'prayers': all_items})
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        return response, 200
     except Exception as e:
         logger.error(f"Error getting prayers: {e}")
         logger.exception("Full traceback:")

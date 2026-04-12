@@ -125,11 +125,20 @@ def send_daily_emails():
         if not prayer:
             logger.error("No prayer available for today")
             return jsonify({'error': 'No prayer available'}), 500
+
+        if isinstance(prayer, dict):
+            prayer = current_app.prayer_generator.merge_email_intro_if_missing(
+                prayer, today_str, verse
+            )
         
         prayer_data = {
             'content': prayer.get('content', '') if isinstance(prayer, dict) else prayer,
-            'date': today_str
+            'date': today_str,
         }
+        if isinstance(prayer, dict):
+            intro = prayer.get('email_intro') or prayer.get('weekly_email_intro')
+            if intro:
+                prayer_data['email_intro'] = intro
         
         # Get all subscribers from Firebase
         # Assuming subscribers are stored in Firestore: users collection with email_subscribed field
@@ -331,12 +340,21 @@ def test_email():
         
         # Get today's prayer
         prayer = current_app.storage_handler.get_prayer(today_str)
+
+        if prayer and isinstance(prayer, dict) and verse:
+            prayer = current_app.prayer_generator.merge_email_intro_if_missing(
+                prayer, today_str, verse
+            )
         
         prayer_data = {
             'content': prayer.get('content', 'Sample prayer content') if prayer and isinstance(prayer, dict) else (prayer if prayer else 'Sample prayer content'),
-            'date': today_str
+            'date': today_str,
         }
-        
+        if prayer and isinstance(prayer, dict):
+            intro = prayer.get('email_intro') or prayer.get('weekly_email_intro')
+            if intro:
+                prayer_data['email_intro'] = intro
+
         # Send test email
         email_service = get_email_service()
         success = email_service.send_daily_content(
