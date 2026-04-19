@@ -49,15 +49,28 @@ function tsToMs(ts: unknown): number {
   return 0;
 }
 
+/** Plan day index (1-based) that falls on the user's local calendar date today, clamped to the plan. */
+function getCalendarTodayPlanDay(plan: DevotionalPlan): number {
+  const planStart = plan.created_at
+    ? dayjs(tsToMs(plan.created_at)).startOf('day')
+    : dayjs().startOf('day');
+  const today = dayjs().startOf('day');
+  const idx = today.diff(planStart, 'day') + 1;
+  return Math.min(plan.duration, Math.max(1, idx));
+}
+
 // ─── Day selector (synced with pager) ────────────────────────────────────────
 
 function DaySelectorStrip({
   plan,
   selectedDay,
+  calendarTodayDay,
   onSelectDay,
 }: {
   plan: DevotionalPlan;
   selectedDay: number;
+  /** Plan day that matches today's local calendar date (strip highlight). */
+  calendarTodayDay: number;
   onSelectDay: (dayNum: number) => void;
 }) {
   const scrollRef = useRef<ScrollView>(null);
@@ -77,7 +90,7 @@ function DaySelectorStrip({
       <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 22, gap: 8, paddingBottom: 4 }}>
         {dayNumbers.map((dayNum) => {
           const dayData = plan.days.find((d) => d.day === dayNum);
-          const isPlanToday = dayNum === plan.current_day;
+          const isCalendarToday = dayNum === calendarTodayDay;
           const isSelected = dayNum === selectedDay;
           const isDone = dayData?.completed ?? false;
           const dayDate = planStartDate.add(dayNum - 1, 'day');
@@ -90,12 +103,12 @@ function DaySelectorStrip({
                 minWidth: 52, paddingVertical: 10, paddingHorizontal: 10, borderRadius: 14, alignItems: 'center',
                 backgroundColor: isSelected ? THEME_COLORS.goldDim : THEME_COLORS.bg3,
                 borderWidth: 2,
-                borderColor: isSelected ? THEME_COLORS.gold : isPlanToday ? THEME_COLORS.goldBorder : isDone ? THEME_COLORS.goldBorder : THEME_COLORS.border,
+                borderColor: isSelected ? THEME_COLORS.gold : isCalendarToday ? THEME_COLORS.goldBorder : isDone ? THEME_COLORS.goldBorder : THEME_COLORS.border,
               }}
             >
               <Text style={{ color: THEME_COLORS.text3, fontSize: 9, fontFamily: 'Geist_500Medium', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>{dayName}</Text>
-              <Text style={{ color: isSelected || isPlanToday ? THEME_COLORS.gold : THEME_COLORS.text2, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16 }}>{dayNum}</Text>
-              <View style={{ width: 5, height: 5, borderRadius: 2.5, marginTop: 5, backgroundColor: isDone ? THEME_COLORS.sage : isPlanToday ? THEME_COLORS.gold : THEME_COLORS.border }} />
+              <Text style={{ color: isSelected || isCalendarToday ? THEME_COLORS.gold : THEME_COLORS.text2, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16 }}>{dayNum}</Text>
+              <View style={{ width: 5, height: 5, borderRadius: 2.5, marginTop: 5, backgroundColor: isDone ? THEME_COLORS.sage : isCalendarToday ? THEME_COLORS.gold : THEME_COLORS.border }} />
             </Pressable>
           );
         })}
@@ -108,7 +121,8 @@ function DaySelectorStrip({
 
 function DayCard({
   day,
-  isToday,
+  isCalendarToday,
+  showCheckIn,
   planId,
   onCheckIn,
   listenLabel,
@@ -116,7 +130,10 @@ function DayCard({
   onOpenReading,
 }: {
   day: DevotionalDay;
-  isToday: boolean;
+  /** Matches today's local calendar date within the plan timeline. */
+  isCalendarToday: boolean;
+  /** This day is the server's current check-in step (Mark complete). */
+  showCheckIn: boolean;
   planId: string;
   onCheckIn: () => void;
   listenLabel: string;
@@ -154,8 +171,8 @@ function DayCard({
 
   return (
     <View style={{
-      backgroundColor: isToday ? '#f5edd8' : THEME_COLORS.bg2,
-      borderWidth: 1, borderColor: isToday ? THEME_COLORS.goldBorder : THEME_COLORS.border,
+      backgroundColor: isCalendarToday ? '#f5edd8' : THEME_COLORS.bg2,
+      borderWidth: 1, borderColor: isCalendarToday ? THEME_COLORS.goldBorder : THEME_COLORS.border,
       borderRadius: 20, padding: 20, marginBottom: 14,
     }}>
       {/* Header row */}
@@ -172,7 +189,7 @@ function DayCard({
               : <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_700Bold', fontSize: 11 }}>{day.day}</Text>
             }
           </View>
-          {isToday && (
+          {isCalendarToday && (
             <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: THEME_COLORS.goldDim, borderWidth: 1, borderColor: THEME_COLORS.goldBorder }}>
               <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 10 }}>Today</Text>
             </View>
@@ -277,7 +294,7 @@ function DayCard({
         </Pressable>
       </View>
 
-      {isToday && !day.completed && (
+      {showCheckIn && !day.completed && (
         <Button label="Mark as Complete" onPress={onCheckIn} style={{ marginTop: 16 }} size="sm" />
       )}
     </View>
@@ -633,9 +650,9 @@ export default function DevotionalScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (plan) setSelectedDay(plan.current_day);
+      if (plan) setSelectedDay(getCalendarTodayPlanDay(plan));
       return () => stopSpeech();
-    }, [plan?.plan_id, plan?.current_day, stopSpeech])
+    }, [plan?.plan_id, plan?.duration, plan?.created_at, stopSpeech])
   );
 
   // Firestore subscription — all user plans, cached locally
@@ -704,7 +721,7 @@ export default function DevotionalScreen() {
 
   function openPlan(p: DevotionalPlan) {
     setViewingPlan(p);
-    setSelectedDay(p.current_day);
+    setSelectedDay(getCalendarTodayPlanDay(p));
     prevCompletedAtRef.current = p.completed_at ? tsToMs(p.completed_at) : undefined;
   }
 
@@ -718,11 +735,14 @@ export default function DevotionalScreen() {
 
   const dayPagerData = useMemo(() => plan?.days.slice().sort((a, b) => a.day - b.day) ?? [], [plan?.days]);
 
+  const calendarTodayPlanDay = useMemo(() => (plan ? getCalendarTodayPlanDay(plan) : 1), [plan]);
+
   const renderDayPage = useCallback(({ item: day }: { item: DevotionalDay }) => (
     <ScrollView style={{ width: screenWidth }} contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: insets.bottom + 80 }} showsVerticalScrollIndicator={false}>
       <DayCard
         day={day}
-        isToday={day.day === (plan?.current_day ?? 1)}
+        isCalendarToday={day.day === calendarTodayPlanDay}
+        showCheckIn={day.day === (plan?.current_day ?? 1)}
         planId={plan?.plan_id ?? ''}
         onCheckIn={() => handleCheckIn(day.day)}
         listenLabel={activeSource === `day-${day.day}` && isSpeaking ? 'Stop' : 'Listen'}
@@ -730,7 +750,7 @@ export default function DevotionalScreen() {
         onOpenReading={() => setReadingDay(day)}
       />
     </ScrollView>
-  ), [plan, activeSource, isSpeaking, screenWidth, insets.bottom]);
+  ), [plan, calendarTodayPlanDay, activeSource, isSpeaking, screenWidth, insets.bottom]);
 
   const getItemLayout = useCallback((_: any, index: number) => ({ length: screenWidth, offset: screenWidth * index, index }), [screenWidth]);
 
@@ -832,12 +852,12 @@ export default function DevotionalScreen() {
       </View>
 
       {/* Day selector strip */}
-      <DaySelectorStrip plan={plan} selectedDay={selectedDay} onSelectDay={setSelectedDay} />
+      <DaySelectorStrip plan={plan} selectedDay={selectedDay} calendarTodayDay={calendarTodayPlanDay} onSelectDay={setSelectedDay} />
 
-      {/* "Go to today" banner */}
-      {selectedDay !== plan.current_day && (
+      {/* "Go to today" banner — calendar date for this plan */}
+      {selectedDay !== calendarTodayPlanDay && (
         <Pressable
-          onPress={() => { setSelectedDay(plan.current_day); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+          onPress={() => { setSelectedDay(calendarTodayPlanDay); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
           style={{
             flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
             paddingVertical: 10, paddingHorizontal: 14, marginHorizontal: 22, marginBottom: 8,
@@ -847,13 +867,14 @@ export default function DevotionalScreen() {
           <Icon name="book" size={14} color={THEME_COLORS.gold} />
           <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_500Medium', fontSize: 13 }}>
             Viewing day {selectedDay} ·{' '}
-            <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold' }}>Go to today (day {plan.current_day})</Text>
+            <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold' }}>Go to today (day {calendarTodayPlanDay})</Text>
           </Text>
         </Pressable>
       )}
 
       {/* Swipeable day pager */}
       <FlatList
+        key={plan.plan_id}
         ref={pagerRef}
         data={dayPagerData}
         keyExtractor={(item) => `day-${item.day}`}
