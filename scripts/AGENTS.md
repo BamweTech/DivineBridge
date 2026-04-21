@@ -64,6 +64,7 @@ Example: `migrate_users_to_firestore.py`.
 | Script | Purpose |
 |--------|---------|
 | `delete_production_test_testimonies.py` | Remove QA posts from GCS: `testimonies/` **and** `prayer_requests/` (mobile Community / `/api/prayer/prayers` uses the latter). `--dry-run` to list only. |
+| `pregen_devotional_templates.py` | Pre-generate the 24 canonical devotional plans (8 suggested themes × 3 durations) into the `devotional_templates` Firestore collection. Run once on first deploy; subsequent refreshes happen monthly via `/admin/api/refresh-devotional-templates`. Pass `--force` to regenerate all templates regardless of age. |
 
 ## Conventions
 

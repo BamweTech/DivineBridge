@@ -871,6 +871,65 @@ Patterns Detected:
         """
     }
 
+@admin_bp.route('/admin/api/refresh-devotional-templates', methods=['POST'])
+@admin_required
+def refresh_devotional_templates():
+    """
+    Regenerate all 24 pre-built devotional templates (8 suggested themes × 3 durations).
+
+    Called monthly by Cloud Scheduler (1st of each month) or manually from the
+    admin panel. Skips templates that are still fresh unless ?force=true is passed.
+
+    Returns a JSON summary of generated / skipped / failed counts.
+    """
+    from routes.devotional_bp import (
+        SUGGESTED_THEMES, VALID_DURATIONS, DEFAULT_TRADITION,
+        _template_key, _load_template, _save_template, _generate_plan_batched,
+        TEMPLATE_MAX_AGE_DAYS,
+    )
+    from perplexity_client import get_perplexity_client, set_client_model
+    from firebase_auth import get_firestore_client as _get_firestore_client
+
+    force = request.args.get('force', '').lower() in ('1', 'true', 'yes')
+    db = _get_firestore_client()
+    set_client_model('sonar-pro')
+    client = get_perplexity_client()
+
+    results = {'generated': [], 'skipped': [], 'failed': []}
+
+    for theme in sorted(SUGGESTED_THEMES):
+        for duration in sorted(VALID_DURATIONS):
+            key = _template_key(theme, duration)
+
+            if not force:
+                cached = _load_template(db, key)
+                if cached is not None:
+                    results['skipped'].append(key)
+                    continue
+
+            try:
+                plan_data = _generate_plan_batched(client, theme, duration, DEFAULT_TRADITION)
+                if 'days' not in plan_data or len(plan_data['days']) != duration:
+                    raise ValueError(
+                        f"Expected {duration} days, got {len(plan_data.get('days', []))}"
+                    )
+                _save_template(db, key, theme, duration, plan_data['days'])
+                results['generated'].append(key)
+                logger.info('Refreshed devotional template: %s', key)
+            except Exception as exc:
+                logger.error('Failed to refresh template %s: %s', key, exc)
+                results['failed'].append({'key': key, 'error': str(exc)})
+
+    status = 200 if not results['failed'] else 207
+    return jsonify({
+        'success': len(results['failed']) == 0,
+        'generated': len(results['generated']),
+        'skipped': len(results['skipped']),
+        'failed': len(results['failed']),
+        'details': results,
+    }), status
+
+
 def send_admin_email(summary):
     """Send email summary to admin"""
     try:

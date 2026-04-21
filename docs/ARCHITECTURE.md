@@ -195,6 +195,7 @@ Authoritative security rules: [firestore.rules](../firestore.rules). Below is a 
 | Community | `prayer_groups`, `group_members` | Small groups ([routes/groups_bp.py](../routes/groups_bp.py)) |
 | Content | `prayer_requests`, `testimonies` | Prayer wall and thanksgiving wall |
 | Devotionals | `devotional_plans` | Personalized plans ([routes/devotional_bp.py](../routes/devotional_bp.py)) |
+| Devotional templates | `devotional_templates` | Pre-generated plans for the 8 suggested themes × 3 durations (7/14/30 days). Backend-only (no client access). Keyed by `{theme-slug}_{duration}` (e.g. `faith-trust_7`). Refreshed monthly via `/admin/api/refresh-devotional-templates` or `scripts/pregen_devotional_templates.py`. |
 
 **Firebase Realtime Database** is used for **low-latency** live-room concerns on the web client (and related mobile hooks) — paths are managed in client code (e.g. [static/js/prayer-room.js](../static/js/prayer-room.js)).
 

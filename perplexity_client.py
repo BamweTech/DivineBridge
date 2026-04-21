@@ -70,6 +70,30 @@ class LazyPerplexityClient:
         )
         return response.choices[0].message.content
 
+    def query_with_system(self, system_prompt: str, user_prompt: str) -> str:
+        """Execute query with a system message for role anchoring (default timeout)."""
+        self._ensure_openai_client()
+        response = self._openai_client.with_options(timeout=DEFAULT_TIMEOUT).chat.completions.create(
+            model=self._model,
+            messages=[
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': user_prompt},
+            ],
+        )
+        return response.choices[0].message.content
+
+    def query_with_timeout_and_system(self, system_prompt: str, user_prompt: str, timeout=120.0) -> str:
+        """Execute query with a system message and custom timeout."""
+        self._ensure_openai_client()
+        response = self._openai_client.with_options(timeout=timeout).chat.completions.create(
+            model=self._model,
+            messages=[
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': user_prompt},
+            ],
+        )
+        return response.choices[0].message.content
+
 
 def get_perplexity_client(model="sonar-reasoning-pro"):
     """

@@ -421,6 +421,11 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
+    // Devotional templates — backend-only; no direct client access
+    match /devotional_templates/{docId} {
+      allow read, write: if false;
+    }
+
     // Deny all other access
     match /{document=**} {
       allow read, write: if false;
