@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
   },
   placeholderText: {
     color: THEME_COLORS.text3,
-    fontFamily: 'Geist_400Regular',
+    fontFamily: 'InterTight_400Regular',
     fontSize: 12,
     paddingHorizontal: 8,
     textAlign: 'center',
@@ -85,6 +85,6 @@ const styles = StyleSheet.create({
   labelText: {
     color: '#ffffff',
     fontSize: 11,
-    fontFamily: 'Geist_500Medium',
+    fontFamily: 'InterTight_500Medium',
   },
 });

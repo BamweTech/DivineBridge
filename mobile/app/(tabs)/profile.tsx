@@ -76,7 +76,7 @@ function SettingRow({
           style={{
             flex: 1,
             color: danger ? THEME_COLORS.rose : THEME_COLORS.text,
-            fontFamily: 'Geist_400Regular',
+            fontFamily: 'InterTight_400Regular',
             fontSize: 14,
           }}
         >
@@ -84,7 +84,7 @@ function SettingRow({
         </Text>
         {value ? (
           <Text
-            style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 13, maxWidth: '42%' }}
+            style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 13, maxWidth: '42%' }}
             numberOfLines={1}
           >
             {value}
@@ -101,7 +101,7 @@ function SectionTitle({ children }: { children: string }) {
     <Text
       style={{
         color: THEME_COLORS.text3,
-        fontFamily: 'Geist_600SemiBold',
+        fontFamily: 'InterTight_600SemiBold',
         fontSize: 11,
         letterSpacing: 1.2,
         textTransform: 'uppercase',
@@ -371,7 +371,7 @@ export default function ProfileScreen() {
         <Text
           style={{
             color: THEME_COLORS.text,
-            fontFamily: 'PlusJakartaSans_700Bold',
+            fontFamily: 'Fraunces_700Bold',
             fontSize: 26,
             letterSpacing: -0.5,
           }}
@@ -389,7 +389,7 @@ export default function ProfileScreen() {
             backgroundColor: THEME_COLORS.goldDim,
           }}
         >
-          <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 13 }}>Edit</Text>
+          <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_600SemiBold', fontSize: 13 }}>Edit</Text>
         </Pressable>
       </Animated.View>
 
@@ -435,10 +435,10 @@ export default function ProfileScreen() {
             <Icon name="edit" size={10} color="#ffffff" />
           </Pressable>
         </View>
-        <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 20 }}>
+        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 20 }}>
           {getDisplayName(profile, user)}
         </Text>
-        <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 4 }}>
+        <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 13, marginTop: 4 }}>
           {user?.email}
         </Text>
       </Animated.View>
@@ -470,11 +470,11 @@ export default function ProfileScreen() {
               }}
             >
               <Icon name={s.icon} size={18} color={THEME_COLORS.gold} style={{ marginBottom: 4 }} />
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 20 }}>{s.num}</Text>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 20 }}>{s.num}</Text>
               <Text
                 style={{
                   color: THEME_COLORS.text3,
-                  fontFamily: 'Geist_400Regular',
+                  fontFamily: 'InterTight_400Regular',
                   fontSize: 10,
                   marginTop: 2,
                   textTransform: 'uppercase',
@@ -555,8 +555,8 @@ export default function ProfileScreen() {
               <Icon name={row.iconName} size={16} color={THEME_COLORS.text2} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14 }}>{row.label}</Text>
-              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 11, marginTop: 2 }}>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_400Regular', fontSize: 14 }}>{row.label}</Text>
+              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 11, marginTop: 2 }}>
                 {row.subtitle}
               </Text>
             </View>
@@ -605,7 +605,7 @@ export default function ProfileScreen() {
             <Text
               style={{
                 color: THEME_COLORS.text,
-                fontFamily: 'PlusJakartaSans_700Bold',
+                fontFamily: 'Fraunces_700Bold',
                 fontSize: 18,
                 marginBottom: 16,
               }}
@@ -621,7 +621,7 @@ export default function ProfileScreen() {
               ] as const
             ).map(([label, val, setVal, kb, secure]) => (
               <View key={label} style={{ marginBottom: 12 }}>
-                <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_500Medium', fontSize: 12, marginBottom: 6 }}>
+                <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_500Medium', fontSize: 12, marginBottom: 6 }}>
                   {label}
                 </Text>
                 <TextInput
@@ -638,7 +638,7 @@ export default function ProfileScreen() {
                     borderRadius: 12,
                     paddingHorizontal: 14,
                     paddingVertical: 12,
-                    fontFamily: 'Geist_400Regular',
+                    fontFamily: 'InterTight_400Regular',
                     fontSize: 15,
                     color: THEME_COLORS.text,
                     backgroundColor: THEME_COLORS.bg,
@@ -658,7 +658,7 @@ export default function ProfileScreen() {
                   alignItems: 'center',
                 }}
               >
-                <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_600SemiBold', fontSize: 15 }}>Cancel</Text>
+                <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_600SemiBold', fontSize: 15 }}>Cancel</Text>
               </Pressable>
               <Pressable
                 onPress={saveEdit}
@@ -675,7 +675,7 @@ export default function ProfileScreen() {
                 {savingProfile ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={{ color: '#fff', fontFamily: 'Geist_600SemiBold', fontSize: 15 }}>Save</Text>
+                  <Text style={{ color: '#fff', fontFamily: 'InterTight_600SemiBold', fontSize: 15 }}>Save</Text>
                 )}
               </Pressable>
             </View>

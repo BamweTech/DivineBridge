@@ -39,7 +39,10 @@ To add a new screen, create a file in `app/` and register in the nearest `_layou
 - **NativeWind** (Tailwind for RN): Use `className` prop.
 - Global CSS in `app/_layout.tsx` via `import '../global.css'`.
 - Theme colors: `THEME_COLORS` from `lib/constants.ts`.
-- Fonts: Plus Jakarta Sans (body), Geist (UI elements), loaded in root layout.
+- Fonts: **Fraunces** (serif — headings, titles, devotional long-form) and **Inter Tight** (sans — UI, chat, labels, forms). Loaded in root layout via `@expo-google-fonts/fraunces` and `@expo-google-fonts/inter-tight`.
+  - Tailwind tokens: `font-serif`, `font-serif-medium`, `font-serif-semibold`, `font-serif-bold`, `font-serif-italic` (Fraunces) and `font-sans`, `font-sans-medium`, `font-sans-semibold`, `font-sans-bold` (Inter Tight). Prefer these.
+  - Direct `fontFamily: 'Fraunces_XXX'` / `'InterTight_XXX'` strings are also valid when styling via inline style.
+  - Legacy `font-jakarta*` / `font-geist*` aliases remain as backwards-compatible shims mapped to Fraunces / Inter Tight; new code should use the semantic `serif` / `sans` tokens.
 
 ## Conventions
 

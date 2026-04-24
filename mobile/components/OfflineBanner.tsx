@@ -23,7 +23,7 @@ const styles = StyleSheet.create({
   },
   text: {
     color: '#fff',
-    fontFamily: 'Geist_500Medium',
+    fontFamily: 'InterTight_500Medium',
     fontSize: 13,
   },
 });

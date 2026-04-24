@@ -32,12 +32,12 @@ export function ReplyComposerBanner({
           paddingLeft: 10,
         }}
       >
-        <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
+        <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_600SemiBold', fontSize: 12 }}>
           Replying to {target.user_name}
         </Text>
         <Text
           numberOfLines={2}
-          style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 2 }}
+          style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 12, marginTop: 2 }}
         >
           {buildReplyPreviewText(target)}
         </Text>

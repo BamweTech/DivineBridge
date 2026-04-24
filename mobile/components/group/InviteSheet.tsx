@@ -52,10 +52,10 @@ export function InviteSheet({ group, onClose }: { group: PrayerGroup; onClose: (
           <View style={{ width: 36, height: 4, backgroundColor: THEME_COLORS.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
 
           {/* Title */}
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 20, textAlign: 'center', marginBottom: 4, letterSpacing: -0.3 }}>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 20, textAlign: 'center', marginBottom: 4, letterSpacing: -0.3 }}>
             Invite to Group
           </Text>
-          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 13, textAlign: 'center', marginBottom: 24 }} numberOfLines={1}>
+          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 13, textAlign: 'center', marginBottom: 24 }} numberOfLines={1}>
             {group.name}
           </Text>
 
@@ -75,7 +75,7 @@ export function InviteSheet({ group, onClose }: { group: PrayerGroup; onClose: (
                 backgroundColor="#ffffff"
               />
             </View>
-            <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 10 }}>
+            <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 12, marginTop: 10 }}>
               Scan to join
             </Text>
           </View>
@@ -96,8 +96,8 @@ export function InviteSheet({ group, onClose }: { group: PrayerGroup; onClose: (
               marginBottom: 20,
             }}>
               <Icon name="lock" size={14} color={THEME_COLORS.gold} />
-              <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_400Regular', fontSize: 13 }}>
-                Code: <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_700Bold', letterSpacing: 2 }}>{inviteCode}</Text>
+              <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 13 }}>
+                Code: <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_700Bold', letterSpacing: 2 }}>{inviteCode}</Text>
               </Text>
             </View>
           )}
@@ -121,7 +121,7 @@ export function InviteSheet({ group, onClose }: { group: PrayerGroup; onClose: (
               })}
             >
               <Icon name="attach" size={16} color={copied ? THEME_COLORS.sage : THEME_COLORS.text2} />
-              <Text style={{ color: copied ? THEME_COLORS.sage : THEME_COLORS.text2, fontFamily: 'Geist_600SemiBold', fontSize: 14 }}>
+              <Text style={{ color: copied ? THEME_COLORS.sage : THEME_COLORS.text2, fontFamily: 'InterTight_600SemiBold', fontSize: 14 }}>
                 {copied ? 'Copied!' : 'Copy Link'}
               </Text>
             </Pressable>
@@ -141,7 +141,7 @@ export function InviteSheet({ group, onClose }: { group: PrayerGroup; onClose: (
               })}
             >
               <Icon name="share" size={16} color="#ffffff" />
-              <Text style={{ color: '#ffffff', fontFamily: 'Geist_600SemiBold', fontSize: 14 }}>
+              <Text style={{ color: '#ffffff', fontFamily: 'InterTight_600SemiBold', fontSize: 14 }}>
                 Share
               </Text>
             </Pressable>

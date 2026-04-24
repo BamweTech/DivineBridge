@@ -162,7 +162,7 @@ export function GroupChatBubble({
             }}
           >
             <Icon name="reply" size={14} color={THEME_COLORS.sage} />
-            <Text style={{ color: THEME_COLORS.sage, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
+            <Text style={{ color: THEME_COLORS.sage, fontFamily: 'InterTight_600SemiBold', fontSize: 12 }}>
               Reply
             </Text>
           </RNAnimated.View>
@@ -193,7 +193,7 @@ export function GroupChatBubble({
               borderColor: THEME_COLORS.border,
             }}
           >
-            <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
+            <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_600SemiBold', fontSize: 12 }}>
               Copy
             </Text>
           </Pressable>
@@ -212,7 +212,7 @@ export function GroupChatBubble({
                 borderColor: 'rgba(176,90,80,0.16)',
               }}
             >
-              <Text style={{ color: THEME_COLORS.rose, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
+              <Text style={{ color: THEME_COLORS.rose, fontFamily: 'InterTight_600SemiBold', fontSize: 12 }}>
                 Delete
               </Text>
             </Pressable>
@@ -229,7 +229,7 @@ export function GroupChatBubble({
         {!isMe && showSender && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, marginLeft: 4 }}>
             <Avatar name={msg.user_name} photoUrl={msg.user_photo} size={20} />
-            <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_500Medium', fontSize: 11 }}>{msg.user_name}</Text>
+            <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_500Medium', fontSize: 11 }}>{msg.user_name}</Text>
           </View>
         )}
         <View style={{ position: 'relative', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
@@ -290,7 +290,7 @@ export function GroupChatBubble({
               }}>
                 <View style={{ padding: 12 }}>
                   {isSpecial && (
-                    <Text style={{ fontSize: 10, marginBottom: 4, color: TYPE_LABEL_COLORS[msg.message_type], fontFamily: 'Geist_600SemiBold', letterSpacing: 0.8, textTransform: 'uppercase' }}>
+                    <Text style={{ fontSize: 10, marginBottom: 4, color: TYPE_LABEL_COLORS[msg.message_type], fontFamily: 'InterTight_600SemiBold', letterSpacing: 0.8, textTransform: 'uppercase' }}>
                       {msg.message_type.replace('_', ' ')}
                     </Text>
                   )}
@@ -307,10 +307,10 @@ export function GroupChatBubble({
                         borderLeftColor: TYPE_LABEL_COLORS[msg.message_type] || THEME_COLORS.gold,
                       }}
                     >
-                      <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 11 }}>
+                      <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_600SemiBold', fontSize: 11 }}>
                         {msg.reply_to.user_name}
                       </Text>
-                      <Text numberOfLines={2} style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 2 }}>
+                      <Text numberOfLines={2} style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 12, marginTop: 2 }}>
                         {msg.reply_to.message}
                       </Text>
                     </Pressable>
@@ -325,19 +325,19 @@ export function GroupChatBubble({
                         paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12,
                         backgroundColor: THEME_COLORS.bg3, borderWidth: 1, borderColor: THEME_COLORS.border,
                       }}>
-                        <Text style={{ color: THEME_COLORS.violet, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
+                        <Text style={{ color: THEME_COLORS.violet, fontFamily: 'InterTight_600SemiBold', fontSize: 12 }}>
                           {a.file_name?.toLowerCase().endsWith('.pdf') ? 'PDF' : 'File'}
                         </Text>
-                        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 4 }} numberOfLines={2}>
+                        <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_400Regular', fontSize: 13, marginTop: 4 }} numberOfLines={2}>
                           {a.file_name}
                         </Text>
-                        <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_500Medium', fontSize: 11, marginTop: 6 }}>Tap to open</Text>
+                        <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_500Medium', fontSize: 11, marginTop: 6 }}>Tap to open</Text>
                       </View>
                     </Pressable>
                   ))}
                   {showText ? (
                     <LinkifiedText
-                      style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 22 }}
+                      style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_400Regular', fontSize: 14, lineHeight: 22 }}
                       linkStyle={{ color: THEME_COLORS.gold }}
                     >
                       {displayMessage}
@@ -375,7 +375,7 @@ export function GroupChatBubble({
                         <Text
                           style={{
                             color: reactedByMe ? THEME_COLORS.gold : THEME_COLORS.text3,
-                            fontFamily: 'Geist_600SemiBold',
+                            fontFamily: 'InterTight_600SemiBold',
                             fontSize: 12,
                           }}
                         >
@@ -416,7 +416,7 @@ export function GroupChatBubble({
                     <Text
                       style={{
                         color: reactedByMe ? THEME_COLORS.gold : THEME_COLORS.text3,
-                        fontFamily: 'Geist_600SemiBold',
+                        fontFamily: 'InterTight_600SemiBold',
                         fontSize: 12,
                       }}
                     >
@@ -430,7 +430,7 @@ export function GroupChatBubble({
         )}
         </View>
         {showTimestamp && (
-          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 10, marginTop: 3, marginHorizontal: 6 }}>
+          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 10, marginTop: 3, marginHorizontal: 6 }}>
             {msg.timestamp
               ? dayjs(
                   typeof msg.timestamp === 'number'

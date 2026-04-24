@@ -80,7 +80,7 @@ function TabBarIcon({
                 justifyContent: 'center',
               }}
             >
-              <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Geist_700Bold' }}>
+              <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'InterTight_700Bold' }}>
                 {badgeCount > 99 ? '99+' : badgeCount}
               </Text>
             </View>
@@ -90,7 +90,7 @@ function TabBarIcon({
       <Text
         style={{
           color: focused ? THEME_COLORS.gold : THEME_COLORS.text3,
-          fontFamily: focused ? 'Geist_600SemiBold' : 'Geist_400Regular',
+          fontFamily: focused ? 'InterTight_600SemiBold' : 'InterTight_400Regular',
           fontSize: 9,
           marginTop: 6,
           letterSpacing: 0.5,

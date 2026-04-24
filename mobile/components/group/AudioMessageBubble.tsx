@@ -143,7 +143,7 @@ export function AudioMessageBubble({ uri, isMe }: AudioMessageBubbleProps) {
         </View>
         <Text style={{
           color: THEME_COLORS.text3,
-          fontFamily: 'Geist_400Regular',
+          fontFamily: 'InterTight_400Regular',
           fontSize: 10,
         }}>
           {durationMs > 0 ? formatTime(playing ? positionMs : durationMs) : '—'}

@@ -60,10 +60,10 @@ export default function ActivityScreen() {
             <Icon name="back" size={18} color={THEME_COLORS.text} />
           </Pressable>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 22, letterSpacing: -0.3 }}>
+            <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 22, letterSpacing: -0.3 }}>
               Activity
             </Text>
-            <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 2 }}>
+            <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 13, marginTop: 2 }}>
               Community prayer wall and your groups{totalUnread > 0 ? ` · ${totalUnread} unread` : ''}
             </Text>
           </View>
@@ -99,10 +99,10 @@ export default function ActivityScreen() {
                 <Icon name="pray" size={22} color={THEME_COLORS.gold} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 16, marginBottom: 4 }}>
+                <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_600SemiBold', fontSize: 16, marginBottom: 4 }}>
                   Prayer Wall
                 </Text>
-                <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 13, lineHeight: 19 }}>
+                <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 13, lineHeight: 19 }}>
                   See prayer requests from the community — including people you may share groups with.
                 </Text>
               </View>
@@ -113,10 +113,10 @@ export default function ActivityScreen() {
 
         {/* Group chats */}
         <Animated.View entering={FadeInDown.delay(80).duration(400)} style={{ marginTop: 24 }}>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, marginBottom: 12 }}>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 16, marginBottom: 12 }}>
             Group chats
           </Text>
-          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 13, lineHeight: 20, marginBottom: 14 }}>
+          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 13, lineHeight: 20, marginBottom: 14 }}>
             Open a group to read messages and prayer requests shared in your circles.
           </Text>
 
@@ -134,7 +134,7 @@ export default function ActivityScreen() {
               }}
             >
               <Icon name="groups" size={32} color={THEME_COLORS.text3} style={{ marginBottom: 10 }} />
-              <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_500Medium', fontSize: 14, textAlign: 'center' }}>
+              <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_500Medium', fontSize: 14, textAlign: 'center' }}>
                 You’re not in any groups yet. Join or create one from the Groups tab.
               </Text>
               <Pressable
@@ -144,7 +144,7 @@ export default function ActivityScreen() {
                 }}
                 style={{ marginTop: 14, paddingVertical: 8, paddingHorizontal: 14 }}
               >
-                <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 14 }}>Go to Groups</Text>
+                <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_600SemiBold', fontSize: 14 }}>Go to Groups</Text>
               </Pressable>
             </View>
           ) : (
@@ -183,17 +183,17 @@ export default function ActivityScreen() {
                               borderColor: THEME_COLORS.bg2,
                             }}
                           >
-                            <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Geist_700Bold' }}>
+                            <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'InterTight_700Bold' }}>
                               {(unreadCountByGroup[g.group_id] ?? 0) > 99 ? '99+' : unreadCountByGroup[g.group_id]}
                             </Text>
                           </View>
                         ) : null}
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 15, marginBottom: 2 }} numberOfLines={1}>
+                        <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_600SemiBold', fontSize: 15, marginBottom: 2 }} numberOfLines={1}>
                           {g.name}
                         </Text>
-                        <Text style={{ color: unreadByGroup[g.group_id] ? THEME_COLORS.rose : THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12 }}>
+                        <Text style={{ color: unreadByGroup[g.group_id] ? THEME_COLORS.rose : THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 12 }}>
                           {unreadByGroup[g.group_id]
                             ? `${unreadCountByGroup[g.group_id]} unread message${unreadCountByGroup[g.group_id] === 1 ? '' : 's'}`
                             : 'Open chat'}

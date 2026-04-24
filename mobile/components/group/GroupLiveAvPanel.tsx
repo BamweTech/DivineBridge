@@ -76,7 +76,7 @@ function AvControl({
           color={danger ? THEME_COLORS.rose : active ? THEME_COLORS.sage : THEME_COLORS.text2}
         />
       </View>
-      <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 9 }} numberOfLines={1}>
+      <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 9 }} numberOfLines={1}>
         {label}
       </Text>
     </Pressable>
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
   },
   toastText: {
     color: THEME_COLORS.text,
-    fontFamily: 'Geist_500Medium',
+    fontFamily: 'InterTight_500Medium',
     fontSize: 12,
     textAlign: 'center',
   },
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   },
   audioOnlyText: {
     color: THEME_COLORS.text3,
-    fontFamily: 'Geist_400Regular',
+    fontFamily: 'InterTight_400Regular',
     fontSize: 13,
     textAlign: 'center',
     paddingHorizontal: 16,

@@ -42,10 +42,10 @@ export function GroupMembersSheet({
           }}
         >
           <View style={{ width: 36, height: 4, backgroundColor: THEME_COLORS.border, borderRadius: 2, alignSelf: 'center', marginBottom: 18 }} />
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18 }}>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 18 }}>
             {groupName}
           </Text>
-          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 4, marginBottom: 14 }}>
+          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 13, marginTop: 4, marginBottom: 14 }}>
             {loading ? 'Loading members...' : `${members.length} ${members.length === 1 ? 'member' : 'members'}`}
           </Text>
           <ScrollView showsVerticalScrollIndicator={false}>
@@ -66,10 +66,10 @@ export function GroupMembersSheet({
                 >
                   <Avatar name={member.display_name} photoUrl={member.photo_url} size={34} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 14 }}>
+                    <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_600SemiBold', fontSize: 14 }}>
                       {member.display_name}
                     </Text>
-                    <Text style={{ color: member.role === 'admin' ? THEME_COLORS.gold : THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 2 }}>
+                    <Text style={{ color: member.role === 'admin' ? THEME_COLORS.gold : THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 12, marginTop: 2 }}>
                       {member.role === 'admin' ? 'Admin' : 'Member'}
                     </Text>
                   </View>

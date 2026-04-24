@@ -69,22 +69,22 @@ function Slide({ item }: { item: typeof SLIDES[number] }) {
         </View>
 
         {/* Title */}
-        <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 34, letterSpacing: -1, textAlign: 'center', lineHeight: 42, marginBottom: 14 }}>
+        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 34, letterSpacing: -1, textAlign: 'center', lineHeight: 42, marginBottom: 14 }}>
           {item.title.replace(item.italicWord, '')}
           <Text style={{ fontStyle: 'italic', color: item.iconColor }}>{item.italicWord}</Text>
         </Text>
 
         {/* Body */}
-        <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_400Regular', fontSize: 15, lineHeight: 24, textAlign: 'center', marginBottom: 28 }}>
+        <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 15, lineHeight: 24, textAlign: 'center', marginBottom: 28 }}>
           {item.body}
         </Text>
 
         {/* Verse */}
         <View style={{ backgroundColor: item.bgHint, borderWidth: 1, borderColor: item.iconColor + '33', borderRadius: 18, padding: 18 }}>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 13, lineHeight: 21, fontStyle: 'italic', textAlign: 'center', marginBottom: 6 }}>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_400Regular', fontSize: 13, lineHeight: 21, fontStyle: 'italic', textAlign: 'center', marginBottom: 6 }}>
             {item.verse}
           </Text>
-          <Text style={{ color: item.iconColor, fontFamily: 'Geist_600SemiBold', fontSize: 11, letterSpacing: 0.4, textAlign: 'center' }}>
+          <Text style={{ color: item.iconColor, fontFamily: 'InterTight_600SemiBold', fontSize: 11, letterSpacing: 0.4, textAlign: 'center' }}>
             {item.verseRef}
           </Text>
         </View>
@@ -120,7 +120,7 @@ export default function OnboardingScreen() {
       {/* Skip button */}
       <Animated.View entering={FadeIn.delay(300)} style={{ alignItems: 'flex-end', paddingHorizontal: 24, paddingTop: 8, paddingBottom: 4 }}>
         <Pressable onPress={() => router.push('/(auth)/login')} hitSlop={12}>
-          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_500Medium', fontSize: 14 }}>Skip</Text>
+          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_500Medium', fontSize: 14 }}>Skip</Text>
         </Pressable>
       </Animated.View>
 
@@ -171,7 +171,7 @@ export default function OnboardingScreen() {
             shadowColor: activeSlide.iconColor, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
           })}
         >
-          <Text style={{ color: '#ffffff', fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, letterSpacing: 0.2 }}>
+          <Text style={{ color: '#ffffff', fontFamily: 'Fraunces_700Bold', fontSize: 16, letterSpacing: 0.2 }}>
             {isLast ? "Get Started — It's Free" : 'Continue'}
           </Text>
         </Pressable>
@@ -186,7 +186,7 @@ export default function OnboardingScreen() {
             opacity: pressed ? 0.7 : 1,
           })}
         >
-          <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_500Medium', fontSize: 14 }}>
+          <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_500Medium', fontSize: 14 }}>
             Sign in to existing account
           </Text>
         </Pressable>

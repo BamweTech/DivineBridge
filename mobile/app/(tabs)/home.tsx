@@ -135,7 +135,7 @@ function CollapsiblePrayer({
       {/* Hidden full-text measurer */}
       {!measured && (
         <Text
-          style={{ position: 'absolute', opacity: 0, top: 0, left: 20, right: 20, fontFamily: 'Geist_400Regular', fontSize: 15, lineHeight: 26 }}
+          style={{ position: 'absolute', opacity: 0, top: 0, left: 20, right: 20, fontFamily: 'InterTight_400Regular', fontSize: 15, lineHeight: 26 }}
           onLayout={(e) => { if (fullHeight === 0) setFullHeight(e.nativeEvent.layout.height); }}
         >
           {content}
@@ -144,7 +144,7 @@ function CollapsiblePrayer({
       {!measured && (
         <Text
           numberOfLines={PRAYER_COLLAPSED_LINES}
-          style={{ position: 'absolute', opacity: 0, top: 0, left: 20, right: 20, fontFamily: 'Geist_400Regular', fontSize: 15, lineHeight: 26 }}
+          style={{ position: 'absolute', opacity: 0, top: 0, left: 20, right: 20, fontFamily: 'InterTight_400Regular', fontSize: 15, lineHeight: 26 }}
           onLayout={(e) => {
             if (collapsedHeight === 0) {
               setCollapsedHeight(e.nativeEvent.layout.height);
@@ -160,7 +160,7 @@ function CollapsiblePrayer({
 
       <Text
         numberOfLines={expanded ? undefined : PRAYER_COLLAPSED_LINES}
-        style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 15, lineHeight: 26 }}
+        style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_400Regular', fontSize: 15, lineHeight: 26 }}
       >
         {content}
       </Text>
@@ -171,7 +171,7 @@ function CollapsiblePrayer({
           hitSlop={8}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: 8 }}
         >
-          <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_500Medium', fontSize: 13 }}>
+          <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_500Medium', fontSize: 13 }}>
             {expanded ? 'Read less' : 'Read more'}
           </Text>
           <Animated.View style={chevronStyle}>
@@ -192,7 +192,7 @@ function CollapsiblePrayer({
           }}
         >
           <Icon name="pray" size={14} color={userLiked ? THEME_COLORS.gold : THEME_COLORS.text3} />
-          <Text style={{ color: userLiked ? THEME_COLORS.gold : THEME_COLORS.text3, fontFamily: 'Geist_500Medium', fontSize: 13 }}>
+          <Text style={{ color: userLiked ? THEME_COLORS.gold : THEME_COLORS.text3, fontFamily: 'InterTight_500Medium', fontSize: 13 }}>
             {likesCount > 0 ? likesCount.toLocaleString() : 'Pray'}
           </Text>
         </Pressable>
@@ -208,7 +208,7 @@ function CollapsiblePrayer({
           }}
         >
           <Icon name="audio" size={14} color={THEME_COLORS.text2} />
-          <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_500Medium', fontSize: 13 }}>{listenLabel}</Text>
+          <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_500Medium', fontSize: 13 }}>{listenLabel}</Text>
         </Pressable>
 
         <Pressable
@@ -222,7 +222,7 @@ function CollapsiblePrayer({
           }}
         >
           <Icon name="share" size={14} color={THEME_COLORS.text2} />
-          <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_500Medium', fontSize: 13 }}>Share</Text>
+          <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_500Medium', fontSize: 13 }}>Share</Text>
         </Pressable>
       </View>
     </View>
@@ -462,10 +462,10 @@ export default function HomeScreen() {
         }}
       >
         <View>
-          <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_400Regular', fontSize: 13 }}>
+          <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 13 }}>
             {dayjs().format('dddd, MMMM D')}
           </Text>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 22, marginTop: 2 }}>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 22, marginTop: 2 }}>
             Good {dayjs().hour() < 12 ? 'morning' : dayjs().hour() < 17 ? 'afternoon' : 'evening'},{' '}
             {getGreetingFirstName(profile, user)}
           </Text>
@@ -506,7 +506,7 @@ export default function HomeScreen() {
                 justifyContent: 'center',
               }}
             >
-              <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Geist_700Bold' }}>
+              <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'InterTight_700Bold' }}>
                 {groupChatUnread > 99 ? '99+' : groupChatUnread}
               </Text>
             </View>
@@ -538,14 +538,14 @@ export default function HomeScreen() {
                 paddingHorizontal: 10, paddingVertical: 4,
               }}>
                 <Icon name="cross" size={9} color={THEME_COLORS.gold} />
-                <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_500Medium', fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase' }}>Daily Verse</Text>
+                <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_500Medium', fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase' }}>Daily Verse</Text>
               </View>
             </View>
 
-            <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 15, fontStyle: 'italic', lineHeight: 26, marginBottom: 10 }}>
+            <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_400Regular', fontSize: 15, fontStyle: 'italic', lineHeight: 26, marginBottom: 10 }}>
               "{verseQuery.data?.data?.verse ?? 'For God so loved the world...'}"
             </Text>
-            <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' }}>
+            <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_600SemiBold', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' }}>
               — {verseQuery.data?.data?.reference ?? 'John 3:16'}
             </Text>
 
@@ -562,7 +562,7 @@ export default function HomeScreen() {
                 hitSlop={8}
               >
                 <Icon name="heart" size={16} color={verseUserLiked ? THEME_COLORS.rose : THEME_COLORS.text3} />
-                <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_500Medium', fontSize: 13 }}>
+                <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_500Medium', fontSize: 13 }}>
                   {verseLikesCount > 0 ? verseLikesCount.toLocaleString() : 'Like'}
                 </Text>
               </Pressable>
@@ -581,7 +581,7 @@ export default function HomeScreen() {
                   style={{ flex: 1, backgroundColor: THEME_COLORS.goldDim, borderWidth: 1, borderColor: THEME_COLORS.goldBorder, borderRadius: 12, paddingVertical: 9, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 5 }}
                 >
                   <Icon name={a.icon} size={10} color={THEME_COLORS.gold} />
-                  <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_500Medium', fontSize: 10 }}>{a.label}</Text>
+                  <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_500Medium', fontSize: 10 }}>{a.label}</Text>
                 </Pressable>
               ))}
             </View>
@@ -592,7 +592,7 @@ export default function HomeScreen() {
       {/* Today's Global Prayer */}
       <Animated.View entering={FadeInDown.delay(160).duration(500)} style={{ paddingHorizontal: 22, marginBottom: 20 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16 }}>Today's Global Prayer</Text>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 16 }}>Today's Global Prayer</Text>
         </View>
         {prayerQuery.isLoading ? (
           <SkeletonBlock height={180} />
@@ -657,9 +657,9 @@ export default function HomeScreen() {
                   />
                 ) : null}
               </View>
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 20 }}>{s.value}</Text>
-              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 10, marginTop: 1, textAlign: 'center' }}>{s.label}</Text>
-              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 8, marginTop: 2, opacity: 0.85, textAlign: 'center' }}>{s.hint}</Text>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 20 }}>{s.value}</Text>
+              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 10, marginTop: 1, textAlign: 'center' }}>{s.label}</Text>
+              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 8, marginTop: 2, opacity: 0.85, textAlign: 'center' }}>{s.hint}</Text>
             </View>
           ))}
         </View>
@@ -667,7 +667,7 @@ export default function HomeScreen() {
 
       {/* Quick Actions */}
       <Animated.View entering={FadeInDown.delay(240).duration(500)} style={{ paddingHorizontal: 22, marginBottom: 24 }}>
-        <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, marginBottom: 12 }}>Quick Actions</Text>
+        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 16, marginBottom: 12 }}>Quick Actions</Text>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           {[
             { icon: 'live' as const, label: 'Join a Room', sub: 'Live prayer rooms', route: '/(tabs)/rooms' as const, qaUnread: false },
@@ -700,8 +700,8 @@ export default function HomeScreen() {
                     />
                   ) : null}
                 </View>
-                <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 12, textAlign: 'center' }}>{a.label}</Text>
-                <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 10, textAlign: 'center', marginTop: 2 }}>{a.sub}</Text>
+                <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_600SemiBold', fontSize: 12, textAlign: 'center' }}>{a.label}</Text>
+                <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 10, textAlign: 'center', marginTop: 2 }}>{a.sub}</Text>
               </View>
             </Pressable>
           ))}
@@ -711,9 +711,9 @@ export default function HomeScreen() {
       {/* My Groups preview */}
       <Animated.View entering={FadeInDown.delay(300).duration(500)} style={{ paddingHorizontal: 22, marginBottom: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16 }}>My Groups</Text>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 16 }}>My Groups</Text>
           <Pressable onPress={() => router.push('/(tabs)/groups')}>
-            <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_500Medium', fontSize: 13 }}>View All</Text>
+            <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_500Medium', fontSize: 13 }}>View All</Text>
           </Pressable>
         </View>
 
@@ -725,8 +725,8 @@ export default function HomeScreen() {
             <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: THEME_COLORS.bg3, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
               <Icon name="groups" size={22} color={THEME_COLORS.text3} />
             </View>
-            <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 14, marginBottom: 4 }}>No groups yet</Text>
-            <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12, textAlign: 'center' }}>Join a prayer group and start praying together</Text>
+            <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_600SemiBold', fontSize: 14, marginBottom: 4 }}>No groups yet</Text>
+            <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 12, textAlign: 'center' }}>Join a prayer group and start praying together</Text>
           </Pressable>
         ) : (
           <View style={{ gap: 10 }}>
@@ -770,7 +770,7 @@ export default function HomeScreen() {
                           borderColor: THEME_COLORS.bg2,
                         }}
                       >
-                        <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'Geist_700Bold' }}>
+                        <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'InterTight_700Bold' }}>
                           {(unreadCountByGroup[g.group_id] ?? 0) > 99 ? '99+' : unreadCountByGroup[g.group_id]}
                         </Text>
                       </View>
@@ -778,7 +778,7 @@ export default function HomeScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                      <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 15 }}>{g.name}</Text>
+                      <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_600SemiBold', fontSize: 15 }}>{g.name}</Text>
                       {isLive && (
                         <View style={{
                           flexDirection: 'row',
@@ -790,11 +790,11 @@ export default function HomeScreen() {
                           borderRadius: 6,
                         }}>
                           <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#34d399' }} />
-                          <Text style={{ color: '#34d399', fontFamily: 'Geist_600SemiBold', fontSize: 10 }}>LIVE</Text>
+                          <Text style={{ color: '#34d399', fontFamily: 'InterTight_600SemiBold', fontSize: 10 }}>LIVE</Text>
                         </View>
                       )}
                     </View>
-                    <Text style={{ color: unreadByGroup[g.group_id] ? THEME_COLORS.rose : THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12 }}>
+                    <Text style={{ color: unreadByGroup[g.group_id] ? THEME_COLORS.rose : THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 12 }}>
                       {isLive
                         ? `${liveByGroup[g.group_id].participants?.length ?? 0} praying now`
                         : unreadByGroup[g.group_id]

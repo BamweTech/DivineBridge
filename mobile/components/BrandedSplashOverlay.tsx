@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: THEME_COLORS.text,
-    fontFamily: 'PlusJakartaSans_700Bold',
+    fontFamily: 'Fraunces_700Bold',
     fontSize: 38,
     letterSpacing: -0.5,
     width: '100%',

@@ -101,7 +101,7 @@ export function Button({
           style={{
             color: v.text,
             fontSize: s.fontSize,
-            fontFamily: 'Geist_500Medium',
+            fontFamily: 'InterTight_500Medium',
             letterSpacing: 0.4,
           }}
         >

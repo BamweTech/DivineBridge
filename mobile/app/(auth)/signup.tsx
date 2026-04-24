@@ -94,7 +94,7 @@ export default function SignupScreen() {
             style={{
               color: THEME_COLORS.text,
               fontSize: 26,
-              fontFamily: 'PlusJakartaSans_700Bold',
+              fontFamily: 'Fraunces_700Bold',
               textAlign: 'center',
               letterSpacing: -0.5,
               marginBottom: 8,
@@ -106,7 +106,7 @@ export default function SignupScreen() {
             style={{
               color: THEME_COLORS.text2,
               fontSize: 14,
-              fontFamily: 'Geist_400Regular',
+              fontFamily: 'InterTight_400Regular',
               textAlign: 'center',
             }}
           >
@@ -175,12 +175,12 @@ export default function SignupScreen() {
           entering={FadeInDown.delay(300).duration(600)}
           style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 28 }}
         >
-          <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_400Regular', fontSize: 14 }}>
+          <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 14 }}>
             Already have an account?{' '}
           </Text>
           <Link href="/(auth)/login" asChild>
             <Pressable>
-              <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 14 }}>
+              <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_600SemiBold', fontSize: 14 }}>
                 Sign in
               </Text>
             </Pressable>

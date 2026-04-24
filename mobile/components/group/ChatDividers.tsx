@@ -6,7 +6,7 @@ export function DateDivider({ label }: { label: string }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 10 }}>
       <View style={{ flex: 1, height: 1, backgroundColor: THEME_COLORS.border }} />
-      <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_500Medium', fontSize: 11 }}>
+      <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_500Medium', fontSize: 11 }}>
         {label}
       </Text>
       <View style={{ flex: 1, height: 1, backgroundColor: THEME_COLORS.border }} />
@@ -28,7 +28,7 @@ export function UnreadDivider({ count }: { count: number }) {
           borderColor: THEME_COLORS.goldBorder,
         }}
       >
-        <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Geist_600SemiBold', fontSize: 11 }}>
+        <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_600SemiBold', fontSize: 11 }}>
           {count > 0 ? `${count} new message${count === 1 ? '' : 's'}` : 'New messages'}
         </Text>
       </View>

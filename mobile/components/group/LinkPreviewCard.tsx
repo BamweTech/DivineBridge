@@ -170,7 +170,7 @@ export function LinkPreviewCard({ url }: Props) {
           numberOfLines={4}
           style={{
             color: THEME_COLORS.gold,
-            fontFamily: 'Geist_500Medium',
+            fontFamily: 'InterTight_500Medium',
             fontSize: 14,
             lineHeight: 20,
             textDecorationLine: 'underline',
@@ -196,7 +196,7 @@ export function LinkPreviewCard({ url }: Props) {
           <Text
             style={{
               color: THEME_COLORS.text3,
-              fontFamily: 'Geist_500Medium',
+              fontFamily: 'InterTight_500Medium',
               fontSize: 10,
               textTransform: 'uppercase',
               letterSpacing: 0.5,
@@ -210,7 +210,7 @@ export function LinkPreviewCard({ url }: Props) {
           <Text
             style={{
               color: THEME_COLORS.text,
-              fontFamily: 'Geist_600SemiBold',
+              fontFamily: 'InterTight_600SemiBold',
               fontSize: 13,
               lineHeight: 18,
             }}
@@ -223,7 +223,7 @@ export function LinkPreviewCard({ url }: Props) {
           <Text
             style={{
               color: THEME_COLORS.text2,
-              fontFamily: 'Geist_400Regular',
+              fontFamily: 'InterTight_400Regular',
               fontSize: 12,
               lineHeight: 16,
               marginTop: 1,

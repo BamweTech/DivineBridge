@@ -29,19 +29,19 @@ function LiveRoomCard({ room, onJoin }: { room: PrayerRoom; onJoin: () => void }
             {/* Live pill */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: THEME_COLORS.sageDim, borderRadius: 50, paddingHorizontal: 10, paddingVertical: 4 }}>
               <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: THEME_COLORS.sage }} />
-              <Text style={{ color: THEME_COLORS.sage, fontFamily: 'Geist_600SemiBold', fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase' }}>Live</Text>
+              <Text style={{ color: THEME_COLORS.sage, fontFamily: 'InterTight_600SemiBold', fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase' }}>Live</Text>
             </View>
             {room.room_privacy === 'private' && (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: THEME_COLORS.bg3, borderWidth: 1, borderColor: THEME_COLORS.border }}>
                 <Icon name="lock" size={10} color={THEME_COLORS.text3} />
-                <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_500Medium', fontSize: 10 }}>Private</Text>
+                <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_500Medium', fontSize: 10 }}>Private</Text>
               </View>
             )}
           </View>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16 }}>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 16 }}>
             {room.room_name}
           </Text>
-          <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 2 }}>
+          <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 13, marginTop: 2 }}>
             Hosted by {room.host_name}
           </Text>
         </View>
@@ -49,21 +49,21 @@ function LiveRoomCard({ room, onJoin }: { room: PrayerRoom; onJoin: () => void }
           onPress={onJoin}
           style={{ backgroundColor: THEME_COLORS.sage, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 8 }}
         >
-          <Text style={{ color: '#ffffff', fontFamily: 'Geist_700Bold', fontSize: 13 }}>Join</Text>
+          <Text style={{ color: '#ffffff', fontFamily: 'InterTight_700Bold', fontSize: 13 }}>Join</Text>
         </Pressable>
       </View>
 
       <View style={{ flexDirection: 'row', gap: 14 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
           <Icon name="mic" size={13} color={THEME_COLORS.text3} />
-          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12 }}>
+          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 12 }}>
             {speakerCount} speaking
           </Text>
         </View>
         {listenerCount > 0 && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
             <Icon name="radio" size={13} color={THEME_COLORS.text3} />
-            <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12 }}>
+            <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 12 }}>
               {listenerCount} listening
             </Text>
           </View>
@@ -80,10 +80,10 @@ function ScheduledCard({ session, onRsvp }: { session: ScheduledSession; onRsvp:
     <View style={{ backgroundColor: THEME_COLORS.bg2, borderWidth: 1, borderColor: THEME_COLORS.border, borderRadius: 20, padding: 18, marginBottom: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 14 }}>
       {/* Date block */}
       <View style={{ width: 48, alignItems: 'center', backgroundColor: THEME_COLORS.bg3, borderRadius: 12, paddingVertical: 8, flexShrink: 0 }}>
-        <Text style={{ color: THEME_COLORS.gold, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 20, lineHeight: 22 }}>
+        <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Fraunces_700Bold', fontSize: 20, lineHeight: 22 }}>
           {dayjs.unix(session.scheduled_time).format('D')}
         </Text>
-        <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 2 }}>
+        <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 2 }}>
           {dayjs.unix(session.scheduled_time).format('MMM')}
         </Text>
       </View>
@@ -91,7 +91,7 @@ function ScheduledCard({ session, onRsvp }: { session: ScheduledSession; onRsvp:
       <View style={{ flex: 1 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: isToday ? THEME_COLORS.goldDim : THEME_COLORS.bg3, borderWidth: 1, borderColor: isToday ? THEME_COLORS.goldBorder : THEME_COLORS.border }}>
-            <Text style={{ color: isToday ? THEME_COLORS.gold : THEME_COLORS.text3, fontFamily: 'Geist_600SemiBold', fontSize: 11 }}>
+            <Text style={{ color: isToday ? THEME_COLORS.gold : THEME_COLORS.text3, fontFamily: 'InterTight_600SemiBold', fontSize: 11 }}>
               {isToday ? 'Today' : dayjs.unix(session.scheduled_time).format('ddd')} · {dayjs.unix(session.scheduled_time).format('h:mm A')}
             </Text>
           </View>
@@ -99,15 +99,15 @@ function ScheduledCard({ session, onRsvp }: { session: ScheduledSession; onRsvp:
             <Icon name="calendar" size={12} color={THEME_COLORS.text3} />
           )}
         </View>
-        <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15 }}>
+        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 15 }}>
           {session.room_name}
         </Text>
         {session.room_description && (
-          <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_400Regular', fontSize: 13, marginTop: 2 }} numberOfLines={1}>
+          <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 13, marginTop: 2 }} numberOfLines={1}>
             {session.room_description}
           </Text>
         )}
-        <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 4 }}>
+        <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 12, marginTop: 4 }}>
           by {session.host_name} · {session.total_rsvps} RSVP{session.total_rsvps !== 1 ? 's' : ''}
         </Text>
       </View>
@@ -121,7 +121,7 @@ function ScheduledCard({ session, onRsvp }: { session: ScheduledSession; onRsvp:
           borderColor: session.user_rsvp_status ? THEME_COLORS.goldBorder : THEME_COLORS.border,
         }}
       >
-        <Text style={{ color: session.user_rsvp_status ? THEME_COLORS.gold : THEME_COLORS.text2, fontFamily: 'Geist_600SemiBold', fontSize: 12 }}>
+        <Text style={{ color: session.user_rsvp_status ? THEME_COLORS.gold : THEME_COLORS.text2, fontFamily: 'InterTight_600SemiBold', fontSize: 12 }}>
           {session.user_rsvp_status ? '✓ Going' : 'RSVP'}
         </Text>
       </Pressable>
@@ -153,19 +153,19 @@ function CreateRoomModal({ onCreated, onClose }: { onCreated: (roomId: string) =
 
   return (
     <View style={{ padding: 24 }}>
-      <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 22, marginBottom: 20 }}>
+      <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 22, marginBottom: 20 }}>
         Create a Prayer Room
       </Text>
-      <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_500Medium', fontSize: 13, marginBottom: 6 }}>Room Name</Text>
+      <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_500Medium', fontSize: 13, marginBottom: 6 }}>Room Name</Text>
       <TextInput
         value={name}
         onChangeText={setName}
         placeholder="e.g. Evening Worship"
         placeholderTextColor={THEME_COLORS.text3}
         maxLength={60}
-        style={{ backgroundColor: THEME_COLORS.bg2, borderRadius: 14, borderWidth: 1, borderColor: THEME_COLORS.border, color: THEME_COLORS.text, fontFamily: 'Geist_400Regular', fontSize: 15, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 16 }}
+        style={{ backgroundColor: THEME_COLORS.bg2, borderRadius: 14, borderWidth: 1, borderColor: THEME_COLORS.border, color: THEME_COLORS.text, fontFamily: 'InterTight_400Regular', fontSize: 15, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 16 }}
       />
-      <Text style={{ color: THEME_COLORS.text2, fontFamily: 'Geist_500Medium', fontSize: 13, marginBottom: 8 }}>Privacy</Text>
+      <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_500Medium', fontSize: 13, marginBottom: 8 }}>Privacy</Text>
       <View style={{ flexDirection: 'row', gap: 10, marginBottom: 24 }}>
         {(['public', 'private'] as const).map((opt) => (
           <Pressable
@@ -180,7 +180,7 @@ function CreateRoomModal({ onCreated, onClose }: { onCreated: (roomId: string) =
           >
             <Text style={{
               color: privacy === opt ? THEME_COLORS.sage : THEME_COLORS.text2,
-              fontFamily: privacy === opt ? 'Geist_600SemiBold' : 'Geist_400Regular', fontSize: 14,
+              fontFamily: privacy === opt ? 'InterTight_600SemiBold' : 'InterTight_400Regular', fontSize: 14,
               textTransform: 'capitalize',
             }}>
               {opt}
@@ -264,7 +264,7 @@ export default function RoomsScreen() {
         style={{ paddingTop: insets.top + 16, paddingHorizontal: 22, paddingBottom: 16 }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 26, letterSpacing: -0.5 }}>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 26, letterSpacing: -0.5 }}>
             Prayer Rooms
           </Text>
           <Pressable
@@ -274,7 +274,7 @@ export default function RoomsScreen() {
               borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
             }}
           >
-            <Text style={{ color: '#ffffff', fontFamily: 'Geist_700Bold', fontSize: 13 }}>+ Create</Text>
+            <Text style={{ color: '#ffffff', fontFamily: 'InterTight_700Bold', fontSize: 13 }}>+ Create</Text>
           </Pressable>
         </View>
 
@@ -291,7 +291,7 @@ export default function RoomsScreen() {
                 borderColor: THEME_COLORS.border,
               }}
             >
-              <Text style={{ color: tab === t ? THEME_COLORS.text : THEME_COLORS.text3, fontFamily: tab === t ? 'Geist_600SemiBold' : 'Geist_400Regular', fontSize: 13 }}>
+              <Text style={{ color: tab === t ? THEME_COLORS.text : THEME_COLORS.text3, fontFamily: tab === t ? 'InterTight_600SemiBold' : 'InterTight_400Regular', fontSize: 13 }}>
                 {t === 'live'
                   ? `Live ${liveRooms.length > 0 ? `(${liveRooms.length})` : ''}`
                   : 'Scheduled'}
@@ -323,8 +323,8 @@ export default function RoomsScreen() {
               <View style={{ width: 72, height: 72, borderRadius: 22, backgroundColor: THEME_COLORS.bg3, alignItems: 'center', justifyContent: 'center', marginBottom: 16, borderWidth: 1, borderColor: THEME_COLORS.border }}>
                 <Icon name="radio" size={32} color={THEME_COLORS.text3} />
               </View>
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18, marginBottom: 8 }}>No live rooms</Text>
-              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 14, textAlign: 'center', maxWidth: 240, marginBottom: 20 }}>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 18, marginBottom: 8 }}>No live rooms</Text>
+              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 14, textAlign: 'center', maxWidth: 240, marginBottom: 20 }}>
                 Be the first to open a prayer room
               </Text>
               <Button label="Open a Room" onPress={handleCreateRoom} />
@@ -344,8 +344,8 @@ export default function RoomsScreen() {
               <View style={{ width: 72, height: 72, borderRadius: 22, backgroundColor: THEME_COLORS.bg3, alignItems: 'center', justifyContent: 'center', marginBottom: 16, borderWidth: 1, borderColor: THEME_COLORS.border }}>
                 <Icon name="calendar" size={32} color={THEME_COLORS.text3} />
               </View>
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18, marginBottom: 8 }}>No sessions scheduled</Text>
-              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 14, textAlign: 'center', maxWidth: 240 }}>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 18, marginBottom: 8 }}>No sessions scheduled</Text>
+              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 14, textAlign: 'center', maxWidth: 240 }}>
                 Schedule a recurring prayer session for your group
               </Text>
             </View>

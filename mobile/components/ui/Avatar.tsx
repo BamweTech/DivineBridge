@@ -94,7 +94,7 @@ export function Avatar({ name, photoUrl, size = 40, showSpeakingRing, isOnline }
           <Text
             style={{
               color: '#fff',
-              fontFamily: 'Geist_700Bold',
+              fontFamily: 'InterTight_700Bold',
               fontSize: size * 0.36,
               lineHeight: size * 0.36 * 1.2,
             }}

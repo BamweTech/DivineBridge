@@ -98,10 +98,10 @@ export function AttachmentTray({
               <Icon name={option.icon} size={18} color={option.iconColor} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 13 }}>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_600SemiBold', fontSize: 13 }}>
                 {option.label}
               </Text>
-              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 11, marginTop: 2 }}>
+              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 11, marginTop: 2 }}>
                 {option.sublabel}
               </Text>
             </View>

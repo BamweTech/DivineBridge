@@ -18,7 +18,7 @@ export function Input({ label, error, isPassword, style, ...props }: InputProps)
         <Text
           style={{
             color: THEME_COLORS.text2,
-            fontFamily: 'Geist_500Medium',
+            fontFamily: 'InterTight_500Medium',
             fontSize: 13,
             marginBottom: 6,
           }}
@@ -51,7 +51,7 @@ export function Input({ label, error, isPassword, style, ...props }: InputProps)
             {
               flex: 1,
               color: THEME_COLORS.text,
-              fontFamily: 'Geist_400Regular',
+              fontFamily: 'InterTight_400Regular',
               fontSize: 15,
               paddingVertical: 14,
             },
@@ -70,7 +70,7 @@ export function Input({ label, error, isPassword, style, ...props }: InputProps)
         <Text
           style={{
             color: THEME_COLORS.rose,
-            fontFamily: 'Geist_400Regular',
+            fontFamily: 'InterTight_400Regular',
             fontSize: 12,
             marginTop: 4,
           }}

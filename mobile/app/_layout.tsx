@@ -18,16 +18,18 @@ import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persi
 import NetInfo from '@react-native-community/netinfo';
 import {
   useFonts,
-  PlusJakartaSans_400Regular,
-  PlusJakartaSans_600SemiBold,
-  PlusJakartaSans_700Bold,
-} from '@expo-google-fonts/plus-jakarta-sans';
+  Fraunces_400Regular,
+  Fraunces_500Medium,
+  Fraunces_600SemiBold,
+  Fraunces_700Bold,
+  Fraunces_400Regular_Italic,
+} from '@expo-google-fonts/fraunces';
 import {
-  Geist_400Regular,
-  Geist_500Medium,
-  Geist_600SemiBold,
-  Geist_700Bold,
-} from '@expo-google-fonts/geist';
+  InterTight_400Regular,
+  InterTight_500Medium,
+  InterTight_600SemiBold,
+  InterTight_700Bold,
+} from '@expo-google-fonts/inter-tight';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -181,7 +183,7 @@ function JoinGroupModal({
           {joining ? (
             <View style={{ alignItems: 'center', paddingVertical: 32 }}>
               <ActivityIndicator color={THEME_COLORS.gold} style={{ marginBottom: 16 }} />
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 16 }}>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_600SemiBold', fontSize: 16 }}>
                 Joining group…
               </Text>
             </View>
@@ -190,10 +192,10 @@ function JoinGroupModal({
               <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: THEME_COLORS.sageDim, borderWidth: 1, borderColor: 'rgba(74,124,94,0.22)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                 <Icon name="groups" size={28} color={THEME_COLORS.sage} />
               </View>
-              <Text style={{ color: THEME_COLORS.sage, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 22, marginBottom: 6 }}>
+              <Text style={{ color: THEME_COLORS.sage, fontFamily: 'Fraunces_700Bold', fontSize: 22, marginBottom: 6 }}>
                 You joined {groupName}!
               </Text>
-              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 14 }}>
+              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 14 }}>
                 Taking you to the group…
               </Text>
             </View>
@@ -202,14 +204,14 @@ function JoinGroupModal({
               <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: 'rgba(180,80,60,0.08)', borderWidth: 1, borderColor: 'rgba(180,80,60,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                 <Icon name="cross" size={28} color="#b4503c" />
               </View>
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18, marginBottom: 6, textAlign: 'center' }}>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 18, marginBottom: 6, textAlign: 'center' }}>
                 Could not join group
               </Text>
-              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 14, textAlign: 'center', marginBottom: 24 }}>
+              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 14, textAlign: 'center', marginBottom: 24 }}>
                 {error}
               </Text>
               <Pressable onPress={onClose} style={{ padding: 16, alignItems: 'center' }}>
-                <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_500Medium', fontSize: 15 }}>
+                <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_500Medium', fontSize: 15 }}>
                   Dismiss
                 </Text>
               </Pressable>
@@ -264,13 +266,15 @@ function RootLayoutInner() {
   useGroupChatNotifications();
 
   const [fontsLoaded, fontError] = useFonts({
-    PlusJakartaSans_400Regular,
-    PlusJakartaSans_600SemiBold,
-    PlusJakartaSans_700Bold,
-    Geist_400Regular,
-    Geist_500Medium,
-    Geist_600SemiBold,
-    Geist_700Bold,
+    Fraunces_400Regular,
+    Fraunces_500Medium,
+    Fraunces_600SemiBold,
+    Fraunces_700Bold,
+    Fraunces_400Regular_Italic,
+    InterTight_400Regular,
+    InterTight_500Medium,
+    InterTight_600SemiBold,
+    InterTight_700Bold,
   });
 
   // Hard safety net: dismiss splash after 3 s regardless of font load state

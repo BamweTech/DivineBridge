@@ -172,10 +172,10 @@ export function VoiceRecorder({ onSend }: VoiceRecorderProps) {
 
       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Animated.View style={[{ width: 10, height: 10, borderRadius: 5, backgroundColor: THEME_COLORS.rose }, pulseStyle]} />
-        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Geist_600SemiBold', fontSize: 15 }}>
+        <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_600SemiBold', fontSize: 15 }}>
           {formatTime(elapsed)}
         </Text>
-        <Text style={{ color: THEME_COLORS.text3, fontFamily: 'Geist_400Regular', fontSize: 12 }}>
+        <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 12 }}>
           / {formatTime(MAX_DURATION_MS)}
         </Text>
       </View>
