@@ -393,7 +393,7 @@ export default function RoomScreen() {
         <View style={{ width: 72, height: 72, borderRadius: 22, backgroundColor: THEME_COLORS.bg3, alignItems: 'center', justifyContent: 'center', marginBottom: 20, borderWidth: 1, borderColor: THEME_COLORS.border }}>
           <Icon name="settings" size={32} color={THEME_COLORS.text3} />
         </View>
-        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 22, textAlign: 'center', marginBottom: 12 }}>
+        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 22, textAlign: 'center', marginBottom: 12 }}>
           Development Build Required
         </Text>
         <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 28 }}>
@@ -418,7 +418,7 @@ export default function RoomScreen() {
         <View style={{ width: 80, height: 80, borderRadius: 26, backgroundColor: THEME_COLORS.sageDim, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(74,124,94,0.22)', marginBottom: 20 }}>
           <Icon name="live" size={36} color={THEME_COLORS.sage} />
         </View>
-        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 26, textAlign: 'center', marginBottom: 8 }}>
+        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 26, textAlign: 'center', marginBottom: 8 }}>
           {room?.room_name ?? 'Prayer Room'}
         </Text>
         <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 15, textAlign: 'center', marginBottom: 32 }}>
@@ -467,7 +467,7 @@ export default function RoomScreen() {
             <Icon name="back" size={16} color={THEME_COLORS.text2} />
           </Pressable>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 16 }} numberOfLines={1}>
+            <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 16 }} numberOfLines={1}>
               {room?.room_name}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 1 }}>

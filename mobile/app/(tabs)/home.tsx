@@ -465,7 +465,7 @@ export default function HomeScreen() {
           <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 13 }}>
             {dayjs().format('dddd, MMMM D')}
           </Text>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 22, marginTop: 2 }}>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 22, marginTop: 2 }}>
             Good {dayjs().hour() < 12 ? 'morning' : dayjs().hour() < 17 ? 'afternoon' : 'evening'},{' '}
             {getGreetingFirstName(profile, user)}
           </Text>
@@ -592,7 +592,7 @@ export default function HomeScreen() {
       {/* Today's Global Prayer */}
       <Animated.View entering={FadeInDown.delay(160).duration(500)} style={{ paddingHorizontal: 22, marginBottom: 20 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 16 }}>Today's Global Prayer</Text>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 16 }}>Today's Global Prayer</Text>
         </View>
         {prayerQuery.isLoading ? (
           <SkeletonBlock height={180} />
@@ -657,7 +657,7 @@ export default function HomeScreen() {
                   />
                 ) : null}
               </View>
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 20 }}>{s.value}</Text>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 20 }}>{s.value}</Text>
               <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 10, marginTop: 1, textAlign: 'center' }}>{s.label}</Text>
               <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 8, marginTop: 2, opacity: 0.85, textAlign: 'center' }}>{s.hint}</Text>
             </View>
@@ -667,7 +667,7 @@ export default function HomeScreen() {
 
       {/* Quick Actions */}
       <Animated.View entering={FadeInDown.delay(240).duration(500)} style={{ paddingHorizontal: 22, marginBottom: 24 }}>
-        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 16, marginBottom: 12 }}>Quick Actions</Text>
+        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 16, marginBottom: 12 }}>Quick Actions</Text>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           {[
             { icon: 'live' as const, label: 'Join a Room', sub: 'Live prayer rooms', route: '/(tabs)/rooms' as const, qaUnread: false },
@@ -711,7 +711,7 @@ export default function HomeScreen() {
       {/* My Groups preview */}
       <Animated.View entering={FadeInDown.delay(300).duration(500)} style={{ paddingHorizontal: 22, marginBottom: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 16 }}>My Groups</Text>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 16 }}>My Groups</Text>
           <Pressable onPress={() => router.push('/(tabs)/groups')}>
             <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_500Medium', fontSize: 13 }}>View All</Text>
           </Pressable>

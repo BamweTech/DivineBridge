@@ -69,7 +69,7 @@ function Slide({ item }: { item: typeof SLIDES[number] }) {
         </View>
 
         {/* Title */}
-        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 34, letterSpacing: -1, textAlign: 'center', lineHeight: 42, marginBottom: 14 }}>
+        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 34, letterSpacing: -1, textAlign: 'center', lineHeight: 42, marginBottom: 14 }}>
           {item.title.replace(item.italicWord, '')}
           <Text style={{ fontStyle: 'italic', color: item.iconColor }}>{item.italicWord}</Text>
         </Text>
@@ -171,7 +171,7 @@ export default function OnboardingScreen() {
             shadowColor: activeSlide.iconColor, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
           })}
         >
-          <Text style={{ color: '#ffffff', fontFamily: 'Fraunces_700Bold', fontSize: 16, letterSpacing: 0.2 }}>
+          <Text style={{ color: '#ffffff', fontFamily: 'Newsreader_700Bold', fontSize: 16, letterSpacing: 0.2 }}>
             {isLast ? "Get Started — It's Free" : 'Continue'}
           </Text>
         </Pressable>

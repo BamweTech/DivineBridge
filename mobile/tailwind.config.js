@@ -44,22 +44,22 @@ module.exports = {
         error: '#EF4444',
       },
       fontFamily: {
-        // Primary tokens: Fraunces (serif, headings + long-form) and Inter Tight (sans, UI + chat).
-        'serif': ['Fraunces_400Regular'],
-        'serif-medium': ['Fraunces_500Medium'],
-        'serif-semibold': ['Fraunces_600SemiBold'],
-        'serif-bold': ['Fraunces_700Bold'],
-        'serif-italic': ['Fraunces_400Regular_Italic'],
+        // Primary tokens: Newsreader (serif, headings + long-form) and Inter Tight (sans, UI + chat).
+        'serif': ['Newsreader_400Regular'],
+        'serif-medium': ['Newsreader_500Medium'],
+        'serif-semibold': ['Newsreader_600SemiBold'],
+        'serif-bold': ['Newsreader_700Bold'],
+        'serif-italic': ['Newsreader_400Regular_Italic'],
         'sans': ['InterTight_400Regular'],
         'sans-medium': ['InterTight_500Medium'],
         'sans-semibold': ['InterTight_600SemiBold'],
         'sans-bold': ['InterTight_700Bold'],
 
         // Legacy aliases kept as shims mapped to the new faces so any usage we miss still renders.
-        'jakarta': ['Fraunces_400Regular'],
-        'jakarta-medium': ['Fraunces_500Medium'],
-        'jakarta-semibold': ['Fraunces_600SemiBold'],
-        'jakarta-bold': ['Fraunces_700Bold'],
+        'jakarta': ['Newsreader_400Regular'],
+        'jakarta-medium': ['Newsreader_500Medium'],
+        'jakarta-semibold': ['Newsreader_600SemiBold'],
+        'jakarta-bold': ['Newsreader_700Bold'],
         'geist': ['InterTight_400Regular'],
         'geist-medium': ['InterTight_500Medium'],
         'geist-semibold': ['InterTight_600SemiBold'],

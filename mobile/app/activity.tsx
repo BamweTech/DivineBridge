@@ -60,7 +60,7 @@ export default function ActivityScreen() {
             <Icon name="back" size={18} color={THEME_COLORS.text} />
           </Pressable>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 22, letterSpacing: -0.3 }}>
+            <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 22, letterSpacing: -0.3 }}>
               Activity
             </Text>
             <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 13, marginTop: 2 }}>
@@ -113,7 +113,7 @@ export default function ActivityScreen() {
 
         {/* Group chats */}
         <Animated.View entering={FadeInDown.delay(80).duration(400)} style={{ marginTop: 24 }}>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 16, marginBottom: 12 }}>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 16, marginBottom: 12 }}>
             Group chats
           </Text>
           <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 13, lineHeight: 20, marginBottom: 14 }}>

@@ -96,7 +96,7 @@ function GroupCard({ group, onPress, unreadCount, isLive, liveCount }: { group: 
           </View>
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 15 }}>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 15 }}>
                 {group.name}
               </Text>
               {isLive && (
@@ -171,7 +171,7 @@ function CreateGroupModal({ onClose }: { onClose: () => void }) {
 
   return (
     <View style={{ padding: 24 }}>
-      <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 22, marginBottom: 20 }}>
+      <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 22, marginBottom: 20 }}>
         Create a Prayer Group
       </Text>
       <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_500Medium', fontSize: 13, marginBottom: 6 }}>Group Name</Text>
@@ -218,7 +218,7 @@ function UpcomingSessions({ onJoinRoom }: { onJoinRoom: (session: ScheduledSessi
 
   return (
     <View style={{ marginBottom: 24 }}>
-      <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 16, marginBottom: 12 }}>Upcoming Sessions</Text>
+      <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 16, marginBottom: 12 }}>Upcoming Sessions</Text>
       {isLoading ? (
         <ActivityIndicator color={THEME_COLORS.gold} />
       ) : (
@@ -338,7 +338,7 @@ const GlobalWatchCard = memo(function GlobalWatchCard({
           </View>
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 14 }}>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 14 }}>
                 Global Prayer Watch
               </Text>
               {/* verified-style badge */}
@@ -536,7 +536,7 @@ function ComposeModal({
           <Pressable onPress={onClose} style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: THEME_COLORS.bg3, borderWidth: 1, borderColor: THEME_COLORS.border, alignItems: 'center', justifyContent: 'center' }}>
             <Icon name="back" size={14} color={THEME_COLORS.text2} />
           </Pressable>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 18 }}>Share a Prayer</Text>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 18 }}>Share a Prayer</Text>
           <View style={{ width: 32 }} />
         </View>
 
@@ -745,7 +745,7 @@ function PrayerWallFeed({ currentUserId, onCompose }: { currentUserId?: string; 
           <View style={{ width: 80, height: 80, borderRadius: 24, backgroundColor: THEME_COLORS.goldDim, borderWidth: 1, borderColor: THEME_COLORS.goldBorder, alignItems: 'center', justifyContent: 'center', marginBottom: 18 }}>
             <Icon name="pray" size={36} color={THEME_COLORS.gold} />
           </View>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 20, textAlign: 'center', marginBottom: 10 }}>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 20, textAlign: 'center', marginBottom: 10 }}>
             Be the first to pray
           </Text>
           <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 14, lineHeight: 22, textAlign: 'center', marginBottom: 28 }}>
@@ -848,7 +848,7 @@ export default function GroupsScreen() {
         style={{ paddingTop: insets.top + 16, paddingHorizontal: 22, paddingBottom: 16 }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 26, letterSpacing: -0.5 }}>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 26, letterSpacing: -0.5 }}>
             {tab === 'prayer-wall' ? 'Prayer Wall' : 'Prayer Groups'}
           </Text>
           {/* The + button opens CreateGroup on "mine" tab and Compose on "prayer-wall" tab */}
@@ -938,7 +938,7 @@ export default function GroupsScreen() {
               <View style={{ width: 80, height: 80, borderRadius: 24, backgroundColor: THEME_COLORS.bg3, alignItems: 'center', justifyContent: 'center', marginBottom: 16, borderWidth: 1, borderColor: THEME_COLORS.border }}>
                 <Icon name="groups" size={36} color={THEME_COLORS.text3} />
               </View>
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 20, marginBottom: 8 }}>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 20, marginBottom: 8 }}>
                 You're not in any group yet
               </Text>
               <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 14, textAlign: 'center', maxWidth: 260, lineHeight: 22, marginBottom: 24 }}>

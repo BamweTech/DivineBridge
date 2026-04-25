@@ -38,7 +38,7 @@ function LiveRoomCard({ room, onJoin }: { room: PrayerRoom; onJoin: () => void }
               </View>
             )}
           </View>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 16 }}>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 16 }}>
             {room.room_name}
           </Text>
           <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 13, marginTop: 2 }}>
@@ -80,7 +80,7 @@ function ScheduledCard({ session, onRsvp }: { session: ScheduledSession; onRsvp:
     <View style={{ backgroundColor: THEME_COLORS.bg2, borderWidth: 1, borderColor: THEME_COLORS.border, borderRadius: 20, padding: 18, marginBottom: 12, flexDirection: 'row', alignItems: 'flex-start', gap: 14 }}>
       {/* Date block */}
       <View style={{ width: 48, alignItems: 'center', backgroundColor: THEME_COLORS.bg3, borderRadius: 12, paddingVertical: 8, flexShrink: 0 }}>
-        <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Fraunces_700Bold', fontSize: 20, lineHeight: 22 }}>
+        <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Newsreader_700Bold', fontSize: 20, lineHeight: 22 }}>
           {dayjs.unix(session.scheduled_time).format('D')}
         </Text>
         <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 2 }}>
@@ -99,7 +99,7 @@ function ScheduledCard({ session, onRsvp }: { session: ScheduledSession; onRsvp:
             <Icon name="calendar" size={12} color={THEME_COLORS.text3} />
           )}
         </View>
-        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 15 }}>
+        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 15 }}>
           {session.room_name}
         </Text>
         {session.room_description && (
@@ -153,7 +153,7 @@ function CreateRoomModal({ onCreated, onClose }: { onCreated: (roomId: string) =
 
   return (
     <View style={{ padding: 24 }}>
-      <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 22, marginBottom: 20 }}>
+      <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 22, marginBottom: 20 }}>
         Create a Prayer Room
       </Text>
       <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_500Medium', fontSize: 13, marginBottom: 6 }}>Room Name</Text>
@@ -264,7 +264,7 @@ export default function RoomsScreen() {
         style={{ paddingTop: insets.top + 16, paddingHorizontal: 22, paddingBottom: 16 }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 26, letterSpacing: -0.5 }}>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 26, letterSpacing: -0.5 }}>
             Prayer Rooms
           </Text>
           <Pressable
@@ -323,7 +323,7 @@ export default function RoomsScreen() {
               <View style={{ width: 72, height: 72, borderRadius: 22, backgroundColor: THEME_COLORS.bg3, alignItems: 'center', justifyContent: 'center', marginBottom: 16, borderWidth: 1, borderColor: THEME_COLORS.border }}>
                 <Icon name="radio" size={32} color={THEME_COLORS.text3} />
               </View>
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 18, marginBottom: 8 }}>No live rooms</Text>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 18, marginBottom: 8 }}>No live rooms</Text>
               <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 14, textAlign: 'center', maxWidth: 240, marginBottom: 20 }}>
                 Be the first to open a prayer room
               </Text>
@@ -344,7 +344,7 @@ export default function RoomsScreen() {
               <View style={{ width: 72, height: 72, borderRadius: 22, backgroundColor: THEME_COLORS.bg3, alignItems: 'center', justifyContent: 'center', marginBottom: 16, borderWidth: 1, borderColor: THEME_COLORS.border }}>
                 <Icon name="calendar" size={32} color={THEME_COLORS.text3} />
               </View>
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 18, marginBottom: 8 }}>No sessions scheduled</Text>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 18, marginBottom: 8 }}>No sessions scheduled</Text>
               <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 14, textAlign: 'center', maxWidth: 240 }}>
                 Schedule a recurring prayer session for your group
               </Text>

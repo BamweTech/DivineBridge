@@ -371,7 +371,7 @@ export default function ProfileScreen() {
         <Text
           style={{
             color: THEME_COLORS.text,
-            fontFamily: 'Fraunces_700Bold',
+            fontFamily: 'Newsreader_700Bold',
             fontSize: 26,
             letterSpacing: -0.5,
           }}
@@ -435,7 +435,7 @@ export default function ProfileScreen() {
             <Icon name="edit" size={10} color="#ffffff" />
           </Pressable>
         </View>
-        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 20 }}>
+        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 20 }}>
           {getDisplayName(profile, user)}
         </Text>
         <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 13, marginTop: 4 }}>
@@ -470,7 +470,7 @@ export default function ProfileScreen() {
               }}
             >
               <Icon name={s.icon} size={18} color={THEME_COLORS.gold} style={{ marginBottom: 4 }} />
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 20 }}>{s.num}</Text>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 20 }}>{s.num}</Text>
               <Text
                 style={{
                   color: THEME_COLORS.text3,
@@ -605,7 +605,7 @@ export default function ProfileScreen() {
             <Text
               style={{
                 color: THEME_COLORS.text,
-                fontFamily: 'Fraunces_700Bold',
+                fontFamily: 'Newsreader_700Bold',
                 fontSize: 18,
                 marginBottom: 16,
               }}

@@ -84,7 +84,7 @@ function DaySelectorStrip({
 
   return (
     <View style={{ marginBottom: 14 }}>
-      <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 13, marginBottom: 10, paddingHorizontal: 22 }}>
+      <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 13, marginBottom: 10, paddingHorizontal: 22 }}>
         Plan days
       </Text>
       <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 22, gap: 8, paddingBottom: 4 }}>
@@ -107,7 +107,7 @@ function DaySelectorStrip({
               }}
             >
               <Text style={{ color: THEME_COLORS.text3, fontSize: 9, fontFamily: 'InterTight_500Medium', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>{dayName}</Text>
-              <Text style={{ color: isSelected || isCalendarToday ? THEME_COLORS.gold : THEME_COLORS.text2, fontFamily: 'Fraunces_700Bold', fontSize: 16 }}>{dayNum}</Text>
+              <Text style={{ color: isSelected || isCalendarToday ? THEME_COLORS.gold : THEME_COLORS.text2, fontFamily: 'Newsreader_700Bold', fontSize: 16 }}>{dayNum}</Text>
               <View style={{ width: 5, height: 5, borderRadius: 2.5, marginTop: 5, backgroundColor: isDone ? THEME_COLORS.sage : isCalendarToday ? THEME_COLORS.gold : THEME_COLORS.border }} />
             </Pressable>
           );
@@ -203,7 +203,7 @@ function DayCard({
         )}
       </View>
 
-      <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 17, marginBottom: 10 }}>{day.title}</Text>
+      <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 17, marginBottom: 10 }}>{day.title}</Text>
 
       {/* Scripture */}
       <View style={{ backgroundColor: THEME_COLORS.goldDim2, borderWidth: 1, borderColor: THEME_COLORS.goldBorder, borderRadius: 14, padding: 14, marginBottom: 12 }}>
@@ -315,7 +315,7 @@ function ReadingMode({ day, onClose }: { day: DevotionalDay; onClose: () => void
         </View>
         <ScrollView contentContainerStyle={{ paddingHorizontal: 28, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
           <Text style={{ color: '#d4c9b0', fontFamily: 'InterTight_500Medium', fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 }}>Day {day.day}</Text>
-          <Text style={{ color: '#f5edd8', fontFamily: 'Fraunces_700Bold', fontSize: 24, marginBottom: 28, letterSpacing: -0.5 }}>{day.title}</Text>
+          <Text style={{ color: '#f5edd8', fontFamily: 'Newsreader_700Bold', fontSize: 24, marginBottom: 28, letterSpacing: -0.5 }}>{day.title}</Text>
 
           <View style={{ backgroundColor: 'rgba(176,125,32,0.12)', borderRadius: 16, padding: 20, marginBottom: 28 }}>
             <Text style={{ color: '#f5edd8', fontFamily: 'InterTight_400Regular', fontSize: 18, lineHeight: 30, fontStyle: 'italic', marginBottom: 10 }}>
@@ -372,21 +372,21 @@ function CompletionCelebration({ plan, onNewPlan, onDismiss }: { plan: Devotiona
           <Icon name="sparkle" size={36} color="#b07d20" />
         </View>
 
-        <Text style={{ color: '#f5edd8', fontFamily: 'Fraunces_700Bold', fontSize: 28, textAlign: 'center', marginBottom: 8, letterSpacing: -0.5 }}>Plan Complete!</Text>
+        <Text style={{ color: '#f5edd8', fontFamily: 'Newsreader_700Bold', fontSize: 28, textAlign: 'center', marginBottom: 8, letterSpacing: -0.5 }}>Plan Complete!</Text>
         <Text style={{ color: '#c9bea8', fontFamily: 'InterTight_400Regular', fontSize: 15, textAlign: 'center', lineHeight: 24, marginBottom: 32 }}>
           You finished your {plan.duration}-day journey on &ldquo;{plan.theme}&rdquo;. Well done!
         </Text>
 
         <View style={{ flexDirection: 'row', gap: 16, marginBottom: 36 }}>
           <View style={{ alignItems: 'center', flex: 1 }}>
-            <Text style={{ color: '#b07d20', fontFamily: 'Fraunces_700Bold', fontSize: 28 }}>{completedDays}</Text>
+            <Text style={{ color: '#b07d20', fontFamily: 'Newsreader_700Bold', fontSize: 28 }}>{completedDays}</Text>
             <Text style={{ color: '#9e8e78', fontFamily: 'InterTight_400Regular', fontSize: 12, marginTop: 2 }}>days done</Text>
           </View>
           <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)' }} />
           <View style={{ alignItems: 'center', flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Icon name="flame" size={20} color="#b07d20" />
-              <Text style={{ color: '#b07d20', fontFamily: 'Fraunces_700Bold', fontSize: 28 }}>{plan.streak}</Text>
+              <Text style={{ color: '#b07d20', fontFamily: 'Newsreader_700Bold', fontSize: 28 }}>{plan.streak}</Text>
             </View>
             <Text style={{ color: '#9e8e78', fontFamily: 'InterTight_400Regular', fontSize: 12, marginTop: 2 }}>day streak</Text>
           </View>
@@ -435,7 +435,7 @@ function PlansHub({ plans, onSelect, onCreateNew, reminderOn, onToggleReminder }
               <Icon name="sparkle" size={9} color={THEME_COLORS.violet} />
               <Text style={{ color: THEME_COLORS.violet, fontFamily: 'InterTight_500Medium', fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase' }}>AI-Powered</Text>
             </View>
-            <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 24, letterSpacing: -0.5 }}>My Devotionals</Text>
+            <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 24, letterSpacing: -0.5 }}>My Devotionals</Text>
           </View>
           <Pressable onPress={onToggleReminder} style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: reminderOn ? THEME_COLORS.goldDim : THEME_COLORS.bg3, borderWidth: 1, borderColor: reminderOn ? THEME_COLORS.goldBorder : THEME_COLORS.border, alignItems: 'center', justifyContent: 'center' }}>
             <Icon name="bell" size={17} color={reminderOn ? THEME_COLORS.gold : THEME_COLORS.text3} />
@@ -457,7 +457,7 @@ function PlansHub({ plans, onSelect, onCreateNew, reminderOn, onToggleReminder }
             <Icon name="plus" size={20} color="#fff" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 16 }}>Create New Plan</Text>
+            <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 16 }}>Create New Plan</Text>
             <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 12, marginTop: 2 }}>AI-generated scripture, reflection & prayer</Text>
           </View>
           <Icon name="chevron-r" size={16} color={THEME_COLORS.gold} />
@@ -473,7 +473,7 @@ function PlansHub({ plans, onSelect, onCreateNew, reminderOn, onToggleReminder }
         )}
 
         {sorted.length > 0 && (
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 15, marginBottom: 12 }}>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 15, marginBottom: 12 }}>
             {sorted.length === 1 ? 'Your Plan' : 'Your Plans'}
           </Text>
         )}
@@ -493,7 +493,7 @@ function PlansHub({ plans, onSelect, onCreateNew, reminderOn, onToggleReminder }
               }}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 15, flex: 1 }} numberOfLines={1}>{p.title || p.theme}</Text>
+                <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 15, flex: 1 }} numberOfLines={1}>{p.title || p.theme}</Text>
                 {isComplete ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 8 }}>
                     <Icon name="cross" size={10} color={THEME_COLORS.sage} />
@@ -555,7 +555,7 @@ function GeneratePlanScreen({ onGenerated, onDismiss }: { onGenerated: () => voi
         <Icon name="sparkle" size={10} color={THEME_COLORS.violet} />
         <Text style={{ color: THEME_COLORS.violet, fontFamily: 'InterTight_500Medium', fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase' }}>AI-Powered Plan</Text>
       </View>
-      <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 26, marginBottom: 6, letterSpacing: -0.5 }}>Your Devotional Plan</Text>
+      <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 26, marginBottom: 6, letterSpacing: -0.5 }}>Your Devotional Plan</Text>
       <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 14, marginBottom: 28, lineHeight: 22 }}>
         Our AI creates a personalized plan with daily scripture, reflection, and prayer — tailored to your theme.
       </Text>
@@ -597,7 +597,7 @@ function GeneratePlanScreen({ onGenerated, onDismiss }: { onGenerated: () => voi
             borderColor: duration === d ? THEME_COLORS.gold : THEME_COLORS.border,
             backgroundColor: duration === d ? THEME_COLORS.goldDim : THEME_COLORS.bg3,
           }}>
-            <Text style={{ color: duration === d ? THEME_COLORS.gold : THEME_COLORS.text2, fontFamily: 'Fraunces_700Bold', fontSize: 20 }}>{d}</Text>
+            <Text style={{ color: duration === d ? THEME_COLORS.gold : THEME_COLORS.text2, fontFamily: 'Newsreader_700Bold', fontSize: 20 }}>{d}</Text>
             <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 11, marginTop: 2 }}>days</Text>
           </Pressable>
         ))}
@@ -830,13 +830,13 @@ export default function DevotionalScreen() {
             <Icon name="back" size={16} color={THEME_COLORS.text2} />
           </Pressable>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 18, letterSpacing: -0.3 }} numberOfLines={1}>{plan.title || plan.theme}</Text>
+            <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 18, letterSpacing: -0.3 }} numberOfLines={1}>{plan.title || plan.theme}</Text>
             <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 12, marginTop: 1 }}>{plan.theme}</Text>
           </View>
           <View style={{ alignItems: 'center', backgroundColor: THEME_COLORS.goldDim, borderWidth: 1, borderColor: THEME_COLORS.goldBorder, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
               <Icon name="flame" size={14} color={THEME_COLORS.gold} />
-              <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Fraunces_700Bold', fontSize: 16 }}>{plan.streak}</Text>
+              <Text style={{ color: THEME_COLORS.gold, fontFamily: 'Newsreader_700Bold', fontSize: 16 }}>{plan.streak}</Text>
             </View>
             <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 9 }}>streak</Text>
           </View>

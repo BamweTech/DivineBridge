@@ -99,7 +99,7 @@ function LiveSessionBanner({
     >
       <PulsingDot size={8} />
       <View style={{ flex: 1 }}>
-        <Text style={{ color: '#34d399', fontFamily: 'Fraunces_700Bold', fontSize: 13 }}>
+        <Text style={{ color: '#34d399', fontFamily: 'Newsreader_700Bold', fontSize: 13 }}>
           Live prayer session
         </Text>
         <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 11, marginTop: 1 }}>
@@ -998,7 +998,7 @@ export default function GroupScreen() {
         </View>
 
         <Pressable style={{ flex: 1 }} onPress={() => setShowMembersSheet(true)}>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 16 }} numberOfLines={1}>
+          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 16 }} numberOfLines={1}>
             {group?.name ?? 'Group Chat'}
           </Text>
           {group && (
@@ -1123,7 +1123,7 @@ export default function GroupScreen() {
             >
               <Icon name="minimize" size={18} color={THEME_COLORS.text2} />
             </Pressable>
-            <Text style={{ flex: 1, color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 16 }} numberOfLines={1}>
+            <Text style={{ flex: 1, color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 16 }} numberOfLines={1}>
               Live — {group?.name ?? 'Group'}
             </Text>
           </View>

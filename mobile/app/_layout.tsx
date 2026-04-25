@@ -18,12 +18,12 @@ import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persi
 import NetInfo from '@react-native-community/netinfo';
 import {
   useFonts,
-  Fraunces_400Regular,
-  Fraunces_500Medium,
-  Fraunces_600SemiBold,
-  Fraunces_700Bold,
-  Fraunces_400Regular_Italic,
-} from '@expo-google-fonts/fraunces';
+  Newsreader_400Regular,
+  Newsreader_500Medium,
+  Newsreader_600SemiBold,
+  Newsreader_700Bold,
+  Newsreader_400Regular_Italic,
+} from '@expo-google-fonts/newsreader';
 import {
   InterTight_400Regular,
   InterTight_500Medium,
@@ -183,7 +183,7 @@ function JoinGroupModal({
           {joining ? (
             <View style={{ alignItems: 'center', paddingVertical: 32 }}>
               <ActivityIndicator color={THEME_COLORS.gold} style={{ marginBottom: 16 }} />
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_600SemiBold', fontSize: 16 }}>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_600SemiBold', fontSize: 16 }}>
                 Joining group…
               </Text>
             </View>
@@ -192,7 +192,7 @@ function JoinGroupModal({
               <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: THEME_COLORS.sageDim, borderWidth: 1, borderColor: 'rgba(74,124,94,0.22)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                 <Icon name="groups" size={28} color={THEME_COLORS.sage} />
               </View>
-              <Text style={{ color: THEME_COLORS.sage, fontFamily: 'Fraunces_700Bold', fontSize: 22, marginBottom: 6 }}>
+              <Text style={{ color: THEME_COLORS.sage, fontFamily: 'Newsreader_700Bold', fontSize: 22, marginBottom: 6 }}>
                 You joined {groupName}!
               </Text>
               <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 14 }}>
@@ -204,7 +204,7 @@ function JoinGroupModal({
               <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: 'rgba(180,80,60,0.08)', borderWidth: 1, borderColor: 'rgba(180,80,60,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                 <Icon name="cross" size={28} color="#b4503c" />
               </View>
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Fraunces_700Bold', fontSize: 18, marginBottom: 6, textAlign: 'center' }}>
+              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 18, marginBottom: 6, textAlign: 'center' }}>
                 Could not join group
               </Text>
               <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 14, textAlign: 'center', marginBottom: 24 }}>
@@ -266,11 +266,11 @@ function RootLayoutInner() {
   useGroupChatNotifications();
 
   const [fontsLoaded, fontError] = useFonts({
-    Fraunces_400Regular,
-    Fraunces_500Medium,
-    Fraunces_600SemiBold,
-    Fraunces_700Bold,
-    Fraunces_400Regular_Italic,
+    Newsreader_400Regular,
+    Newsreader_500Medium,
+    Newsreader_600SemiBold,
+    Newsreader_700Bold,
+    Newsreader_400Regular_Italic,
     InterTight_400Regular,
     InterTight_500Medium,
     InterTight_600SemiBold,

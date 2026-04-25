@@ -94,7 +94,7 @@ export default function SignupScreen() {
             style={{
               color: THEME_COLORS.text,
               fontSize: 26,
-              fontFamily: 'Fraunces_700Bold',
+              fontFamily: 'Newsreader_700Bold',
               textAlign: 'center',
               letterSpacing: -0.5,
               marginBottom: 8,
