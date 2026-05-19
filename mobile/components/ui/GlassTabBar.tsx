@@ -22,17 +22,18 @@ export function GlassTabBar() {
   return (
     <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
       <BlurView
-        intensity={80}
+        intensity={95}
         tint="light"
         experimentalBlurMethod={ANDROID_BLUR_METHOD}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
       />
-      {/* Cream tint atop the blur — keeps cream-on-cream from disappearing. */}
+      {/* Thin cream tint over the blur — just enough to keep icons legible
+          on top of scrolling content without smothering the blur. */}
       <View
         pointerEvents="none"
         style={{
           position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(250,246,239,0.55)',
+          backgroundColor: 'rgba(250,246,239,0.28)',
         }}
       />
     </View>

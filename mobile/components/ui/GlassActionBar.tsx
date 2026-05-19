@@ -28,15 +28,15 @@ export function GlassActionBar({ children, style, radius = 20 }: GlassActionBarP
         {
           borderRadius: radius,
           overflow: 'hidden',
-          backgroundColor: 'rgba(255,253,247,0.32)',
+          backgroundColor: 'rgba(255,253,247,0.18)',
           borderWidth: 1,
-          borderColor: 'rgba(44,36,23,0.10)',
+          borderColor: 'rgba(44,36,23,0.09)',
         },
         style,
       ]}
     >
       <BlurView
-        intensity={50}
+        intensity={65}
         tint="light"
         experimentalBlurMethod={ANDROID_BLUR_METHOD}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
@@ -46,7 +46,7 @@ export function GlassActionBar({ children, style, radius = 20 }: GlassActionBarP
         pointerEvents="none"
         style={{
           position: 'absolute', top: 0, left: 0, right: 0, height: 1,
-          backgroundColor: 'rgba(255,255,255,0.75)',
+          backgroundColor: 'rgba(255,255,255,0.55)',
         }}
       />
       {children}

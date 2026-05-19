@@ -56,6 +56,69 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 
+// ─── Page ambience — soft drifting tinted blobs behind the scroll ───────────
+// Glass blurs whatever is behind it. On a flat cream canvas there is nothing
+// to reveal, so cards stop reading as glass. These low-opacity blobs give every
+// glass surface on the page real color to filter through — same trick iOS uses
+// to make Control Center glass pop on top of the wallpaper.
+
+function HomeAmbience() {
+  const d1 = useSharedValue(0);
+  const d2 = useSharedValue(0);
+  const d3 = useSharedValue(0);
+
+  useEffect(() => {
+    d1.value = withRepeat(withTiming(1, { duration: 14000, easing: Easing.inOut(Easing.ease) }), -1, true);
+    d2.value = withRepeat(withDelay(900, withTiming(1, { duration: 17000, easing: Easing.inOut(Easing.ease) })), -1, true);
+    d3.value = withRepeat(withDelay(1800, withTiming(1, { duration: 19000, easing: Easing.inOut(Easing.ease) })), -1, true);
+  }, []);
+
+  const gold = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: interpolate(d1.value, [0, 1], [-30, 40]) },
+      { translateY: interpolate(d1.value, [0, 1], [-20, 30]) },
+    ],
+  }));
+  const sage = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: interpolate(d2.value, [0, 1], [30, -20]) },
+      { translateY: interpolate(d2.value, [0, 1], [10, -30]) },
+    ],
+  }));
+  const rose = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: interpolate(d3.value, [0, 1], [-15, 25]) },
+      { translateY: interpolate(d3.value, [0, 1], [20, -10]) },
+    ],
+  }));
+
+  return (
+    <View
+      pointerEvents="none"
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}
+    >
+      <Animated.View
+        style={[
+          { position: 'absolute', top: -120, right: -100, width: 360, height: 360, borderRadius: 180, backgroundColor: 'rgba(201,146,48,0.22)' },
+          gold,
+        ]}
+      />
+      <Animated.View
+        style={[
+          { position: 'absolute', top: '38%', left: -120, width: 320, height: 320, borderRadius: 160, backgroundColor: 'rgba(74,124,94,0.16)' },
+          sage,
+        ]}
+      />
+      <Animated.View
+        style={[
+          { position: 'absolute', bottom: -100, right: -80, width: 340, height: 340, borderRadius: 170, backgroundColor: 'rgba(176,90,80,0.14)' },
+          rose,
+        ]}
+      />
+    </View>
+  );
+}
+
 // ─── Verse hero — animated blobs (parallax-tied) ─────────────────────────────
 
 function VerseHeroBlobs({ scrollY }: { scrollY: SharedValue<number> }) {
@@ -557,16 +620,20 @@ export default function HomeScreen() {
         : String(wallPrayLast7);
 
   return (
-    <AnimatedScrollView
-      style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}
-      contentContainerStyle={{
-        paddingTop: insets.top + 12,
-        paddingBottom: insets.bottom + 96,
-      }}
-      showsVerticalScrollIndicator={false}
-      onScroll={scrollHandler}
-      scrollEventThrottle={16}
-      refreshControl={
+    <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}>
+      {/* Ambient color so glass surfaces have something to filter. */}
+      <HomeAmbience />
+
+      <AnimatedScrollView
+        style={{ flex: 1, backgroundColor: 'transparent' }}
+        contentContainerStyle={{
+          paddingTop: insets.top + 12,
+          paddingBottom: insets.bottom + 96,
+        }}
+        showsVerticalScrollIndicator={false}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        refreshControl={
         <RefreshControl
           refreshing={pullRefreshing}
           onRefresh={async () => {
@@ -1052,5 +1119,6 @@ export default function HomeScreen() {
         )}
       </Animated.View>
     </AnimatedScrollView>
+    </View>
   );
 }

@@ -31,39 +31,41 @@ interface GlassCardProps {
   bordered?: boolean;
 }
 
+// iOS Material-thin alphas (~0.18 – 0.28) — anything higher buries the blur
+// underneath the tint and the card stops reading as glass.
 const TONE: Record<GlassTone, { fill: string; border: string; highlight: string }> = {
   default: {
-    fill:      'rgba(255,253,247,0.55)',
-    border:    'rgba(44,36,23,0.10)',
-    highlight: 'rgba(255,255,255,0.72)',
+    fill:      'rgba(255,253,247,0.22)',
+    border:    'rgba(44,36,23,0.09)',
+    highlight: 'rgba(255,255,255,0.55)',
   },
   warm: {
-    fill:      'rgba(252,244,228,0.62)',
-    border:    'rgba(44,36,23,0.10)',
-    highlight: 'rgba(255,255,255,0.75)',
+    fill:      'rgba(252,244,228,0.26)',
+    border:    'rgba(44,36,23,0.09)',
+    highlight: 'rgba(255,255,255,0.58)',
   },
   gold: {
-    fill:      'rgba(252,243,220,0.55)',
-    border:    'rgba(176,125,32,0.22)',
-    highlight: 'rgba(255,238,196,0.80)',
+    fill:      'rgba(252,243,220,0.24)',
+    border:    'rgba(176,125,32,0.20)',
+    highlight: 'rgba(255,238,196,0.65)',
   },
   sage: {
-    fill:      'rgba(232,242,236,0.55)',
-    border:    'rgba(74,124,94,0.20)',
-    highlight: 'rgba(255,255,255,0.72)',
+    fill:      'rgba(232,242,236,0.24)',
+    border:    'rgba(74,124,94,0.18)',
+    highlight: 'rgba(255,255,255,0.55)',
   },
   rose: {
-    fill:      'rgba(247,234,232,0.55)',
-    border:    'rgba(176,90,80,0.20)',
-    highlight: 'rgba(255,255,255,0.70)',
+    fill:      'rgba(247,234,232,0.24)',
+    border:    'rgba(176,90,80,0.18)',
+    highlight: 'rgba(255,255,255,0.55)',
   },
 };
 
 const INTENSITY: Record<GlassIntensity, number> = {
-  subtle: 25,   // ambient surface
-  card:   40,   // standard card
-  bar:    50,   // action bar `saturate(180%) blur(16px)` equivalent
-  heavy:  80,   // tab bar / sheet — `saturate(200%) blur(40px)` equivalent
+  subtle: 35,   // ambient surface
+  card:   55,   // standard card — `saturate(180%) blur(16px)` equivalent
+  bar:    65,   // action bar
+  heavy:  90,   // tab bar / sheet — `saturate(200%) blur(40px)` equivalent
 };
 
 /** Use the modern Android blur backend on API 31+ where it actually composites. */

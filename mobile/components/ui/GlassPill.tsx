@@ -11,11 +11,12 @@ import { BlurView } from 'expo-blur';
 
 export type GlassPillTone = 'default' | 'gold' | 'sage' | 'rose';
 
+// Same iOS-material-thin alphas as GlassCard so pills read as glass too.
 const TONE: Record<GlassPillTone, { fill: string; border: string }> = {
-  default: { fill: 'rgba(255,253,247,0.45)', border: 'rgba(44,36,23,0.10)' },
-  gold:    { fill: 'rgba(252,243,220,0.55)', border: 'rgba(176,125,32,0.30)' },
-  sage:    { fill: 'rgba(232,242,236,0.55)', border: 'rgba(74,124,94,0.25)'  },
-  rose:    { fill: 'rgba(247,234,232,0.55)', border: 'rgba(176,90,80,0.25)'  },
+  default: { fill: 'rgba(255,253,247,0.22)', border: 'rgba(44,36,23,0.09)' },
+  gold:    { fill: 'rgba(252,243,220,0.26)', border: 'rgba(176,125,32,0.28)' },
+  sage:    { fill: 'rgba(232,242,236,0.26)', border: 'rgba(74,124,94,0.22)'  },
+  rose:    { fill: 'rgba(247,234,232,0.26)', border: 'rgba(176,90,80,0.22)'  },
 };
 
 const ANDROID_BLUR_METHOD = Platform.OS === 'android' && (Platform.Version as number) >= 31
@@ -56,7 +57,7 @@ export function GlassPill({
   const inner = (
     <>
       <BlurView
-        intensity={30}
+        intensity={55}
         tint="light"
         experimentalBlurMethod={ANDROID_BLUR_METHOD}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
@@ -65,7 +66,7 @@ export function GlassPill({
         pointerEvents="none"
         style={{
           position: 'absolute', top: 0, left: 0, right: 0, height: 1,
-          backgroundColor: 'rgba(255,255,255,0.72)',
+          backgroundColor: 'rgba(255,255,255,0.55)',
         }}
       />
       {children}
