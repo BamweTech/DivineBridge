@@ -1,6 +1,5 @@
 import { View, Platform, type ViewStyle, type StyleProp } from 'react-native';
 import { BlurView, type BlurTint } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 
 /**
  * Cream-tinted glassmorphism primitive.
@@ -106,12 +105,12 @@ export function GlassCard({
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
       />
       {highlight && (
-        <LinearGradient
-          colors={[t.highlight, 'rgba(255,255,255,0)']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
+        <View
           pointerEvents="none"
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1 }}
+          style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+            backgroundColor: t.highlight,
+          }}
         />
       )}
       {children}

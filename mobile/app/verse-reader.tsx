@@ -10,7 +10,6 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import dayjs from 'dayjs';
@@ -131,13 +130,15 @@ export default function VerseReaderScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}>
-      {/* Warm ambient gradient backdrop */}
-      <LinearGradient
-        colors={['#fbf2da', '#faf6ef', '#f6e6c0']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+    <View style={{ flex: 1, backgroundColor: '#fbf2da' }}>
+      {/* Soft warm wash anchored to the bottom — gives the sheet a hint of depth
+          without needing a native gradient module. */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0, height: '55%',
+          backgroundColor: 'rgba(246,230,192,0.55)',
+        }}
       />
 
       {/* Top bar: close + share */}

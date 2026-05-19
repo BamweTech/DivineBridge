@@ -1,6 +1,5 @@
 import { View, Pressable, Platform, type ViewStyle, type StyleProp } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 
 /**
  * Compact frosted pill — used for cap labels (e.g. "DAILY VERSE"), the
@@ -62,12 +61,12 @@ export function GlassPill({
         experimentalBlurMethod={ANDROID_BLUR_METHOD}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
       />
-      <LinearGradient
-        colors={['rgba(255,255,255,0.72)', 'rgba(255,255,255,0)']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
+      <View
         pointerEvents="none"
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1 }}
+        style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+          backgroundColor: 'rgba(255,255,255,0.72)',
+        }}
       />
       {children}
     </>

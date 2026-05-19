@@ -14,7 +14,6 @@ import {
 import type { AppStateStatus } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   FadeInDown,
   FadeIn,
@@ -661,15 +660,24 @@ export default function HomeScreen() {
                 height: heroHeight,
                 borderRadius: 28,
                 overflow: 'hidden',
-                backgroundColor: '#fbf2da',
+                backgroundColor: '#f6e6c0',
               }}
             >
-              {/* Warm gradient backdrop */}
-              <LinearGradient
-                colors={['#fdf6e2', '#f6e6c0', '#efd9a0']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+              {/* Soft cream wash atop the base tone, sized to fake a top-down gradient. */}
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute', top: 0, left: 0, right: 0, height: '55%',
+                  backgroundColor: 'rgba(253,246,226,0.65)',
+                }}
+              />
+              {/* Slightly deeper warm wash anchored to the bottom. */}
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute', bottom: 0, left: 0, right: 0, height: '45%',
+                  backgroundColor: 'rgba(239,217,160,0.45)',
+                }}
               />
 
               {/* Animated parallax blobs */}

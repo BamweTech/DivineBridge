@@ -1,6 +1,5 @@
 import { View, Platform, type ViewStyle, type StyleProp } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 
 /**
  * Frosted action bar.
@@ -42,13 +41,13 @@ export function GlassActionBar({ children, style, radius = 20 }: GlassActionBarP
         experimentalBlurMethod={ANDROID_BLUR_METHOD}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
       />
-      {/* Top-edge highlight — the lit-glass shimmer */}
-      <LinearGradient
-        colors={['rgba(255,255,255,0.75)', 'rgba(255,255,255,0)']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
+      {/* Top-edge highlight — 1px hairline of near-white to mimic the lit-glass shimmer. */}
+      <View
         pointerEvents="none"
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1 }}
+        style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+          backgroundColor: 'rgba(255,255,255,0.75)',
+        }}
       />
       {children}
     </View>
