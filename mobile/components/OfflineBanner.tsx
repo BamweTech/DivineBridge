@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFontStyle } from '@/lib/typography';
 
 export function OfflineBanner() {
   const { isConnected } = useNetworkStatus();
@@ -23,7 +24,7 @@ const styles = StyleSheet.create({
   },
   text: {
     color: '#fff',
-    fontFamily: 'InterTight_500Medium',
+    ...iosFontStyle('500'),
     fontSize: 13,
   },
 });

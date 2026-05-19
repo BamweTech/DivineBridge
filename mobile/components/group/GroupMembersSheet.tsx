@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFontStyle } from '@/lib/typography';
 import { Avatar } from '@/components/ui/Avatar';
 import type { GroupMember } from '@/types';
 
@@ -42,10 +43,10 @@ export function GroupMembersSheet({
           }}
         >
           <View style={{ width: 36, height: 4, backgroundColor: THEME_COLORS.border, borderRadius: 2, alignSelf: 'center', marginBottom: 18 }} />
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 18 }}>
+          <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 18 }}>
             {groupName}
           </Text>
-          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 13, marginTop: 4, marginBottom: 14 }}>
+          <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 13, marginTop: 4, marginBottom: 14 }}>
             {loading ? 'Loading members...' : `${members.length} ${members.length === 1 ? 'member' : 'members'}`}
           </Text>
           <ScrollView showsVerticalScrollIndicator={false}>
@@ -66,10 +67,10 @@ export function GroupMembersSheet({
                 >
                   <Avatar name={member.display_name} photoUrl={member.photo_url} size={34} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_600SemiBold', fontSize: 14 }}>
+                    <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('600'), fontSize: 14 }}>
                       {member.display_name}
                     </Text>
-                    <Text style={{ color: member.role === 'admin' ? THEME_COLORS.gold : THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 12, marginTop: 2 }}>
+                    <Text style={{ color: member.role === 'admin' ? THEME_COLORS.gold : THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 2 }}>
                       {member.role === 'admin' ? 'Admin' : 'Member'}
                     </Text>
                   </View>

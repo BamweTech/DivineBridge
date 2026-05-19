@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { startCallRingtone, stopCallRingtone } from '@/lib/callRingtone';
 import Icon from '@/components/ui/Icon';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFontStyle } from '@/lib/typography';
 
 type Props = {
   groupId: string;
@@ -70,10 +71,10 @@ export function GroupCallBanner({ groupId, groupName, hostName, onDismiss }: Pro
       </Animated.View>
 
       <View style={{ flex: 1 }}>
-        <Text style={{ color: '#fff', fontFamily: 'InterTight_600SemiBold', fontSize: 14 }} numberOfLines={1}>
+        <Text style={{ color: '#fff', ...iosFontStyle('600'), fontSize: 14 }} numberOfLines={1}>
           {groupName}
         </Text>
-        <Text style={{ color: THEME_COLORS.sage, fontFamily: 'InterTight_400Regular', fontSize: 12, marginTop: 2 }} numberOfLines={1}>
+        <Text style={{ color: THEME_COLORS.sage, ...iosFontStyle('400'), fontSize: 12, marginTop: 2 }} numberOfLines={1}>
           {hostName} started a live prayer
         </Text>
       </View>
@@ -91,7 +92,7 @@ export function GroupCallBanner({ groupId, groupName, hostName, onDismiss }: Pro
         }}
         hitSlop={8}
       >
-        <Text style={{ color: '#fff', fontFamily: 'InterTight_600SemiBold', fontSize: 13 }}>Join</Text>
+        <Text style={{ color: '#fff', ...iosFontStyle('600'), fontSize: 13 }}>Join</Text>
       </Pressable>
 
       <Pressable onPress={dismiss} hitSlop={8}>

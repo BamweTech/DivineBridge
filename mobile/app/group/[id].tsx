@@ -70,6 +70,7 @@ import {
 import { PulsingDot } from '@/components/ui/PulsingDot';
 import { useAuthStore } from '@/stores/authStore';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFontStyle, iosFontStyleItalic } from '@/lib/typography';
 import Icon from '@/components/ui/Icon';
 import type { PrayerGroup, GroupChatAttachment, GroupChatMessage, GroupChatReplyRef } from '@/types';
 
@@ -99,10 +100,10 @@ function LiveSessionBanner({
     >
       <PulsingDot size={8} />
       <View style={{ flex: 1 }}>
-        <Text style={{ color: '#34d399', fontFamily: 'Newsreader_700Bold', fontSize: 13 }}>
+        <Text style={{ color: '#34d399', ...iosFontStyle('700'), fontSize: 13 }}>
           Live prayer session
         </Text>
-        <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 11, marginTop: 1 }}>
+        <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 11, marginTop: 1 }}>
           {participantCount > 0
             ? `${participantCount} ${participantCount === 1 ? 'person' : 'people'} praying now`
             : 'Tap to join'}
@@ -117,7 +118,7 @@ function LiveSessionBanner({
           borderRadius: 10,
           backgroundColor: '#34d399',
         }}>
-          <Text style={{ color: '#fff', fontFamily: 'InterTight_600SemiBold', fontSize: 12 }}>Join</Text>
+          <Text style={{ color: '#fff', ...iosFontStyle('600'), fontSize: 12 }}>Join</Text>
         </View>
       )}
     </Pressable>
@@ -931,7 +932,7 @@ export default function GroupScreen() {
       <Icon name="gathering" size={48} color={THEME_COLORS.text3} />
       <Text style={{
         color: THEME_COLORS.text2,
-        fontFamily: 'InterTight_500Medium',
+        ...iosFontStyle('500'),
         fontSize: 15,
         marginTop: 16,
         textAlign: 'center',
@@ -998,11 +999,11 @@ export default function GroupScreen() {
         </View>
 
         <Pressable style={{ flex: 1 }} onPress={() => setShowMembersSheet(true)}>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 16 }} numberOfLines={1}>
+          <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 16 }} numberOfLines={1}>
             {group?.name ?? 'Group Chat'}
           </Text>
           {group && (
-            <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 11, marginTop: 1 }}>
+            <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 11, marginTop: 1 }}>
               {group.member_count} {group.member_count === 1 ? 'member' : 'members'}
             </Text>
           )}
@@ -1123,7 +1124,7 @@ export default function GroupScreen() {
             >
               <Icon name="minimize" size={18} color={THEME_COLORS.text2} />
             </Pressable>
-            <Text style={{ flex: 1, color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 16 }} numberOfLines={1}>
+            <Text style={{ flex: 1, color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 16 }} numberOfLines={1}>
               Live — {group?.name ?? 'Group'}
             </Text>
           </View>
@@ -1167,7 +1168,7 @@ export default function GroupScreen() {
               }}
             >
               <Icon name="chat" size={16} color={THEME_COLORS.gold} />
-              <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_600SemiBold', fontSize: 13 }}>
+              <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('600'), fontSize: 13 }}>
                 {fsChatOpen ? 'Hide group chat' : 'Show group chat'}
               </Text>
               <Icon name={fsChatOpen ? 'chevron-d' : 'chevron-r'} size={14} color={THEME_COLORS.text3} />
@@ -1236,7 +1237,7 @@ export default function GroupScreen() {
                         paddingHorizontal: 16,
                         paddingVertical: 10,
                         color: THEME_COLORS.text,
-                        fontFamily: 'InterTight_400Regular',
+                        ...iosFontStyle('400'),
                         fontSize: 14,
                         maxHeight: 88,
                         borderWidth: 1,
@@ -1309,7 +1310,7 @@ export default function GroupScreen() {
             style={{
               flex: 1, backgroundColor: THEME_COLORS.bg2, borderRadius: 20,
               paddingHorizontal: 16, paddingVertical: 10,
-              color: THEME_COLORS.text, fontFamily: 'InterTight_400Regular', fontSize: 14,
+              color: THEME_COLORS.text, ...iosFontStyle('400'), fontSize: 14,
               maxHeight: 100, borderWidth: 1, borderColor: THEME_COLORS.border,
             }}
             multiline
@@ -1429,7 +1430,7 @@ export default function GroupScreen() {
                     top: insets.top + 48,
                     alignSelf: 'center',
                     color: 'rgba(255,255,255,0.75)',
-                    fontFamily: 'InterTight_500Medium',
+                    ...iosFontStyle('500'),
                     fontSize: 13,
                   }}
                 >
@@ -1461,7 +1462,7 @@ export default function GroupScreen() {
               ) : (
                 <Icon name="share" size={16} color="#fff" />
               )}
-              <Text style={{ color: '#fff', fontFamily: 'InterTight_500Medium', fontSize: 14 }}>Share file</Text>
+              <Text style={{ color: '#fff', ...iosFontStyle('500'), fontSize: 14 }}>Share file</Text>
             </Pressable>
             <Pressable
               onPress={() => { void handleSaveMedia(); }}
@@ -1478,7 +1479,7 @@ export default function GroupScreen() {
               ) : (
                 <Icon name="download" size={16} color="#fff" />
               )}
-              <Text style={{ color: '#fff', fontFamily: 'InterTight_500Medium', fontSize: 14 }}>Save</Text>
+              <Text style={{ color: '#fff', ...iosFontStyle('500'), fontSize: 14 }}>Save</Text>
             </Pressable>
           </View>
         </View>

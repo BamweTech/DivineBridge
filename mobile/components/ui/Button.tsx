@@ -2,6 +2,7 @@ import { Pressable, Text, ActivityIndicator, ViewStyle, StyleProp } from 'react-
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFont } from '@/lib/typography';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -101,7 +102,8 @@ export function Button({
           style={{
             color: v.text,
             fontSize: s.fontSize,
-            fontFamily: 'InterTight_500Medium',
+            fontFamily: iosFont('500'),
+            fontWeight: '500',
             letterSpacing: 0.4,
           }}
         >

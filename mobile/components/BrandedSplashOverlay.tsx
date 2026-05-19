@@ -9,6 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import DivineBridgeLogo from '@/components/ui/DivineBridgeLogo';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFontStyle } from '@/lib/typography';
 
 const LOGO_SIZE = 80;
 const GAP = 18;
@@ -127,7 +128,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: THEME_COLORS.text,
-    fontFamily: 'Newsreader_700Bold',
+    ...iosFontStyle('700'),
     fontSize: 38,
     letterSpacing: -0.5,
     width: '100%',

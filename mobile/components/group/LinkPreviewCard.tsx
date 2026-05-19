@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, Pressable, Linking, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFontStyle } from '@/lib/typography';
 
 type OgData = {
   title?: string;
@@ -170,7 +171,7 @@ export function LinkPreviewCard({ url }: Props) {
           numberOfLines={4}
           style={{
             color: THEME_COLORS.gold,
-            fontFamily: 'InterTight_500Medium',
+            ...iosFontStyle('500'),
             fontSize: 14,
             lineHeight: 20,
             textDecorationLine: 'underline',
@@ -196,7 +197,7 @@ export function LinkPreviewCard({ url }: Props) {
           <Text
             style={{
               color: THEME_COLORS.text3,
-              fontFamily: 'InterTight_500Medium',
+              ...iosFontStyle('500'),
               fontSize: 10,
               textTransform: 'uppercase',
               letterSpacing: 0.5,
@@ -210,7 +211,7 @@ export function LinkPreviewCard({ url }: Props) {
           <Text
             style={{
               color: THEME_COLORS.text,
-              fontFamily: 'InterTight_600SemiBold',
+              ...iosFontStyle('600'),
               fontSize: 13,
               lineHeight: 18,
             }}
@@ -223,7 +224,7 @@ export function LinkPreviewCard({ url }: Props) {
           <Text
             style={{
               color: THEME_COLORS.text2,
-              fontFamily: 'InterTight_400Regular',
+              ...iosFontStyle('400'),
               fontSize: 12,
               lineHeight: 16,
               marginTop: 1,

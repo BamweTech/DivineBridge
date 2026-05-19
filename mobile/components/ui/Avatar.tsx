@@ -1,6 +1,7 @@
 import { View, Text } from 'react-native';
 import { Image } from 'expo-image';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFont } from '@/lib/typography';
 
 const AVATAR_COLORS = [
   '#b07d20', '#4a7c5e', '#7040b8', '#b05a50',
@@ -94,7 +95,8 @@ export function Avatar({ name, photoUrl, size = 40, showSpeakingRing, isOnline }
           <Text
             style={{
               color: '#fff',
-              fontFamily: 'InterTight_700Bold',
+              fontFamily: iosFont('700'),
+              fontWeight: '700',
               fontSize: size * 0.36,
               lineHeight: size * 0.36 * 1.2,
             }}

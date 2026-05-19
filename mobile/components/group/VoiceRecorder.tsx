@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, cancelAnimation } from 'react-native-reanimated';
 import Icon from '@/components/ui/Icon';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFontStyle } from '@/lib/typography';
 
 const MAX_DURATION_MS = 120_000;
 
@@ -172,10 +173,10 @@ export function VoiceRecorder({ onSend }: VoiceRecorderProps) {
 
       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Animated.View style={[{ width: 10, height: 10, borderRadius: 5, backgroundColor: THEME_COLORS.rose }, pulseStyle]} />
-        <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_600SemiBold', fontSize: 15 }}>
+        <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('600'), fontSize: 15 }}>
           {formatTime(elapsed)}
         </Text>
-        <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 12 }}>
+        <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12 }}>
           / {formatTime(MAX_DURATION_MS)}
         </Text>
       </View>

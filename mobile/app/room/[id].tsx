@@ -21,6 +21,7 @@ import { usePrayerRoom } from '@/hooks/usePrayerRoom';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuthStore } from '@/stores/authStore';
 import { THEME_COLORS, ROOM_MODES, MESSAGE_TYPES } from '@/lib/constants';
+import { iosFontStyle, iosFontStyleItalic } from '@/lib/typography';
 import { presentPrayerRoomBackgroundNotice } from '@/lib/roomChatNotify';
 import Icon from '@/components/ui/Icon';
 import type { Participant } from '@/types';
@@ -101,13 +102,13 @@ function ControlButton({
               borderColor: THEME_COLORS.bg,
             }}
           >
-            <Text style={{ color: '#fff', fontFamily: 'InterTight_700Bold', fontSize: 9 }}>
+            <Text style={{ color: '#fff', ...iosFontStyle('700'), fontSize: 9 }}>
               {badgeCount > 9 ? '9+' : badgeCount}
             </Text>
           </View>
         ) : null}
       </View>
-      <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 10 }}>{label}</Text>
+      <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 10 }}>{label}</Text>
     </Pressable>
   );
 }
@@ -129,13 +130,13 @@ function ParticipantTile({ participant, isActiveSpeaker }: { participant: Partic
       </View>
       <Text
         numberOfLines={1}
-        style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 11, marginTop: 4, textAlign: 'center' }}
+        style={{ color: THEME_COLORS.text2, ...iosFontStyle('400'), fontSize: 11, marginTop: 4, textAlign: 'center' }}
       >
         {participant.user_name.split(' ')[0]}
       </Text>
       {participant.is_host && (
         <View style={{ paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5, backgroundColor: THEME_COLORS.goldDim, marginTop: 2 }}>
-          <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_600SemiBold', fontSize: 8, letterSpacing: 0.5 }}>HOST</Text>
+          <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600'), fontSize: 8, letterSpacing: 0.5 }}>HOST</Text>
         </View>
       )}
       {participant.is_muted && (
@@ -160,7 +161,7 @@ function ModeTransitionToast({ message }: { message: string }) {
         zIndex: 100,
       }}
     >
-      <Text style={{ color: '#ffffff', fontFamily: 'InterTight_600SemiBold', fontSize: 13 }}>
+      <Text style={{ color: '#ffffff', ...iosFontStyle('600'), fontSize: 13 }}>
         {message}
       </Text>
     </Animated.View>
@@ -198,7 +199,7 @@ function RoomMessageToast({
         shadowRadius: 8,
       }}
     >
-      <Text style={{ color: '#ffffff', fontFamily: 'InterTight_600SemiBold', fontSize: 13, textAlign: 'center' }} numberOfLines={4}>
+      <Text style={{ color: '#ffffff', ...iosFontStyle('600'), fontSize: 13, textAlign: 'center' }} numberOfLines={4}>
         {message}
       </Text>
     </Animated.View>
@@ -393,18 +394,18 @@ export default function RoomScreen() {
         <View style={{ width: 72, height: 72, borderRadius: 22, backgroundColor: THEME_COLORS.bg3, alignItems: 'center', justifyContent: 'center', marginBottom: 20, borderWidth: 1, borderColor: THEME_COLORS.border }}>
           <Icon name="settings" size={32} color={THEME_COLORS.text3} />
         </View>
-        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 22, textAlign: 'center', marginBottom: 12 }}>
+        <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 22, textAlign: 'center', marginBottom: 12 }}>
           Development Build Required
         </Text>
-        <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 28 }}>
+        <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('400'), fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 28 }}>
           Live prayer rooms use native audio/video not available in Expo Go.{'\n\n'}
           Build the dev client to use this feature:{'\n'}
-          <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_600SemiBold' }}>
+          <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600') }}>
             npx eas build --profile development
           </Text>
         </Text>
         <Pressable onPress={() => router.back()} style={{ backgroundColor: THEME_COLORS.gold, borderRadius: 50, paddingHorizontal: 28, paddingVertical: 14 }}>
-          <Text style={{ color: '#ffffff', fontFamily: 'InterTight_700Bold', fontSize: 15 }}>Go Back</Text>
+          <Text style={{ color: '#ffffff', ...iosFontStyle('700'), fontSize: 15 }}>Go Back</Text>
         </Pressable>
       </View>
     );
@@ -418,10 +419,10 @@ export default function RoomScreen() {
         <View style={{ width: 80, height: 80, borderRadius: 26, backgroundColor: THEME_COLORS.sageDim, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(74,124,94,0.22)', marginBottom: 20 }}>
           <Icon name="live" size={36} color={THEME_COLORS.sage} />
         </View>
-        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 26, textAlign: 'center', marginBottom: 8 }}>
+        <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 26, textAlign: 'center', marginBottom: 8 }}>
           {room?.room_name ?? 'Prayer Room'}
         </Text>
-        <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 15, textAlign: 'center', marginBottom: 32 }}>
+        <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('400'), fontSize: 15, textAlign: 'center', marginBottom: 32 }}>
           {participants.length} {participants.length === 1 ? 'person' : 'people'} inside
         </Text>
         <Pressable
@@ -432,11 +433,11 @@ export default function RoomScreen() {
           {isJoining ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
-            <Text style={{ color: '#ffffff', fontFamily: 'InterTight_700Bold', fontSize: 16 }}>Join Room</Text>
+            <Text style={{ color: '#ffffff', ...iosFontStyle('700'), fontSize: 16 }}>Join Room</Text>
           )}
         </Pressable>
         <Pressable onPress={() => router.back()}>
-          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_500Medium', fontSize: 14 }}>Cancel</Text>
+          <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('500'), fontSize: 14 }}>Cancel</Text>
         </Pressable>
       </View>
     );
@@ -467,12 +468,12 @@ export default function RoomScreen() {
             <Icon name="back" size={16} color={THEME_COLORS.text2} />
           </Pressable>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 16 }} numberOfLines={1}>
+            <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 16 }} numberOfLines={1}>
               {room?.room_name}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 1 }}>
               <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: THEME_COLORS.sage }} />
-              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 11 }}>
+              <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 11 }}>
                 {participants.length} · {isGroupCall ? 'Group Call' : 'Prayer Room'}
               </Text>
             </View>
@@ -549,7 +550,7 @@ export default function RoomScreen() {
                         <Text
                           style={{
                             color: THEME_COLORS.rose,
-                            fontFamily: 'InterTight_500Medium',
+                            ...iosFontStyle('500'),
                             fontSize: 13,
                             lineHeight: 19,
                             textAlign: 'center',
@@ -565,7 +566,7 @@ export default function RoomScreen() {
                 return (
                   <Animated.View key={msg.message_id} entering={FadeInDown.duration(200)} style={{ marginBottom: 10, alignItems: isMe ? 'flex-end' : 'flex-start' }}>
                     {!isMe && (
-                      <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_500Medium', fontSize: 11, marginBottom: 3, marginLeft: 4 }}>
+                      <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('500'), fontSize: 11, marginBottom: 3, marginLeft: 4 }}>
                         {msg.user_name}
                       </Text>
                     )}
@@ -576,11 +577,11 @@ export default function RoomScreen() {
                       backgroundColor: isMe ? THEME_COLORS.goldDim : THEME_COLORS.bg2,
                       borderColor: isMe ? THEME_COLORS.goldBorder : THEME_COLORS.border,
                     }}>
-                      <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_400Regular', fontSize: 14, lineHeight: 20 }}>
+                      <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('400'), fontSize: 14, lineHeight: 20 }}>
                         {msg.message}
                       </Text>
                     </View>
-                    <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 10, marginTop: 3, marginHorizontal: 4 }}>
+                    <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 10, marginTop: 3, marginHorizontal: 4 }}>
                       {dayjs(msg.timestamp).format('h:mm A')}
                     </Text>
                   </Animated.View>
@@ -593,7 +594,7 @@ export default function RoomScreen() {
                 onChangeText={setChatText}
                 placeholder="Say something..."
                 placeholderTextColor={THEME_COLORS.text3}
-                style={{ flex: 1, backgroundColor: THEME_COLORS.bg2, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, color: THEME_COLORS.text, fontFamily: 'InterTight_400Regular', fontSize: 14, borderWidth: 1, borderColor: THEME_COLORS.border }}
+                style={{ flex: 1, backgroundColor: THEME_COLORS.bg2, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, color: THEME_COLORS.text, ...iosFontStyle('400'), fontSize: 14, borderWidth: 1, borderColor: THEME_COLORS.border }}
                 returnKeyType="send"
                 onSubmitEditing={handleSend}
               />
@@ -639,7 +640,7 @@ export default function RoomScreen() {
             )}
 
             {/* Speakers grid */}
-            <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_600SemiBold', fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 14 }}>
+            <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('600'), fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 14 }}>
               {speakers.length} {speakers.length === 1 ? 'Speaker' : 'Speakers'}
             </Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }}>
@@ -651,13 +652,13 @@ export default function RoomScreen() {
             {/* Listeners */}
             {participants.filter((p) => p.role === 'listener').length > 0 && (
               <>
-                <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_600SemiBold', fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12 }}>
+                <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('600'), fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12 }}>
                   {participants.filter((p) => p.role === 'listener').length} Listening
                 </Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                   {participants.filter((p) => p.role === 'listener').map((p) => (
                     <View key={p.user_id} style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, backgroundColor: THEME_COLORS.bg3, borderWidth: 1, borderColor: THEME_COLORS.border }}>
-                      <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 12 }}>
+                      <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('400'), fontSize: 12 }}>
                         {p.user_name.split(' ')[0]}
                       </Text>
                     </View>

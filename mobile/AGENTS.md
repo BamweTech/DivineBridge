@@ -38,11 +38,28 @@ To add a new screen, create a file in `app/` and register in the nearest `_layou
 
 - **NativeWind** (Tailwind for RN): Use `className` prop.
 - Global CSS in `app/_layout.tsx` via `import '../global.css'`.
-- Theme colors: `THEME_COLORS` from `lib/constants.ts`.
-- Fonts: **Newsreader** (serif — headings, titles, devotional long-form) and **Inter Tight** (sans — UI, chat, labels, forms). Loaded in root layout via `@expo-google-fonts/newsreader` and `@expo-google-fonts/inter-tight`.
-  - Tailwind tokens: `font-serif`, `font-serif-medium`, `font-serif-semibold`, `font-serif-bold`, `font-serif-italic` (Newsreader) and `font-sans`, `font-sans-medium`, `font-sans-semibold`, `font-sans-bold` (Inter Tight). Prefer these.
-  - Direct `fontFamily: 'Newsreader_XXX'` / `'InterTight_XXX'` strings are also valid when styling via inline style.
-  - Legacy `font-jakarta*` / `font-geist*` aliases remain as backwards-compatible shims mapped to Newsreader / Inter Tight; new code should use the semantic `serif` / `sans` tokens.
+- Theme colors: `THEME_COLORS` from `lib/constants.ts` (warm cream palette).
+
+### Typography — iOS type-role system (SF Pro)
+
+The app uses Apple's iOS typography system: **SF Pro** on iOS (via `'System'`) and **Nunito Sans** as the open-source fallback on Android. The canonical source is `lib/typography.ts`.
+
+- **`TYPE`** — nine iOS type roles (`largeTitle`, `title1`, `title2`, `title3`, `headline`, `body`, `callout`, `subheadline`, `footnote`, `caption1`, `caption2`, `capsLabel`) each carrying Apple's exact `fontSize` / `lineHeight` / `letterSpacing` / `fontWeight`. Spread inline:
+  ```tsx
+  <Text style={{ ...TYPE.headline, color: THEME_COLORS.text }}>Settings</Text>
+  ```
+- **`<AppText variant="…">`** (`components/ui/AppText.tsx`) — drop-in `Text` wrapper for the same roles; pass `tabular` for monospaced digit runs (streaks, counts, timers).
+- **`iosFontStyle('600')`** — `{ fontFamily, fontWeight }` for ad-hoc sizes. Used everywhere as the migration drop-in for legacy `fontFamily: 'InterTight_*'` / `'Newsreader_*'`.
+- Tailwind tokens (`font-sans*`, `font-serif*`) map to the SF Pro / Nunito Sans stack; the legacy `font-jakarta*` / `font-geist*` aliases have been removed. New code should prefer `TYPE.*` or `iosFontStyle()` over Tailwind font classes.
+
+### Glassmorphism primitives
+
+Cream-tinted iOS-style glass via `expo-blur`. All four live under `components/ui/`:
+
+- **`GlassCard`** — backdrop blur + cream tint + hairline border + top-edge highlight. Tones: `default | warm | gold | sage | rose`. Intensities: `subtle | card | bar | heavy`.
+- **`GlassActionBar`** — bottom-anchored action toolbar (the verse hero's row of Listen / Like / Share).
+- **`GlassPill`** — small frosted pill for cap labels, notification bell, status chips.
+- **`GlassTabBar`** — slotted into expo-router via `tabBarBackground={() => <GlassTabBar />}` with `tabBarStyle.position: 'absolute'` so content scrolls under it.
 
 ## Conventions
 

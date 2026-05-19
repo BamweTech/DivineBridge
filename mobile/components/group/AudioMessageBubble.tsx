@@ -4,6 +4,7 @@ import { Audio, AVPlaybackStatus } from 'expo-av';
 import Svg, { Circle } from 'react-native-svg';
 import Icon from '@/components/ui/Icon';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFontStyle } from '@/lib/typography';
 
 let activeSound: Audio.Sound | null = null;
 
@@ -143,7 +144,7 @@ export function AudioMessageBubble({ uri, isMe }: AudioMessageBubbleProps) {
         </View>
         <Text style={{
           color: THEME_COLORS.text3,
-          fontFamily: 'InterTight_400Regular',
+          ...iosFontStyle('400'),
           fontSize: 10,
         }}>
           {durationMs > 0 ? formatTime(playing ? positionMs : durationMs) : '—'}

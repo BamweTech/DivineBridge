@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text, Pressable } from 'react-native';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFontStyle } from '@/lib/typography';
 
 export function JumpToLatestButton({
   count,
@@ -30,7 +31,7 @@ export function JumpToLatestButton({
         elevation: 4,
       }}
     >
-      <Text style={{ color: '#fff', fontFamily: 'InterTight_600SemiBold', fontSize: 12 }}>
+      <Text style={{ color: '#fff', ...iosFontStyle('600'), fontSize: 12 }}>
         {count > 0 ? `${count} new` : 'Latest'}
       </Text>
       <Text style={{ color: '#fff', fontSize: 12 }}>↓</Text>

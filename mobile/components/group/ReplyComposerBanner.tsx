@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFontStyle } from '@/lib/typography';
 import Icon from '@/components/ui/Icon';
 import type { GroupChatMessage } from '@/types';
 import { buildReplyPreviewText } from '@/components/group/groupChatUtils';
@@ -32,12 +33,12 @@ export function ReplyComposerBanner({
           paddingLeft: 10,
         }}
       >
-        <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_600SemiBold', fontSize: 12 }}>
+        <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600'), fontSize: 12 }}>
           Replying to {target.user_name}
         </Text>
         <Text
           numberOfLines={2}
-          style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 12, marginTop: 2 }}
+          style={{ color: THEME_COLORS.text2, ...iosFontStyle('400'), fontSize: 12, marginTop: 2 }}
         >
           {buildReplyPreviewText(target)}
         </Text>

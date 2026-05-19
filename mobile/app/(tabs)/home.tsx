@@ -1,28 +1,50 @@
-import { ScrollView, View, Text, Pressable, RefreshControl, Alert, LayoutAnimation, UIManager, Platform, AppState } from 'react-native';
+import {
+  ScrollView,
+  View,
+  Text,
+  Pressable,
+  RefreshControl,
+  Alert,
+  LayoutAnimation,
+  UIManager,
+  Platform,
+  AppState,
+  useWindowDimensions,
+} from 'react-native';
 import type { AppStateStatus } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   FadeInDown,
+  FadeIn,
   useSharedValue,
   useAnimatedStyle,
   withRepeat,
   withTiming,
   withDelay,
+  withSequence,
   Easing,
   interpolate,
+  useAnimatedScrollHandler,
+  type SharedValue,
 } from 'react-native-reanimated';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import dayjs from 'dayjs';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { prayerApi, verseApi, prayerRequestApi } from '@/services/api';
 import { shareServerImage } from '@/lib/shareServerImage';
 import { getGreetingFirstName } from '@/lib/userDisplayName';
 import { useSpeechPlayback } from '@/hooks/useSpeechPlayback';
 import { useAuthStore } from '@/stores/authStore';
 import { THEME_COLORS } from '@/lib/constants';
+import { TYPE, iosFont } from '@/lib/typography';
+import { AppText } from '@/components/ui/AppText';
 import Icon from '@/components/ui/Icon';
+import { GlassCard } from '@/components/ui/GlassCard';
+import { GlassPill } from '@/components/ui/GlassPill';
+import { GlassActionBar } from '@/components/ui/GlassActionBar';
 import { useGroupUnread } from '@/contexts/GroupUnreadContext';
 import { useGroupLiveRooms } from '@/hooks/useGroups';
 import { useDevotionalStreak } from '@/hooks/useHomeStats';
@@ -33,64 +55,154 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-/* ── Floating geometric shapes for the Daily Verse card ── */
-function FloatingGeometrics() {
+const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
+
+// ─── Verse hero — animated blobs (parallax-tied) ─────────────────────────────
+
+function VerseHeroBlobs({ scrollY }: { scrollY: SharedValue<number> }) {
   const drift1 = useSharedValue(0);
   const drift2 = useSharedValue(0);
   const pulse = useSharedValue(0);
 
   useEffect(() => {
-    drift1.value = withRepeat(
-      withTiming(1, { duration: 8000, easing: Easing.inOut(Easing.ease) }),
-      -1, true,
-    );
-    drift2.value = withRepeat(
-      withDelay(600, withTiming(1, { duration: 10000, easing: Easing.inOut(Easing.ease) })),
-      -1, true,
-    );
-    pulse.value = withRepeat(
-      withTiming(1, { duration: 6000, easing: Easing.inOut(Easing.ease) }),
-      -1, true,
-    );
+    drift1.value = withRepeat(withTiming(1, { duration: 9000, easing: Easing.inOut(Easing.ease) }), -1, true);
+    drift2.value = withRepeat(withDelay(700, withTiming(1, { duration: 11000, easing: Easing.inOut(Easing.ease) })), -1, true);
+    pulse.value = withRepeat(withTiming(1, { duration: 6000, easing: Easing.inOut(Easing.ease) }), -1, true);
   }, []);
 
-  const circle1 = useAnimatedStyle(() => ({
+  const blob1 = useAnimatedStyle(() => ({
     transform: [
-      { translateX: interpolate(drift1.value, [0, 1], [0, 18]) },
-      { translateY: interpolate(drift1.value, [0, 1], [0, -14]) },
-      { scale: interpolate(pulse.value, [0, 1], [1, 1.12]) },
+      { translateX: interpolate(drift1.value, [0, 1], [0, 28]) },
+      { translateY: interpolate(drift1.value, [0, 1], [0, -22]) + scrollY.value * -0.15 },
+      { scale: interpolate(pulse.value, [0, 1], [1, 1.14]) },
     ],
-    opacity: interpolate(pulse.value, [0, 1], [0.36, 0.62]),
+    opacity: interpolate(pulse.value, [0, 1], [0.55, 0.78]),
   }));
 
-  const circle2 = useAnimatedStyle(() => ({
+  const blob2 = useAnimatedStyle(() => ({
     transform: [
-      { translateX: interpolate(drift2.value, [0, 1], [0, -12]) },
-      { translateY: interpolate(drift2.value, [0, 1], [0, 10]) },
+      { translateX: interpolate(drift2.value, [0, 1], [0, -18]) },
+      { translateY: interpolate(drift2.value, [0, 1], [0, 14]) + scrollY.value * -0.08 },
     ],
-    opacity: interpolate(drift2.value, [0, 1], [0.3, 0.55]),
+    opacity: interpolate(drift2.value, [0, 1], [0.42, 0.65]),
+  }));
+
+  const blob3 = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: interpolate(drift1.value, [0, 1], [10, -10]) },
+      { translateY: scrollY.value * -0.2 },
+    ],
+    opacity: 0.35,
   }));
 
   return (
     <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-      {/* Large glow — top right */}
-      <Animated.View style={[{
-        position: 'absolute', top: -40, right: -40,
-        width: 142, height: 142, borderRadius: 71,
-        backgroundColor: 'rgba(176,125,32,0.2)',
-      }, circle1]} />
-      {/* Small circle — bottom left */}
-      <Animated.View style={[{
-        position: 'absolute', bottom: 12, left: 16,
-        width: 50, height: 50, borderRadius: 25,
-        backgroundColor: 'rgba(176,125,32,0.16)',
-      }, circle2]} />
+      <Animated.View style={[{ position: 'absolute', top: -60, right: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(201,146,48,0.32)' }, blob1]} />
+      <Animated.View style={[{ position: 'absolute', bottom: -30, left: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(176,125,32,0.22)' }, blob2]} />
+      <Animated.View style={[{ position: 'absolute', top: '40%', right: '20%', width: 90, height: 90, borderRadius: 45, backgroundColor: 'rgba(74,124,94,0.18)' }, blob3]} />
     </View>
   );
 }
 
-/* ── Collapsible prayer card ── */
-const PRAYER_COLLAPSED_LINES = 3;
+// ─── Audio waveform — shown while TTS is speaking ────────────────────────────
+
+function ListenWaveform({ active, color }: { active: boolean; color: string }) {
+  const a = useSharedValue(0.3);
+  const b = useSharedValue(0.6);
+  const c = useSharedValue(0.4);
+
+  useEffect(() => {
+    if (active) {
+      a.value = withRepeat(withTiming(1, { duration: 420 }), -1, true);
+      b.value = withRepeat(withDelay(120, withTiming(1, { duration: 520 })), -1, true);
+      c.value = withRepeat(withDelay(240, withTiming(1, { duration: 360 })), -1, true);
+    } else {
+      a.value = withTiming(0.3);
+      b.value = withTiming(0.6);
+      c.value = withTiming(0.4);
+    }
+  }, [active]);
+
+  const sA = useAnimatedStyle(() => ({ height: interpolate(a.value, [0, 1], [4, 14]) }));
+  const sB = useAnimatedStyle(() => ({ height: interpolate(b.value, [0, 1], [6, 16]) }));
+  const sC = useAnimatedStyle(() => ({ height: interpolate(c.value, [0, 1], [4, 12]) }));
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, height: 16 }}>
+      <Animated.View style={[{ width: 2, borderRadius: 1, backgroundColor: color }, sA]} />
+      <Animated.View style={[{ width: 2, borderRadius: 1, backgroundColor: color }, sB]} />
+      <Animated.View style={[{ width: 2, borderRadius: 1, backgroundColor: color }, sC]} />
+    </View>
+  );
+}
+
+// ─── Glass action button (used inside the hero action bar) ───────────────────
+
+function HeroActionButton({
+  icon,
+  label,
+  onPress,
+  active,
+  showWaveform,
+  count,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onPress: () => void;
+  active?: boolean;
+  showWaveform?: boolean;
+  count?: number;
+}) {
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const onPressIn = useCallback(() => { scale.value = withTiming(0.94, { duration: 80 }); }, []);
+  const onPressOut = useCallback(() => { scale.value = withTiming(1, { duration: 120 }); }, []);
+
+  return (
+    <Pressable
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      onPress={onPress}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={{ flex: 1 }}
+    >
+      <Animated.View style={[{ alignItems: 'center', justifyContent: 'center', paddingVertical: 12, gap: 4 }, animatedStyle]}>
+        <View style={{ height: 20, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4 }}>
+          {showWaveform
+            ? <ListenWaveform active color={active ? THEME_COLORS.gold : THEME_COLORS.text2} />
+            : icon}
+          {count != null && count > 0 ? (
+            <Text
+              style={{
+                ...TYPE.caption2,
+                color: active ? THEME_COLORS.gold : THEME_COLORS.text2,
+                fontVariant: ['tabular-nums'],
+              }}
+              maxFontSizeMultiplier={1.3}
+            >
+              {count > 9999 ? `${(count / 1000).toFixed(1)}k` : count.toLocaleString()}
+            </Text>
+          ) : null}
+        </View>
+        <Text
+          style={{
+            ...TYPE.capsLabel,
+            color: active ? THEME_COLORS.gold : THEME_COLORS.text2,
+          }}
+          maxFontSizeMultiplier={1.2}
+        >
+          {label}
+        </Text>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+// ─── Collapsible prayer card (now on glass) ──────────────────────────────────
+
+const PRAYER_COLLAPSED_LINES = 2;
 
 function CollapsiblePrayer({
   content,
@@ -99,6 +211,7 @@ function CollapsiblePrayer({
   onLike,
   onListen,
   listenLabel,
+  isListening,
   onShare,
 }: {
   content: string;
@@ -107,17 +220,15 @@ function CollapsiblePrayer({
   onLike: () => void;
   onListen: () => void;
   listenLabel: string;
+  isListening: boolean;
   onShare: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [needsTruncation, setNeedsTruncation] = useState(false);
-  const [fullHeight, setFullHeight] = useState(0);
-  const [collapsedHeight, setCollapsedHeight] = useState(0);
-  const measured = fullHeight > 0 && collapsedHeight > 0;
 
   const chevronRotation = useSharedValue(0);
   useEffect(() => {
-    chevronRotation.value = withTiming(expanded ? 1 : 0, { duration: 300, easing: Easing.inOut(Easing.ease) });
+    chevronRotation.value = withTiming(expanded ? 1 : 0, { duration: 280, easing: Easing.inOut(Easing.ease) });
   }, [expanded]);
 
   const chevronStyle = useAnimatedStyle(() => ({
@@ -125,42 +236,26 @@ function CollapsiblePrayer({
   }));
 
   const toggleExpand = useCallback(() => {
-    LayoutAnimation.configureNext(LayoutAnimation.create(300, 'easeInEaseOut', 'opacity'));
+    LayoutAnimation.configureNext(LayoutAnimation.create(280, 'easeInEaseOut', 'opacity'));
     setExpanded((v) => !v);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }, []);
 
   return (
-    <View style={{ backgroundColor: THEME_COLORS.bg2, borderWidth: 1, borderColor: THEME_COLORS.border, borderRadius: 20, padding: 20 }}>
-      {/* Hidden full-text measurer */}
-      {!measured && (
-        <Text
-          style={{ position: 'absolute', opacity: 0, top: 0, left: 20, right: 20, fontFamily: 'InterTight_400Regular', fontSize: 15, lineHeight: 26 }}
-          onLayout={(e) => { if (fullHeight === 0) setFullHeight(e.nativeEvent.layout.height); }}
-        >
-          {content}
-        </Text>
-      )}
-      {!measured && (
-        <Text
-          numberOfLines={PRAYER_COLLAPSED_LINES}
-          style={{ position: 'absolute', opacity: 0, top: 0, left: 20, right: 20, fontFamily: 'InterTight_400Regular', fontSize: 15, lineHeight: 26 }}
-          onLayout={(e) => {
-            if (collapsedHeight === 0) {
-              setCollapsedHeight(e.nativeEvent.layout.height);
-            }
-          }}
-          onTextLayout={(e) => {
-            if (e.nativeEvent.lines.length >= PRAYER_COLLAPSED_LINES) setNeedsTruncation(true);
-          }}
-        >
-          {content}
-        </Text>
-      )}
+    <GlassCard tone="warm" intensity="card" radius={22} style={{ padding: 18 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+        <Icon name="pray" size={12} color={THEME_COLORS.gold} />
+        <Text style={{ ...TYPE.capsLabel, color: THEME_COLORS.gold }}>Today&apos;s Global Prayer</Text>
+      </View>
 
       <Text
         numberOfLines={expanded ? undefined : PRAYER_COLLAPSED_LINES}
-        style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_400Regular', fontSize: 15, lineHeight: 26 }}
+        onTextLayout={(e) => {
+          if (!expanded && e.nativeEvent.lines.length >= PRAYER_COLLAPSED_LINES && !needsTruncation) {
+            setNeedsTruncation(true);
+          }
+        }}
+        style={{ ...TYPE.subheadline, color: THEME_COLORS.text }}
       >
         {content}
       </Text>
@@ -171,7 +266,7 @@ function CollapsiblePrayer({
           hitSlop={8}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: 8 }}
         >
-          <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_500Medium', fontSize: 13 }}>
+          <Text style={{ ...TYPE.footnote, color: THEME_COLORS.gold, fontWeight: '500', fontFamily: iosFont('500') }}>
             {expanded ? 'Read less' : 'Read more'}
           </Text>
           <Animated.View style={chevronStyle}>
@@ -180,19 +275,27 @@ function CollapsiblePrayer({
         </Pressable>
       )}
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 18, gap: 8, flexWrap: 'wrap' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 14, gap: 8, flexWrap: 'wrap' }}>
         <Pressable
           onPress={onLike}
           style={{
             flexDirection: 'row', alignItems: 'center', gap: 6,
-            paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10,
-            backgroundColor: userLiked ? THEME_COLORS.goldDim : THEME_COLORS.bg3,
+            paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999,
+            backgroundColor: userLiked ? THEME_COLORS.goldDim : 'rgba(255,253,247,0.55)',
             borderWidth: 1,
             borderColor: userLiked ? THEME_COLORS.goldBorder : THEME_COLORS.border,
           }}
         >
-          <Icon name="pray" size={14} color={userLiked ? THEME_COLORS.gold : THEME_COLORS.text3} />
-          <Text style={{ color: userLiked ? THEME_COLORS.gold : THEME_COLORS.text3, fontFamily: 'InterTight_500Medium', fontSize: 13 }}>
+          <Icon name="pray" size={12} color={userLiked ? THEME_COLORS.gold : THEME_COLORS.text3} />
+          <Text
+            style={{
+              ...TYPE.caption1,
+              color: userLiked ? THEME_COLORS.gold : THEME_COLORS.text3,
+              fontWeight: '500',
+              fontFamily: iosFont('500'),
+              fontVariant: ['tabular-nums'],
+            }}
+          >
             {likesCount > 0 ? likesCount.toLocaleString() : 'Pray'}
           </Text>
         </Pressable>
@@ -201,39 +304,41 @@ function CollapsiblePrayer({
           onPress={onListen}
           style={{
             flexDirection: 'row', alignItems: 'center', gap: 6,
-            paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10,
-            backgroundColor: THEME_COLORS.bg3,
-            borderWidth: 1,
-            borderColor: THEME_COLORS.border,
+            paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999,
+            backgroundColor: 'rgba(255,253,247,0.55)',
+            borderWidth: 1, borderColor: THEME_COLORS.border,
           }}
         >
-          <Icon name="audio" size={14} color={THEME_COLORS.text2} />
-          <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_500Medium', fontSize: 13 }}>{listenLabel}</Text>
+          {isListening
+            ? <ListenWaveform active color={THEME_COLORS.text2} />
+            : <Icon name="audio" size={12} color={THEME_COLORS.text2} />}
+          <Text style={{ ...TYPE.caption1, color: THEME_COLORS.text2, fontWeight: '500', fontFamily: iosFont('500') }}>{listenLabel}</Text>
         </Pressable>
 
         <Pressable
           onPress={onShare}
           style={{
             flexDirection: 'row', alignItems: 'center', gap: 6,
-            paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10,
-            backgroundColor: THEME_COLORS.bg3,
-            borderWidth: 1,
-            borderColor: THEME_COLORS.border,
+            paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999,
+            backgroundColor: 'rgba(255,253,247,0.55)',
+            borderWidth: 1, borderColor: THEME_COLORS.border,
           }}
         >
-          <Icon name="share" size={14} color={THEME_COLORS.text2} />
-          <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_500Medium', fontSize: 13 }}>Share</Text>
+          <Icon name="share" size={12} color={THEME_COLORS.text2} />
+          <Text style={{ ...TYPE.caption1, color: THEME_COLORS.text2, fontWeight: '500', fontFamily: iosFont('500') }}>Share</Text>
         </Pressable>
       </View>
-    </View>
+    </GlassCard>
   );
 }
 
-function SkeletonBlock({ height = 120 }: { height?: number }) {
+function SkeletonBlock({ height = 120, radius = 22 }: { height?: number; radius?: number }) {
   return (
-    <View style={{ height, backgroundColor: THEME_COLORS.bg3, borderRadius: 20, marginBottom: 16 }} />
+    <View style={{ height, backgroundColor: 'rgba(255,253,247,0.55)', borderRadius: radius, borderWidth: 1, borderColor: THEME_COLORS.border }} />
   );
 }
+
+// ─── Home screen ─────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -244,11 +349,18 @@ export default function HomeScreen() {
   const { groups: myGroups, totalUnread: groupChatUnread, unreadByGroup, unreadCountByGroup } = useGroupUnread();
   const liveByGroup = useGroupLiveRooms(myGroups.map((g) => g.group_id));
   const { devotionalStreak } = useDevotionalStreak();
+  const { height: viewportHeight } = useWindowDimensions();
 
   const [homeTabActive, setHomeTabActive] = useState(false);
   const [appForeground, setAppForeground] = useState(AppState.currentState === 'active');
   /** Only true during user pull-to-refresh — not background query refetches (avoids layout jump every ~10s). */
   const [pullRefreshing, setPullRefreshing] = useState(false);
+
+  // Parallax for the hero blobs and subtle hero scale-down on scroll.
+  const scrollY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (e) => { scrollY.value = e.contentOffset.y; },
+  });
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
@@ -331,15 +443,9 @@ export default function HomeScreen() {
         const likes = base.likes ?? { count: 0, liked: false };
         const count = typeof likes.count === 'number' ? likes.count : 0;
         if (currentlyLiked) {
-          return {
-            ...base,
-            likes: { liked: false, count: Math.max(0, count - 1) },
-          };
+          return { ...base, likes: { liked: false, count: Math.max(0, count - 1) } };
         }
-        return {
-          ...base,
-          likes: { liked: true, count: count + 1 },
-        };
+        return { ...base, likes: { liked: true, count: count + 1 } };
       });
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       return { previous };
@@ -357,6 +463,22 @@ export default function HomeScreen() {
 
   const verseText = verseQuery.data?.data?.verse ?? '';
   const verseRef = verseQuery.data?.data?.reference ?? '';
+
+  // Hero sized to dominate the first scroll without crowding small phones.
+  const heroHeight = useMemo(
+    () => Math.min(Math.max(viewportHeight * 0.62, 460), 620),
+    [viewportHeight]
+  );
+
+  // ─── Heart pop animation on verse like ────────────────────────────────────
+  const heartScale = useSharedValue(1);
+  const heartStyle = useAnimatedStyle(() => ({ transform: [{ scale: heartScale.value }] }));
+  const popHeart = useCallback(() => {
+    heartScale.value = withSequence(
+      withTiming(1.35, { duration: 140, easing: Easing.out(Easing.quad) }),
+      withTiming(1, { duration: 180, easing: Easing.inOut(Easing.quad) })
+    );
+  }, []);
 
   async function handleSharePrayer() {
     const content = prayerQuery.data?.prayer?.content;
@@ -399,8 +521,25 @@ export default function HomeScreen() {
     speechToggle([`Today's prayer. ${content}`], 'prayer');
   }
 
-  const verseListenLabel = activeSource === 'verse' && isSpeaking ? 'Stop' : 'Listen';
-  const prayerListenLabel = activeSource === 'prayer' && isSpeaking ? 'Stop' : 'Listen';
+  function handleVerseLike() {
+    if (!user) {
+      Alert.alert('Sign in', "Sign in to like today's verse.");
+      return;
+    }
+    popHeart();
+    verseLikeMutation.mutate(verseUserLiked);
+  }
+
+  function handleOpenVerseReader() {
+    if (!verseText) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({ pathname: '/verse-reader', params: { client_date: today } } as any);
+  }
+
+  const verseIsListening = activeSource === 'verse' && isSpeaking;
+  const prayerIsListening = activeSource === 'prayer' && isSpeaking;
+  const verseListenLabel = verseIsListening ? 'Stop' : 'Listen';
+  const prayerListenLabel = prayerIsListening ? 'Stop' : 'Listen';
 
   const userLiked = interactionsQuery.data?.likes?.liked ?? false;
   const likesCount = interactionsQuery.data?.likes?.count ?? 0;
@@ -419,13 +558,15 @@ export default function HomeScreen() {
         : String(wallPrayLast7);
 
   return (
-    <ScrollView
+    <AnimatedScrollView
       style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}
       contentContainerStyle={{
-        paddingTop: insets.top + 16,
-        paddingBottom: insets.bottom + 80,
+        paddingTop: insets.top + 12,
+        paddingBottom: insets.bottom + 96,
       }}
       showsVerticalScrollIndicator={false}
+      onScroll={scrollHandler}
+      scrollEventThrottle={16}
       refreshControl={
         <RefreshControl
           refreshing={pullRefreshing}
@@ -450,152 +591,216 @@ export default function HomeScreen() {
         />
       }
     >
-      {/* Greeting row */}
+      {/* Compact greeting strip */}
       <Animated.View
-        entering={FadeInDown.delay(0).duration(500)}
+        entering={FadeInDown.delay(0).duration(420)}
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          paddingHorizontal: 22,
-          marginBottom: 4,
+          paddingHorizontal: 20,
+          marginBottom: 12,
         }}
       >
-        <View>
-          <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 13 }}>
-            {dayjs().format('dddd, MMMM D')}
+        <View style={{ flex: 1 }}>
+          <Text style={{ ...TYPE.caption1, color: THEME_COLORS.text3 }}>
+            {dayjs().format('dddd, MMMM D').toUpperCase()}
           </Text>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 22, marginTop: 2 }}>
+          <Text style={{ ...TYPE.headline, color: THEME_COLORS.text, marginTop: 2 }} numberOfLines={1}>
             Good {dayjs().hour() < 12 ? 'morning' : dayjs().hour() < 17 ? 'afternoon' : 'evening'},{' '}
             {getGreetingFirstName(profile, user)}
           </Text>
         </View>
-        <Pressable
+        <GlassPill
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push('/activity');
           }}
-          hitSlop={8}
-          accessibilityRole="button"
           accessibilityLabel="Activity, prayer wall and group chats"
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: 12,
-            backgroundColor: THEME_COLORS.bg3,
-            borderWidth: 1,
-            borderColor: THEME_COLORS.border,
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-          }}
+          radius={14}
+          style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
+          hitSlop={8}
         >
-          <Icon name="bell" size={18} color={THEME_COLORS.text2} />
-          {groupChatUnread > 0 ? (
-            <View
-              style={{
-                position: 'absolute',
-                top: -4,
-                right: -4,
-                minWidth: 18,
-                height: 18,
-                paddingHorizontal: 4,
-                borderRadius: 9,
-                backgroundColor: THEME_COLORS.rose,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'InterTight_700Bold' }}>
-                {groupChatUnread > 99 ? '99+' : groupChatUnread}
-              </Text>
-            </View>
-          ) : null}
-        </Pressable>
+          <View style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="bell" size={18} color={THEME_COLORS.text2} />
+            {groupChatUnread > 0 ? (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 4,
+                  right: 4,
+                  minWidth: 16,
+                  height: 16,
+                  paddingHorizontal: 4,
+                  borderRadius: 8,
+                  backgroundColor: THEME_COLORS.rose,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text style={{ ...TYPE.caption2, color: '#fff', fontWeight: '700', fontFamily: iosFont('700') }}>
+                  {groupChatUnread > 99 ? '99+' : groupChatUnread}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </GlassPill>
       </Animated.View>
 
-      {/* Daily Verse Card */}
-      <Animated.View entering={FadeInDown.delay(80).duration(500)} style={{ paddingHorizontal: 22, marginBottom: 16, marginTop: 16 }}>
+      {/* ─── Verse Hero ────────────────────────────────────────────────────── */}
+      <Animated.View
+        entering={FadeIn.delay(60).duration(500)}
+        style={{ paddingHorizontal: 16, marginBottom: 16 }}
+      >
         {verseQuery.isLoading ? (
-          <SkeletonBlock height={140} />
+          <SkeletonBlock height={heroHeight} radius={28} />
         ) : (
-          <View
-            style={{
-              backgroundColor: '#f5edd8',
-              borderWidth: 1,
-              borderColor: THEME_COLORS.goldBorder,
-              borderRadius: 24,
-              padding: 22,
-              overflow: 'hidden',
-            }}
-          >
-            <FloatingGeometrics />
-            {/* Pill label */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 10 }}>
-              <View style={{
-                flexDirection: 'row', alignItems: 'center', gap: 5,
-                backgroundColor: THEME_COLORS.goldDim, borderRadius: 50,
-                paddingHorizontal: 10, paddingVertical: 4,
-              }}>
-                <Icon name="cross" size={9} color={THEME_COLORS.gold} />
-                <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_500Medium', fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase' }}>Daily Verse</Text>
+          <Pressable onPress={handleOpenVerseReader} accessibilityRole="button" accessibilityLabel="Open verse reader">
+            <View
+              style={{
+                height: heroHeight,
+                borderRadius: 28,
+                overflow: 'hidden',
+                backgroundColor: '#fbf2da',
+              }}
+            >
+              {/* Warm gradient backdrop */}
+              <LinearGradient
+                colors={['#fdf6e2', '#f6e6c0', '#efd9a0']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+              />
+
+              {/* Animated parallax blobs */}
+              <VerseHeroBlobs scrollY={scrollY} />
+
+              {/* Top: cap-label pill + share */}
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 22,
+                  left: 22,
+                  right: 22,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <GlassPill tone="gold" radius={999} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Icon name="cross" size={10} color={THEME_COLORS.gold} />
+                    <Text style={{ ...TYPE.capsLabel, color: THEME_COLORS.gold }}>Daily Verse</Text>
+                  </View>
+                </GlassPill>
+
+                <GlassPill
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    handleShareVerse();
+                  }}
+                  accessibilityLabel="Share today's verse"
+                  radius={14}
+                  style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
+                  hitSlop={8}
+                >
+                  <View style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name="share" size={14} color={THEME_COLORS.text2} />
+                  </View>
+                </GlassPill>
+              </View>
+
+              {/* Verse body — centered vertically */}
+              <View
+                style={{
+                  flex: 1,
+                  paddingHorizontal: 28,
+                  paddingTop: 72,
+                  paddingBottom: 100,
+                  justifyContent: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: iosFont('600'),
+                    fontSize: 30,
+                    lineHeight: 38,
+                    letterSpacing: -0.5,
+                    color: THEME_COLORS.text,
+                    fontWeight: '600',
+                  }}
+                  numberOfLines={9}
+                >
+                  &ldquo;{verseText || 'For God so loved the world…'}&rdquo;
+                </Text>
+                <Text
+                  style={{
+                    ...TYPE.capsLabel,
+                    color: THEME_COLORS.gold,
+                    marginTop: 18,
+                    letterSpacing: 1.4,
+                    fontSize: 12,
+                  }}
+                >
+                  — {verseRef || 'John 3:16'}
+                </Text>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 14 }}>
+                  <Text style={{ ...TYPE.footnote, color: THEME_COLORS.text3 }}>
+                    Tap to open the reader
+                  </Text>
+                  <Icon name="chevron-r" size={12} color={THEME_COLORS.text3} />
+                </View>
+              </View>
+
+              {/* Bottom glass action bar */}
+              <View style={{ position: 'absolute', left: 14, right: 14, bottom: 14 }}>
+                <GlassActionBar radius={20}>
+                  <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
+                    <HeroActionButton
+                      icon={
+                        <Animated.View style={heartStyle}>
+                          <Icon
+                            name="heart"
+                            size={18}
+                            color={verseUserLiked ? THEME_COLORS.rose : THEME_COLORS.text2}
+                          />
+                        </Animated.View>
+                      }
+                      label={verseUserLiked ? 'Liked' : 'Like'}
+                      onPress={handleVerseLike}
+                      active={verseUserLiked}
+                      count={verseLikesCount}
+                    />
+                    <View style={{ width: 1, marginVertical: 10, backgroundColor: 'rgba(44,36,23,0.08)' }} />
+                    <HeroActionButton
+                      icon={<Icon name="audio" size={18} color={verseIsListening ? THEME_COLORS.gold : THEME_COLORS.text2} />}
+                      label={verseListenLabel}
+                      onPress={handleListenVerse}
+                      active={verseIsListening}
+                      showWaveform={verseIsListening}
+                    />
+                    <View style={{ width: 1, marginVertical: 10, backgroundColor: 'rgba(44,36,23,0.08)' }} />
+                    <HeroActionButton
+                      icon={<Icon name="book" size={18} color={THEME_COLORS.text2} />}
+                      label="Devotional"
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        router.push('/(tabs)/devotional');
+                      }}
+                    />
+                  </View>
+                </GlassActionBar>
               </View>
             </View>
-
-            <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_400Regular', fontSize: 15, fontStyle: 'italic', lineHeight: 26, marginBottom: 10 }}>
-              "{verseQuery.data?.data?.verse ?? 'For God so loved the world...'}"
-            </Text>
-            <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_600SemiBold', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' }}>
-              — {verseQuery.data?.data?.reference ?? 'John 3:16'}
-            </Text>
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
-              <Pressable
-                onPress={() => {
-                  if (!user) {
-                    Alert.alert('Sign in', 'Sign in to like today’s verse.');
-                    return;
-                  }
-                  verseLikeMutation.mutate(verseUserLiked);
-                }}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
-                hitSlop={8}
-              >
-                <Icon name="heart" size={16} color={verseUserLiked ? THEME_COLORS.rose : THEME_COLORS.text3} />
-                <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_500Medium', fontSize: 13 }}>
-                  {verseLikesCount > 0 ? verseLikesCount.toLocaleString() : 'Like'}
-                </Text>
-              </Pressable>
-            </View>
-
-            {/* Action row */}
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-              {[
-                { key: 'devotional', icon: 'book' as const, label: 'Devotional', onPress: () => router.push('/(tabs)/devotional') },
-                { key: 'listen', icon: 'audio' as const, label: verseListenLabel, onPress: handleListenVerse },
-                { key: 'share', icon: 'share' as const, label: 'Share', onPress: handleShareVerse },
-              ].map((a) => (
-                <Pressable
-                  key={a.key}
-                  onPress={a.onPress}
-                  style={{ flex: 1, backgroundColor: THEME_COLORS.goldDim, borderWidth: 1, borderColor: THEME_COLORS.goldBorder, borderRadius: 12, paddingVertical: 9, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 5 }}
-                >
-                  <Icon name={a.icon} size={10} color={THEME_COLORS.gold} />
-                  <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_500Medium', fontSize: 10 }}>{a.label}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
+          </Pressable>
         )}
       </Animated.View>
 
-      {/* Today's Global Prayer */}
-      <Animated.View entering={FadeInDown.delay(160).duration(500)} style={{ paddingHorizontal: 22, marginBottom: 20 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 16 }}>Today's Global Prayer</Text>
-        </View>
+      {/* ─── Today's Global Prayer (glass) ─────────────────────────────────── */}
+      <Animated.View entering={FadeInDown.delay(140).duration(420)} style={{ paddingHorizontal: 16, marginBottom: 14 }}>
         {prayerQuery.isLoading ? (
-          <SkeletonBlock height={180} />
+          <SkeletonBlock height={140} />
         ) : (
           <CollapsiblePrayer
             content={prayerQuery.data?.prayer?.content ?? "Loading today's prayer..."}
@@ -604,129 +809,157 @@ export default function HomeScreen() {
             onLike={() => likeMutation.mutate(userLiked)}
             onListen={handleListenPrayer}
             listenLabel={prayerListenLabel}
+            isListening={prayerIsListening}
             onShare={handleSharePrayer}
           />
         )}
       </Animated.View>
 
-      {/* Stats row — Groups; Day streak (devotional vs Prayer Wall, higher wins); Wall "I prayed" taps (7 days) */}
-      <Animated.View entering={FadeInDown.delay(200).duration(500)} style={{ paddingHorizontal: 22, marginBottom: 20 }}>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          {[
-            {
-              icon: 'groups' as const,
-              label: 'Groups',
-              hint: groupChatUnread > 0 ? `${groupChatUnread} new message${groupChatUnread === 1 ? '' : 's'}` : 'Your circles',
-              value: myGroups.length.toString(),
-              color: THEME_COLORS.sage,
-              showUnreadDot: groupChatUnread > 0,
-            },
-            {
-              icon: 'flame' as const,
-              label: 'Day streak',
-              hint: 'Devotional · Wall',
-              value: dayStreakDisplay,
-              color: THEME_COLORS.gold,
-              showUnreadDot: false,
-            },
-            {
-              icon: 'pray' as const,
-              label: 'Praying',
-              hint: 'Wall · 7 days',
-              value: prayingWeeklyDisplay,
-              color: THEME_COLORS.rose,
-              showUnreadDot: false,
-            },
-          ].map((s) => (
-            <View key={s.label} style={{ flex: 1, backgroundColor: THEME_COLORS.bg2, borderWidth: 1, borderColor: THEME_COLORS.border, borderRadius: 16, padding: 14, alignItems: 'center' }}>
-              <View style={{ position: 'relative', marginBottom: 6 }}>
-                <Icon name={s.icon} size={20} color={s.color} />
-                {s.showUnreadDot ? (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: -2,
-                      right: -4,
-                      width: 8,
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: THEME_COLORS.rose,
-                      borderWidth: 1.5,
-                      borderColor: THEME_COLORS.bg2,
-                    }}
-                  />
-                ) : null}
-              </View>
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 20 }}>{s.value}</Text>
-              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 10, marginTop: 1, textAlign: 'center' }}>{s.label}</Text>
-              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 8, marginTop: 2, opacity: 0.85, textAlign: 'center' }}>{s.hint}</Text>
-            </View>
-          ))}
-        </View>
-      </Animated.View>
-
-      {/* Quick Actions */}
-      <Animated.View entering={FadeInDown.delay(240).duration(500)} style={{ paddingHorizontal: 22, marginBottom: 24 }}>
-        <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 16, marginBottom: 12 }}>Quick Actions</Text>
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          {[
-            { icon: 'live' as const, label: 'Join a Room', sub: 'Live prayer rooms', route: '/(tabs)/rooms' as const, qaUnread: false },
-            { icon: 'book' as const, label: 'Devotional', sub: 'AI-powered plan', route: '/(tabs)/devotional' as const, qaUnread: false },
-            {
-              icon: 'groups' as const,
-              label: 'My Groups',
-              sub: groupChatUnread > 0 ? `${groupChatUnread} unread chat${groupChatUnread === 1 ? '' : 's'}` : 'Prayer circles',
-              route: '/(tabs)/groups' as const,
-              qaUnread: groupChatUnread > 0,
-            },
-          ].map((a) => (
-            <Pressable key={a.label} onPress={() => router.push(a.route)} style={{ flex: 1 }}>
-              <View style={{ backgroundColor: THEME_COLORS.bg2, borderWidth: 1, borderColor: THEME_COLORS.border, borderRadius: 16, padding: 14, alignItems: 'center' }}>
-                <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: THEME_COLORS.bg3, alignItems: 'center', justifyContent: 'center', marginBottom: 8, position: 'relative' }}>
-                  <Icon name={a.icon} size={18} color={THEME_COLORS.gold} />
-                  {a.qaUnread ? (
+      {/* ─── Combined stats + quick actions (glass strip) ──────────────────── */}
+      <Animated.View entering={FadeInDown.delay(200).duration(420)} style={{ paddingHorizontal: 16, marginBottom: 14 }}>
+        <GlassCard tone="default" intensity="card" radius={22} style={{ padding: 14, gap: 12 }}>
+          {/* Stats row */}
+          <View style={{ flexDirection: 'row' }}>
+            {[
+              {
+                key: 'groups',
+                icon: 'groups' as const,
+                label: 'Groups',
+                value: myGroups.length.toString(),
+                color: THEME_COLORS.sage,
+                showDot: groupChatUnread > 0,
+              },
+              {
+                key: 'streak',
+                icon: 'flame' as const,
+                label: 'Day Streak',
+                value: dayStreakDisplay,
+                color: THEME_COLORS.gold,
+              },
+              {
+                key: 'pray',
+                icon: 'pray' as const,
+                label: 'Praying · 7d',
+                value: prayingWeeklyDisplay,
+                color: THEME_COLORS.rose,
+              },
+            ].map((s, i) => (
+              <View key={s.key} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                {i > 0 && (
+                  <View style={{ width: 1, height: 32, backgroundColor: 'rgba(44,36,23,0.08)', marginRight: 10 }} />
+                )}
+                <View style={{ position: 'relative' }}>
+                  <Icon name={s.icon} size={18} color={s.color} />
+                  {s.showDot ? (
                     <View
                       style={{
                         position: 'absolute',
-                        top: 2,
-                        right: 2,
-                        width: 10,
-                        height: 10,
-                        borderRadius: 5,
+                        top: -2,
+                        right: -3,
+                        width: 8,
+                        height: 8,
+                        borderRadius: 4,
                         backgroundColor: THEME_COLORS.rose,
-                        borderWidth: 2,
-                        borderColor: THEME_COLORS.bg3,
+                        borderWidth: 1.5,
+                        borderColor: '#fff',
                       }}
                     />
                   ) : null}
                 </View>
-                <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_600SemiBold', fontSize: 12, textAlign: 'center' }}>{a.label}</Text>
-                <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 10, textAlign: 'center', marginTop: 2 }}>{a.sub}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      ...TYPE.title3,
+                      color: THEME_COLORS.text,
+                      fontVariant: ['tabular-nums'],
+                    }}
+                  >
+                    {s.value}
+                  </Text>
+                  <Text style={{ ...TYPE.caption2, color: THEME_COLORS.text3, textTransform: 'none', letterSpacing: 0 }}>
+                    {s.label}
+                  </Text>
+                </View>
               </View>
-            </Pressable>
-          ))}
-        </View>
+            ))}
+          </View>
+
+          <View style={{ height: 1, backgroundColor: 'rgba(44,36,23,0.06)' }} />
+
+          {/* Quick actions row */}
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {[
+              { icon: 'live' as const, label: 'Join Room', route: '/(tabs)/rooms' as const, qaUnread: false },
+              { icon: 'book' as const, label: 'Devotional', route: '/(tabs)/devotional' as const, qaUnread: false },
+              { icon: 'groups' as const, label: 'My Groups', route: '/(tabs)/groups' as const, qaUnread: groupChatUnread > 0 },
+            ].map((a) => (
+              <Pressable
+                key={a.label}
+                onPress={() => router.push(a.route)}
+                style={{
+                  flex: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  paddingVertical: 10,
+                  borderRadius: 14,
+                  backgroundColor: 'rgba(176,125,32,0.10)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(176,125,32,0.18)',
+                }}
+              >
+                <View style={{ position: 'relative' }}>
+                  <Icon name={a.icon} size={14} color={THEME_COLORS.gold} />
+                  {a.qaUnread ? (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: -3,
+                        right: -3,
+                        width: 7,
+                        height: 7,
+                        borderRadius: 3.5,
+                        backgroundColor: THEME_COLORS.rose,
+                      }}
+                    />
+                  ) : null}
+                </View>
+                <Text style={{ ...TYPE.caption1, color: THEME_COLORS.gold, fontWeight: '600', fontFamily: iosFont('600') }}>
+                  {a.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </GlassCard>
       </Animated.View>
 
-      {/* My Groups preview */}
-      <Animated.View entering={FadeInDown.delay(300).duration(500)} style={{ paddingHorizontal: 22, marginBottom: 10 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 16 }}>My Groups</Text>
-          <Pressable onPress={() => router.push('/(tabs)/groups')}>
-            <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_500Medium', fontSize: 13 }}>View All</Text>
+      {/* ─── My Groups preview (glass rows) ────────────────────────────────── */}
+      <Animated.View entering={FadeInDown.delay(260).duration(420)} style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingHorizontal: 4 }}>
+          <Text style={{ ...TYPE.headline, color: THEME_COLORS.text }}>My Groups</Text>
+          <Pressable onPress={() => router.push('/(tabs)/groups')} hitSlop={8}>
+            <Text style={{ ...TYPE.footnote, color: THEME_COLORS.gold, fontWeight: '500', fontFamily: iosFont('500') }}>View All</Text>
           </Pressable>
         </View>
 
         {myGroups.length === 0 ? (
-          <Pressable
-            onPress={() => router.push('/(tabs)/groups')}
-            style={{ backgroundColor: THEME_COLORS.bg2, borderWidth: 1.5, borderColor: THEME_COLORS.border, borderRadius: 20, padding: 20, alignItems: 'center', borderStyle: 'dashed' }}
-          >
-            <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: THEME_COLORS.bg3, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
-              <Icon name="groups" size={22} color={THEME_COLORS.text3} />
-            </View>
-            <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_600SemiBold', fontSize: 14, marginBottom: 4 }}>No groups yet</Text>
-            <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 12, textAlign: 'center' }}>Join a prayer group and start praying together</Text>
+          <Pressable onPress={() => router.push('/(tabs)/groups')}>
+            <GlassCard
+              tone="default"
+              intensity="subtle"
+              radius={20}
+              bordered={false}
+              style={{ padding: 20, alignItems: 'center', borderWidth: 1.5, borderColor: THEME_COLORS.border, borderStyle: 'dashed' }}
+            >
+              <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(44,36,23,0.05)', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                <Icon name="groups" size={20} color={THEME_COLORS.text3} />
+              </View>
+              <Text style={{ ...TYPE.callout, color: THEME_COLORS.text, marginBottom: 2 }}>No groups yet</Text>
+              <Text style={{ ...TYPE.footnote, color: THEME_COLORS.text3, textAlign: 'center' }}>
+                Join a prayer group and start praying together
+              </Text>
+            </GlassCard>
           </Pressable>
         ) : (
           <View style={{ gap: 10 }}>
@@ -736,79 +969,80 @@ export default function HomeScreen() {
                 <Pressable
                   key={g.group_id}
                   onPress={() => router.push(`/group/${g.group_id}` as any)}
-                  style={{
-                    backgroundColor: THEME_COLORS.bg2,
-                    borderWidth: 1,
-                    borderColor: isLive ? 'rgba(52,211,153,0.3)' : THEME_COLORS.border,
-                    borderRadius: 18,
-                    padding: 16,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 12,
-                  }}
                 >
-                  <View style={{ position: 'relative' }}>
-                    <Avatar name={g.name} size={44} />
-                    {isLive ? (
-                      <View style={{ position: 'absolute', top: -4, right: -4 }}>
-                        <PulsingDot size={6} color="#34d399" />
-                      </View>
-                    ) : unreadByGroup[g.group_id] ? (
-                      <View
-                        style={{
-                          position: 'absolute',
-                          top: -2,
-                          right: -4,
-                          minWidth: 18,
-                          height: 18,
-                          paddingHorizontal: 4,
-                          borderRadius: 9,
-                          backgroundColor: THEME_COLORS.rose,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderWidth: 1.5,
-                          borderColor: THEME_COLORS.bg2,
-                        }}
-                      >
-                        <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'InterTight_700Bold' }}>
-                          {(unreadCountByGroup[g.group_id] ?? 0) > 99 ? '99+' : unreadCountByGroup[g.group_id]}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                      <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_600SemiBold', fontSize: 15 }}>{g.name}</Text>
-                      {isLive && (
-                        <View style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 4,
-                          backgroundColor: 'rgba(52,211,153,0.12)',
-                          paddingHorizontal: 7,
-                          paddingVertical: 2,
-                          borderRadius: 6,
-                        }}>
-                          <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#34d399' }} />
-                          <Text style={{ color: '#34d399', fontFamily: 'InterTight_600SemiBold', fontSize: 10 }}>LIVE</Text>
+                  <GlassCard
+                    tone={isLive ? 'sage' : 'default'}
+                    intensity="card"
+                    radius={18}
+                    style={{ padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}
+                  >
+                    <View style={{ position: 'relative' }}>
+                      <Avatar name={g.name} size={42} />
+                      {isLive ? (
+                        <View style={{ position: 'absolute', top: -3, right: -3 }}>
+                          <PulsingDot size={6} color="#34d399" />
                         </View>
-                      )}
+                      ) : unreadByGroup[g.group_id] ? (
+                        <View
+                          style={{
+                            position: 'absolute',
+                            top: -2,
+                            right: -3,
+                            minWidth: 18,
+                            height: 18,
+                            paddingHorizontal: 4,
+                            borderRadius: 9,
+                            backgroundColor: THEME_COLORS.rose,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1.5,
+                            borderColor: '#fffaf2',
+                          }}
+                        >
+                          <Text style={{ ...TYPE.caption2, color: '#fff', fontWeight: '700', fontFamily: iosFont('700') }}>
+                            {(unreadCountByGroup[g.group_id] ?? 0) > 99 ? '99+' : unreadCountByGroup[g.group_id]}
+                          </Text>
+                        </View>
+                      ) : null}
                     </View>
-                    <Text style={{ color: unreadByGroup[g.group_id] ? THEME_COLORS.rose : THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 12 }}>
-                      {isLive
-                        ? `${liveByGroup[g.group_id].participants?.length ?? 0} praying now`
-                        : unreadByGroup[g.group_id]
-                          ? `${unreadCountByGroup[g.group_id]} unread message${unreadCountByGroup[g.group_id] === 1 ? '' : 's'}`
-                        : `${g.member_count} ${g.member_count === 1 ? 'member' : 'members'}`}
-                    </Text>
-                  </View>
-                  <Icon name="chevron-r" size={16} color={THEME_COLORS.text3} />
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 1 }}>
+                        <Text style={{ ...TYPE.callout, color: THEME_COLORS.text, fontWeight: '600', fontFamily: iosFont('600') }} numberOfLines={1}>
+                          {g.name}
+                        </Text>
+                        {isLive && (
+                          <View style={{
+                            flexDirection: 'row', alignItems: 'center', gap: 4,
+                            backgroundColor: 'rgba(52,211,153,0.16)',
+                            paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6,
+                          }}>
+                            <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#34d399' }} />
+                            <Text style={{ ...TYPE.capsLabel, color: '#2f855a' }}>LIVE</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text
+                        style={{
+                          ...TYPE.footnote,
+                          color: unreadByGroup[g.group_id] ? THEME_COLORS.rose : THEME_COLORS.text3,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {isLive
+                          ? `${liveByGroup[g.group_id].participants?.length ?? 0} praying now`
+                          : unreadByGroup[g.group_id]
+                            ? `${unreadCountByGroup[g.group_id]} unread message${unreadCountByGroup[g.group_id] === 1 ? '' : 's'}`
+                            : `${g.member_count} ${g.member_count === 1 ? 'member' : 'members'}`}
+                      </Text>
+                    </View>
+                    <Icon name="chevron-r" size={16} color={THEME_COLORS.text3} />
+                  </GlassCard>
                 </Pressable>
               );
             })}
           </View>
         )}
       </Animated.View>
-    </ScrollView>
+    </AnimatedScrollView>
   );
 }

@@ -15,6 +15,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFontStyle } from '@/lib/typography';
 import Icon from '@/components/ui/Icon';
 import DivineBridgeLogo from '@/components/ui/DivineBridgeLogo';
 
@@ -101,7 +102,7 @@ export default function LoginScreen() {
             style={{
               color: THEME_COLORS.text,
               fontSize: 30,
-              fontFamily: 'Newsreader_700Bold',
+              ...iosFontStyle('700'),
               textAlign: 'center',
               letterSpacing: -0.5,
               marginBottom: 8,
@@ -113,7 +114,7 @@ export default function LoginScreen() {
             style={{
               color: THEME_COLORS.text2,
               fontSize: 15,
-              fontFamily: 'InterTight_400Regular',
+              ...iosFontStyle('400'),
               textAlign: 'center',
             }}
           >
@@ -147,7 +148,7 @@ export default function LoginScreen() {
             onPress={handleForgotPassword}
             style={{ alignSelf: 'flex-end', marginBottom: 24, marginTop: -8 }}
           >
-            <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_500Medium', fontSize: 13 }}>
+            <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('500'), fontSize: 13 }}>
               Forgot password?
             </Text>
           </Pressable>
@@ -160,12 +161,12 @@ export default function LoginScreen() {
           entering={FadeInDown.delay(300).duration(600)}
           style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 32 }}
         >
-          <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 14 }}>
+          <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('400'), fontSize: 14 }}>
             Don't have an account?{' '}
           </Text>
           <Link href="/(auth)/signup" asChild>
             <Pressable>
-              <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_600SemiBold', fontSize: 14 }}>
+              <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600'), fontSize: 14 }}>
                 Sign up
               </Text>
             </Pressable>
@@ -175,10 +176,10 @@ export default function LoginScreen() {
         {/* Scripture quote */}
         <Animated.View entering={FadeInDown.delay(400).duration(600)} style={{ marginTop: 48, alignItems: 'center' }}>
           <View style={{ height: 1, width: 48, backgroundColor: THEME_COLORS.border, marginBottom: 16 }} />
-          <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 13, fontStyle: 'italic', textAlign: 'center', lineHeight: 20 }}>
+          <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 13, fontStyle: 'italic', textAlign: 'center', lineHeight: 20 }}>
             "Where two or three gather in my name,{'\n'}I am there among them."
           </Text>
-          <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_500Medium', fontSize: 11, marginTop: 6, letterSpacing: 0.5 }}>
+          <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('500'), fontSize: 11, marginTop: 6, letterSpacing: 0.5 }}>
             MATTHEW 18:20
           </Text>
         </Animated.View>

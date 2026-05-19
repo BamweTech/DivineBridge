@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { TextInput, View, Text, Pressable, TextInputProps } from 'react-native';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFont } from '@/lib/typography';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -18,7 +19,8 @@ export function Input({ label, error, isPassword, style, ...props }: InputProps)
         <Text
           style={{
             color: THEME_COLORS.text2,
-            fontFamily: 'InterTight_500Medium',
+            fontFamily: iosFont('500'),
+            fontWeight: '500',
             fontSize: 13,
             marginBottom: 6,
           }}
@@ -51,7 +53,7 @@ export function Input({ label, error, isPassword, style, ...props }: InputProps)
             {
               flex: 1,
               color: THEME_COLORS.text,
-              fontFamily: 'InterTight_400Regular',
+              fontFamily: iosFont('400'),
               fontSize: 15,
               paddingVertical: 14,
             },
@@ -70,7 +72,7 @@ export function Input({ label, error, isPassword, style, ...props }: InputProps)
         <Text
           style={{
             color: THEME_COLORS.rose,
-            fontFamily: 'InterTight_400Regular',
+            fontFamily: iosFont('400'),
             fontSize: 12,
             marginTop: 4,
           }}

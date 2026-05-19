@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { RTCView } from '@/lib/sfu';
 import { VideoStreamView } from '@/components/room/VideoStreamView';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFontStyle } from '@/lib/typography';
 import Icon from '@/components/ui/Icon';
 import type { IconName } from '@/components/ui/Icon';
 import type { PeerEntry } from '@/lib/sfu';
@@ -76,7 +77,7 @@ function AvControl({
           color={danger ? THEME_COLORS.rose : active ? THEME_COLORS.sage : THEME_COLORS.text2}
         />
       </View>
-      <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 9 }} numberOfLines={1}>
+      <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 9 }} numberOfLines={1}>
         {label}
       </Text>
     </Pressable>
@@ -233,7 +234,7 @@ const styles = StyleSheet.create({
   },
   toastText: {
     color: THEME_COLORS.text,
-    fontFamily: 'InterTight_500Medium',
+    ...iosFontStyle('500'),
     fontSize: 12,
     textAlign: 'center',
   },
@@ -273,7 +274,7 @@ const styles = StyleSheet.create({
   },
   audioOnlyText: {
     color: THEME_COLORS.text3,
-    fontFamily: 'InterTight_400Regular',
+    ...iosFontStyle('400'),
     fontSize: 13,
     textAlign: 'center',
     paddingHorizontal: 16,

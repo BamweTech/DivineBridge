@@ -15,6 +15,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFontStyle } from '@/lib/typography';
 import { validatePasswordStrength } from '@/lib/passwordStrength';
 import DivineBridgeLogo from '@/components/ui/DivineBridgeLogo';
 
@@ -94,7 +95,7 @@ export default function SignupScreen() {
             style={{
               color: THEME_COLORS.text,
               fontSize: 26,
-              fontFamily: 'Newsreader_700Bold',
+              ...iosFontStyle('700'),
               textAlign: 'center',
               letterSpacing: -0.5,
               marginBottom: 8,
@@ -106,7 +107,7 @@ export default function SignupScreen() {
             style={{
               color: THEME_COLORS.text2,
               fontSize: 14,
-              fontFamily: 'InterTight_400Regular',
+              ...iosFontStyle('400'),
               textAlign: 'center',
             }}
           >
@@ -175,12 +176,12 @@ export default function SignupScreen() {
           entering={FadeInDown.delay(300).duration(600)}
           style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 28 }}
         >
-          <Text style={{ color: THEME_COLORS.text2, fontFamily: 'InterTight_400Regular', fontSize: 14 }}>
+          <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('400'), fontSize: 14 }}>
             Already have an account?{' '}
           </Text>
           <Link href="/(auth)/login" asChild>
             <Pressable>
-              <Text style={{ color: THEME_COLORS.gold, fontFamily: 'InterTight_600SemiBold', fontSize: 14 }}>
+              <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600'), fontSize: 14 }}>
                 Sign in
               </Text>
             </Pressable>

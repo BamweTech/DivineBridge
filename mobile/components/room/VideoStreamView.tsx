@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import { RTCView } from '@/lib/sfu';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFontStyle } from '@/lib/typography';
 
 /** Minimal shape for react-native-webrtc MediaStream in UI. */
 export interface StreamLike {
@@ -67,7 +68,7 @@ const styles = StyleSheet.create({
   },
   placeholderText: {
     color: THEME_COLORS.text3,
-    fontFamily: 'InterTight_400Regular',
+    ...iosFontStyle('400'),
     fontSize: 12,
     paddingHorizontal: 8,
     textAlign: 'center',
@@ -85,6 +86,6 @@ const styles = StyleSheet.create({
   labelText: {
     color: '#ffffff',
     fontSize: 11,
-    fontFamily: 'InterTight_500Medium',
+    ...iosFontStyle('500'),
   },
 });

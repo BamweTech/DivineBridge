@@ -8,8 +8,10 @@ import Animated, {
 import { useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFont } from '@/lib/typography';
 import Icon from '@/components/ui/Icon';
 import type { IconName } from '@/components/ui/Icon';
+import { GlassTabBar } from '@/components/ui/GlassTabBar';
 import { useGroupUnread } from '@/contexts/GroupUnreadContext';
 
 const TABS: { name: string; label: string; icon: IconName }[] = [
@@ -80,7 +82,7 @@ function TabBarIcon({
                 justifyContent: 'center',
               }}
             >
-              <Text style={{ color: '#fff', fontSize: 9, fontFamily: 'InterTight_700Bold' }}>
+              <Text style={{ color: '#fff', fontSize: 9, fontFamily: iosFont('700'), fontWeight: '700' }}>
                 {badgeCount > 99 ? '99+' : badgeCount}
               </Text>
             </View>
@@ -90,10 +92,11 @@ function TabBarIcon({
       <Text
         style={{
           color: focused ? THEME_COLORS.gold : THEME_COLORS.text3,
-          fontFamily: focused ? 'InterTight_600SemiBold' : 'InterTight_400Regular',
+          fontFamily: iosFont(focused ? '600' : '400'),
+          fontWeight: focused ? '600' : '400',
           fontSize: 9,
           marginTop: 6,
-          letterSpacing: 0.5,
+          letterSpacing: 0.6,
           textTransform: 'uppercase',
         }}
       >
@@ -112,15 +115,20 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: 'rgba(250,246,239,0.97)',
-          borderTopColor: THEME_COLORS.border,
-          borderTopWidth: 1,
+          // Background is rendered by `tabBarBackground` (GlassTabBar). Keep
+          // this transparent so the BlurView actually shows the content
+          // scrolling underneath.
+          backgroundColor: 'transparent',
+          position: 'absolute',
+          borderTopColor: 'rgba(44,36,23,0.06)',
+          borderTopWidth: 0.5,
           height: 70 + insets.bottom,
           paddingBottom: insets.bottom,
           paddingTop: 10,
           elevation: 0,
           shadowOpacity: 0,
         },
+        tabBarBackground: () => <GlassTabBar />,
         tabBarShowLabel: false,
         tabBarHideOnKeyboard: true,
       }}

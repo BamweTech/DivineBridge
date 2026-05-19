@@ -4,6 +4,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { ResizeMode, Video } from 'expo-av';
 import { Image } from 'expo-image';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFontStyle } from '@/lib/typography';
 import Icon from '@/components/ui/Icon';
 import type { PendingUploadBubble } from '@/components/group/groupChatUtils';
 
@@ -61,13 +62,13 @@ export function PendingUploadChatBubble({
             />
           )}
           <View style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
-            <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_500Medium', fontSize: 12 }} numberOfLines={1}>
+            <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('500'), fontSize: 12 }} numberOfLines={1}>
               {item.file_name}
             </Text>
             <Text
               style={{
                 color: item.status === 'failed' ? THEME_COLORS.rose : THEME_COLORS.text3,
-                fontFamily: 'InterTight_500Medium',
+                ...iosFontStyle('500'),
                 fontSize: 11,
                 marginTop: 4,
               }}
@@ -104,16 +105,16 @@ export function PendingUploadChatBubble({
                   marginBottom: item.message ? 10 : 0,
                 }}
               >
-                <Text style={{ color: THEME_COLORS.violet, fontFamily: 'InterTight_600SemiBold', fontSize: 12 }}>
+                <Text style={{ color: THEME_COLORS.violet, ...iosFontStyle('600'), fontSize: 12 }}>
                   File
                 </Text>
-                <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_400Regular', fontSize: 13, marginTop: 4 }} numberOfLines={2}>
+                <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('400'), fontSize: 13, marginTop: 4 }} numberOfLines={2}>
                   {item.file_name}
                 </Text>
               </View>
             )}
             {!!item.message && (
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'InterTight_400Regular', fontSize: 14, lineHeight: 22 }}>
+              <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('400'), fontSize: 14, lineHeight: 22 }}>
                 {item.message}
               </Text>
             )}
@@ -121,7 +122,7 @@ export function PendingUploadChatBubble({
               <Text
                 style={{
                   color: item.status === 'failed' ? THEME_COLORS.rose : THEME_COLORS.text3,
-                  fontFamily: 'InterTight_500Medium',
+                  ...iosFontStyle('500'),
                   fontSize: 11,
                   marginTop: 8,
                 }}

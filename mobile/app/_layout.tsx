@@ -8,6 +8,7 @@ import {
   Modal,
   ActivityIndicator,
   Linking,
+  Platform,
 } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as Notifications from 'expo-notifications';
@@ -30,6 +31,18 @@ import {
   InterTight_600SemiBold,
   InterTight_700Bold,
 } from '@expo-google-fonts/inter-tight';
+// Nunito Sans is our open-source SF Pro stand-in on Android (and Web fallback).
+// iOS uses the native 'System' font (SF Pro) and never needs these bytes.
+import {
+  NunitoSans_300Light,
+  NunitoSans_400Regular,
+  NunitoSans_500Medium,
+  NunitoSans_600SemiBold,
+  NunitoSans_700Bold,
+  NunitoSans_400Regular_Italic,
+  NunitoSans_600SemiBold_Italic,
+  NunitoSans_700Bold_Italic,
+} from '@expo-google-fonts/nunito-sans';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -44,6 +57,7 @@ import { OfflineBanner } from '@/components/OfflineBanner';
 import { usePushToken } from '@/hooks/usePushToken';
 import { groupApi } from '@/services/api';
 import { THEME_COLORS } from '@/lib/constants';
+import { iosFontStyle } from '@/lib/typography';
 import Icon from '@/components/ui/Icon';
 import BrandedSplashOverlay from '@/components/BrandedSplashOverlay';
 
@@ -183,7 +197,7 @@ function JoinGroupModal({
           {joining ? (
             <View style={{ alignItems: 'center', paddingVertical: 32 }}>
               <ActivityIndicator color={THEME_COLORS.gold} style={{ marginBottom: 16 }} />
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_600SemiBold', fontSize: 16 }}>
+              <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('600'), fontSize: 16 }}>
                 Joining group…
               </Text>
             </View>
@@ -192,10 +206,10 @@ function JoinGroupModal({
               <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: THEME_COLORS.sageDim, borderWidth: 1, borderColor: 'rgba(74,124,94,0.22)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                 <Icon name="groups" size={28} color={THEME_COLORS.sage} />
               </View>
-              <Text style={{ color: THEME_COLORS.sage, fontFamily: 'Newsreader_700Bold', fontSize: 22, marginBottom: 6 }}>
+              <Text style={{ color: THEME_COLORS.sage, ...iosFontStyle('700'), fontSize: 22, marginBottom: 6 }}>
                 You joined {groupName}!
               </Text>
-              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 14 }}>
+              <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 14 }}>
                 Taking you to the group…
               </Text>
             </View>
@@ -204,14 +218,14 @@ function JoinGroupModal({
               <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: 'rgba(180,80,60,0.08)', borderWidth: 1, borderColor: 'rgba(180,80,60,0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
                 <Icon name="cross" size={28} color="#b4503c" />
               </View>
-              <Text style={{ color: THEME_COLORS.text, fontFamily: 'Newsreader_700Bold', fontSize: 18, marginBottom: 6, textAlign: 'center' }}>
+              <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 18, marginBottom: 6, textAlign: 'center' }}>
                 Could not join group
               </Text>
-              <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_400Regular', fontSize: 14, textAlign: 'center', marginBottom: 24 }}>
+              <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 14, textAlign: 'center', marginBottom: 24 }}>
                 {error}
               </Text>
               <Pressable onPress={onClose} style={{ padding: 16, alignItems: 'center' }}>
-                <Text style={{ color: THEME_COLORS.text3, fontFamily: 'InterTight_500Medium', fontSize: 15 }}>
+                <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('500'), fontSize: 15 }}>
                   Dismiss
                 </Text>
               </Pressable>
@@ -266,6 +280,9 @@ function RootLayoutInner() {
   useGroupChatNotifications();
 
   const [fontsLoaded, fontError] = useFonts({
+    // Legacy faces kept loaded during the SF Pro migration so any unmigrated
+    // `fontFamily: 'Newsreader_*'` / `'InterTight_*'` strings still render.
+    // Remove once `rg 'Newsreader_|InterTight_'` is clean (one release window).
     Newsreader_400Regular,
     Newsreader_500Medium,
     Newsreader_600SemiBold,
@@ -275,6 +292,22 @@ function RootLayoutInner() {
     InterTight_500Medium,
     InterTight_600SemiBold,
     InterTight_700Bold,
+    // SF Pro stand-in for non-iOS. On iOS these are no-ops because we use
+    // `'System'`, but bundling them everywhere keeps the useFonts() call
+    // simple; the Android-only branch in `iosFont()` is what actually picks
+    // them up at render time.
+    ...(Platform.OS !== 'ios'
+      ? {
+          NunitoSans_300Light,
+          NunitoSans_400Regular,
+          NunitoSans_500Medium,
+          NunitoSans_600SemiBold,
+          NunitoSans_700Bold,
+          NunitoSans_400Regular_Italic,
+          NunitoSans_600SemiBold_Italic,
+          NunitoSans_700Bold_Italic,
+        }
+      : {}),
   });
 
   // Hard safety net: dismiss splash after 3 s regardless of font load state
@@ -372,6 +405,17 @@ function RootLayoutInner() {
             <Stack.Screen
               name="activity"
               options={{ animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+              name="verse-reader"
+              options={{
+                presentation: Platform.OS === 'ios' ? 'formSheet' : 'modal',
+                animation: 'slide_from_bottom',
+                ...(Platform.OS === 'ios'
+                  ? { sheetGrabberVisible: true, sheetAllowedDetents: [0.96], sheetCornerRadius: 24 }
+                  : null),
+                contentStyle: { backgroundColor: 'transparent' },
+              }}
             />
           </Stack>
 
