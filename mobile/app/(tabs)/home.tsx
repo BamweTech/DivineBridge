@@ -14,6 +14,7 @@ import {
 import type { AppStateStatus } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 import Animated, {
   FadeInDown,
   FadeIn,
@@ -730,22 +731,25 @@ export default function HomeScreen() {
                 backgroundColor: '#f6e6c0',
               }}
             >
-              {/* Soft cream wash atop the base tone, sized to fake a top-down gradient. */}
-              <View
-                pointerEvents="none"
-                style={{
-                  position: 'absolute', top: 0, left: 0, right: 0, height: '55%',
-                  backgroundColor: 'rgba(253,246,226,0.65)',
-                }}
-              />
-              {/* Slightly deeper warm wash anchored to the bottom. */}
-              <View
-                pointerEvents="none"
-                style={{
-                  position: 'absolute', bottom: 0, left: 0, right: 0, height: '45%',
-                  backgroundColor: 'rgba(239,217,160,0.45)',
-                }}
-              />
+              {/* True diagonal warm gradient via react-native-svg (already in
+                  the dev client — no native rebuild needed). preserveAspectRatio
+                  "none" stretches the gradient rect to fill the hero. */}
+              <Svg
+                width="100%"
+                height="100%"
+                preserveAspectRatio="none"
+                viewBox="0 0 100 100"
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+              >
+                <Defs>
+                  <SvgLinearGradient id="verseHeroGradient" x1="0" y1="0" x2="1" y2="1">
+                    <Stop offset="0" stopColor="#fdf6e2" stopOpacity="1" />
+                    <Stop offset="0.55" stopColor="#f4e3b4" stopOpacity="1" />
+                    <Stop offset="1" stopColor="#e9c97a" stopOpacity="1" />
+                  </SvgLinearGradient>
+                </Defs>
+                <Rect x="0" y="0" width="100" height="100" fill="url(#verseHeroGradient)" />
+              </Svg>
 
               {/* Animated parallax blobs */}
               <VerseHeroBlobs scrollY={scrollY} />
