@@ -40,6 +40,7 @@ import { useSpeechPlayback } from '@/hooks/useSpeechPlayback';
 import { useAuthStore } from '@/stores/authStore';
 import { THEME_COLORS } from '@/lib/constants';
 import { TYPE, iosFont } from '@/lib/typography';
+import { pickVerseTheme, type VerseTheme } from '@/lib/verseThemes';
 import { AppText } from '@/components/ui/AppText';
 import Icon from '@/components/ui/Icon';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -122,7 +123,13 @@ function HomeAmbience() {
 
 // ─── Verse hero — animated blobs (parallax-tied) ─────────────────────────────
 
-function VerseHeroBlobs({ scrollY }: { scrollY: SharedValue<number> }) {
+function VerseHeroBlobs({
+  scrollY,
+  colors,
+}: {
+  scrollY: SharedValue<number>;
+  colors: [string, string, string];
+}) {
   const drift1 = useSharedValue(0);
   const drift2 = useSharedValue(0);
   const pulse = useSharedValue(0);
@@ -160,9 +167,9 @@ function VerseHeroBlobs({ scrollY }: { scrollY: SharedValue<number> }) {
 
   return (
     <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-      <Animated.View style={[{ position: 'absolute', top: -60, right: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(201,146,48,0.32)' }, blob1]} />
-      <Animated.View style={[{ position: 'absolute', bottom: -30, left: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(176,125,32,0.22)' }, blob2]} />
-      <Animated.View style={[{ position: 'absolute', top: '40%', right: '20%', width: 90, height: 90, borderRadius: 45, backgroundColor: 'rgba(74,124,94,0.18)' }, blob3]} />
+      <Animated.View style={[{ position: 'absolute', top: -60, right: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: colors[0] }, blob1]} />
+      <Animated.View style={[{ position: 'absolute', bottom: -30, left: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: colors[1] }, blob2]} />
+      <Animated.View style={[{ position: 'absolute', top: '40%', right: '20%', width: 90, height: 90, borderRadius: 45, backgroundColor: colors[2] }, blob3]} />
     </View>
   );
 }
@@ -206,6 +213,7 @@ function HeroActionButton({
   label,
   onPress,
   active,
+  activeColor,
   showWaveform,
   count,
 }: {
@@ -213,6 +221,8 @@ function HeroActionButton({
   label: string;
   onPress: () => void;
   active?: boolean;
+  /** Color applied to the label, count, and waveform when `active` is true. */
+  activeColor?: string;
   showWaveform?: boolean;
   count?: number;
 }) {
@@ -220,6 +230,8 @@ function HeroActionButton({
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const onPressIn = useCallback(() => { scale.value = withTiming(0.94, { duration: 80 }); }, []);
   const onPressOut = useCallback(() => { scale.value = withTiming(1, { duration: 120 }); }, []);
+
+  const activeTint = activeColor ?? THEME_COLORS.gold;
 
   return (
     <Pressable
@@ -234,13 +246,13 @@ function HeroActionButton({
       <Animated.View style={[{ alignItems: 'center', justifyContent: 'center', paddingVertical: 12, gap: 4 }, animatedStyle]}>
         <View style={{ height: 20, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4 }}>
           {showWaveform
-            ? <ListenWaveform active color={active ? THEME_COLORS.gold : THEME_COLORS.text2} />
+            ? <ListenWaveform active color={active ? activeTint : THEME_COLORS.text2} />
             : icon}
           {count != null && count > 0 ? (
             <Text
               style={{
                 ...TYPE.caption2,
-                color: active ? THEME_COLORS.gold : THEME_COLORS.text2,
+                color: active ? activeTint : THEME_COLORS.text2,
                 fontVariant: ['tabular-nums'],
               }}
               maxFontSizeMultiplier={1.3}
@@ -252,7 +264,7 @@ function HeroActionButton({
         <Text
           style={{
             ...TYPE.capsLabel,
-            color: active ? THEME_COLORS.gold : THEME_COLORS.text2,
+            color: active ? activeTint : THEME_COLORS.text2,
           }}
           maxFontSizeMultiplier={1.2}
         >
@@ -527,6 +539,13 @@ export default function HomeScreen() {
   const verseText = verseQuery.data?.data?.verse ?? '';
   const verseRef = verseQuery.data?.data?.reference ?? '';
 
+  // Pick the verse mood theme — drives the hero gradient, accent, and blob
+  // colors. Stable per (text, ref, date) so it doesn't flicker on re-renders.
+  const verseTheme: VerseTheme = useMemo(
+    () => pickVerseTheme(verseText, verseRef, today),
+    [verseText, verseRef, today],
+  );
+
   // Hero sized to dominate the first scroll without crowding small phones.
   const heroHeight = useMemo(
     () => Math.min(Math.max(viewportHeight * 0.62, 460), 620),
@@ -728,12 +747,15 @@ export default function HomeScreen() {
                 height: heroHeight,
                 borderRadius: 28,
                 overflow: 'hidden',
-                backgroundColor: '#f6e6c0',
+                backgroundColor: verseTheme.baseColor,
               }}
             >
-              {/* True diagonal warm gradient via react-native-svg (already in
-                  the dev client — no native rebuild needed). preserveAspectRatio
-                  "none" stretches the gradient rect to fill the hero. */}
+              {/* Diagonal mood gradient via react-native-svg (already in the
+                  dev client — no native rebuild needed). Stops are sourced
+                  from the verse theme so a Hope verse reads as a sunrise,
+                  Peace as sage stillness, etc. The SVG id includes the theme
+                  id so React Native diff-applies the new gradient cleanly
+                  when the verse (and therefore the theme) changes. */}
               <Svg
                 width="100%"
                 height="100%"
@@ -742,17 +764,23 @@ export default function HomeScreen() {
                 style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
               >
                 <Defs>
-                  <SvgLinearGradient id="verseHeroGradient" x1="0" y1="0" x2="1" y2="1">
-                    <Stop offset="0" stopColor="#fdf6e2" stopOpacity="1" />
-                    <Stop offset="0.55" stopColor="#f4e3b4" stopOpacity="1" />
-                    <Stop offset="1" stopColor="#e9c97a" stopOpacity="1" />
+                  <SvgLinearGradient
+                    id={`verseHeroGradient-${verseTheme.id}`}
+                    x1="0" y1="0" x2="1" y2="1"
+                  >
+                    <Stop offset="0" stopColor={verseTheme.gradient[0]} stopOpacity="1" />
+                    <Stop offset="0.55" stopColor={verseTheme.gradient[1]} stopOpacity="1" />
+                    <Stop offset="1" stopColor={verseTheme.gradient[2]} stopOpacity="1" />
                   </SvgLinearGradient>
                 </Defs>
-                <Rect x="0" y="0" width="100" height="100" fill="url(#verseHeroGradient)" />
+                <Rect
+                  x="0" y="0" width="100" height="100"
+                  fill={`url(#verseHeroGradient-${verseTheme.id})`}
+                />
               </Svg>
 
-              {/* Animated parallax blobs */}
-              <VerseHeroBlobs scrollY={scrollY} />
+              {/* Themed parallax blobs */}
+              <VerseHeroBlobs scrollY={scrollY} colors={verseTheme.blobs} />
 
               {/* Top: cap-label pill + share */}
               <View
@@ -766,10 +794,10 @@ export default function HomeScreen() {
                   justifyContent: 'space-between',
                 }}
               >
-                <GlassPill tone="gold" radius={999} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
+                <GlassPill tone={verseTheme.pillTone} radius={999} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Icon name="cross" size={10} color={THEME_COLORS.gold} />
-                    <Text style={{ ...TYPE.capsLabel, color: THEME_COLORS.gold }}>Daily Verse</Text>
+                    <Icon name="cross" size={10} color={verseTheme.accent} />
+                    <Text style={{ ...TYPE.capsLabel, color: verseTheme.accent }}>{verseTheme.label}</Text>
                   </View>
                 </GlassPill>
 
@@ -815,7 +843,7 @@ export default function HomeScreen() {
                 <Text
                   style={{
                     ...TYPE.capsLabel,
-                    color: THEME_COLORS.gold,
+                    color: verseTheme.accent,
                     marginTop: 18,
                     letterSpacing: 1.4,
                     fontSize: 12,
@@ -849,14 +877,16 @@ export default function HomeScreen() {
                       label={verseUserLiked ? 'Liked' : 'Like'}
                       onPress={handleVerseLike}
                       active={verseUserLiked}
+                      activeColor={THEME_COLORS.rose}
                       count={verseLikesCount}
                     />
                     <View style={{ width: 1, marginVertical: 10, backgroundColor: 'rgba(44,36,23,0.08)' }} />
                     <HeroActionButton
-                      icon={<Icon name="audio" size={18} color={verseIsListening ? THEME_COLORS.gold : THEME_COLORS.text2} />}
+                      icon={<Icon name="audio" size={18} color={verseIsListening ? verseTheme.accent : THEME_COLORS.text2} />}
                       label={verseListenLabel}
                       onPress={handleListenVerse}
                       active={verseIsListening}
+                      activeColor={verseTheme.accent}
                       showWaveform={verseIsListening}
                     />
                     <View style={{ width: 1, marginVertical: 10, backgroundColor: 'rgba(44,36,23,0.08)' }} />
