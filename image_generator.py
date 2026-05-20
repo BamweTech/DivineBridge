@@ -1038,14 +1038,31 @@ class ImageGenerator:
     # Mirrors the mobile home hero (mobile/app/(tabs)/home.tsx +
     # mobile/lib/verseThemes.ts): diagonal 3-stop gradient, three frozen
     # drifting blobs, a theme-aware cap-label pill at the top-left, the
-    # verse body and reference centered in the canvas, and a frosted
-    # glass pill at the bottom-right holding the logo + wordmark.
+    # verse body and reference centered in the canvas, and the wordmark
+    # at the bottom-right.
     #
-    # Output is 1080x1920 JPEG. Rendered at 2x then downsampled for crisp
-    # text edges, same pattern the existing verse / prayer images use.
+    # Output is a 1080x1580 JPEG whose aspect (≈0.68) matches the in-app
+    # verse hero card on a typical iPhone (heroHeight≈528 on a 360-wide
+    # card). The art is rendered inside a rounded inner card and pasted
+    # onto a white outer canvas so when the user shares to iMessage /
+    # WhatsApp / Instagram, the recipient sees what feels like a
+    # screenshot of the home-screen hero rather than a tall billboard.
+    # Rendered at 2x then downsampled for crisp text edges, same pattern
+    # the existing verse / prayer images use.
 
     HERO_WIDTH = 1080
-    HERO_HEIGHT = 1920
+    HERO_HEIGHT = 1580
+    # White frame around the rounded inner card. Keep small so the card
+    # still feels like the dominant element when previewed at thumbnail
+    # size in a message bubble.
+    HERO_CARD_MARGIN = 36
+    # Corner radius of the inner card, in final-image pixels. ≈7.5% of
+    # the inner card width — the same ratio as the in-app `borderRadius:
+    # 28` on a ~360dp wide card.
+    HERO_CARD_RADIUS = 76
+    # Outer canvas background. White was chosen by product so the card
+    # reads cleanly against any messaging app theme.
+    HERO_OUTER_BG = (255, 255, 255)
     WORDMARK_LOGO_PATH = 'assets/logos/divineBridgeLogo4.png'
 
     @staticmethod
@@ -1212,8 +1229,15 @@ class ImageGenerator:
         """
         try:
             scale = 2
-            W = self.HERO_WIDTH * scale
-            H = self.HERO_HEIGHT * scale
+            # Inner card dimensions — the artwork is rendered onto this
+            # rounded rectangle, which is then pasted onto the white outer
+            # canvas. Everything below sizes off W/H so all the existing
+            # percentage-based positioning (label pill, blobs, verse text,
+            # wordmark) automatically reflows to the card aspect.
+            inner_w = self.HERO_WIDTH - 2 * self.HERO_CARD_MARGIN
+            inner_h = self.HERO_HEIGHT - 2 * self.HERO_CARD_MARGIN
+            W = inner_w * scale
+            H = inner_h * scale
 
             # 1) Diagonal gradient base. Convert to RGBA so we can composite
             # blurred regions and translucent pills on top.
@@ -1271,8 +1295,8 @@ class ImageGenerator:
             # 4) Verse body — centered horizontally, vertically positioned in
             # the upper-middle band of the canvas so the reference + logo
             # have room below. Picks the largest body size that fits.
-            body_max_w = (self.HERO_WIDTH - 140) * scale
-            body_max_h = int(self.HERO_HEIGHT * scale * 0.62)
+            body_max_w = (inner_w - 140) * scale
+            body_max_h = int(inner_h * scale * 0.62)
             verse_font, verse_lines, line_h = self._hero_fit_verse_font(
                 sans, f'\u201c{verse_text}\u201d', body_max_w, body_max_h,
             )
@@ -1321,19 +1345,46 @@ class ImageGenerator:
             except Exception as logo_err:
                 logger.warning(f"Hero image: couldn't load wordmark logo: {logo_err}")
 
-            # 7) Flatten alpha onto opaque base color, downsample for crisp
-            # edges, slight sharpen pass.
-            flat = Image.new('RGB', base.size, self._hex_rgb(theme['base_color']))
-            flat.paste(base, mask=base.split()[-1])
-            flat = flat.resize((self.HERO_WIDTH, self.HERO_HEIGHT), Image.Resampling.LANCZOS)
-            flat = flat.filter(ImageFilter.SHARPEN)
+            # 7) Flatten the inner artwork onto its opaque base color,
+            # downsample to the final inner-card pixel size, then sharpen.
+            # This is the same pipeline we had before, just bounded by the
+            # rounded inner card rather than the whole image.
+            inner_flat = Image.new('RGB', base.size, self._hex_rgb(theme['base_color']))
+            inner_flat.paste(base, mask=base.split()[-1])
+            inner_flat = inner_flat.resize((inner_w, inner_h), Image.Resampling.LANCZOS)
+            inner_flat = inner_flat.filter(ImageFilter.SHARPEN)
+
+            # 8) Round the inner card corners. We render the mask at 4× and
+            # downsample so the curve antialiases cleanly (Pillow's
+            # rounded_rectangle stair-steps at 1× on radii this large).
+            mask_scale = 4
+            mask_hi = Image.new('L', (inner_w * mask_scale, inner_h * mask_scale), 0)
+            ImageDraw.Draw(mask_hi).rounded_rectangle(
+                (0, 0, inner_w * mask_scale, inner_h * mask_scale),
+                radius=self.HERO_CARD_RADIUS * mask_scale,
+                fill=255,
+            )
+            mask = mask_hi.resize((inner_w, inner_h), Image.Resampling.LANCZOS)
+            inner_rgba = inner_flat.convert('RGBA')
+            inner_rgba.putalpha(mask)
+
+            # 9) Composite onto the white outer canvas. The card sits with
+            # HERO_CARD_MARGIN of white on every side so the rounded
+            # corners are visible against any messaging-app background.
+            outer = Image.new('RGB', (self.HERO_WIDTH, self.HERO_HEIGHT), self.HERO_OUTER_BG)
+            outer.paste(
+                inner_rgba,
+                (self.HERO_CARD_MARGIN, self.HERO_CARD_MARGIN),
+                mask=inner_rgba.split()[-1],
+            )
 
             out = BytesIO()
-            flat.save(out, format='JPEG', quality=92, optimize=True)
+            outer.save(out, format='JPEG', quality=92, optimize=True)
             out.seek(0)
             logger.info(
                 f"Generated verse hero image: theme={theme['id']} "
-                f"ref={reference!r} chars={len(verse_text or '')}"
+                f"ref={reference!r} chars={len(verse_text or '')} "
+                f"size={self.HERO_WIDTH}x{self.HERO_HEIGHT} radius={self.HERO_CARD_RADIUS}"
             )
             return out
 
