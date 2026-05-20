@@ -122,6 +122,89 @@ def download_verse_image():
         logger.error(f"Error generating verse image: {e}")
         return jsonify({'error': 'Failed to generate image'}), 500
 
+@verse_bp.route('/today-verse/hero-image', methods=['GET'])
+def download_verse_hero_image():
+    """Download today's verse as a themed 9:16 JPEG hero image (with caching).
+
+    Renders the same visual as the in-app verse hero: diagonal mood
+    gradient, drifting blobs, theme-labelled cap pill, verse body,
+    reference, and a Divine Bridge logo + wordmark glass pill at the
+    bottom-right. Theme is classified server-side from the verse text
+    and reference so the image is correct regardless of who hits the
+    URL (mobile share, web link, scheduled task).
+
+    Lives alongside `/today-verse/download` (the legacy square image)
+    rather than replacing it, so existing share flows keep working.
+
+    Query params:
+      client_date: YYYY-MM-DD (optional) - the client's local date.
+      force:       'true' to bypass cache and regenerate.
+    """
+    try:
+        client_date = request.args.get('client_date')
+        force_regenerate = request.args.get('force', 'false').lower() == 'true'
+
+        if client_date:
+            try:
+                client_datetime = datetime.strptime(client_date, '%Y-%m-%d')
+                day_of_year = client_datetime.timetuple().tm_yday
+                cache_date = client_date
+            except ValueError:
+                day_of_year = None
+                cache_date = datetime.now().strftime('%Y-%m-%d')
+        else:
+            day_of_year = None
+            cache_date = datetime.now().strftime('%Y-%m-%d')
+
+        # Cache hit — short-circuit before doing any rendering work.
+        if not force_regenerate:
+            cached_image = current_app.storage_handler.get_verse_hero_image(cache_date)
+            if cached_image:
+                logger.info(f"Serving cached verse hero image for {cache_date}")
+                from io import BytesIO
+                return send_file(
+                    BytesIO(cached_image),
+                    mimetype='image/jpeg',
+                    as_attachment=True,
+                    download_name=f"divine_bridge_verse_hero_{client_date or 'today'}.jpg",
+                )
+
+        logger.info(f"Generating new verse hero image for {cache_date}")
+
+        verse = current_app.verse_cache.get_today_verse(day_of_year=day_of_year)
+        if not verse:
+            return jsonify({'success': False, 'error': 'No verse available'}), 404
+
+        # Server-side mood classification — mirrors mobile/lib/verseThemes.ts
+        # so the rendered theme matches what the app shows.
+        from verse_themes import pick_verse_theme
+        theme = pick_verse_theme(verse.get('verse', ''), verse.get('reference', ''), cache_date)
+
+        from image_generator import get_image_generator
+        generator = get_image_generator()
+        image_data = generator.generate_verse_hero_image(
+            verse_text=verse['verse'],
+            reference=verse['reference'],
+            theme=theme,
+        )
+
+        image_bytes = image_data.getvalue()
+        current_app.storage_handler.save_verse_hero_image(cache_date, image_bytes)
+        logger.info(f"Cached verse hero image for {cache_date} (theme={theme['id']})")
+
+        image_data.seek(0)
+        return send_file(
+            image_data,
+            mimetype='image/jpeg',
+            as_attachment=True,
+            download_name=f"divine_bridge_verse_hero_{client_date or 'today'}.jpg",
+        )
+
+    except Exception as e:
+        logger.error(f"Error generating verse hero image: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Failed to generate hero image'}), 500
+
+
 @verse_bp.route('/today-verse/<date>/image', methods=['GET'])
 def get_daily_verse_image(date):
     """Serve daily verse image for sharing (not download)"""

@@ -1033,6 +1033,332 @@ class ImageGenerator:
         return img
 
 
+    # ── Verse Hero image (themed, 1080x1920 / 9:16) ────────────────────────
+    #
+    # Mirrors the mobile home hero (mobile/app/(tabs)/home.tsx +
+    # mobile/lib/verseThemes.ts): diagonal 3-stop gradient, three frozen
+    # drifting blobs, a theme-aware cap-label pill at the top-left, the
+    # verse body and reference centered in the canvas, and a frosted
+    # glass pill at the bottom-right holding the logo + wordmark.
+    #
+    # Output is 1080x1920 JPEG. Rendered at 2x then downsampled for crisp
+    # text edges, same pattern the existing verse / prayer images use.
+
+    HERO_WIDTH = 1080
+    HERO_HEIGHT = 1920
+    WORDMARK_LOGO_PATH = 'assets/logos/divineBridgeLogo4.png'
+
+    @staticmethod
+    def _hex_rgb(hex_color):
+        return ImageColor.getrgb(hex_color)
+
+    @staticmethod
+    def _hex_rgba(hex_color, alpha):
+        r, g, b = ImageColor.getrgb(hex_color)
+        return (r, g, b, max(0, min(255, int(round(alpha * 255)))))
+
+    def _hero_diagonal_gradient(self, width, height, stops):
+        """Render a three-stop diagonal gradient (top-left -> bottom-right).
+
+        We build the gradient on a tiny reference image (per-pixel Python loop
+        across ~16k pixels is fine), then bicubic-upscale to the target size.
+        This avoids a 2M-pixel Python loop on every request while still
+        producing a smooth blend.
+
+        `stops` is a 3-tuple of hex colors applied at offsets 0, 0.55, 1.
+        """
+        ref_w, ref_h = 128, 128
+        ref = Image.new('RGB', (ref_w, ref_h))
+        px = ref.load()
+        c0 = self._hex_rgb(stops[0])
+        c1 = self._hex_rgb(stops[1])
+        c2 = self._hex_rgb(stops[2])
+        for y in range(ref_h):
+            ny = y / (ref_h - 1)
+            for x in range(ref_w):
+                nx = x / (ref_w - 1)
+                t = (nx + ny) / 2
+                if t <= 0.55:
+                    k = t / 0.55
+                    r = int(c0[0] + (c1[0] - c0[0]) * k)
+                    g = int(c0[1] + (c1[1] - c0[1]) * k)
+                    b = int(c0[2] + (c1[2] - c0[2]) * k)
+                else:
+                    k = (t - 0.55) / 0.45
+                    r = int(c1[0] + (c2[0] - c1[0]) * k)
+                    g = int(c1[1] + (c2[1] - c1[1]) * k)
+                    b = int(c1[2] + (c2[2] - c1[2]) * k)
+                px[x, y] = (r, g, b)
+        return ref.resize((width, height), Image.Resampling.BICUBIC)
+
+    def _hero_paint_blob(self, base_rgba, center_xy, radius, hex_color, alpha):
+        """Paint a soft circular blob onto an RGBA image.
+
+        The ellipse is drawn directly on a layer the size of `base_rgba`,
+        so off-canvas positions are clipped naturally by PIL. We blur a
+        local crop (ellipse bbox + 3-sigma padding) instead of blurring a
+        tight blob image — the tight approach produces hard rectangular
+        halos where the blur hits the blob-image edge when sigma is large
+        relative to the padding.
+        """
+        cx, cy = center_xy
+        layer = Image.new('RGBA', base_rgba.size, (0, 0, 0, 0))
+        ld = ImageDraw.Draw(layer)
+        ld.ellipse(
+            [(cx - radius, cy - radius), (cx + radius, cy + radius)],
+            fill=self._hex_rgba(hex_color, alpha),
+        )
+        sigma = max(8, radius // 8)
+        pad = int(sigma * 3)
+        bbox = (
+            max(0, cx - radius - pad),
+            max(0, cy - radius - pad),
+            min(base_rgba.width, cx + radius + pad),
+            min(base_rgba.height, cy + radius + pad),
+        )
+        if bbox[2] > bbox[0] and bbox[3] > bbox[1]:
+            region = layer.crop(bbox).filter(ImageFilter.GaussianBlur(sigma))
+            layer.paste(region, (bbox[0], bbox[1]))
+        base_rgba.alpha_composite(layer)
+
+    def _hero_frosted_pill(
+        self,
+        base_rgba,
+        bbox,
+        radius,
+        fill_rgba=(255, 253, 247, 200),
+        border_rgba=(44, 36, 23, 30),
+        blur_radius=24,
+    ):
+        """Draw a frosted-glass rounded pill in-place on `base_rgba`.
+
+        Process: blur the region behind the pill (so the gradient and blobs
+        smear into a soft backdrop), then paint a translucent rounded fill
+        on top and a 1px hairline border. This matches what BlurView gives
+        the in-app glass primitives.
+        """
+        x0, y0, x1, y1 = bbox
+        # Crop with a small bleed so the blur near edges still has context.
+        bleed = 8
+        cx0 = max(0, x0 - bleed)
+        cy0 = max(0, y0 - bleed)
+        cx1 = min(base_rgba.width, x1 + bleed)
+        cy1 = min(base_rgba.height, y1 + bleed)
+        region = base_rgba.crop((cx0, cy0, cx1, cy1))
+        region = region.filter(ImageFilter.GaussianBlur(blur_radius))
+        base_rgba.paste(region, (cx0, cy0))
+
+        # Fill + border overlay.
+        overlay = Image.new('RGBA', base_rgba.size, (0, 0, 0, 0))
+        od = ImageDraw.Draw(overlay)
+        od.rounded_rectangle(bbox, radius=radius, fill=fill_rgba, outline=border_rgba, width=2)
+        # 1px specular sheen along the top edge — matches the GlassCard
+        # "lit-from-above" highlight.
+        od.rounded_rectangle(
+            (x0, y0, x1, y0 + 2),
+            radius=radius,
+            fill=(255, 255, 255, 110),
+        )
+        base_rgba.alpha_composite(overlay)
+
+    def _hero_wrap_text(self, text, font, max_width):
+        """Wrap text into lines that fit `max_width` in pixels."""
+        words = text.split()
+        lines = []
+        line_words = []
+        for w in words:
+            trial = ' '.join(line_words + [w])
+            bbox = font.getbbox(trial)
+            if (bbox[2] - bbox[0]) <= max_width:
+                line_words.append(w)
+            else:
+                if line_words:
+                    lines.append(' '.join(line_words))
+                line_words = [w]
+        if line_words:
+            lines.append(' '.join(line_words))
+        return lines
+
+    def _hero_fit_verse_font(self, sans, text, max_width, max_height, max_lines=12):
+        """Pick the largest body font that fits within the verse text box.
+
+        Walks from 96pt down to 56pt until the wrapped text fits in
+        (max_width x max_height) without exceeding `max_lines`. Long verses
+        get smaller type rather than overflowing the canvas.
+        """
+        for size in (96, 90, 84, 78, 72, 66, 60, 56):
+            font = sans(size, bold=True)
+            line_h = int(size * 1.22)
+            lines = self._hero_wrap_text(text, font, max_width)
+            if len(lines) <= max_lines and len(lines) * line_h <= max_height:
+                return font, lines, line_h
+        # Fallback: smallest size, hard-clip to max_lines if needed.
+        font = sans(56, bold=True)
+        line_h = int(56 * 1.22)
+        lines = self._hero_wrap_text(text, font, max_width)[:max_lines]
+        return font, lines, line_h
+
+    def generate_verse_hero_image(self, verse_text, reference, theme):
+        """Render the themed 9:16 verse hero image.
+
+        Args:
+          verse_text: the verse body
+          reference:  e.g. "John 3:16"
+          theme:      a dict from verse_themes.VERSE_THEMES with 'label',
+                      'gradient', 'accent', 'blobs', 'base_color'
+
+        Returns: BytesIO containing JPEG bytes.
+        """
+        try:
+            scale = 2
+            W = self.HERO_WIDTH * scale
+            H = self.HERO_HEIGHT * scale
+
+            # 1) Diagonal gradient base. Convert to RGBA so we can composite
+            # blurred regions and translucent pills on top.
+            base = self._hero_diagonal_gradient(W, H, theme['gradient']).convert('RGBA')
+
+            # 2) Three frozen drifting blobs at fixed positions. Sizes and
+            # positions mirror the in-app VerseHeroBlobs layout, scaled to
+            # the 9:16 canvas. Top-right and bottom-left peek partially off
+            # the edge; the mid-right accent sits fully inside the canvas.
+            b0, b1, b2 = theme['blobs']
+            self._hero_paint_blob(
+                base, (int(W * 0.95), int(H * 0.05)), int(W * 0.28), b0[0], b0[1],
+            )
+            self._hero_paint_blob(
+                base, (int(W * 0.05), int(H * 0.92)), int(W * 0.24), b1[0], b1[1],
+            )
+            self._hero_paint_blob(
+                base, (int(W * 0.72), int(H * 0.52)), int(W * 0.14), b2[0], b2[1],
+            )
+
+            sans = self._get_sans_font()
+
+            # 3) Top-left theme label pill — "HOPE", "LOVE", etc. in theme
+            # accent on a frosted cream pill.
+            label_text = theme['label'].upper()
+            label_font = sans(32 * scale, bold=True)
+            lb = label_font.getbbox(label_text)
+            label_w = lb[2] - lb[0]
+            label_h = lb[3] - lb[1]
+            # Approximate letter-spacing for the caps label via inter-char gaps
+            # is not needed — we just pad the pill generously instead.
+            pad_x = 38 * scale
+            pad_y = 22 * scale
+            label_pill_x0 = 70 * scale
+            label_pill_y0 = 110 * scale
+            label_pill_x1 = label_pill_x0 + label_w + 2 * pad_x
+            label_pill_y1 = label_pill_y0 + label_h + 2 * pad_y + 6 * scale
+            self._hero_frosted_pill(
+                base,
+                (label_pill_x0, label_pill_y0, label_pill_x1, label_pill_y1),
+                radius=(label_pill_y1 - label_pill_y0) // 2,
+                fill_rgba=(255, 253, 247, 195),
+                border_rgba=(*self._hex_rgb(theme['accent']), 60),
+            )
+            draw = ImageDraw.Draw(base)
+            label_text_x = label_pill_x0 + pad_x
+            label_text_y = label_pill_y0 + pad_y - lb[1]
+            draw.text(
+                (label_text_x, label_text_y),
+                label_text,
+                font=label_font,
+                fill=(*self._hex_rgb(theme['accent']), 255),
+            )
+
+            # 4) Verse body — centered horizontally, vertically positioned in
+            # the upper-middle band of the canvas so the reference + logo
+            # pill have room below. Picks the largest body size that fits.
+            body_max_w = (self.HERO_WIDTH - 160) * scale
+            body_max_h = int(self.HERO_HEIGHT * scale * 0.50)
+            verse_font, verse_lines, line_h = self._hero_fit_verse_font(
+                sans, f'\u201c{verse_text}\u201d', body_max_w, body_max_h,
+            )
+            text_block_h = len(verse_lines) * line_h
+            # Center the text block vertically with a slight upward bias so
+            # the reference + logo pill below feel anchored to the bottom.
+            verse_top = (H - text_block_h) // 2 - int(80 * scale)
+            for i, line in enumerate(verse_lines):
+                lw = verse_font.getbbox(line)[2] - verse_font.getbbox(line)[0]
+                draw.text(
+                    ((W - lw) // 2, verse_top + i * line_h),
+                    line,
+                    font=verse_font,
+                    fill=(28, 22, 14, 255),  # Near-black, warm.
+                )
+
+            # 5) Reference caption — caps, theme accent, ~14pt of breathing
+            # room above the logo pill.
+            ref_font = sans(40 * scale, bold=True)
+            ref_text = f'\u2014 {reference.upper()}' if reference else ''
+            ref_y = verse_top + text_block_h + 40 * scale
+            if ref_text:
+                rb = ref_font.getbbox(ref_text)
+                rw = rb[2] - rb[0]
+                draw.text(
+                    ((W - rw) // 2, ref_y),
+                    ref_text,
+                    font=ref_font,
+                    fill=(*self._hex_rgb(theme['accent']), 255),
+                )
+
+            # 6) Bottom-right glass pill with logo + wordmark. Uses the
+            # combined mark+wordmark PNG so we don't need a separate font
+            # for "Divine Bridge".
+            try:
+                wm = Image.open(self.WORDMARK_LOGO_PATH).convert('RGBA')
+                # Scale to a height of ~100px (logical) / 200px (rendered)
+                # so the brand reads cleanly at thumbnail size.
+                target_h = 100 * scale
+                aspect = wm.width / wm.height
+                target_w = int(target_h * aspect)
+                wm = wm.resize((target_w, target_h), Image.Resampling.LANCZOS)
+                inner_pad_x = 44 * scale
+                inner_pad_y = 30 * scale
+                pill_w = target_w + 2 * inner_pad_x
+                pill_h = target_h + 2 * inner_pad_y
+                pill_margin = 60 * scale
+                pill_x1 = W - pill_margin
+                pill_y1 = H - pill_margin
+                pill_x0 = pill_x1 - pill_w
+                pill_y0 = pill_y1 - pill_h
+                self._hero_frosted_pill(
+                    base,
+                    (pill_x0, pill_y0, pill_x1, pill_y1),
+                    radius=int(pill_h * 0.46),
+                    fill_rgba=(255, 253, 247, 210),
+                    border_rgba=(44, 36, 23, 40),
+                    blur_radius=28,
+                )
+                base.alpha_composite(
+                    wm,
+                    (pill_x0 + inner_pad_x, pill_y0 + inner_pad_y),
+                )
+            except Exception as logo_err:
+                logger.warning(f"Hero image: couldn't load wordmark logo: {logo_err}")
+
+            # 7) Flatten alpha onto opaque base color, downsample for crisp
+            # edges, slight sharpen pass.
+            flat = Image.new('RGB', base.size, self._hex_rgb(theme['base_color']))
+            flat.paste(base, mask=base.split()[-1])
+            flat = flat.resize((self.HERO_WIDTH, self.HERO_HEIGHT), Image.Resampling.LANCZOS)
+            flat = flat.filter(ImageFilter.SHARPEN)
+
+            out = BytesIO()
+            flat.save(out, format='JPEG', quality=92, optimize=True)
+            out.seek(0)
+            logger.info(
+                f"Generated verse hero image: theme={theme['id']} "
+                f"ref={reference!r} chars={len(verse_text or '')}"
+            )
+            return out
+
+        except Exception as e:
+            logger.error(f"Error generating verse hero image: {e}", exc_info=True)
+            raise
+
+
 # Singleton instance
 _image_generator = None
 

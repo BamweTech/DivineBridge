@@ -313,10 +313,26 @@ class LocalStorageHandler:
     def get_verse_image(self, date_str):
         """Get a verse image"""
         file_path = self.images_path / f"verse_{date_str}.png"
-        
+
         if not file_path.exists():
             return None
-        
+
+        with open(file_path, 'rb') as f:
+            return f.read()
+
+    def save_verse_hero_image(self, date_str, image_data):
+        """Save the themed 9:16 verse hero image (local-dev cache)."""
+        file_path = self.images_path / f"verse_hero_{date_str}.jpg"
+        with open(file_path, 'wb') as f:
+            f.write(image_data)
+        logger.info(f"Saved verse hero image locally: {file_path}")
+        return str(file_path)
+
+    def get_verse_hero_image(self, date_str):
+        """Get the cached themed 9:16 verse hero image (local-dev cache)."""
+        file_path = self.images_path / f"verse_hero_{date_str}.jpg"
+        if not file_path.exists():
+            return None
         with open(file_path, 'rb') as f:
             return f.read()
     
