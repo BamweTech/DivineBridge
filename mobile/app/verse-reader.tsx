@@ -20,6 +20,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { shareServerImage } from '@/lib/shareServerImage';
 import { THEME_COLORS } from '@/lib/constants';
 import { TYPE, iosFont } from '@/lib/typography';
+import { pickVerseTheme } from '@/lib/verseThemes';
 import Icon from '@/components/ui/Icon';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GlassPill } from '@/components/ui/GlassPill';
@@ -73,6 +74,12 @@ export default function VerseReaderScreen() {
   const verseRef = verseQuery.data?.data?.reference ?? '';
   const liked = interactionsQuery.data?.likes?.liked ?? false;
   const likesCount = interactionsQuery.data?.likes?.count ?? 0;
+  // Use the same mood theme as the hero card so the reader feels like a
+  // natural extension of what was just tapped.
+  const verseTheme = useMemo(
+    () => pickVerseTheme(verseText, verseRef, date),
+    [verseText, verseRef, date]
+  );
 
   const likeMutation = useMutation({
     mutationFn: (currentlyLiked: boolean) =>
@@ -141,12 +148,13 @@ export default function VerseReaderScreen() {
         }}
       />
 
-      {/* Top bar: close + share */}
+      {/* Top bar: close + share. The pill is themed to match the hero card so
+          the reader feels like an extension of what was tapped. */}
       <View
         style={{
-          paddingTop: insets.top + (Platform.OS === 'ios' ? 8 : 12),
+          paddingTop: insets.top + (Platform.OS === 'ios' ? 14 : 16),
           paddingHorizontal: 16,
-          paddingBottom: 8,
+          paddingBottom: 18,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -163,11 +171,11 @@ export default function VerseReaderScreen() {
             <Icon name="chevron-d" size={18} color={THEME_COLORS.text2} />
           </View>
         </GlassPill>
-        <GlassPill tone="gold" radius={999} style={{ paddingHorizontal: 14, paddingVertical: 7 }}>
+        <GlassPill tone={verseTheme.pillTone} radius={999} style={{ paddingHorizontal: 14, paddingVertical: 7 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Icon name="cross" size={11} color={THEME_COLORS.gold} />
-            <Text style={{ ...TYPE.capsLabel, color: THEME_COLORS.gold }}>
-              {dayjs(date).format('MMM D')} · Daily Verse
+            <Icon name="cross" size={11} color={verseTheme.accent} />
+            <Text style={{ ...TYPE.capsLabel, color: verseTheme.accent }}>
+              {dayjs(date).format('MMM D')} · {verseTheme.label}
             </Text>
           </View>
         </GlassPill>
@@ -191,7 +199,7 @@ export default function VerseReaderScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{
           paddingHorizontal: 22,
-          paddingTop: 12,
+          paddingTop: 28,
           paddingBottom: insets.bottom + 120,
         }}
         showsVerticalScrollIndicator={false}
@@ -202,11 +210,10 @@ export default function VerseReaderScreen() {
             style={{
               fontFamily: iosFont('700'),
               fontWeight: '700',
-              fontSize: 36,
-              lineHeight: 46,
+              fontSize: 32,
+              lineHeight: 42,
               letterSpacing: -0.6,
               color: THEME_COLORS.text,
-              marginTop: 12,
             }}
           >
             &ldquo;{verseText || 'Loading today\u2019s verse\u2026'}&rdquo;
@@ -216,7 +223,7 @@ export default function VerseReaderScreen() {
               ...TYPE.capsLabel,
               fontSize: 13,
               letterSpacing: 1.6,
-              color: THEME_COLORS.gold,
+              color: verseTheme.accent,
               marginTop: 22,
             }}
           >
@@ -288,10 +295,11 @@ export default function VerseReaderScreen() {
             />
             <View style={{ width: 1, marginVertical: 12, backgroundColor: 'rgba(44,36,23,0.08)' }} />
             <ReaderActionButton
-              icon={<Icon name="audio" size={20} color={isListening ? THEME_COLORS.gold : THEME_COLORS.text2} />}
+              icon={<Icon name="audio" size={20} color={isListening ? verseTheme.accent : THEME_COLORS.text2} />}
               label={isListening ? 'Stop' : 'Listen'}
               onPress={onListen}
               active={isListening}
+              activeColor={verseTheme.accent}
             />
             <View style={{ width: 1, marginVertical: 12, backgroundColor: 'rgba(44,36,23,0.08)' }} />
             <ReaderActionButton
@@ -312,13 +320,16 @@ function ReaderActionButton({
   onPress,
   active,
   count,
+  activeColor,
 }: {
   icon: React.ReactNode;
   label: string;
   onPress: () => void;
   active?: boolean;
   count?: number;
+  activeColor?: string;
 }) {
+  const accent = activeColor ?? THEME_COLORS.gold;
   return (
     <Pressable
       onPress={onPress}
@@ -332,7 +343,7 @@ function ReaderActionButton({
           <Text
             style={{
               ...TYPE.caption2,
-              color: active ? THEME_COLORS.gold : THEME_COLORS.text2,
+              color: active ? accent : THEME_COLORS.text2,
               fontVariant: ['tabular-nums'],
               textTransform: 'none',
               letterSpacing: 0,
@@ -344,7 +355,7 @@ function ReaderActionButton({
           </Text>
         ) : null}
       </View>
-      <Text style={{ ...TYPE.capsLabel, color: active ? THEME_COLORS.gold : THEME_COLORS.text2 }}>
+      <Text style={{ ...TYPE.capsLabel, color: active ? accent : THEME_COLORS.text2 }}>
         {label}
       </Text>
     </Pressable>
