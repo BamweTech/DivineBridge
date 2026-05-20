@@ -90,14 +90,20 @@ function TabBarIcon({
         </View>
       </Animated.View>
       <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
+        allowFontScaling={false}
         style={{
           color: focused ? THEME_COLORS.gold : THEME_COLORS.text3,
           fontFamily: iosFont(focused ? '600' : '400'),
           fontWeight: focused ? '600' : '400',
           fontSize: 9,
           marginTop: 6,
-          letterSpacing: 0.6,
+          letterSpacing: 0.4,
           textTransform: 'uppercase',
+          textAlign: 'center',
+          width: SLOT_W,
         }}
       >
         {label}
