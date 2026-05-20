@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   Pressable,
   Platform,
   Alert,
+  type LayoutChangeEvent,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -81,6 +82,18 @@ export default function VerseReaderScreen() {
     [verseText, verseRef, date]
   );
 
+  // We render the top bar as an absolutely-positioned overlay so it can never
+  // be collapsed by a flex quirk and let the verse text slide up underneath
+  // it. We measure its real height on layout and use that to pad the
+  // ScrollView so the verse always starts cleanly below it.
+  const [headerHeight, setHeaderHeight] = useState<number>(
+    (Platform.OS === 'ios' ? Math.max(insets.top, 18) + 14 : insets.top + 16) + 40 + 24
+  );
+  const onHeaderLayout = (e: LayoutChangeEvent) => {
+    const h = e.nativeEvent.layout.height;
+    if (h && Math.abs(h - headerHeight) > 1) setHeaderHeight(h);
+  };
+
   const likeMutation = useMutation({
     mutationFn: (currentlyLiked: boolean) =>
       currentlyLiked ? verseApi.unlike(date) : verseApi.like(date),
@@ -148,68 +161,16 @@ export default function VerseReaderScreen() {
         }}
       />
 
-      {/* Top bar: close + share. The pill is themed to match the hero card so
-          the reader feels like an extension of what was tapped.
-          We floor the top padding on iOS so the row always clears the sheet
-          grabber, even when `insets.top` is reported as 0 inside the formSheet. */}
-      <View
-        style={{
-          paddingTop:
-            Platform.OS === 'ios'
-              ? Math.max(insets.top, 18) + 14
-              : insets.top + 16,
-          paddingHorizontal: 16,
-          paddingBottom: 24,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <GlassPill
-          onPress={() => router.back()}
-          accessibilityLabel="Close verse reader"
-          radius={14}
-          hitSlop={8}
-          style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
-        >
-          <View style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="chevron-d" size={18} color={THEME_COLORS.text2} />
-          </View>
-        </GlassPill>
-        <GlassPill tone={verseTheme.pillTone} radius={999} style={{ paddingHorizontal: 14, paddingVertical: 7 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Icon name="cross" size={11} color={verseTheme.accent} />
-            <Text style={{ ...TYPE.capsLabel, color: verseTheme.accent }}>
-              {dayjs(date).format('MMM D')} · {verseTheme.label}
-            </Text>
-          </View>
-        </GlassPill>
-        <GlassPill
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            onShare();
-          }}
-          accessibilityLabel="Share today's verse"
-          radius={14}
-          hitSlop={8}
-          style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
-        >
-          <View style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="share" size={16} color={THEME_COLORS.text2} />
-          </View>
-        </GlassPill>
-      </View>
-
+      {/* ScrollView fills the whole sheet; we pad its top by the measured
+          header height so the verse always starts cleanly below the pills. */}
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{
           paddingHorizontal: 22,
-          paddingTop: 56,
+          paddingTop: headerHeight + 24,
           paddingBottom: insets.bottom + 120,
         }}
         showsVerticalScrollIndicator={false}
-        // Prevent iOS from silently shifting our top content up under the
-        // header pill via automatic content inset adjustment inside the sheet.
         contentInsetAdjustmentBehavior="never"
         automaticallyAdjustContentInsets={false}
       >
@@ -291,8 +252,68 @@ export default function VerseReaderScreen() {
         </Animated.View>
       </ScrollView>
 
+      {/* Top bar: close + share. Rendered ABSOLUTELY at the top so it always
+          stays put, with a soft gradient scrim behind it that fades the verse
+          out as it scrolls under. The pill is themed to match the hero card
+          so the reader feels like an extension of what was tapped. */}
+      <View
+        onLayout={onHeaderLayout}
+        pointerEvents="box-none"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 10,
+          paddingTop:
+            Platform.OS === 'ios'
+              ? Math.max(insets.top, 18) + 14
+              : insets.top + 16,
+          paddingHorizontal: 16,
+          paddingBottom: 16,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          backgroundColor: 'rgba(251,242,218,0.85)',
+        }}
+      >
+        <GlassPill
+          onPress={() => router.back()}
+          accessibilityLabel="Close verse reader"
+          radius={14}
+          hitSlop={8}
+          style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <View style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="chevron-d" size={18} color={THEME_COLORS.text2} />
+          </View>
+        </GlassPill>
+        <GlassPill tone={verseTheme.pillTone} radius={999} style={{ paddingHorizontal: 14, paddingVertical: 7 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Icon name="cross" size={11} color={verseTheme.accent} />
+            <Text style={{ ...TYPE.capsLabel, color: verseTheme.accent }}>
+              {dayjs(date).format('MMM D')} · {verseTheme.label}
+            </Text>
+          </View>
+        </GlassPill>
+        <GlassPill
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onShare();
+          }}
+          accessibilityLabel="Share today's verse"
+          radius={14}
+          hitSlop={8}
+          style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <View style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="share" size={16} color={THEME_COLORS.text2} />
+          </View>
+        </GlassPill>
+      </View>
+
       {/* Bottom glass action bar */}
-      <View style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 12 }}>
+      <View style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 12, zIndex: 10 }}>
         <GlassActionBar radius={22}>
           <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
             <ReaderActionButton
