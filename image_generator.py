@@ -1179,22 +1179,23 @@ class ImageGenerator:
             lines.append(' '.join(line_words))
         return lines
 
-    def _hero_fit_verse_font(self, sans, text, max_width, max_height, max_lines=12):
+    def _hero_fit_verse_font(self, sans, text, max_width, max_height, max_lines=14):
         """Pick the largest body font that fits within the verse text box.
 
-        Walks from 96pt down to 56pt until the wrapped text fits in
+        Walks from 132pt down to 64pt until the wrapped text fits in
         (max_width x max_height) without exceeding `max_lines`. Long verses
-        get smaller type rather than overflowing the canvas.
+        get smaller type rather than overflowing the canvas; short verses
+        get true display size so the verse dominates the canvas.
         """
-        for size in (96, 90, 84, 78, 72, 66, 60, 56):
+        for size in (132, 124, 116, 108, 100, 92, 84, 76, 70, 64):
             font = sans(size, bold=True)
             line_h = int(size * 1.22)
             lines = self._hero_wrap_text(text, font, max_width)
             if len(lines) <= max_lines and len(lines) * line_h <= max_height:
                 return font, lines, line_h
         # Fallback: smallest size, hard-clip to max_lines if needed.
-        font = sans(56, bold=True)
-        line_h = int(56 * 1.22)
+        font = sans(64, bold=True)
+        line_h = int(64 * 1.22)
         lines = self._hero_wrap_text(text, font, max_width)[:max_lines]
         return font, lines, line_h
 
@@ -1269,9 +1270,9 @@ class ImageGenerator:
 
             # 4) Verse body — centered horizontally, vertically positioned in
             # the upper-middle band of the canvas so the reference + logo
-            # pill have room below. Picks the largest body size that fits.
-            body_max_w = (self.HERO_WIDTH - 160) * scale
-            body_max_h = int(self.HERO_HEIGHT * scale * 0.50)
+            # have room below. Picks the largest body size that fits.
+            body_max_w = (self.HERO_WIDTH - 140) * scale
+            body_max_h = int(self.HERO_HEIGHT * scale * 0.62)
             verse_font, verse_lines, line_h = self._hero_fit_verse_font(
                 sans, f'\u201c{verse_text}\u201d', body_max_w, body_max_h,
             )
@@ -1303,38 +1304,20 @@ class ImageGenerator:
                     fill=(*self._hex_rgb(theme['accent']), 255),
                 )
 
-            # 6) Bottom-right glass pill with logo + wordmark. Uses the
-            # combined mark+wordmark PNG so we don't need a separate font
-            # for "Divine Bridge".
+            # 6) Bottom-right wordmark (logo + "Divine Bridge"). Pasted
+            # plain on the gradient — no surrounding glass pill — so the
+            # brand reads as a subtle signature rather than competing with
+            # the verse.
             try:
                 wm = Image.open(self.WORDMARK_LOGO_PATH).convert('RGBA')
-                # Scale to a height of ~100px (logical) / 200px (rendered)
-                # so the brand reads cleanly at thumbnail size.
-                target_h = 100 * scale
+                target_h = 110 * scale
                 aspect = wm.width / wm.height
                 target_w = int(target_h * aspect)
                 wm = wm.resize((target_w, target_h), Image.Resampling.LANCZOS)
-                inner_pad_x = 44 * scale
-                inner_pad_y = 30 * scale
-                pill_w = target_w + 2 * inner_pad_x
-                pill_h = target_h + 2 * inner_pad_y
-                pill_margin = 60 * scale
-                pill_x1 = W - pill_margin
-                pill_y1 = H - pill_margin
-                pill_x0 = pill_x1 - pill_w
-                pill_y0 = pill_y1 - pill_h
-                self._hero_frosted_pill(
-                    base,
-                    (pill_x0, pill_y0, pill_x1, pill_y1),
-                    radius=int(pill_h * 0.46),
-                    fill_rgba=(255, 253, 247, 210),
-                    border_rgba=(44, 36, 23, 40),
-                    blur_radius=28,
-                )
-                base.alpha_composite(
-                    wm,
-                    (pill_x0 + inner_pad_x, pill_y0 + inner_pad_y),
-                )
+                margin = 70 * scale
+                wm_x = W - margin - target_w
+                wm_y = H - margin - target_h
+                base.alpha_composite(wm, (wm_x, wm_y))
             except Exception as logo_err:
                 logger.warning(f"Hero image: couldn't load wordmark logo: {logo_err}")
 
