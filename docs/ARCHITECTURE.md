@@ -196,6 +196,7 @@ Authoritative security rules: [firestore.rules](../firestore.rules). Below is a 
 | Content | `prayer_requests`, `testimonies` | Prayer wall and thanksgiving wall |
 | Devotionals | `devotional_plans` | Personalized plans ([routes/devotional_bp.py](../routes/devotional_bp.py)) |
 | Devotional templates | `devotional_templates` | Pre-generated plans for the 8 suggested themes × 3 durations (7/14/30 days). Backend-only (no client access). Keyed by `{theme-slug}_{duration}` (e.g. `faith-trust_7`). Refreshed monthly via `/admin/api/refresh-devotional-templates` or `scripts/pregen_devotional_templates.py`. |
+| Verse devotional context | `verse_contexts` | AI-generated short "sermon" for each daily verse (summary, context / meaning / application paragraphs, 2–4 Hebrew or Greek words with transliteration + gloss, 3 verse-specific reflection questions). Keyed by verse slug derived from the reference (e.g. `1-john-4-11`), **not** by date, because the underlying verse rotation in `static/bible_verses.json` repeats yearly — generate once per unique verse, reuse forever. Public read; writes go through `verse_context_generator.py` from `routes/verse_bp.py` (`/api/today-verse/context`) or `scripts/pregen_verse_contexts.py`. Backfill all verses once, then a nightly Cloud Scheduler call to `POST /api/today-verse/context/generate` pre-warms the next 7 days. |
 
 **Firebase Realtime Database** is used for **low-latency** live-room concerns on the web client (and related mobile hooks) — paths are managed in client code (e.g. [static/js/prayer-room.js](../static/js/prayer-room.js)).
 
@@ -221,6 +222,7 @@ User journeys and screenshots-level detail: **[USER_FEATURES_DOCUMENTATION.md](U
 |--------------|---------------------------|
 | Daily prayer and AI generation | [prayer_generator.py](../prayer_generator.py), [routes/prayer_bp.py](../routes/prayer_bp.py), scheduler docs [deployment/CLOUD_SCHEDULER_SETUP.md](deployment/CLOUD_SCHEDULER_SETUP.md) |
 | Daily verse | [routes/verse_bp.py](../routes/verse_bp.py), [verse_generator.py](../verse_generator.py), [verse_cache.py](../verse_cache.py) |
+| Verse devotional context (AI sermon, original-language insights, reflection questions) | [verse_context_generator.py](../verse_context_generator.py), [config/verse_context_prompt.txt](../config/verse_context_prompt.txt), [routes/verse_bp.py](../routes/verse_bp.py) (`/api/today-verse/context`), [scripts/pregen_verse_contexts.py](../scripts/pregen_verse_contexts.py), [mobile/app/verse-reader.tsx](../mobile/app/verse-reader.tsx) |
 | Disaster / SEO pages | [routes/seo_bp.py](../routes/seo_bp.py), [disaster_prayer_service.py](../disaster_prayer_service.py) |
 | Prayer requests | [routes/prayer_bp.py](../routes/prayer_bp.py), [content_moderator.py](../content_moderator.py) |
 | Testimonies | [routes/testimony_bp.py](../routes/testimony_bp.py) |

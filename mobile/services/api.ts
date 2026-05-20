@@ -87,9 +87,39 @@ export const prayerApi = {
     request<any>(`/api/prayer/daily-prayer/${date}/share`, { method: 'POST' }),
 };
 
+export type VerseContextOriginalWord = {
+  word: string;
+  transliteration: string;
+  language: 'Hebrew' | 'Greek' | string;
+  appears_as: string;
+  gloss: string;
+};
+
+export type VerseContext = {
+  reference: string;
+  verse_slug: string;
+  summary: string;
+  context: string;
+  meaning: string;
+  application: string;
+  original_words: VerseContextOriginalWord[];
+  reflection_questions: string[];
+  version: number;
+};
+
 export const verseApi = {
   getToday: (date: string) =>
     request<any>(`/api/today-verse?client_date=${encodeURIComponent(date)}`),
+  /**
+   * AI-generated "sermon" for today's verse: short context / meaning /
+   * application sections, 2-4 Hebrew or Greek words with transliteration
+   * and gloss, and 3 verse-specific reflection questions. Cached server-
+   * side per unique verse (not per date) and CDN-cached for an hour.
+   */
+  getContext: (date: string) =>
+    request<{ success: boolean; data: VerseContext }>(
+      `/api/today-verse/context?client_date=${encodeURIComponent(date)}`
+    ),
   like: (date: string) =>
     request<any>(`/api/today-verse/${date}/like`, { method: 'POST' }),
   unlike: (date: string) =>

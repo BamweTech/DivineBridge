@@ -304,6 +304,17 @@ service cloud.firestore {
                     request.resource.data.platform.size() <= 50;
       }
     }
+
+    // AI-generated verse devotional context (sermon + original words +
+    // reflection questions). Keyed by verse slug (e.g. "1-john-4-11"), not
+    // by date, because the underlying verse rotation repeats each year.
+    // Read is public so the mobile reader can fetch without auth; writes
+    // are server-only via Flask /api/today-verse/context endpoints and the
+    // pregen script (both run as the Firebase admin SDK).
+    match /verse_contexts/{slug} {
+      allow read: if true;
+      allow create, update, delete: if false;
+    }
     
     // ─── WebRTC Firestore Signaling (mobile app — replaces HTTP polling) ────────
     match /prayer_rooms/{roomId}/signaling/{sigId} {

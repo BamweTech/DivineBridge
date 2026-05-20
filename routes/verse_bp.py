@@ -1,11 +1,44 @@
 from flask import Blueprint, jsonify, current_app, request, send_file
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from auth_helpers import get_user_from_session
+from auth_decorators import verify_cloud_scheduler
 from firebase_auth import get_firestore_client
 
 logger = logging.getLogger(__name__)
 verse_bp = Blueprint('verse', __name__)
+
+
+def _resolve_client_date(client_date_str):
+    """Parse ``client_date=YYYY-MM-DD`` from the request, falling back to today.
+
+    Returns ``(day_of_year, date_str)``. Used by every endpoint that needs to
+    map a client calendar date to the day-of-year index into
+    ``static/bible_verses.json``.
+    """
+    if client_date_str:
+        try:
+            dt = datetime.strptime(client_date_str, '%Y-%m-%d')
+            return dt.timetuple().tm_yday, client_date_str
+        except ValueError:
+            logger.warning("Invalid client_date %r, using server time", client_date_str)
+    now = datetime.now()
+    return now.timetuple().tm_yday, now.strftime('%Y-%m-%d')
+
+
+def _get_verse_context_generator():
+    """Lazy-construct ``VerseContextGenerator`` once per process.
+
+    Import is deferred so the route module can load even when Firestore /
+    Perplexity aren't configured (e.g. during tests that only touch verse
+    text / image endpoints).
+    """
+    gen = getattr(current_app, '_verse_context_generator', None)
+    if gen is None:
+        from verse_context_generator import VerseContextGenerator
+        gen = VerseContextGenerator()
+        current_app._verse_context_generator = gen
+    return gen
 
 @verse_bp.route('/today-verse', methods=['GET'])
 def get_verse():
@@ -539,3 +572,128 @@ def home_bundle():
     except Exception as e:
         logger.error(f"Error building home bundle: {e}")
         return jsonify({'success': False, 'error': 'Failed to build home bundle'}), 500
+
+
+# ── Verse Context (AI-generated "sermon" + original words + reflection Qs) ──
+
+@verse_bp.route('/today-verse/context', methods=['GET'])
+def get_verse_context():
+    """Return the AI-generated devotional context for today's verse.
+
+    Looks up the verse by client_date → day_of_year (same logic as
+    ``/today-verse``), then reads ``verse_contexts/{slug}`` from Firestore.
+    If no doc exists yet (first appearance of a verse), generates one on the
+    fly via :class:`VerseContextGenerator` and caches it. Same-verse future
+    days reuse the cached doc — generation is keyed by verse, not by date.
+
+    Response is CDN-cacheable for an hour because the verse text and its
+    context are both deterministic per day.
+    """
+    try:
+        client_date = request.args.get('client_date')
+        day_of_year, _ = _resolve_client_date(client_date)
+        verse = current_app.verse_cache.get_today_verse(day_of_year=day_of_year)
+        if not verse:
+            return jsonify({'success': False, 'error': 'No verse available'}), 404
+
+        generator = _get_verse_context_generator()
+        # generate_context() is a no-op when the doc already exists.
+        doc = generator.generate_context(
+            verse_text=verse['verse'],
+            reference=verse['reference'],
+        )
+
+        # Trim fields we don't need to ship to clients (verse text is already
+        # delivered by /today-verse; sending it twice wastes bytes).
+        client_view = {
+            'reference': doc.get('reference'),
+            'verse_slug': doc.get('verse_slug'),
+            'summary': doc.get('summary'),
+            'context': doc.get('context'),
+            'meaning': doc.get('meaning'),
+            'application': doc.get('application'),
+            'original_words': doc.get('original_words') or [],
+            'reflection_questions': doc.get('reflection_questions') or [],
+            'version': doc.get('version'),
+        }
+        response = jsonify({'success': True, 'data': client_view})
+        response.headers['Cache-Control'] = 'public, max-age=3600, s-maxage=3600'
+        return response, 200
+
+    except Exception as e:
+        logger.error(f"Error getting verse context: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Failed to get verse context'}), 500
+
+
+@verse_bp.route('/today-verse/context/generate', methods=['POST'])
+@verify_cloud_scheduler()
+def generate_upcoming_verse_contexts():
+    """Pre-generate verse contexts for the next N days (Cloud Scheduler job).
+
+    Defaults to 7 days of look-ahead so the daily cron always lands at least
+    one new context (when a verse cycles in for the first time) and keeps
+    week-ahead contexts pre-warmed for instant reader opens. Returns a
+    per-day report including which days hit the cache vs which were freshly
+    generated.
+
+    Body (optional JSON): ``{ "days": 7, "force": false }``.
+    """
+    try:
+        body = request.get_json(silent=True) or {}
+        days = int(body.get('days', 7))
+        days = max(1, min(days, 30))  # sanity bounds
+        force = bool(body.get('force', False))
+
+        generator = _get_verse_context_generator()
+        results = []
+        ok, skipped, failed = 0, 0, 0
+        base = datetime.now()
+        for i in range(days):
+            dt = base + timedelta(days=i)
+            doy = dt.timetuple().tm_yday
+            verse = current_app.verse_cache.get_today_verse(day_of_year=doy)
+            if not verse:
+                continue
+            ref = verse.get('reference', '')
+            text = verse.get('verse', '')
+            try:
+                if not force and generator.get_cached(ref):
+                    skipped += 1
+                    results.append({
+                        'date': dt.strftime('%Y-%m-%d'),
+                        'reference': ref,
+                        'status': 'cached',
+                    })
+                    continue
+                generator.generate_context(text, ref, force=force)
+                ok += 1
+                results.append({
+                    'date': dt.strftime('%Y-%m-%d'),
+                    'reference': ref,
+                    'status': 'generated',
+                })
+            except Exception as inner:
+                failed += 1
+                logger.error(
+                    "verse_context generation failed for %s: %s",
+                    ref, inner, exc_info=True,
+                )
+                results.append({
+                    'date': dt.strftime('%Y-%m-%d'),
+                    'reference': ref,
+                    'status': 'error',
+                    'error': str(inner),
+                })
+
+        return jsonify({
+            'success': True,
+            'days': days,
+            'generated': ok,
+            'cached': skipped,
+            'failed': failed,
+            'results': results,
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error in scheduled verse context generation: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500

@@ -52,6 +52,21 @@ gcloud scheduler jobs create http send-daily-emails \
     --http-method=POST \
     --oidc-service-account-email=divinebridge@appspot.gserviceaccount.com \
     --oidc-token-audience="https://divinebridge-<your-hash>-uc.a.run.app"
+
+# Nightly verse-context warmer (7-day look-ahead)
+# Pre-generates the AI sermon / original-language words / reflection questions
+# for the next week of daily verses into Firestore `verse_contexts/{slug}`.
+# Skips any verses already cached, so the cost on a normal night is near-zero.
+gcloud scheduler jobs create http verse-context-warmer \
+    --location=us-central1 \
+    --schedule="30 0 * * *" \
+    --time-zone="UTC" \
+    --uri="https://divinebridge-<your-hash>-uc.a.run.app/api/today-verse/context/generate" \
+    --http-method=POST \
+    --message-body='{"days":7,"force":false}' \
+    --headers="Content-Type=application/json" \
+    --oidc-service-account-email=prayer-scheduler@divinebridge.iam.gserviceaccount.com \
+    --oidc-token-audience="https://divinebridge-<your-hash>-uc.a.run.app"
 ```
 
 **Note:** Replace `<your-hash>` with your actual Cloud Run service URL.

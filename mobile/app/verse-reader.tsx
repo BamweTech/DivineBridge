@@ -15,7 +15,7 @@ import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import dayjs from 'dayjs';
 
-import { verseApi } from '@/services/api';
+import { verseApi, type VerseContext, type VerseContextOriginalWord } from '@/services/api';
 import { useSpeechPlayback } from '@/hooks/useSpeechPlayback';
 import { useAuthStore } from '@/stores/authStore';
 import { shareServerImage } from '@/lib/shareServerImage';
@@ -67,6 +67,18 @@ export default function VerseReaderScreen() {
     queryKey: ['verse-interactions', date],
     queryFn: () => verseApi.getInteractions(date),
   });
+  // The AI sermon / original-language / reflection-questions payload.
+  // First-time loads for an uncached verse can take ~5–15s while the server
+  // calls Perplexity; subsequent loads come back from Firestore instantly.
+  // We keep the query soft (no retries beyond 1, long staleTime) because
+  // failure is non-fatal — the reader still works without the sermon.
+  const contextQuery = useQuery({
+    queryKey: ['verse-context', date],
+    queryFn: () => verseApi.getContext(date),
+    retry: 1,
+    staleTime: 60 * 60 * 1000, // 1h — backend cache-control matches
+  });
+  const verseContext: VerseContext | undefined = contextQuery.data?.data;
 
   const { toggle: speechToggle, isSpeaking, activeSource } = useSpeechPlayback();
   const isListening = activeSource === 'verse' && isSpeaking;
@@ -201,14 +213,104 @@ export default function VerseReaderScreen() {
           </Text>
         </Animated.View>
 
-        {/* Reflection prompts */}
-        <Animated.View entering={FadeInDown.delay(160).duration(420)} style={{ marginTop: 36 }}>
+        {/* AI-generated "sermon" — summary headline followed by short
+            Context / Meaning / Application paragraphs. Renders only after
+            the context query lands; while it's loading we show a tiny
+            preparing-message cap label instead of a blocking spinner so
+            the rest of the reader stays usable. */}
+        {verseContext ? (
+          <Animated.View entering={FadeInDown.delay(120).duration(420)} style={{ marginTop: 36 }}>
+            <Text style={{ ...TYPE.capsLabel, color: verseTheme.accent, marginBottom: 12 }}>
+              Today&apos;s Message
+            </Text>
+            {verseContext.summary ? (
+              <Text
+                style={{
+                  fontFamily: iosFont('500'),
+                  fontWeight: '500',
+                  fontSize: 19,
+                  lineHeight: 27,
+                  letterSpacing: -0.2,
+                  color: THEME_COLORS.text,
+                  marginBottom: 18,
+                }}
+              >
+                {verseContext.summary}
+              </Text>
+            ) : null}
+            <View style={{ gap: 12 }}>
+              {(
+                [
+                  { label: 'Context', body: verseContext.context },
+                  { label: 'Meaning', body: verseContext.meaning },
+                  { label: 'Application', body: verseContext.application },
+                ] as const
+              )
+                .filter((s) => !!s.body)
+                .map((section) => (
+                  <GlassCard
+                    key={section.label}
+                    tone="warm"
+                    intensity="card"
+                    radius={18}
+                    style={{ padding: 16 }}
+                  >
+                    <Text style={{ ...TYPE.capsLabel, color: verseTheme.accent, marginBottom: 8 }}>
+                      {section.label}
+                    </Text>
+                    <Text style={{ ...TYPE.body, color: THEME_COLORS.text, lineHeight: 24 }}>
+                      {section.body}
+                    </Text>
+                  </GlassCard>
+                ))}
+            </View>
+          </Animated.View>
+        ) : contextQuery.isLoading ? (
+          <View style={{ marginTop: 36, alignItems: 'center', paddingVertical: 12 }}>
+            <Text style={{ ...TYPE.capsLabel, color: THEME_COLORS.text3 }}>
+              Preparing today&apos;s message…
+            </Text>
+          </View>
+        ) : null}
+
+        {/* Original-language insights — stacked cards highlighting 2–4
+            Hebrew or Greek words the English translation flattens. */}
+        {verseContext?.original_words?.length ? (
+          <Animated.View entering={FadeInDown.delay(180).duration(420)} style={{ marginTop: 32 }}>
+            <Text style={{ ...TYPE.capsLabel, color: verseTheme.accent, marginBottom: 12 }}>
+              In the Original Language
+            </Text>
+            <View style={{ gap: 10 }}>
+              {verseContext.original_words.map((w, i) => (
+                <OriginalWordCard
+                  key={`${w.transliteration}-${i}`}
+                  word={w}
+                  accent={verseTheme.accent}
+                />
+              ))}
+            </View>
+          </Animated.View>
+        ) : null}
+
+        {/* Reflect — AI-generated, verse-specific prompts when available;
+            otherwise fall back to the three generic ones so the section is
+            never empty. */}
+        <Animated.View entering={FadeInDown.delay(220).duration(420)} style={{ marginTop: 32 }}>
           <Text style={{ ...TYPE.capsLabel, color: THEME_COLORS.text3, marginBottom: 12 }}>
             Reflect
           </Text>
           <View style={{ gap: 10 }}>
-            {REFLECTION_PROMPTS.map((prompt, i) => (
-              <GlassCard key={i} tone="warm" intensity="card" radius={18} style={{ padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            {(verseContext?.reflection_questions?.length
+              ? verseContext.reflection_questions
+              : REFLECTION_PROMPTS
+            ).map((prompt, i) => (
+              <GlassCard
+                key={`${i}-${prompt.slice(0, 16)}`}
+                tone="warm"
+                intensity="card"
+                radius={18}
+                style={{ padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}
+              >
                 <View
                   style={{
                     width: 28, height: 28, borderRadius: 14,
@@ -216,7 +318,7 @@ export default function VerseReaderScreen() {
                     alignItems: 'center', justifyContent: 'center',
                   }}
                 >
-                  <Text style={{ ...TYPE.caption2, color: THEME_COLORS.gold, fontWeight: '700', fontFamily: iosFont('700') }}>
+                  <Text style={{ ...TYPE.caption2, color: verseTheme.accent, fontWeight: '700', fontFamily: iosFont('700') }}>
                     {i + 1}
                   </Text>
                 </View>
@@ -341,6 +443,71 @@ export default function VerseReaderScreen() {
         </GlassActionBar>
       </View>
     </View>
+  );
+}
+
+/**
+ * Compact card for one original-language word from the verse context.
+ *
+ * Visually: the original script (Hebrew or Greek) is displayed large on the
+ * left, with the transliteration · language pill and the English mapping
+ * stacked to the right, and the single-sentence gloss running across the
+ * bottom. The whole card adopts the verse's mood accent for the language
+ * pill so it stays cohesive with the rest of the reader.
+ */
+function OriginalWordCard({
+  word,
+  accent,
+}: {
+  word: VerseContextOriginalWord;
+  accent: string;
+}) {
+  return (
+    <GlassCard tone="warm" intensity="card" radius={18} style={{ padding: 16 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 14 }}>
+        <Text
+          // Original script; use System on iOS so SF Pro's broad Unicode
+          // coverage handles Hebrew / Greek. fontWeight 500 keeps Greek
+          // diacritics legible without going heavy.
+          style={{
+            fontFamily: iosFont('500'),
+            fontSize: 30,
+            lineHeight: 36,
+            color: THEME_COLORS.text,
+            minWidth: 88,
+          }}
+        >
+          {word.word}
+        </Text>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <Text style={{ ...TYPE.headline, color: THEME_COLORS.text }}>
+              {word.transliteration}
+            </Text>
+            <View
+              style={{
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: 999,
+                backgroundColor: 'rgba(176,125,32,0.10)',
+              }}
+            >
+              <Text style={{ ...TYPE.capsLabel, color: accent, fontSize: 10, letterSpacing: 0.8 }}>
+                {word.language}
+              </Text>
+            </View>
+          </View>
+          {word.appears_as ? (
+            <Text style={{ ...TYPE.footnote, color: THEME_COLORS.text3, marginTop: 2 }}>
+              appears as <Text style={{ color: THEME_COLORS.text2, fontWeight: '600', fontFamily: iosFont('600') }}>{word.appears_as}</Text>
+            </Text>
+          ) : null}
+        </View>
+      </View>
+      <Text style={{ ...TYPE.subheadline, color: THEME_COLORS.text, marginTop: 12, lineHeight: 22 }}>
+        {word.gloss}
+      </Text>
+    </GlassCard>
   );
 }
 
