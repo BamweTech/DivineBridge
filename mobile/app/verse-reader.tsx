@@ -112,7 +112,7 @@ export default function VerseReaderScreen() {
         ? `Today's Verse (${verseRef}):\n\n"${verseText}"\n\nDivine Bridge — divinebridge.io`
         : `Today's verse on Divine Bridge — divinebridge.io`;
     await shareServerImage(
-      `/api/today-verse/download?client_date=${encodeURIComponent(date)}`,
+      `/api/today-verse/hero-image?client_date=${encodeURIComponent(date)}`,
       `divine_bridge_verse_${date}.jpg`,
       fallback
     );

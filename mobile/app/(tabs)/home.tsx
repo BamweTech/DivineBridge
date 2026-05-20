@@ -583,7 +583,7 @@ export default function HomeScreen() {
         ? `Today's Verse (${verseRef}):\n\n"${verseText}"\n\nDivine Bridge — divinebridge.io`
         : `Today's verse on Divine Bridge — divinebridge.io`;
     await shareServerImage(
-      `/api/today-verse/download?client_date=${encodeURIComponent(today)}`,
+      `/api/today-verse/hero-image?client_date=${encodeURIComponent(today)}`,
       `divine_bridge_verse_${today}.jpg`,
       fallback
     );
