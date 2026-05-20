@@ -149,12 +149,17 @@ export default function VerseReaderScreen() {
       />
 
       {/* Top bar: close + share. The pill is themed to match the hero card so
-          the reader feels like an extension of what was tapped. */}
+          the reader feels like an extension of what was tapped.
+          We floor the top padding on iOS so the row always clears the sheet
+          grabber, even when `insets.top` is reported as 0 inside the formSheet. */}
       <View
         style={{
-          paddingTop: insets.top + (Platform.OS === 'ios' ? 14 : 16),
+          paddingTop:
+            Platform.OS === 'ios'
+              ? Math.max(insets.top, 18) + 14
+              : insets.top + 16,
           paddingHorizontal: 16,
-          paddingBottom: 18,
+          paddingBottom: 24,
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -199,10 +204,14 @@ export default function VerseReaderScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{
           paddingHorizontal: 22,
-          paddingTop: 28,
+          paddingTop: 56,
           paddingBottom: insets.bottom + 120,
         }}
         showsVerticalScrollIndicator={false}
+        // Prevent iOS from silently shifting our top content up under the
+        // header pill via automatic content inset adjustment inside the sheet.
+        contentInsetAdjustmentBehavior="never"
+        automaticallyAdjustContentInsets={false}
       >
         {/* Verse */}
         <Animated.View entering={FadeIn.delay(80).duration(450)}>
