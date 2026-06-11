@@ -948,11 +948,21 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
         text = f"{summary} {location}"
         return bool(ROUNDUP_SUMMARY_RE.search(text))
 
-    def _passes_impact_gate(self, disaster_type: str, summary: str, development_type: str) -> bool:
+    def _passes_impact_gate(
+        self,
+        disaster_type: str,
+        summary: str,
+        development_type: str,
+        severity: str = 'moderate',
+    ) -> bool:
         if disaster_type == 'conflict':
             return True
         if development_type == 'forecast_watch':
-            return False
+            return severity in ('severe', 'catastrophic')
+        if development_type in ('new_impact', 'ongoing_response') and severity in (
+            'moderate', 'severe', 'catastrophic'
+        ):
+            return True
         return bool(IMPACT_KEYWORDS_RE.search(summary or ''))
 
     def _passes_conflict_freshness(self, summary: str, disaster_time: Optional[datetime], now: datetime) -> bool:
@@ -1065,15 +1075,14 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
             return 'meta-commentary in summary'
         if self._is_generic_news_source(news_source):
             return 'missing or generic news_source'
-        if confidence == 'low':
-            return 'low confidence'
+        # confidence is stored for audit; weak rows are caught by source/impact/location gates
         if self._is_vague_location(location):
             return 'vague location'
         if self._is_weekly_roundup(summary, location):
             return 'weekly roundup not specific incident'
         if self._casualties_exceed_cap(dtype, disaster.get('casualties')):
             return 'casualties exceed sanity cap'
-        if not self._passes_impact_gate(dtype, summary, development_type):
+        if not self._passes_impact_gate(dtype, summary, development_type, disaster.get('severity', 'moderate')):
             return 'no community impact signal'
         if dtype == 'conflict' and not self._passes_conflict_freshness(summary, disaster_time, now):
             return 'conflict lacks in-window development'

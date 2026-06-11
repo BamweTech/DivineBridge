@@ -65,13 +65,6 @@ def test_rejects_meta_phrasing(svc):
     assert svc._validate_discovery_row(row, disaster_time, now) == 'meta-commentary in summary'
 
 
-def test_rejects_low_confidence(svc):
-    now = datetime.now()
-    disaster_time = now - timedelta(hours=6)
-    row = _base_row(confidence='low')
-    assert svc._validate_discovery_row(row, disaster_time, now) == 'low confidence'
-
-
 def test_conflict_requires_development_signal(svc):
     now = datetime.now()
     disaster_time = now - timedelta(days=4)
