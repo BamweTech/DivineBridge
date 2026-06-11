@@ -71,6 +71,68 @@ DISCOVERY_MAX_ITEMS = 12
 DISCOVERY_MODEL = "sonar"
 DISCOVERY_QUERY_TIMEOUT = 90.0
 
+VALID_SEVERITIES = frozenset({'minor', 'moderate', 'severe', 'catastrophic'})
+SEVERITY_ALIASES = {
+    'high': 'severe',
+    'critical': 'severe',
+    'extreme': 'catastrophic',
+    'ongoing': 'moderate',
+    'unknown': 'moderate',
+}
+MIN_NEWS_SUMMARY_CHARS = 40
+MAX_CASUALTIES_DEFAULT = 500_000
+CASUALTY_CAP_EXEMPT_TYPES = frozenset({'conflict', 'epidemic', 'famine'})
+VALID_DEVELOPMENT_TYPES = frozenset({'new_impact', 'ongoing_response', 'forecast_watch'})
+VALID_CONFIDENCE_LEVELS = frozenset({'high', 'medium', 'low'})
+GENERIC_NEWS_SOURCES = frozenset({
+    '', 'unknown', 'n/a', 'na', 'example', 'example.com', 'not available', 'none',
+})
+VAGUE_LOCATION_RE = re.compile(
+    r'\b(?:nationwide|unknown|tracked\s+region|western\s+pacific|eastern\s+pacific|'
+    r'global(?:\s+disaster)?|multiple\s+locations(?:\s+across)?|asean\s+region|'
+    r'various\s+regions?|affected\s+regions?)\b',
+    re.IGNORECASE,
+)
+ROUNDUP_SUMMARY_RE = re.compile(
+    r'\b(?:weekly\s+(?:disaster\s+)?(?:update|report|roundup)|'
+    r'\d+\s+significant\s+(?:earthquakes?|floods?|fires?)|'
+    r'multiple\s+locations\s+across|several\s+(?:significant\s+)?(?:earthquakes?|events?))\b',
+    re.IGNORECASE,
+)
+META_PHRASE_RE = re.compile(
+    r'\b(?:search\s+results?\s+(?:did\s+not|provided)|available\s+alert\s+text|'
+    r'this\s+is\s+included\s+because|the\s+listing\s+indicates|'
+    r'no\s+(?:fresh|specific)\s+(?:single[- ]incident\s+)?update)\b',
+    re.IGNORECASE,
+)
+IMPACT_KEYWORDS_RE = re.compile(
+    r'\b(?:affected|displaced|evacuat|damage|injur|fatal|killed|wounded|missing|'
+    r'destroy|response|emergency|shelter|collapse|crash|explosion|burning|'
+    r'flooded|landslide|aftershock|casualt|death\s+toll)\b',
+    re.IGNORECASE,
+)
+CONFLICT_DEVELOPMENT_RE = re.compile(
+    r'\b(?:displaced|offensive|ceasefire|humanitarian|blockade|famine|truce|fighting|'
+    r'attack|strike|shell|bombard|aid\s+(?:convoy|access|delivery)|evacuat|'
+    r'injur|fatal|killed|wounded|toll|front\s*line|cease[- ]?fire)\b',
+    re.IGNORECASE,
+)
+# Non-sovereign labels → (country, default_location_if_vague)
+COUNTRY_LOCATION_FIXES = {
+    'gaza': ('Palestine', 'Gaza Strip'),
+    'gaza strip': ('Palestine', 'Gaza Strip'),
+    'crimea': ('Ukraine', 'Crimea'),
+    'donbas': ('Ukraine', 'Donbas'),
+    'donetsk': ('Ukraine', 'Donetsk region'),
+    'drc': ('Democratic Republic of the Congo', None),
+    'dr congo': ('Democratic Republic of the Congo', None),
+    'democratic republic of congo': ('Democratic Republic of the Congo', None),
+    'usa': ('United States', None),
+    'u.s.': ('United States', None),
+    'u.s.a.': ('United States', None),
+    'uk': ('United Kingdom', None),
+}
+
 
 class DisasterPrayerService:
     """Service for hourly disaster monitoring and customized prayer generation"""
@@ -109,35 +171,48 @@ class DisasterPrayerService:
 CURRENT TIME: {current_time}
 WINDOW: Events or fresh reporting from **{window_start}** through **{window_end}** (last {max_age_days} days). Today's anchor: {today_tokens}.
 
-WHAT TO INCLUDE (cast a wide net):
-- Natural disasters: floods, earthquakes, fires, storms, landslides, etc. with recent or ongoing impact.
-- **Ongoing conflicts** with current humanitarian impact (e.g. Ukraine, Sudan, Gaza, DRC, Myanmar).
+WHAT TO INCLUDE (cast a wide net, then curate):
+- Natural disasters with community impact: displacement, damage, injuries, evacuations, or emergency response.
+- **Ongoing conflicts** only when the summary cites a development inside the window (offensive, displacement, aid blockade, ceasefire shift, rising toll, etc.).
 - Major accidents (aviation, rail, structural collapse, industrial explosions) from the window.
-- Prefer items with reporting in the last 24–72 hours; include major ongoing crises across the full {max_age_days}-day window.
-- Downstream code filters stale timestamps — **include plausible candidates** rather than returning an empty list when events exist.
+- Prefer reporting in the last 24–72 hours; major ongoing crises may use the full {max_age_days}-day window.
+- Downstream code filters weak rows — include plausible candidates when events exist.
 
-EXCLUDE ONLY:
-- Pure anniversary / "on this day" recaps with no new development.
+SOURCE QUALITY (prefer in order):
+1. Government emergency agencies, UN OCHA, GDACS, USGS, national meteorological services
+2. Major wires (Reuters, AP, AFP) and established humanitarian orgs (ICRC, WFP, UNHCR)
+3. Regional disaster networks (AHA Centre, ReliefWeb)
+Avoid: social media rumors, unverified blogs, opinion pieces, fundraising pages.
+
+INCIDENT RULES:
+- **One row = one specific incident** or one named ongoing crisis — not a generic weekly roundup.
+- Do NOT emit vague weekly tallies ("seven earthquakes this week") unless you name the primary location and latest development.
+- `location` must be a city, province, or named region — not "western Pacific", "tracked region", or "multiple locations across ASEAN".
+- `country` must be a UN-recognized sovereign state (United States, not USA). Gaza Strip → country "Palestine", location "Gaza Strip". Donbas → country "Ukraine".
+- `severity` must be exactly: minor | moderate | severe | catastrophic (never high/critical/ongoing).
+- `news_summary`: 2–4 factual sentences; no hype; no [1] citations; no markdown; **no meta-commentary** (never write "search results did not include…").
+- Prefer events with reported community impact. Skip pure forecast watches with no impact yet unless severity is severe+.
+
+EXCLUDE:
+- Anniversary / "on this day" recaps with no new development.
 - Stories whose primary event date is clearly months or years old with no current activity.
 
-SEARCH: Use real-time web search — breaking news, official alerts, wires, humanitarian agencies. Keywords: {hazard_search_hints}.
+SEARCH: Real-time web search — breaking news, official alerts, wires, humanitarian agencies. Keywords: {hazard_search_hints}.
 
 CANONICAL `type` per row (lowercase slug):
 {DISCOVERY_JSON_TYPE_SLUGS}
 Map hurricanes/cyclones/storms → typhoon; wildfires → fire; wars → conflict; aviation/rail/structural/explosion → major_accident.
 
-OUTPUT RULES:
-- Return **3–{DISCOVERY_MAX_ITEMS}** objects when any qualifying events exist worldwide.
+OUTPUT:
+- Return **3–{DISCOVERY_MAX_ITEMS}** objects when qualifying events exist worldwide.
 - One object per distinct incident; merge duplicate articles into one `news_summary`.
-- `country`: English sovereign state name (United States, not USA).
-- `location`: city/region as reported.
-- `severity`: minor | moderate | severe | catastrophic (default moderate when unsure).
 - `casualties`: integer only if sources state a count; otherwise null.
-- `news_summary`: 2–4 factual sentences; no hype; no [1] citations; no markdown.
-- `timestamp`: ISO 8601 UTC for the article/update you rely on (on or after {cutoff_iso}; use today if only the date is known).
+- `timestamp`: ISO 8601 UTC for the article/update you rely on (on or after {cutoff_iso}).
+- `development_type`: new_impact | ongoing_response | forecast_watch
+- `confidence`: high | medium | low (high = named outlet + clear timing; low = weak or inferred)
 
 Return ONLY a JSON array, no markdown or prose:
-[{{"type":"earthquake","country":"Japan","location":"Tokyo","severity":"moderate","casualties":null,"news_summary":"Officials report strong shaking in the capital region. Agencies issued safety guidance. Response teams are assessing damage.","news_source":"Reuters","timestamp":"{example_ts}"}}]"""
+[{{"type":"earthquake","country":"Japan","location":"Tokyo","severity":"moderate","casualties":null,"news_summary":"Officials report strong shaking in the capital region. Agencies issued safety guidance. Response teams are assessing damage.","news_source":"Reuters","source_url":"https://example.com/article","timestamp":"{example_ts}","development_type":"new_impact","confidence":"high"}}]"""
 
             set_client_model(DISCOVERY_MODEL)
             response = self.client.query_with_timeout(prompt, timeout=DISCOVERY_QUERY_TIMEOUT)
@@ -282,13 +357,36 @@ Return ONLY a JSON array, no markdown or prose:
                         )
                         continue
 
-                    # Normalize disaster type
                     disaster['type'] = self._normalize_disaster_type(disaster.get('type', ''))
-                    # Ensure country is properly formatted
-                    disaster['country'] = disaster['country'].strip()
+                    country, location = self._normalize_discovery_country(
+                        disaster.get('country', ''),
+                        disaster.get('location', ''),
+                    )
+                    disaster['country'] = country.strip()
+                    disaster['location'] = (location or country).strip()
+                    disaster['severity'] = self._normalize_severity(disaster.get('severity', ''))
+                    disaster['development_type'] = self._normalize_development_type(
+                        disaster.get('development_type', '')
+                    )
+                    disaster['confidence'] = self._normalize_confidence(disaster.get('confidence', ''))
+                    disaster['source_url'] = (disaster.get('source_url') or '').strip()
+                    disaster['news_source'] = (disaster.get('news_source') or '').strip()
+
+                    reject_reason = self._validate_discovery_row(disaster, disaster_time, now)
+                    if reject_reason:
+                        logger.warning(
+                            f"Rejected disaster ({reject_reason}): {disaster.get('type')} in "
+                            f"{disaster.get('country')} — {disaster.get('location', '')[:60]}"
+                        )
+                        continue
+
                     validated_disasters.append(disaster)
-            
-            logger.info(f"Validated {len(validated_disasters)} disasters (rejected {len(disasters) - len(validated_disasters)} old/invalid disasters)")
+
+            validated_disasters = self._dedupe_discovery_batch(validated_disasters)
+            logger.info(
+                f"Validated {len(validated_disasters)} disasters "
+                f"(rejected {len(disasters) - len(validated_disasters)} old/invalid disasters)"
+            )
             return validated_disasters
             
         except json.JSONDecodeError as e:
@@ -468,6 +566,9 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                 'casualties': disaster.get('casualties'),
                 'news_summary': disaster.get('news_summary', ''),
                 'news_source': disaster.get('news_source', ''),
+                'source_url': disaster.get('source_url', ''),
+                'development_type': disaster.get('development_type', ''),
+                'confidence': disaster.get('confidence', ''),
                 'prayer': prayer,
                 'created_at': datetime.now().isoformat(),
                 'expires_at': (datetime.now() + timedelta(days=3)).isoformat(),
@@ -537,6 +638,8 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                 'key_details': info.get('key_details', []),
                 'all_news_summaries': info.get('all_news_summaries', []),
                 'all_areas': info.get('all_areas', []),
+                # Internal audit trail (not exposed in prayer feeds or public APIs)
+                'event_sources': self._build_event_sources(info.get('all_areas', [])),
                 'created_at': created_at,
                 'updated_at': now.isoformat(),
                 'expires_at': (now + timedelta(days=3)).isoformat(),
@@ -811,6 +914,171 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
             return True
         return False
 
+    def _normalize_discovery_country(self, country: str, location: str) -> tuple:
+        """Map non-sovereign country labels to sovereign state + clearer location."""
+        country = (country or '').strip()
+        location = (location or '').strip()
+        key = country.lower().strip()
+        if key in COUNTRY_LOCATION_FIXES:
+            fixed_country, default_loc = COUNTRY_LOCATION_FIXES[key]
+            if not location or VAGUE_LOCATION_RE.search(location):
+                location = default_loc or location or fixed_country
+            return fixed_country, location
+        return country, location
+
+    def _normalize_severity(self, severity: str) -> str:
+        raw = (severity or 'moderate').lower().strip()
+        if raw in VALID_SEVERITIES:
+            return raw
+        return SEVERITY_ALIASES.get(raw, 'moderate')
+
+    def _is_vague_location(self, location: str) -> bool:
+        loc = (location or '').strip()
+        if not loc or len(loc) < 3:
+            return True
+        return bool(VAGUE_LOCATION_RE.search(loc))
+
+    def _has_meta_phrasing(self, text: str) -> bool:
+        return bool(text and META_PHRASE_RE.search(text))
+
+    def _is_generic_news_source(self, source: str) -> bool:
+        return (source or '').strip().lower() in GENERIC_NEWS_SOURCES
+
+    def _is_weekly_roundup(self, summary: str, location: str) -> bool:
+        text = f"{summary} {location}"
+        return bool(ROUNDUP_SUMMARY_RE.search(text))
+
+    def _passes_impact_gate(self, disaster_type: str, summary: str, development_type: str) -> bool:
+        if disaster_type == 'conflict':
+            return True
+        if development_type == 'forecast_watch':
+            return False
+        return bool(IMPACT_KEYWORDS_RE.search(summary or ''))
+
+    def _passes_conflict_freshness(self, summary: str, disaster_time: Optional[datetime], now: datetime) -> bool:
+        if CONFLICT_DEVELOPMENT_RE.search(summary or ''):
+            return True
+        if disaster_time and (now - disaster_time) <= timedelta(hours=72):
+            return True
+        return self._summary_has_recent_date_token(summary, now)
+
+    def _summary_has_recent_date_token(self, summary: str, now: datetime) -> bool:
+        if not summary:
+            return False
+        month_names = [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December',
+        ]
+        month_re = '|'.join(month_names)
+        window_start = now - timedelta(days=DISASTER_DISCOVERY_MAX_AGE_DAYS)
+        for m in re.finditer(rf'\b({month_re})\s+(\d{{1,2}})(?:,?\s+(\d{{4}}))?\b', summary, re.IGNORECASE):
+            mon_name = m.group(1).lower()
+            try:
+                mon = next(i for i, name in enumerate(month_names, 1) if name.lower() == mon_name)
+                day = int(m.group(2))
+                year = int(m.group(3)) if m.group(3) else now.year
+                dt = datetime(year, mon, day)
+                if window_start <= dt <= now + timedelta(days=1):
+                    return True
+            except (ValueError, StopIteration):
+                continue
+        for m in re.finditer(r'\b(\d{{4}})-(\d{{2}})-(\d{{2}})\b', summary):
+            try:
+                dt = datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+                if window_start <= dt <= now + timedelta(days=1):
+                    return True
+            except ValueError:
+                continue
+        return False
+
+    def _normalize_development_type(self, value: str) -> str:
+        raw = (value or 'ongoing_response').lower().strip()
+        return raw if raw in VALID_DEVELOPMENT_TYPES else 'ongoing_response'
+
+    def _normalize_confidence(self, value: str) -> str:
+        raw = (value or 'medium').lower().strip()
+        return raw if raw in VALID_CONFIDENCE_LEVELS else 'medium'
+
+    def _casualties_exceed_cap(self, disaster_type: str, casualties) -> bool:
+        if casualties is None:
+            return False
+        try:
+            count = int(casualties)
+        except (TypeError, ValueError):
+            return False
+        if disaster_type in CASUALTY_CAP_EXEMPT_TYPES:
+            return count > MAX_CASUALTIES_DEFAULT * 2
+        return count > MAX_CASUALTIES_DEFAULT
+
+    def _discovery_dedup_key(self, disaster: Dict) -> str:
+        dtype = self._normalize_disaster_type(disaster.get('type', ''))
+        country = (disaster.get('country') or '').lower().strip()
+        location = re.sub(r'\s+', ' ', (disaster.get('location') or '').lower().strip())
+        location_key = ' '.join(location.split()[:4])
+        return f"{dtype}|{country}|{location_key}"
+
+    def _dedupe_discovery_batch(self, disasters: List[Dict]) -> List[Dict]:
+        seen = set()
+        deduped = []
+        for disaster in disasters:
+            key = self._discovery_dedup_key(disaster)
+            if key in seen:
+                logger.debug(f"Skipping duplicate discovery row: {key}")
+                continue
+            seen.add(key)
+            deduped.append(disaster)
+        return deduped
+
+    def _build_event_sources(self, all_areas: List[Dict]) -> List[Dict]:
+        """Internal audit trail — stored in GCS, not exposed in prayer feeds."""
+        sources = []
+        for area in all_areas or []:
+            sources.append({
+                'country': area.get('country', ''),
+                'location': area.get('location', ''),
+                'news_source': area.get('news_source', ''),
+                'source_url': area.get('source_url', ''),
+                'timestamp': area.get('timestamp', ''),
+                'development_type': area.get('development_type', ''),
+                'confidence': area.get('confidence', ''),
+            })
+        return sources
+
+    def _validate_discovery_row(
+        self,
+        disaster: Dict,
+        disaster_time: datetime,
+        now: datetime,
+    ) -> Optional[str]:
+        """Return rejection reason, or None if the row passes."""
+        dtype = self._normalize_disaster_type(disaster.get('type', ''))
+        country = disaster.get('country', '')
+        location = disaster.get('location', '')
+        summary = (disaster.get('news_summary') or '').strip()
+        news_source = (disaster.get('news_source') or '').strip()
+        development_type = self._normalize_development_type(disaster.get('development_type', ''))
+        confidence = self._normalize_confidence(disaster.get('confidence', ''))
+
+        if len(summary) < MIN_NEWS_SUMMARY_CHARS:
+            return 'summary too short'
+        if self._has_meta_phrasing(summary):
+            return 'meta-commentary in summary'
+        if self._is_generic_news_source(news_source):
+            return 'missing or generic news_source'
+        if confidence == 'low':
+            return 'low confidence'
+        if self._is_vague_location(location):
+            return 'vague location'
+        if self._is_weekly_roundup(summary, location):
+            return 'weekly roundup not specific incident'
+        if self._casualties_exceed_cap(dtype, disaster.get('casualties')):
+            return 'casualties exceed sanity cap'
+        if not self._passes_impact_gate(dtype, summary, development_type):
+            return 'no community impact signal'
+        if dtype == 'conflict' and not self._passes_conflict_freshness(summary, disaster_time, now):
+            return 'conflict lacks in-window development'
+        return None
+
     def _has_old_date_in_text(self, text: str, max_age_days: Optional[int] = None) -> bool:
         """
         True if text cites a calendar date clearly outside the recent window (e.g. "October 2025"
@@ -923,14 +1191,17 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                 casualties = disaster.get('casualties')
                 severity = disaster.get('severity', 'moderate')
                 news_source = disaster.get('news_source', '')
+                source_url = disaster.get('source_url', '')
                 timestamp = disaster.get('timestamp', '')
-                
+                development_type = disaster.get('development_type', '')
+                confidence = disaster.get('confidence', '')
+
                 # Remove citation markers like [1], [2], [3], etc. from news summary
                 if news_summary:
                     news_summary = re.sub(r'\[\d+\]', '', news_summary).strip()
                     # Clean up any double spaces left after removing citations
                     news_summary = re.sub(r'\s+', ' ', news_summary).strip()
-                
+
                 area_info = {
                     'country': country,
                     'location': location if location else country,
@@ -938,7 +1209,10 @@ Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hop
                     'casualties': casualties,
                     'severity': severity,
                     'news_source': news_source,
-                    'timestamp': timestamp
+                    'source_url': source_url,
+                    'timestamp': timestamp,
+                    'development_type': development_type,
+                    'confidence': confidence,
                 }
                 affected_areas.append(area_info)
             
@@ -1290,6 +1564,8 @@ AFFECTED REGIONS:
 DETAILED NEWS FROM ALL AREAS:
 {all_summaries}
 
+Do not mention news outlets, URLs, or source names.
+
 Return ONLY the summary text (2-3 sentences), no JSON, no bullet list."""
             
             summary_response = self.client.query(summary_prompt)
@@ -1322,6 +1598,7 @@ PRAYER REQUIREMENTS:
 - Tone: **steady, compassionate, factual** — not alarmist. Avoid exaggerated language and unverified superlatives
 - Use "we" / "our" throughout
 - NO thinking tags, NO commentary
+- Do not mention news outlets, URLs, or source names
 
 Return ONLY the prayer text."""
             
@@ -1392,6 +1669,8 @@ GOOD EXAMPLES:
 "Standing with Queensland communities under cyclone watch. May families stay safe. 🙏"
 
 BAD: invented stats, alarmist tone, more than 2 sentences, formal liturgical opening.
+
+Do not mention news outlets, URLs, or source names.
 
 Return ONLY the post text. No quotes or labels."""
 
