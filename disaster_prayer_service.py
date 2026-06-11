@@ -67,6 +67,9 @@ DISCOVERY_JSON_TYPE_SLUGS = (
     "conflict, epidemic, famine, mass_shooting, major_accident"
 )
 DISCOVERY_MAX_ITEMS = 12
+# sonar is better at live web search; reasoning-pro over-filters and often returns [].
+DISCOVERY_MODEL = "sonar"
+DISCOVERY_QUERY_TIMEOUT = 90.0
 
 
 class DisasterPrayerService:
@@ -101,70 +104,43 @@ class DisasterPrayerService:
             example_ts = (now - timedelta(hours=6)).strftime("%Y-%m-%dT%H:%M:%SZ")
             today_tokens = f"{now.strftime('%B')} {now.day}, {now.year}"
 
-            prompt = f"""You are the Global Prayer Watch news monitor. Find situations worldwide that are **actively developing now** and belong in a calm, factual prayer feed.
+            prompt = f"""You are the Global Prayer Watch news monitor. Search the web and return active disasters and humanitarian crises for a Christian prayer feed. Be factual and calm.
 
 CURRENT TIME: {current_time}
-ROLLING WINDOW: Only events (or clearly documented **new** developments) from **on or after {window_start}** through **{window_end}** — about the last **{max_age_days} days**. Use real-time search; do not invent dates.
+WINDOW: Events or fresh reporting from **{window_start}** through **{window_end}** (last {max_age_days} days). Today's anchor: {today_tokens}.
 
-CRITICAL RELEVANCE:
-- Include items when there is **meaningful current reporting** inside the window: response, warnings, new impact, verified updates, humanitarian scale, or official figures still moving.
-- **Large-scale crises** (major quakes, floods, conflicts, mass-casualty accidents) often stay newsworthy for **several days** (aftershocks, relief, rising tolls, newly reached areas). If substantive coverage is still active inside the window, **include them** — do not drop a major story only because the first impact was a few days ago.
-- Omit items whose main story is old recap, anniversary, or "on this day" content.
-- Omit anything you cannot time to the window.
-- When searching, you may consider many hazard keywords (storms, quakes, conflicts, accidents, etc.), but each JSON row must use a **canonical type** from the list below.
+WHAT TO INCLUDE (cast a wide net):
+- Natural disasters: floods, earthquakes, fires, storms, landslides, etc. with recent or ongoing impact.
+- **Ongoing conflicts** with current humanitarian impact (e.g. Ukraine, Sudan, Gaza, DRC, Myanmar).
+- Major accidents (aviation, rail, structural collapse, industrial explosions) from the window.
+- Prefer items with reporting in the last 24–72 hours; include major ongoing crises across the full {max_age_days}-day window.
+- Downstream code filters stale timestamps — **include plausible candidates** rather than returning an empty list when events exist.
 
-DEDUPLICATION & LIMITS:
-- **At most one object per distinct ongoing incident** (merge multiple articles into one `news_summary`).
-- Return **at most {DISCOVERY_MAX_ITEMS}** objects total, ordered by **recency of the development** you use for `timestamp`, then by human impact.
-- Prefer very recent items for **smaller** events; use the full **{max_age_days}-day** window freely for **major** ongoing situations with sustained coverage.
+EXCLUDE ONLY:
+- Pure anniversary / "on this day" recaps with no new development.
+- Stories whose primary event date is clearly months or years old with no current activity.
 
-SEARCH: Use varied queries, e.g. breaking news last {max_age_days} days, "today" + hazard + region, official alerts, wires and local outlets. Today's date anchor: {today_tokens}.
-Cast a wide net with keywords such as: {hazard_search_hints} — but each JSON row's `type` must still be one **canonical slug** from the list below (map hurricanes/cyclones/storms to typhoon, wildfires to fire, etc.).
+SEARCH: Use real-time web search — breaking news, official alerts, wires, humanitarian agencies. Keywords: {hazard_search_hints}.
 
-CANONICAL `type` (use exactly one string per row, lowercase):
+CANONICAL `type` per row (lowercase slug):
 {DISCOVERY_JSON_TYPE_SLUGS}
-- Hurricanes, cyclones, and broad "storm" systems → **typhoon**.
-- Wildfires → **fire**. Wars and ongoing large-scale violence → **conflict**. Aviation, rail, structural, industrial, explosion incidents → **major_accident**.
+Map hurricanes/cyclones/storms → typhoon; wildfires → fire; wars → conflict; aviation/rail/structural/explosion → major_accident.
 
-LOCATION:
-- `country`: sovereign state in English (**United States**, not USA).
-- `location`: city/region as reported (e.g. "City, State" where helpful). For cross-border impact, set `country` to the primary state and mention other areas briefly in `news_summary`.
+OUTPUT RULES:
+- Return **3–{DISCOVERY_MAX_ITEMS}** objects when any qualifying events exist worldwide.
+- One object per distinct incident; merge duplicate articles into one `news_summary`.
+- `country`: English sovereign state name (United States, not USA).
+- `location`: city/region as reported.
+- `severity`: minor | moderate | severe | catastrophic (default moderate when unsure).
+- `casualties`: integer only if sources state a count; otherwise null.
+- `news_summary`: 2–4 factual sentences; no hype; no [1] citations; no markdown.
+- `timestamp`: ISO 8601 UTC for the article/update you rely on (on or after {cutoff_iso}; use today if only the date is known).
 
-TONE & FACTS (mandatory):
-- **news_summary**: 2–4 short sentences, **plain and factual**. No hype, no emotional padding, no words like "catastrophic", "unprecedented", "devastating", "massive", "nightmare" unless **directly quoted** from a named source.
-- Do **not** speculate. State only what sources report.
-- No numbered citations like [1], [2]. No markdown.
+Return ONLY a JSON array, no markdown or prose:
+[{{"type":"earthquake","country":"Japan","location":"Tokyo","severity":"moderate","casualties":null,"news_summary":"Officials report strong shaking in the capital region. Agencies issued safety guidance. Response teams are assessing damage.","news_source":"Reuters","timestamp":"{example_ts}"}}]"""
 
-SEVERITY & CASUALTIES:
-- `severity`: **conservative** scale — `minor` | `moderate` | `severe` | `catastrophic`. Use **moderate** when unsure. Reserve `severe` / `catastrophic` for well-sourced reports of large loss of life, widespread displacement, or declared large-scale emergency. **Do not inflate.**
-- `casualties`: integer only if sources give a **specific** dead/injured count you are reporting; otherwise **null**. Never guess; do not use 0 for "unknown".
-
-TIMESTAMP (mandatory):
-- `timestamp`: ISO 8601 UTC (**YYYY-MM-DDTHH:MM:SSZ** or valid offset) for the **specific development this row is based on** — e.g. time of the breaking update, alert, or first credible report you rely on. If only the article time is known, use that. **Do not** use a years-old "event start" date as `timestamp` if the row is about a new update (the timestamp must fall in the allowed window).
-- Must be on or after **{cutoff_iso}**, not in the future, with a plausible year (e.g. **{now.year}** when the window does not cross New Year).
-
-JSON ARRAY — exact keys (return ONLY this array, no markdown or prose):
-[
-  {{
-    "type": "<one canonical slug from the list above>",
-    "country": "<English country name>",
-    "location": "<city/region or repeat country>",
-    "severity": "minor" | "moderate" | "severe" | "catastrophic",
-    "casualties": <integer or null>,
-    "news_summary": "<2–4 factual sentences, calm tone>",
-    "news_source": "<primary outlet name or URL>",
-    "timestamp": "<ISO 8601 in window>"
-  }}
-]
-
-If nothing qualifies, return [].
-
-Minimal valid example (values illustrative only; your `timestamp` must satisfy the window):
-[{{"type":"earthquake","country":"Japan","location":"Tokyo","severity":"moderate","casualties":null,"news_summary":"Officials report strong shaking in the capital region. Agencies issued safety guidance. Response teams are assessing damage.","news_source":"https://example.com","timestamp":"{example_ts}"}}]
-
-Do not emit stale recap items (e.g. storms whose main story is months old with no new development in the window)."""
-
-            response = self.client.query(prompt)
+            set_client_model(DISCOVERY_MODEL)
+            response = self.client.query_with_timeout(prompt, timeout=DISCOVERY_QUERY_TIMEOUT)
             
             # Log the raw response first to see what Perplexity actually returned
             logger.info(f"Perplexity RAW response (first 2000 chars): {response[:2000]}")

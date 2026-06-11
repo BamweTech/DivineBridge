@@ -272,7 +272,7 @@ REQUIREMENTS:
 
 Return ONLY the prayer text, nothing else."""
 
-        response = client.generate_response(prompt)
+        response = client.query(prompt)
         
         # Clean the response - remove any <think> tags
         import re
