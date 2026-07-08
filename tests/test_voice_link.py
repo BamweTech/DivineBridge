@@ -30,6 +30,10 @@ class TestVoiceLinkHelpers:
         assert pr._is_voice_link_expired({'room_type': 'voice_link', 'expires_at': future}) is False
         assert pr._is_voice_link_expired({'room_type': 'group'}) is False
 
+        from datetime import timezone
+        aware_future = datetime.now(timezone.utc) + timedelta(minutes=5)
+        assert pr._is_voice_link_expired({'room_type': 'voice_link', 'expires_at': aware_future}) is False
+
     def test_active_participant_count(self):
         participants = [
             {'user_id': 'a', 'is_active': True},

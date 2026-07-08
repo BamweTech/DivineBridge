@@ -229,14 +229,18 @@ export default function RoomsScreen() {
     setStartingVoiceLink(true);
     try {
       const result = await voiceLinkApi.create();
-      await Share.share({
-        message: `Join my voice call on Divine Bridge:\n\n${result.share_url}`,
-        url: result.share_url,
-      });
       const href =
         `/voice-call/${result.room_id}?code=${encodeURIComponent(result.room_code)}` +
         `&shareUrl=${encodeURIComponent(result.share_url)}`;
       router.push(href as Href);
+      try {
+        await Share.share({
+          message: `Join my voice call on Divine Bridge:\n\n${result.share_url}`,
+          url: result.share_url,
+        });
+      } catch {
+        /* user dismissed share sheet — call screen has its own Share button */
+      }
     } catch (err: any) {
       Alert.alert('Could not start call', err?.message || 'Please try again.');
     } finally {

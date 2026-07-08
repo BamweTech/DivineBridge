@@ -46,11 +46,29 @@ def _is_voice_link_room(room_data):
     return bool(room_data) and room_data.get('room_type') == 'voice_link'
 
 
+def _normalize_utc_datetime(value):
+    """Normalize Firestore/datetime values to naive UTC for comparisons."""
+    if value is None:
+        return None
+    if hasattr(value, 'timestamp') and hasattr(value, 'tzinfo'):
+        if value.tzinfo is not None:
+            return datetime.utcfromtimestamp(value.timestamp())
+        return value.replace(tzinfo=None)
+    return value
+
+
+def _format_expires_at_iso(value):
+    normalized = _normalize_utc_datetime(value)
+    if not normalized:
+        return None
+    return normalized.isoformat() + 'Z'
+
+
 def _is_voice_link_expired(room_data, now=None):
     if not _is_voice_link_room(room_data):
         return False
-    now = now or datetime.utcnow()
-    expires_at = room_data.get('expires_at')
+    now = _normalize_utc_datetime(now) or datetime.utcnow()
+    expires_at = _normalize_utc_datetime(room_data.get('expires_at'))
     if not expires_at:
         return False
     return expires_at <= now
@@ -103,8 +121,8 @@ def _expire_stale_voice_links(db, now=None):
             data = doc.to_dict() or {}
             if data.get('room_type') != 'voice_link':
                 continue
-            expires_at = data.get('expires_at')
-            if expires_at and expires_at <= now:
+            expires_at = _normalize_utc_datetime(data.get('expires_at'))
+            if expires_at and expires_at < now:
                 doc.reference.update({
                     'is_active': False,
                     'ended_at': now,
@@ -926,7 +944,7 @@ def join_prayer_room(room_id):
             response['host_name'] = room_data.get('host_name')
             expires_at = room_data.get('expires_at')
             if expires_at:
-                response['expires_at'] = expires_at.isoformat() + 'Z'
+                response['expires_at'] = _format_expires_at_iso(expires_at)
         return jsonify(response)
         
     except Exception as e:

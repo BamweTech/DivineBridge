@@ -671,7 +671,11 @@ def create_app():
         try:
             from firebase_auth import get_firestore_client
             from datetime import datetime
-            from routes.prayer_room_bp import _voice_link_code_matches
+            from routes.prayer_room_bp import (
+                _voice_link_code_matches,
+                _is_voice_link_expired,
+                _format_expires_at_iso,
+            )
             db = get_firestore_client()
             room_doc = db.collection('prayer_rooms').document(room_id).get()
             if room_doc.exists:
@@ -683,8 +687,8 @@ def create_app():
                         is_active = bool(room_data.get('is_active', False))
                         expires_raw = room_data.get('expires_at')
                         if expires_raw:
-                            expires_at = expires_raw.isoformat() + 'Z'
-                            is_expired = expires_raw <= datetime.utcnow()
+                            expires_at = _format_expires_at_iso(expires_raw)
+                            is_expired = _is_voice_link_expired(room_data)
                         participants = room_data.get('participants') or []
                         active_count = sum(
                             1 for p in participants if p.get('is_active', True) is not False
