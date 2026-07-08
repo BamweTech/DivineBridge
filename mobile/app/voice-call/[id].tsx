@@ -14,12 +14,15 @@ import { useVoiceLink } from '@/hooks/useVoiceLink';
 import { THEME_COLORS } from '@/lib/constants';
 import { iosFontStyle } from '@/lib/typography';
 import Icon from '@/components/ui/Icon';
+import { Avatar } from '@/components/ui/Avatar';
 
-function formatCountdown(seconds: number | null): string {
-  if (seconds == null) return '';
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
+function formatCountdown(seconds: number | null, waiting: boolean): string {
+  if (seconds != null) {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+  return waiting ? 'Waiting…' : '';
 }
 
 export default function VoiceCallScreen() {
@@ -45,6 +48,8 @@ export default function VoiceCallScreen() {
     audioOutputRoute,
     secondsRemaining,
     isConnected,
+    guestName,
+    guestIsSpeaking,
     join,
     endCall,
     toggleMute,
@@ -117,7 +122,7 @@ export default function VoiceCallScreen() {
         </Pressable>
         <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600'), fontSize: 14 }}>Voice call</Text>
         <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('500'), fontSize: 13, fontVariant: ['tabular-nums'] }}>
-          {formatCountdown(secondsRemaining)}
+          {formatCountdown(secondsRemaining, isJoined && !isConnected)}
         </Text>
       </View>
 
@@ -134,17 +139,44 @@ export default function VoiceCallScreen() {
           </>
         ) : (
           <>
-            <View style={{
-              width: 88,
-              height: 88,
-              borderRadius: 44,
-              backgroundColor: THEME_COLORS.goldDim,
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 20,
-            }}>
-              <Icon name="audio" size={32} color={THEME_COLORS.gold} />
-            </View>
+            {isConnected ? (
+              <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                <Avatar
+                  name={guestName}
+                  size={72}
+                  isOnline
+                  showSpeakingRing={guestIsSpeaking}
+                />
+                <Text style={{
+                  color: THEME_COLORS.text2,
+                  ...iosFontStyle('500'),
+                  fontSize: 14,
+                  marginTop: 10,
+                }}>
+                  {guestName}
+                </Text>
+                <Text style={{
+                  color: guestIsSpeaking ? THEME_COLORS.speaking : THEME_COLORS.text3,
+                  ...iosFontStyle('400'),
+                  fontSize: 12,
+                  marginTop: 4,
+                }}>
+                  {guestIsSpeaking ? 'Speaking' : 'Connected'}
+                </Text>
+              </View>
+            ) : (
+              <View style={{
+                width: 88,
+                height: 88,
+                borderRadius: 44,
+                backgroundColor: THEME_COLORS.goldDim,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 20,
+              }}>
+                <Icon name="audio" size={32} color={THEME_COLORS.gold} />
+              </View>
+            )}
             <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('600'), fontSize: 22, marginBottom: 8 }}>
               {isConnected ? 'Connected' : 'Waiting for guest'}
             </Text>

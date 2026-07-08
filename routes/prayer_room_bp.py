@@ -31,6 +31,7 @@ prayer_room_bp = Blueprint('prayer_room', __name__)
 MAX_ACTIVE_SPEAKERS = 20
 VOICE_LINK_MAX_PARTICIPANTS = 2
 VOICE_LINK_TTL_MINUTES = 10
+VOICE_LINK_WAIT_MINUTES = 30
 VALID_PARTICIPANT_ROLES = {'speaker', 'listener'}
 
 
@@ -111,8 +112,21 @@ def _public_base_url():
     return os.getenv('PUBLIC_BASE_URL', 'https://divinebridge.io').rstrip('/')
 
 
+def _voice_link_timer_start_if_needed(room_data, participants, now=None):
+    """Start the call TTL when the second participant joins (guest connected)."""
+    if not _is_voice_link_room(room_data):
+        return None, {}
+    if _normalize_utc_datetime(room_data.get('expires_at')):
+        return None, {}
+    if _active_participant_count(participants) < VOICE_LINK_MAX_PARTICIPANTS:
+        return None, {}
+    now = now or datetime.utcnow()
+    expires_at = now + timedelta(minutes=VOICE_LINK_TTL_MINUTES)
+    return expires_at, {'expires_at': expires_at, 'call_started_at': now}
+
+
 def _expire_stale_voice_links(db, now=None):
-    """Mark active voice_link rooms past expires_at as ended (timeout)."""
+    """Mark active voice_link rooms past expires_at or idle wait limit as ended."""
     now = now or datetime.utcnow()
     expired_count = 0
     try:
@@ -122,7 +136,14 @@ def _expire_stale_voice_links(db, now=None):
             if data.get('room_type') != 'voice_link':
                 continue
             expires_at = _normalize_utc_datetime(data.get('expires_at'))
+            should_expire = False
             if expires_at and expires_at < now:
+                should_expire = True
+            elif not expires_at:
+                created_at = _normalize_utc_datetime(data.get('created_at'))
+                if created_at and created_at + timedelta(minutes=VOICE_LINK_WAIT_MINUTES) < now:
+                    should_expire = True
+            if should_expire:
                 doc.reference.update({
                     'is_active': False,
                     'ended_at': now,
@@ -507,7 +528,7 @@ def _voice_link_room_access_checks(room_data, user_id):
 
 @prayer_room_bp.route('/voice-link/create', methods=['POST'])
 def create_voice_link_room():
-    """Create a private 1:1 voice-only call room with a 10-minute TTL."""
+    """Create a private 1:1 voice-only call room; TTL starts when the guest joins."""
     try:
         user = get_user_from_session()
         if not user:
@@ -524,7 +545,6 @@ def create_voice_link_room():
         room_id = _generate_room_id()
         room_code = _generate_room_code(8)
         created_at = datetime.utcnow()
-        expires_at = created_at + timedelta(minutes=VOICE_LINK_TTL_MINUTES)
 
         room_data = {
             'room_id': room_id,
@@ -535,7 +555,7 @@ def create_voice_link_room():
             'host_id': host_id,
             'host_name': host_name,
             'created_at': created_at,
-            'expires_at': expires_at,
+            'call_started_at': None,
             'media_mode': 'audio_only',
             'participants': [{
                 'user_id': host_id,
@@ -568,7 +588,7 @@ def create_voice_link_room():
             'room_id': room_id,
             'room_code': room_code,
             'share_url': share_url,
-            'expires_at': expires_at.isoformat() + 'Z',
+            'expires_at': None,
             'host_id': host_id,
             'host_name': host_name,
         })
@@ -925,12 +945,17 @@ def join_prayer_room(room_id):
             speaker_count += 1
 
         participants.append(new_participant)
-        room_ref.update({
+        update_fields = {
             'participants': participants,
             'last_activity': datetime.utcnow(),
-            'max_speakers': max_speakers
-        })
-        
+            'max_speakers': max_speakers,
+        }
+        started_expires_at, timer_fields = _voice_link_timer_start_if_needed(
+            room_data, participants
+        )
+        update_fields.update(timer_fields)
+        room_ref.update(update_fields)
+
         response = {
             'success': True,
             'room_id': room_id,
@@ -942,7 +967,8 @@ def join_prayer_room(room_id):
         if _is_voice_link_room(room_data):
             response['room_type'] = 'voice_link'
             response['host_name'] = room_data.get('host_name')
-            expires_at = _normalize_utc_datetime(room_data.get('expires_at'))
+            expires_at = started_expires_at or _normalize_utc_datetime(room_data.get('expires_at'))
+            response['call_started'] = bool(expires_at)
             if expires_at:
                 response['expires_at'] = _format_expires_at_iso(expires_at)
                 response['seconds_remaining'] = max(

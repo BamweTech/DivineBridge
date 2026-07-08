@@ -93,6 +93,18 @@
     });
   }
 
+  function parseExpiresAtMs(raw) {
+    if (!raw) return null;
+    if (raw.toDate && typeof raw.toDate === 'function') {
+      return raw.toDate().getTime();
+    }
+    if (typeof raw === 'string' || typeof raw === 'number') {
+      const parsed = Date.parse(String(raw));
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  }
+
   function setExpiresFromJoin(joinResult) {
     if (joinResult == null) return;
     if (typeof joinResult.seconds_remaining === 'number' && joinResult.seconds_remaining > 0) {
@@ -104,6 +116,15 @@
       if (Number.isFinite(parsed) && parsed > Date.now()) {
         expiresAtMs = parsed;
       }
+    }
+  }
+
+  function tryStartCountdownFromRoom(data) {
+    if (expiresAtMs) return;
+    const parsed = parseExpiresAtMs(data.expires_at);
+    if (parsed && parsed > Date.now()) {
+      expiresAtMs = parsed;
+      startCountdown();
     }
   }
 
@@ -159,6 +180,7 @@
         if (!snap.exists) return;
         const data = snap.data() || {};
         updatePeerLabel(data);
+        tryStartCountdownFromRoom(data);
 
         // Ignore cached/offline snapshots for end detection — stale cache caused false "call ended" UI.
         if (snap.metadata && snap.metadata.fromCache) return;

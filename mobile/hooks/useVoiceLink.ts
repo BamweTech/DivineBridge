@@ -28,6 +28,7 @@ export function useVoiceLink(roomId: string, roomCode?: string) {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [audioOutputRoute, setAudioOutputRouteState] = useState<LiveRoomAudioRoute>('speaker');
   const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
+  const [activeSpeakers, setActiveSpeakers] = useState<string[]>([]);
   const audioOutputRouteRef = useRef<LiveRoomAudioRoute>('speaker');
 
   useEffect(() => {
@@ -61,6 +62,7 @@ export function useVoiceLink(roomId: string, roomCode?: string) {
         token,
       });
       engine.onPeersChanged = (p) => setPeers(new Map(p));
+      engine.onActiveSpeakersChanged = setActiveSpeakers;
       await engine.start({ videoEnabled: false });
 
       engineRef.current = engine;
@@ -112,6 +114,14 @@ export function useVoiceLink(roomId: string, roomCode?: string) {
 
   const activePeerCount = room?.participants?.filter((p: Participant) => p.is_active !== false).length ?? 0;
   const isConnected = activePeerCount >= 2;
+
+  const guestParticipant = room?.participants?.find(
+    (p: Participant) => p.is_active !== false && !p.is_host,
+  );
+  const guestPeer = Array.from(peers.values()).find((p) => p.userId !== user?.uid);
+  const guestUserId = guestPeer?.userId ?? guestParticipant?.user_id;
+  const guestName = guestPeer?.userName ?? guestParticipant?.user_name ?? 'Guest';
+  const guestIsSpeaking = Boolean(guestUserId && activeSpeakers.includes(guestUserId));
 
   useEffect(() => {
     if (!room?.expires_at) return;
@@ -165,6 +175,8 @@ export function useVoiceLink(roomId: string, roomCode?: string) {
     secondsRemaining,
     activePeerCount,
     isConnected,
+    guestName,
+    guestIsSpeaking,
     join,
     leave,
     endCall,
