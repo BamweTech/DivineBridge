@@ -124,3 +124,7 @@ export const useFeatureStore = create<FeatureState>((set) => ({
   setSelectedId: (id) => set({ selectedId: id }),
 }));
 ```
+
+## Step 8: Update the mobile wireframe
+
+Follow the **`update-mobile-wireframe`** skill: add or update the matching panel in `divinebridge-app-v4.html` (side nav + `.phone-screen` + bottom nav if applicable). Keep labels and tab names aligned with `(tabs)/_layout.tsx`.

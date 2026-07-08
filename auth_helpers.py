@@ -47,6 +47,9 @@ def get_user_from_session():
             if decoded_token:
                 user_name = decoded_token.get('name') or decoded_token.get('email', '').split('@')[0] or 'Anonymous'
                 user_id = decoded_token.get('uid')
+                firebase_meta = decoded_token.get('firebase') or {}
+                sign_in_provider = firebase_meta.get('sign_in_provider')
+                is_anonymous = sign_in_provider == 'anonymous'
                 
                 logger.info(f"✅ User authenticated via Firebase ID token: {user_id}")
                 
@@ -68,7 +71,9 @@ def get_user_from_session():
                     'user_id': user_id,
                     'user_name': user_name,
                     'name': user_name,
-                    'email': decoded_token.get('email')
+                    'email': decoded_token.get('email'),
+                    'is_anonymous': is_anonymous,
+                    'sign_in_provider': sign_in_provider,
                 }
         except auth.ExpiredIdTokenError:
             logger.warning(f"⚠️ Firebase ID token expired - user needs to refresh")
@@ -101,7 +106,9 @@ def get_user_from_session():
         'user_id': user.get('uid'),
         'user_name': user_name,
         'name': user_name,
-        'email': user.get('email')
+        'email': user.get('email'),
+        'is_anonymous': False,
+        'sign_in_provider': None,
     }
 
 

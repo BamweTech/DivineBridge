@@ -155,8 +155,11 @@ export const roomApi = {
     }),
   get: (roomId: string) =>
     request<any>(`/api/prayer-room/room/${roomId}`),
-  end: (roomId: string) =>
-    request<any>(`/api/prayer-room/end/${roomId}`, { method: 'POST' }),
+  end: (roomId: string, reason: 'user' | 'timeout' = 'user') =>
+    request<any>(`/api/prayer-room/room/${roomId}/end`, {
+      method: 'POST',
+      body: JSON.stringify({ ended_reason: reason }),
+    }),
   leave: (roomId: string) =>
     request<any>(`/api/prayer-room/leave/${roomId}`, { method: 'POST' }),
   mute: (roomId: string, userId: string, muted: boolean) =>
@@ -177,6 +180,39 @@ export const roomApi = {
       method: 'POST',
       body: JSON.stringify({ message }),
     }),
+};
+
+// ─── Voice Link (1:1 web-shareable calls) ─────────────────────────────────────
+
+export const voiceLinkApi = {
+  create: () =>
+    request<{
+      success: boolean;
+      room_id: string;
+      room_code: string;
+      share_url: string;
+      expires_at: string;
+      host_name: string;
+    }>('/api/prayer-room/voice-link/create', { method: 'POST' }),
+  join: (roomId: string, code: string) =>
+    request<any>(`/api/prayer-room/join/${roomId}`, {
+      method: 'POST',
+      body: JSON.stringify({ room_code: code }),
+    }),
+  end: (roomId: string, reason: 'user' | 'timeout' = 'user') =>
+    request<any>(`/api/prayer-room/room/${roomId}/end`, {
+      method: 'POST',
+      body: JSON.stringify({ ended_reason: reason }),
+    }),
+  leave: (roomId: string) =>
+    request<any>(`/api/prayer-room/leave/${roomId}`, { method: 'POST' }),
+  selfMute: (roomId: string, muted: boolean) =>
+    request<any>(`/api/prayer-room/${roomId}/self-mute`, {
+      method: 'POST',
+      body: JSON.stringify({ muted }),
+    }),
+  sfuToken: (roomId: string) =>
+    request<{ customToken: string; sfuUrl: string }>(`/api/prayer-room/sfu-token/${roomId}`, { method: 'POST' }),
 };
 
 // ─── Scheduled Sessions ────────────────────────────────────────────────────────

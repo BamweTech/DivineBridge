@@ -23,10 +23,12 @@ export function LiveRoomsProvider({ children }: { children: React.ReactNode }) {
     const unsub = onSnapshot(
       q,
       (snap) => {
-        const data: PrayerRoom[] = snap.docs.map((d) => ({
-          ...d.data(),
-          room_id: d.id,
-        }) as PrayerRoom);
+        const data: PrayerRoom[] = snap.docs
+          .map((d) => ({
+            ...d.data(),
+            room_id: d.id,
+          }) as PrayerRoom)
+          .filter((r) => r.room_type !== 'voice_link');
         data.sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
         setRooms(data);
         setIsLoading(false);

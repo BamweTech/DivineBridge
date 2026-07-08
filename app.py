@@ -657,6 +657,64 @@ def create_app():
         response.headers['Permissions-Policy'] = 'microphone=*'
         return response
 
+    @app.route('/call/<room_id>')
+    def voice_call_page(room_id):
+        """Minimal 1:1 voice call page for shared web links."""
+        room_code = request.args.get('code', '')
+        host_name = 'Host'
+        is_active = False
+        is_expired = False
+        is_full = False
+        link_invalid = True
+        expires_at = None
+
+        try:
+            from firebase_auth import get_firestore_client
+            from datetime import datetime
+            from routes.prayer_room_bp import _voice_link_code_matches
+            db = get_firestore_client()
+            room_doc = db.collection('prayer_rooms').document(room_id).get()
+            if room_doc.exists:
+                room_data = room_doc.to_dict() or {}
+                if room_data.get('room_type') == 'voice_link':
+                    if _voice_link_code_matches(room_data, room_code):
+                        link_invalid = False
+                        host_name = room_data.get('host_name') or host_name
+                        is_active = bool(room_data.get('is_active', False))
+                        expires_raw = room_data.get('expires_at')
+                        if expires_raw:
+                            expires_at = expires_raw.isoformat() + 'Z'
+                            is_expired = expires_raw <= datetime.utcnow()
+                        participants = room_data.get('participants') or []
+                        active_count = sum(
+                            1 for p in participants if p.get('is_active', True) is not False
+                        )
+                        is_full = active_count >= 2
+        except Exception as e:
+            logger.error(f'Error loading voice call room {room_id}: {e}')
+
+        firebase_config = config.FIREBASE_CLIENT_CONFIG
+        if isinstance(firebase_config, str):
+            import json
+            firebase_config = json.loads(firebase_config)
+
+        from flask import make_response
+        response = make_response(render_template(
+            'voice_call.html',
+            room_id=room_id,
+            room_code=room_code if not link_invalid else '',
+            host_name=host_name if not link_invalid else '',
+            is_active=is_active,
+            is_expired=is_expired,
+            is_full=is_full,
+            link_invalid=link_invalid,
+            expires_at=expires_at,
+            firebase_config=firebase_config,
+        ))
+        response.headers['Permissions-Policy'] = 'microphone=*'
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+
     @app.route('/daily-prayer')
     def daily_prayer():
         """Serve the daily prayer page"""

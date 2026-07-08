@@ -39,7 +39,8 @@ Divine Bridge is a multi-stack faith community platform. This file provides top-
 - `scripts/` — Deploy scripts, migrations, admin utilities
 - `docs/` — Architecture docs, deployment guides
 - `.cursor/rules/` — File-scoped agent rules
-- `.cursor/skills/` — Multi-step workflow skills
+- `.cursor/skills/` — Multi-step workflow skills (e.g. `update-mobile-wireframe` for `divinebridge-app-v4.html`)
+- `divinebridge-app-v4.html` — Local mobile UI wireframe (not deployed; keep in sync with `mobile/app/`)
 - `.cursor/agents/` — Custom subagents
 
 ## Full architecture reference

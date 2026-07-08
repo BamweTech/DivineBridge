@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Divine Bridge — Mobile App</title>
+<title>Divine Bridge — Mobile Wireframes (Jun 2026)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Georgia:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"/>
 
 <!-- ═══════════════════════════════════════════════════════
      CUSTOM SVG ICON SYSTEM
@@ -245,9 +245,14 @@
       <path d="M9 23V15h6v8"/>
       <path d="M12 2v9M8 6h8"/>
     </symbol>
-    <!-- Heart / healing -->
+    <!-- Heart / like -->
     <symbol id="ic-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
       <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+    </symbol>
+    <!-- Pray bridge (tab icon) -->
+    <symbol id="ic-pray-bridge" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 2C10 5 7 9 7 13a5 5 0 0010 0c0-4-3-8-5-11z"/>
+      <path d="M7 13H5a3 3 0 000 6h14a3 3 0 000-6h-2"/>
     </symbol>
     <!-- Star sparkle (AI) -->
     <symbol id="ic-sparkle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
@@ -280,6 +285,8 @@
 /* helper to size inline SVG icons */
 .icon { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; }
 .icon svg { width:100%; height:100%; }
+.icon-12 { width:12px; height:12px; }
+.icon-14 { width:14px; height:14px; }
 .icon-9  { width:9px;  height:9px;  }
 .icon-11 { width:11px; height:11px; }
 .icon-10 { width:10px; height:10px; }
@@ -296,7 +303,7 @@
 html, body {
   height: 100%;
   background: #e8e2d8;
-  font-family: 'DM Sans', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   overflow: hidden;
 }
 .stage {
@@ -346,7 +353,7 @@ html, body {
   border: 1px solid rgba(180,160,120,.2);
   border-radius: 12px; padding: 10px 16px;
   color: rgba(80,60,30,.55);
-  font-family: 'Syne', sans-serif;
+  font-family: inherit;
   font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
   cursor: pointer; white-space: nowrap; transition: all .2s; text-align: left;
 }
@@ -370,6 +377,7 @@ html, body {
   --sage-dim: rgba(74,124,94,.12);
   --rose:     #b05a50;
   --violet:   #7040b8;
+  --violet-dim: rgba(112,64,184,.1);
   --text:     #2c2417;
   --text2:    #6b5c48;
   --text3:    #9e8e78;
@@ -391,7 +399,7 @@ html, body {
   display: flex; align-items: center; justify-content: space-between;
   position: relative; z-index: 10;
 }
-.status-time { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 600; color: var(--text); }
+.status-time { font-size: 15px; font-weight: 600; color: var(--text); }
 .status-icons { display: flex; align-items: center; gap: 4px; color: var(--text2); }
 .sig-bars { display:flex; align-items:flex-end; gap:1.5px; height:12px; }
 .sig-bars span { width:3px; background:currentColor; border-radius:1px; }
@@ -427,7 +435,7 @@ html, body {
 
 .btn {
   display: flex; align-items: center; justify-content: center; gap: 8px;
-  border-radius: 50px; font-family: 'DM Sans', sans-serif;
+  border-radius: 50px; font-family: inherit;
   font-size: 14px; font-weight: 500; letter-spacing: .04em;
   cursor: pointer; border: none; transition: all .2s; text-decoration: none;
 }
@@ -436,11 +444,11 @@ html, body {
 .btn-sm { padding: 9px 18px; font-size: 12px; }
 
 .sec-header { display: flex; align-items: center; justify-content: space-between; padding: 0 22px; margin-bottom: 14px; }
-.sec-title { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 600; color: var(--text); }
+.sec-title { font-size: 16px; font-weight: 600; color: var(--text); }
 .sec-more { font-size: 12px; color: var(--gold); font-weight: 500; cursor: pointer; }
 
 .page-header { padding: 16px 22px 20px; display: flex; align-items: center; justify-content: space-between; }
-.page-title { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 700; color: var(--text); }
+.page-title { font-size: 26px; font-weight: 700; color: var(--text); letter-spacing: -.5px; }
 
 .icon-btn {
   width: 36px; height: 36px; border-radius: 11px;
@@ -449,103 +457,171 @@ html, body {
   color: var(--text2);
 }
 
-/* ===================== SCREEN 1: ONBOARDING ===================== */
-#s-onboard { background: linear-gradient(160deg,#fdf8f0 0%,#f7f0e4 55%,#f0f5ee 100%); }
-.ob-hero {
-  flex: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  padding: 20px 32px 0; text-align: center; position: relative;
+/* ===================== SCREEN: LOGIN ===================== */
+#s-login { background: var(--bg); }
+.login-glow {
+  position: absolute; top: -80px; left: 50%; margin-left: -150px;
+  width: 300px; height: 300px; border-radius: 50%;
+  background: var(--gold-dim); pointer-events: none;
 }
-.ob-glow {
-  position: absolute; top: -60px; left: 50%; transform: translateX(-50%);
-  width: 300px; height: 300px;
-  background: radial-gradient(circle,rgba(176,125,32,.14) 0%,transparent 70%);
+.login-logo {
+  width: 80px; height: 80px; border-radius: 24px;
+  background: var(--gold-dim); border: 1px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--gold); margin: 0 auto 20px;
 }
-.ob-cross {
-  width: 56px; height: 56px; position: relative; margin: 0 auto 28px;
-  color: var(--gold);
+.login-title { font-size: 30px; font-weight: 700; color: var(--text); letter-spacing: -.5px; text-align: center; margin-bottom: 8px; }
+.login-sub { font-size: 15px; color: var(--text2); text-align: center; margin-bottom: 32px; }
+.field-label { font-size: 13px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+.field-input {
+  width: 100%; background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 14px; padding: 14px 16px; color: var(--text);
+  font-family: inherit; font-size: 15px; margin-bottom: 16px; outline: none;
 }
-.ob-title { font-family: 'Lora', serif; font-size: 32px; font-weight: 500; color: var(--text); line-height: 1.2; margin-bottom: 14px; }
-.ob-title em { font-style: italic; color: var(--gold); }
-.ob-sub { font-size: 14px; color: var(--text2); line-height: 1.8; max-width: 280px; margin: 0 auto 32px; }
-.ob-verse { font-family: 'Lora', serif; font-style: italic; font-size: 13px; color: var(--text3); line-height: 1.7; border-top: 1px solid var(--border); padding-top: 20px; }
-.ob-bottom { padding: 24px 28px 40px; display: flex; flex-direction: column; gap: 12px; }
-.ob-dots { display: flex; gap: 6px; justify-content: center; margin-bottom: 16px; }
-.ob-dot { width: 6px; height: 6px; border-radius: 3px; background: var(--border); }
-.ob-dot.on { background: var(--gold); width: 20px; }
+.field-input::placeholder { color: var(--text3); }
+.login-forgot { font-size: 13px; color: var(--gold); font-weight: 500; text-align: right; margin: -8px 0 24px; cursor: pointer; }
+.login-footer { text-align: center; margin-top: 32px; font-size: 14px; color: var(--text2); }
+.login-footer a { color: var(--gold); font-weight: 600; text-decoration: none; cursor: pointer; }
+.login-verse { margin-top: 48px; text-align: center; padding: 0 12px; }
+.login-verse-line { height: 1px; width: 48px; background: var(--border); margin: 0 auto 16px; }
+.login-verse-text { font-family: Georgia, serif; font-style: italic; font-size: 13px; color: var(--text3); line-height: 1.6; }
+.login-verse-ref { font-size: 11px; color: var(--gold); letter-spacing: .5px; margin-top: 6px; font-weight: 500; }
 
 /* ===================== SCREEN 2: HOME ===================== */
-.home-greeting { padding: 18px 22px 4px; }
-.greeting-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
-.greeting-name { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 700; color: var(--text); }
-.greeting-sub { font-size: 13px; color: var(--text2); }
+.home-greeting { padding: 12px 20px 4px; }
+.greeting-date { font-size: 11px; color: var(--text3); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 2px; }
+.greeting-name { font-size: 17px; font-weight: 600; color: var(--text); }
+.greeting-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .notif-btn {
-  width: 38px; height: 38px; border-radius: 12px;
-  background: var(--bg3); border: 1px solid var(--border);
+  width: 40px; height: 40px; border-radius: 14px;
+  background: rgba(255,253,247,.55); backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; position: relative; color: var(--text2);
 }
-.notif-dot { position: absolute; top: 7px; right: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--gold); border: 1.5px solid var(--bg); }
-
-.daily-card {
-  margin: 16px 22px;
-  background: linear-gradient(135deg,#f5edd8 0%,#ede0c0 100%);
-  border: 1px solid var(--border2); border-radius: 24px; padding: 24px;
-  position: relative; overflow: hidden;
+.notif-badge {
+  position: absolute; top: 4px; right: 4px; min-width: 16px; height: 16px;
+  padding: 0 4px; border-radius: 8px; background: var(--rose); color: #fff;
+  font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center;
 }
-.daily-card::before {
-  content: ''; position: absolute; top: -40px; right: -40px;
-  width: 140px; height: 140px;
-  background: radial-gradient(circle,rgba(176,125,32,.2) 0%,transparent 70%);
+
+.verse-hero {
+  margin: 12px 16px 16px; height: 380px; border-radius: 28px; overflow: hidden;
+  background: linear-gradient(135deg, #e8d5a8 0%, #d4c088 55%, #c9bea8 100%);
+  position: relative; cursor: pointer;
 }
-.daily-verse-text { font-family: 'Lora', serif; font-style: italic; font-size: 16px; color: var(--text); line-height: 1.7; margin: 12px 0 10px; }
-.daily-ref { font-size: 11px; color: var(--gold); letter-spacing: .1em; text-transform: uppercase; font-weight: 500; }
-.daily-actions { display: flex; gap: 10px; margin-top: 18px; }
-.daily-act {
-  flex: 1; background: rgba(176,125,32,.12); border: 1px solid var(--border2);
-  border-radius: 12px; padding: 10px 6px; text-align: center;
-  font-size: 10px; color: var(--gold); font-weight: 500; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; gap: 5px;
-  transition: background .2s;
+.verse-hero-blob { position: absolute; border-radius: 50%; opacity: .55; }
+.verse-hero-top { position: absolute; top: 22px; left: 22px; right: 22px; display: flex; justify-content: space-between; align-items: center; z-index: 2; }
+.verse-hero-body { position: absolute; inset: 72px 28px 100px; display: flex; flex-direction: column; justify-content: center; z-index: 2; }
+.verse-hero-text { font-size: 26px; font-weight: 600; line-height: 1.25; letter-spacing: -.5px; color: var(--text); }
+.verse-hero-ref { font-size: 12px; color: var(--gold); letter-spacing: 1.4px; text-transform: uppercase; margin-top: 18px; font-weight: 500; }
+.verse-hero-hint { font-size: 12px; color: var(--text3); margin-top: 14px; display: flex; align-items: center; gap: 6px; }
+.glass-action-bar {
+  position: absolute; left: 14px; right: 14px; bottom: 14px; z-index: 2;
+  background: rgba(255,253,247,.72); backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,.6); border-radius: 20px;
+  display: flex; align-items: stretch;
 }
-.daily-act:active { background: rgba(176,125,32,.2); }
+.glass-action-btn { flex: 1; padding: 12px 4px; text-align: center; cursor: pointer; }
+.glass-action-btn .ga-label { font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--text2); margin-top: 4px; font-weight: 500; }
+.glass-action-div { width: 1px; margin: 10px 0; background: rgba(44,36,23,.08); }
 
-.quick-row { display: flex; gap: 10px; padding: 0 22px; margin-bottom: 20px; }
-.quick-card { flex: 1; background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 14px 12px; text-align: center; }
-.quick-num { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 700; color: var(--gold); display:flex; align-items:center; justify-content:center; gap:4px; }
-.quick-lbl { font-size: 10px; color: var(--text3); margin-top: 2px; letter-spacing: .06em; text-transform: uppercase; }
+.glass-card {
+  margin: 0 16px 14px; background: rgba(255,253,247,.55); backdrop-filter: blur(12px);
+  border: 1px solid var(--border); border-radius: 22px; padding: 18px;
+}
+.prayer-card-label { display: flex; align-items: center; gap: 6px; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); font-weight: 500; margin-bottom: 10px; }
+.prayer-card-text { font-size: 15px; color: var(--text); line-height: 1.5; }
+.prayer-card-more { font-size: 12px; color: var(--gold); margin-top: 8px; font-weight: 500; cursor: pointer; }
+.prayer-pills { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.prayer-pill {
+  display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px;
+  background: rgba(255,253,247,.55); border: 1px solid var(--border); font-size: 12px; color: var(--text3); cursor: pointer;
+}
+.prayer-pill.gold { background: var(--gold-dim); border-color: var(--border2); color: var(--gold); }
 
-.group-row { display: flex; align-items: center; gap: 14px; background: var(--bg2); border: 1px solid var(--border); border-radius: 18px; padding: 14px 16px; margin: 0 22px 10px; cursor: pointer; transition: border-color .2s; }
-.group-row:active { border-color: var(--border2); }
-.group-av { width: 40px; height: 40px; border-radius: 12px; background: var(--bg3); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--gold); }
-.group-info { flex: 1; min-width: 0; }
-.group-name { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 3px; }
-.group-meta { font-size: 11px; color: var(--text3); }
-.group-badge { background: var(--gold); color: #fff; font-size: 10px; font-weight: 700; min-width: 18px; height: 18px; border-radius: 9px; display: flex; align-items: center; justify-content: center; padding: 0 5px; }
+.stats-strip { display: flex; align-items: stretch; }
+.stat-item { flex: 1; display: flex; align-items: center; gap: 10px; }
+.stat-div { width: 1px; height: 32px; background: rgba(44,36,23,.08); margin-right: 10px; }
+.stat-val { font-size: 20px; font-weight: 600; color: var(--text); }
+.stat-lbl { font-size: 11px; color: var(--text3); }
+.quick-actions { display: flex; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(44,36,23,.06); }
+.quick-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 6px; border-radius: 14px; background: rgba(176,125,32,.10);
+  border: 1px solid rgba(176,125,32,.18); font-size: 12px; color: var(--gold); font-weight: 600; cursor: pointer;
+}
 
-.live-scroll { display: flex; gap: 12px; padding: 0 22px; overflow-x: auto; scrollbar-width: none; }
-.live-scroll::-webkit-scrollbar { display: none; }
-.live-room-card { width: 130px; flex-shrink: 0; background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 12px; cursor: pointer; transition: border-color .2s; }
-.live-room-card:active { border-color: var(--border2); }
-.live-room-host { width: 26px; height: 26px; border-radius: 8px; background: var(--bg3); margin-bottom: 8px; display: flex; align-items: center; justify-content: center; color: var(--gold); }
-.live-room-name { font-size: 11px; font-weight: 500; color: var(--text); margin-bottom: 6px; line-height: 1.3; }
-.live-room-count { font-size: 11px; color: var(--text3); display:flex; align-items:center; gap:5px; }
+.group-glass {
+  display: flex; align-items: center; gap: 12px; padding: 14px;
+  background: rgba(255,253,247,.55); backdrop-filter: blur(12px);
+  border: 1px solid var(--border); border-radius: 18px; margin-bottom: 10px; cursor: pointer;
+}
+.group-glass.live { border-color: rgba(52,211,153,.35); background: rgba(240,250,243,.8); }
+.group-avatar { width: 42px; height: 42px; border-radius: 21px; background: var(--bg3); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: var(--gold); position: relative; flex-shrink: 0; }
+.live-dot-sm { position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; border-radius: 4px; background: #34d399; border: 1.5px solid #fff; }
+.unread-badge { position: absolute; top: -2px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--rose); color: #fff; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1.5px solid #fffaf2; }
+
+.tab-switch { display: flex; background: var(--bg3); border-radius: 12px; padding: 4px; margin: 0 22px 16px; }
+.tab-switch-btn {
+  flex: 1; padding: 8px; border-radius: 10px; text-align: center; font-size: 13px;
+  color: var(--text3); cursor: pointer; position: relative; border: 1px solid transparent;
+}
+.tab-switch-btn.active { background: var(--bg2); color: var(--text); font-weight: 600; border-color: var(--border); }
+
+.header-row { padding: 16px 22px; display: flex; align-items: center; justify-content: space-between; }
+.header-action {
+  display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 50px;
+  background: var(--bg3); border: 1px solid var(--border); font-size: 12px; color: var(--text2); cursor: pointer;
+}
+.header-action.gold { background: var(--gold-dim); border-color: var(--border2); color: var(--gold); }
+.header-action.sage { background: var(--sage); border-color: transparent; color: #fff; font-weight: 700; }
+
+.wall-card {
+  margin: 0 22px 14px; background: #f6f3fc; border: 1px solid rgba(112,64,184,.18);
+  border-radius: 20px; padding: 16px; position: relative; overflow: hidden;
+}
+.wall-card.community { background: var(--bg2); border-color: var(--border); }
+.wall-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.wall-av { width: 40px; height: 40px; border-radius: 20px; background: var(--violet-dim); border: 1.5px solid rgba(112,64,184,.25); display: flex; align-items: center; justify-content: center; color: var(--violet); }
+.wall-pray-btn { margin-top: 12px; padding: 8px 14px; border-radius: 999px; background: var(--gold-dim); border: 1px solid var(--border2); color: var(--gold); font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+
+.room-card { margin: 0 22px 12px; background: #eef5f0; border: 1px solid rgba(74,124,94,.22); border-radius: 20px; padding: 18px; }
+.room-card.sched { background: var(--bg2); border-color: var(--border); display: flex; gap: 14px; align-items: flex-start; }
+.room-join { background: var(--sage); color: #fff; border: none; border-radius: 12px; padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
+
+.devo-hub-header { padding: 16px 22px 8px; }
+.devo-ai-pill { display: inline-flex; align-items: center; gap: 5px; background: var(--violet-dim); border: 1px solid rgba(112,64,184,.2); border-radius: 50px; padding: 3px 10px; font-size: 10px; color: var(--violet); letter-spacing: .8px; text-transform: uppercase; margin-bottom: 6px; }
+.create-plan-cta {
+  margin: 0 22px 20px; display: flex; align-items: center; gap: 12px; padding: 16px;
+  background: var(--gold-dim); border: 1px solid var(--border2); border-radius: 16px; cursor: pointer;
+}
+.plan-list-card { margin: 0 22px 10px; background: var(--bg2); border: 1px solid var(--border2); border-radius: 16px; padding: 16px; cursor: pointer; }
+.plan-progress { height: 4px; background: var(--bg3); border-radius: 2px; overflow: hidden; margin-top: 10px; }
+.plan-progress-fill { height: 100%; background: var(--gold); border-radius: 2px; }
+
+.activity-card {
+  background: var(--bg2); border: 1px solid var(--border2); border-radius: 20px;
+  padding: 18px; display: flex; align-items: center; gap: 14px; margin-bottom: 10px; cursor: pointer;
+}
+
+/* ===================== SCREEN: ONBOARDING (legacy — removed) ===================== */
 
 /* ===================== SCREEN 3: GROUPS ===================== */
 .my-group-card { margin: 0 22px 14px; background: linear-gradient(135deg,#f0faf3 0%,#e8f5ec 100%); border: 1px solid rgba(74,124,94,.22); border-radius: 22px; padding: 20px; cursor: pointer; transition: border-color .2s; }
 .my-group-card:active { border-color: rgba(74,124,94,.5); }
 .mgc-top { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .mgc-icon { width: 42px; height: 42px; border-radius: 13px; background: rgba(74,124,94,.12); display: flex; align-items: center; justify-content: center; color: var(--sage); }
-.mgc-name { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 600; color: var(--text); }
+.mgc-name { font-weight: 600; color: var(--text); }
 .mgc-members { font-size: 11px; color: var(--text2); margin-top: 2px; }
 .mgc-next { background: rgba(74,124,94,.08); border: 1px solid rgba(74,124,94,.15); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; }
 .mgc-next-label { font-size: 10px; color: var(--sage); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 3px; }
 .mgc-next-time { font-size: 13px; font-weight: 500; color: var(--text); }
-.mgc-join-btn { background: var(--sage); color: #fff; border: none; border-radius: 10px; padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.mgc-join-btn { background: var(--sage); color: #fff; border: none; border-radius: 10px; padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
 
 .sched-card { margin: 0 22px 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: 18px; padding: 16px 18px; display: flex; align-items: center; gap: 14px; }
 .sched-date { width: 44px; flex-shrink: 0; text-align: center; background: var(--bg3); border-radius: 12px; padding: 8px 4px; }
-.sched-day { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: var(--gold); line-height: 1; }
+.sched-day { font-size: 18px; font-weight: 700; color: var(--gold); line-height: 1; }
 .sched-mon { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: .08em; margin-top: 2px; }
 .sched-info { flex: 1; }
 .sched-title { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 3px; }
@@ -557,14 +633,14 @@ html, body {
 .disc-info { flex: 1; }
 .disc-name { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 3px; }
 .disc-meta { font-size: 11px; color: var(--text3); }
-.disc-join { background: var(--gold-dim); color: var(--gold); border: 1px solid var(--border2); border-radius: 10px; padding: 7px 14px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.disc-join { background: var(--gold-dim); color: var(--gold); border: 1px solid var(--border2); border-radius: 10px; padding: 7px 14px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; }
 
-/* ===================== SCREEN 4: LIVE ===================== */
-#s-live { background: linear-gradient(180deg,#eef5f0 0%,#faf6ef 40%,#faf6ef 100%); }
+/* ===================== SCREEN: IN PRAYER ROOM ===================== */
+#s-room { background: linear-gradient(180deg,#eef5f0 0%,#faf6ef 40%,#faf6ef 100%); }
 .live-top-bar { padding: 12px 22px; display: flex; align-items: center; justify-content: space-between; }
 .live-back { width: 32px; height: 32px; border-radius: 10px; background: var(--bg2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text2); }
 .live-title-block { text-align: center; }
-.live-room-title { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 600; color: var(--text); }
+.live-room-title { font-weight: 600; color: var(--text); }
 .live-room-sub { font-size: 10px; color: var(--text3); margin-top: 1px; }
 .live-share-btn { width: 32px; height: 32px; border-radius: 10px; background: var(--bg2); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text2); }
 
@@ -581,7 +657,7 @@ html, body {
 
 .prayer-display { margin: 14px 22px; background: rgba(176,125,32,.05); border: 1px solid var(--border2); border-radius: 18px; padding: 16px 18px; }
 .pd-label { font-size: 10px; color: var(--gold); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 8px; display:flex; align-items:center; gap:6px; }
-.pd-text { font-family: 'Lora', serif; font-style: italic; font-size: 13px; color: var(--text2); line-height: 1.7; }
+.pd-text { font-family: Georgia, serif; font-style: italic; font-size: 13px; color: var(--text2); line-height: 1.7; }
 
 .listener-row { padding: 0 22px; margin-bottom: 14px; }
 .listener-label { font-size: 11px; color: var(--text3); margin-bottom: 10px; }
@@ -602,14 +678,14 @@ html, body {
 .chat-name { font-size: 10px; color: var(--gold); font-weight: 500; margin-bottom: 3px; }
 .chat-text { font-size: 12px; color: var(--text2); line-height: 1.5; }
 .chat-input-row { padding: 10px 22px 0; display: flex; gap: 8px; align-items: center; }
-.chat-input { flex: 1; background: var(--bg2); border: 1px solid var(--border); border-radius: 50px; padding: 9px 16px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; }
+.chat-input { flex: 1; background: var(--bg2); border: 1px solid var(--border); border-radius: 50px; padding: 9px 16px; color: var(--text); font-family: inherit; font-size: 13px; outline: none; }
 .chat-input::placeholder { color: var(--text3); }
 .chat-send { width: 36px; height: 36px; border-radius: 50%; background: var(--gold); border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #fff; }
 
 /* ===================== SCREEN 5: CHAT ===================== */
 .chat-header { padding: 12px 22px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--border); }
 .chat-header-av { width: 22px; height: 22px; border-radius: 7px; background: var(--bg3); display: flex; align-items: center; justify-content: center; color: var(--sage); }
-.chat-header-name { flex: 1; font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 600; color: var(--text); }
+.chat-header-name { flex: 1; font-weight: 600; color: var(--text); }
 .chat-header-meta { font-size: 10px; color: var(--text3); margin-top: 1px; }
 .chat-header-btns { display: flex; gap: 8px; }
 
@@ -623,11 +699,11 @@ html, body {
 .msg-name { font-size: 10px; color: var(--gold); font-weight: 500; margin-bottom: 4px; }
 .msg-text { font-size: 13px; color: var(--text); line-height: 1.5; }
 .msg-time { font-size: 10px; color: var(--text3); margin-top: 4px; }
-.prayer-msg { background: rgba(176,125,32,.05); border: 1px solid var(--border2); border-radius: 16px; padding: 12px 16px; font-family: 'Lora', serif; font-style: italic; font-size: 13px; color: var(--text2); line-height: 1.6; text-align: center; }
-.prayer-msg-label { font-family: 'DM Sans', sans-serif; font-style: normal; font-size: 10px; color: var(--gold); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 6px; display:flex; align-items:center; justify-content:center; gap:5px; }
+.prayer-msg { background: rgba(176,125,32,.05); border: 1px solid var(--border2); border-radius: 16px; padding: 12px 16px; font-family: Georgia, serif; font-style: italic; font-size: 13px; color: var(--text2); line-height: 1.6; text-align: center; }
+.prayer-msg-label { font-family: inherit; font-style: normal; font-size: 10px; color: var(--gold); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 6px; display:flex; align-items:center; justify-content:center; gap:5px; }
 .date-divider { text-align: center; font-size: 10px; color: var(--text3); letter-spacing: .1em; text-transform: uppercase; padding: 4px 0; }
 .msg-input-bar { padding: 10px 22px 6px; border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: flex-end; }
-.msg-input { flex: 1; background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 10px 14px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; resize: none; max-height: 80px; }
+.msg-input { flex: 1; background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 10px 14px; color: var(--text); font-family: inherit; font-size: 13px; outline: none; resize: none; max-height: 80px; }
 .msg-input::placeholder { color: var(--text3); }
 .msg-actions { display: flex; gap: 6px; padding-bottom: 2px; }
 .msg-act-btn { width: 22px; height: 22px; border-radius: 7px; background: var(--bg3); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text2); }
@@ -637,20 +713,20 @@ html, body {
 .devo-hero { margin: 0 22px 18px; background: linear-gradient(135deg,#f0ebf8 0%,#e8e0f4 100%); border: 1px solid rgba(112,64,184,.18); border-radius: 24px; padding: 22px; position: relative; overflow: hidden; }
 .devo-hero::before { content: ''; position: absolute; top: -50px; right: -50px; width: 160px; height: 160px; background: radial-gradient(circle,rgba(112,64,184,.12) 0%,transparent 70%); }
 .devo-ai-tag { display: inline-flex; align-items: center; gap: 6px; background: rgba(112,64,184,.1); border: 1px solid rgba(112,64,184,.2); border-radius: 50px; padding: 4px 12px; font-size: 10px; color: var(--violet); font-weight: 500; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 14px; }
-.devo-plan-title { font-family: 'Lora', serif; font-size: 20px; color: var(--text); line-height: 1.3; margin-bottom: 8px; }
+.devo-plan-title { font-family: Georgia, serif; font-size: 20px; color: var(--text); line-height: 1.3; margin-bottom: 8px; }
 .devo-plan-meta { font-size: 12px; color: var(--text2); margin-bottom: 16px; }
 .devo-progress-bar { background: rgba(112,64,184,.12); border-radius: 50px; height: 4px; overflow: hidden; margin-bottom: 8px; }
 .devo-progress-fill { height: 100%; background: linear-gradient(90deg,#8c64c8,#b08be0); border-radius: 50px; width: 77%; }
 .devo-progress-label { font-size: 10px; color: var(--text2); }
 
 .devo-week { padding: 0 22px; margin-bottom: 18px; }
-.devo-week-title { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 12px; }
+.devo-week-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 12px; }
 .week-days { display: flex; gap: 8px; }
 .week-day { flex: 1; background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 10px 4px; text-align: center; }
 .week-day.done { border-color: var(--border2); background: var(--gold-dim2); }
 .week-day.today { border-color: var(--gold); }
 .wd-name { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; }
-.wd-num { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 600; color: var(--text3); }
+.wd-num { font-size: 15px; font-weight: 600; color: var(--text3); }
 .week-day.done .wd-num, .week-day.today .wd-num { color: var(--gold); }
 .wd-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text3); margin: 4px auto 0; }
 .week-day.done .wd-dot, .week-day.today .wd-dot { background: var(--gold); }
@@ -660,7 +736,7 @@ html, body {
 .tr-image::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom,transparent 40%,rgba(250,246,239,.5)); }
 .tr-body { padding: 14px 18px; }
 .tr-day { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 5px; }
-.tr-title { font-family: 'Lora', serif; font-size: 17px; color: var(--text); margin-bottom: 6px; }
+.tr-title { font-family: Georgia, serif; font-size: 17px; color: var(--text); margin-bottom: 6px; }
 .tr-verse { font-size: 12px; color: var(--text2); font-style: italic; line-height: 1.6; }
 
 .ai-suggest { margin: 0 22px 16px; background: rgba(112,64,184,.05); border: 1px solid rgba(112,64,184,.14); border-radius: 18px; padding: 16px 18px; }
@@ -685,19 +761,19 @@ html, body {
 .profile-av-wrap { position: relative; display: inline-block; margin-bottom: 14px; }
 .profile-av { width: 80px; height: 80px; border-radius: 26px; background: var(--bg3); display: flex; align-items: center; justify-content: center; border: 2px solid var(--border2); box-shadow: 0 4px 16px rgba(44,36,23,.1); color: var(--gold); }
 .profile-edit-btn { position: absolute; bottom: -4px; right: -4px; width: 24px; height: 24px; border-radius: 8px; background: var(--gold); display: flex; align-items: center; justify-content: center; cursor: pointer; color:#fff; }
-.profile-name { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.profile-name { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
 .profile-role { font-size: 12px; color: var(--text3); }
 
 .profile-stats { display: flex; margin: 0 22px 20px; background: var(--bg2); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; }
-.ps-item { flex: 1; text-align: center; padding: 16px 8px; border-right: 1px solid var(--border); }
+.ps-item { flex: 1; text-align: center; padding: 16px 8px; border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; }
 .ps-item:last-child { border-right: none; }
-.ps-num { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: var(--gold); }
+.ps-num { font-size: 18px; font-weight: 700; color: var(--gold); }
 .ps-lbl { font-size: 10px; color: var(--text3); margin-top: 3px; text-transform: uppercase; letter-spacing: .06em; }
 
 .streak-card { margin: 0 22px 16px; background: linear-gradient(135deg,#fdf3e0 0%,#f8eccc 100%); border: 1px solid rgba(176,125,32,.2); border-radius: 18px; padding: 16px 18px; display: flex; align-items: center; gap: 14px; }
 .streak-icon-wrap { width:44px; height:44px; border-radius:14px; background:rgba(176,125,32,.12); display:flex; align-items:center; justify-content:center; color:var(--gold); flex-shrink:0; }
 .streak-info { flex: 1; }
-.streak-num { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 700; color: var(--gold); line-height: 1; }
+.streak-num { font-size: 22px; font-weight: 700; color: var(--gold); line-height: 1; }
 .streak-lbl { font-size: 11px; color: var(--text3); margin-top: 3px; }
 .streak-bar { display: flex; gap: 4px; margin-top: 10px; }
 .streak-seg { flex: 1; height: 3px; border-radius: 2px; background: rgba(176,125,32,.15); }
@@ -722,19 +798,23 @@ html, body {
 <div class="stage">
   <!-- LEFT NAV -->
   <div style="position:relative">
-    <div style="color:rgba(80,60,30,.4);font-family:'Syne',sans-serif;font-size:10px;letter-spacing:.15em;text-transform:uppercase;margin-bottom:16px;padding-left:4px">Screens</div>
+    <div style="color:rgba(80,60,30,.4);font-family:inherit;font-size:10px;letter-spacing:.15em;text-transform:uppercase;margin-bottom:16px;padding-left:4px">Screens</div>
     <div class="side-nav">
-      <button class="side-btn active"  onclick="show('s-onboard',this)">① Onboarding</button>
-      <button class="side-btn" onclick="show('s-home',this)">② Home</button>
-      <button class="side-btn" onclick="show('s-groups',this)">③ Prayer Groups</button>
-      <button class="side-btn" onclick="show('s-live',this)">④ Live Prayer Room</button>
-      <button class="side-btn" onclick="show('s-chat',this)">⑤ Group Chat</button>
-      <button class="side-btn" onclick="show('s-devo',this)">⑥ Devotional (AI)</button>
-      <button class="side-btn" onclick="show('s-profile',this)">⑦ Profile</button>
+      <button class="side-btn" onclick="show('s-login',this)">Login</button>
+      <button class="side-btn active" onclick="show('s-home',this)">Home</button>
+      <button class="side-btn" onclick="show('s-pray',this)">Pray · Groups</button>
+      <button class="side-btn" onclick="show('s-wall',this)">Prayer Wall</button>
+      <button class="side-btn" onclick="show('s-rooms',this)">Prayer Rooms</button>
+      <button class="side-btn" onclick="show('s-room',this)">In Room</button>
+      <button class="side-btn" onclick="show('s-chat',this)">Group Chat</button>
+      <button class="side-btn" onclick="show('s-devo',this)">Devotional</button>
+      <button class="side-btn" onclick="show('s-activity',this)">Activity</button>
+      <button class="side-btn" onclick="show('s-profile',this)">Profile</button>
+      <button class="side-btn" onclick="show('s-voice-call',this)">Voice Call</button>
     </div>
     <div style="margin-top:24px;padding:14px;background:rgba(176,125,32,.07);border:1px solid rgba(176,125,32,.18);border-radius:12px;max-width:160px">
       <div style="font-size:10px;color:#9a6d18;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Divine Bridge</div>
-      <div style="font-size:11px;color:rgba(60,45,25,.45);line-height:1.6">Mobile App<br/>UI Prototype</div>
+      <div style="font-size:11px;color:rgba(60,45,25,.45);line-height:1.6">Mobile App<br/>Wireframe · Jun 2026</div>
     </div>
   </div>
 
@@ -742,201 +822,289 @@ html, body {
   <div class="phone">
     <div class="phone-notch"><div class="notch-camera"></div><div class="notch-pill"></div></div>
 
-    <!-- ① ONBOARDING -->
-    <div class="phone-screen active" id="s-onboard">
-      <div class="status-bar">
-        <span class="status-time">9:41</span>
-        <div class="status-icons">
-          <div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div>
-          <div class="bat"><div class="bat-fill"></div></div>
+    <!-- LOGIN -->
+    <div class="phone-screen" id="s-login">
+      <div class="login-glow"></div>
+      <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
+      <div class="app-screen" style="padding: 48px 28px 40px;">
+        <div class="login-logo"><span class="icon icon-36"><svg><use href="#ic-cross"/></svg></span></div>
+        <div class="login-title">Divine Bridge</div>
+        <div class="login-sub">Welcome back</div>
+        <div class="field-label">Email</div>
+        <input class="field-input" placeholder="you@example.com" type="email"/>
+        <div class="field-label">Password</div>
+        <input class="field-input" placeholder="••••••••" type="password"/>
+        <div class="login-forgot">Forgot password?</div>
+        <button class="btn btn-fill" style="width:100%;justify-content:center" onclick="show('s-home',document.querySelectorAll('.side-btn')[1])">Sign In</button>
+        <div class="login-footer">Don't have an account? <a onclick="show('s-home',document.querySelectorAll('.side-btn')[1])">Sign up</a></div>
+        <div class="login-verse">
+          <div class="login-verse-line"></div>
+          <div class="login-verse-text">"Where two or three gather in my name,<br/>I am there among them."</div>
+          <div class="login-verse-ref">MATTHEW 18:20</div>
         </div>
-      </div>
-      <div class="ob-hero">
-        <div class="ob-glow"></div>
-        <div class="ob-cross icon icon-44">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="12" y1="3" x2="12" y2="21"/><line x1="4" y1="9" x2="20" y2="9"/></svg>
-        </div>
-        <div class="ob-title">Pray Together.<br/><em>Anywhere.</em></div>
-        <div class="ob-sub">Join small prayer groups, attend live rooms, and grow daily with an AI-powered devotional plan.</div>
-        <div class="ob-verse">"Where two or three gather in my name,<br/>I am there among them." — Matthew 18:20</div>
-      </div>
-      <div class="ob-bottom">
-        <div class="ob-dots"><div class="ob-dot on"></div><div class="ob-dot"></div><div class="ob-dot"></div></div>
-        <button class="btn btn-fill" style="width:100%;justify-content:center" onclick="show('s-home',document.querySelectorAll('.side-btn')[1])">Get Started — It's Free</button>
-        <button class="btn btn-outline" style="width:100%;justify-content:center;font-size:13px">Sign in to existing account</button>
       </div>
     </div>
 
-    <!-- ② HOME -->
-    <div class="phone-screen" id="s-home">
+    <!-- HOME -->
+    <div class="phone-screen active" id="s-home">
       <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
       <div class="app-screen">
         <div class="home-greeting">
           <div class="greeting-top">
-            <div class="greeting-name">Good morning, Sarah</div>
-            <div class="notif-btn"><span class="icon icon-16"><svg><use href="#ic-bell"/></svg></span><div class="notif-dot"></div></div>
-          </div>
-          <div class="greeting-sub">Tuesday · March 17 · Day 23 of your plan</div>
-        </div>
-
-        <div class="daily-card">
-          <div class="pill pill-gold" style="margin-bottom:10px">
-            <span class="icon icon-9"><svg><use href="#ic-cross"/></svg></span> Daily Verse
-          </div>
-          <div class="daily-verse-text">"Seek the Lord while he may be found; call upon him while he is near."</div>
-          <div class="daily-ref">Isaiah 55:6</div>
-          <div class="daily-actions">
-            <div class="daily-act" onclick="show('s-devo',document.querySelectorAll('.side-btn')[5])">
-              <span class="icon icon-10"><svg><use href="#ic-book"/></svg></span> Reading
+            <div>
+              <div class="greeting-date">MONDAY, JUNE 1</div>
+              <div class="greeting-name">Good morning, Sarah</div>
             </div>
-            <div class="daily-act">
-              <span class="icon icon-10"><svg><use href="#ic-audio"/></svg></span> Listen
-            </div>
-            <div class="daily-act">
-              <span class="icon icon-10"><svg><use href="#ic-share"/></svg></span> Share
+            <div class="notif-btn" onclick="show('s-activity',document.querySelectorAll('.side-btn')[8])">
+              <span class="icon icon-16"><svg><use href="#ic-bell"/></svg></span>
+              <div class="notif-badge">3</div>
             </div>
           </div>
         </div>
 
-        <div class="quick-row">
-          <div class="quick-card">
-            <div class="quick-num"><span class="icon icon-18" style="color:var(--gold)"><svg><use href="#ic-flame"/></svg></span> 23</div>
-            <div class="quick-lbl">Day Streak</div>
+        <div class="verse-hero" onclick="show('s-devo',document.querySelectorAll('.side-btn')[7])">
+          <div class="verse-hero-blob" style="top:-40px;right:-30px;width:180px;height:180px;background:rgba(201,146,48,.35)"></div>
+          <div class="verse-hero-blob" style="bottom:-20px;left:-20px;width:140px;height:140px;background:rgba(74,124,94,.25)"></div>
+          <div class="verse-hero-top">
+            <div class="pill pill-gold"><span class="icon icon-9"><svg><use href="#ic-cross"/></svg></span> Hope</div>
+            <div class="icon-btn" style="width:36px;height:36px;border-radius:14px;background:rgba(255,253,247,.55)"><span class="icon icon-14"><svg><use href="#ic-share"/></svg></span></div>
           </div>
-          <div class="quick-card"><div class="quick-num">4</div><div class="quick-lbl">Groups</div></div>
-          <div class="quick-card"><div class="quick-num">148</div><div class="quick-lbl">Prayers</div></div>
+          <div class="verse-hero-body">
+            <div class="verse-hero-text">"Seek the Lord while he may be found; call upon him while he is near."</div>
+            <div class="verse-hero-ref">— Isaiah 55:6</div>
+            <div class="verse-hero-hint">Tap to open the reader <span class="icon icon-10"><svg><use href="#ic-chevron-r"/></svg></span></div>
+          </div>
+          <div class="glass-action-bar">
+            <div class="glass-action-btn"><span class="icon icon-18" style="color:var(--rose)"><svg><use href="#ic-heart"/></svg></span><div class="ga-label">Like · 128</div></div>
+            <div class="glass-action-div"></div>
+            <div class="glass-action-btn"><span class="icon icon-18"><svg><use href="#ic-audio"/></svg></span><div class="ga-label">Listen</div></div>
+            <div class="glass-action-div"></div>
+            <div class="glass-action-btn"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="ga-label">Devotional</div></div>
+          </div>
         </div>
 
-        <div class="sec-header">
-          <div class="sec-title">My Groups</div>
-          <div class="sec-more" onclick="show('s-groups',document.querySelectorAll('.side-btn')[2])">See all</div>
-        </div>
-        <div class="group-row" onclick="show('s-chat',document.querySelectorAll('.side-btn')[4])">
-          <div class="group-av"><span class="icon icon-16"><svg><use href="#ic-sunrise"/></svg></span></div>
-          <div class="group-info"><div class="group-name">Morning Seekers</div><div class="group-meta">Next session: Today 7 AM · 6 members</div></div>
-          <div class="group-badge">3</div>
-        </div>
-        <div class="group-row">
-          <div class="group-av"><span class="icon icon-16"><svg><use href="#ic-cross"/></svg></span></div>
-          <div class="group-info"><div class="group-name">Thursday Night Study</div><div class="group-meta">Thu 8 PM · 12 members</div></div>
+        <div class="glass-card">
+          <div class="prayer-card-label"><span class="icon icon-10"><svg><use href="#ic-pray"/></svg></span> Today's Global Prayer</div>
+          <div class="prayer-card-text">Heavenly Father, we lift up every nation in need of Your peace today. Guide leaders, comfort the weary, and let Your love be known…</div>
+          <div class="prayer-card-more">Read more</div>
+          <div class="prayer-pills">
+            <div class="prayer-pill gold"><span class="icon icon-10"><svg><use href="#ic-pray"/></svg></span> Pray · 842</div>
+            <div class="prayer-pill"><span class="icon icon-10"><svg><use href="#ic-audio"/></svg></span> Listen</div>
+            <div class="prayer-pill"><span class="icon icon-10"><svg><use href="#ic-share"/></svg></span> Share</div>
+          </div>
         </div>
 
-        <div class="sec-header" style="margin-top:8px">
-          <div class="sec-title">Live Prayer Rooms</div>
-          <div class="sec-more" onclick="show('s-live',document.querySelectorAll('.side-btn')[3])">Join</div>
+        <div class="glass-card" style="padding:14px">
+          <div class="stats-strip">
+            <div class="stat-item"><span class="icon icon-18" style="color:var(--sage)"><svg><use href="#ic-groups"/></svg></span><div><div class="stat-val">4</div><div class="stat-lbl">Groups</div></div></div>
+            <div class="stat-div"></div>
+            <div class="stat-item"><span class="icon icon-18" style="color:var(--gold)"><svg><use href="#ic-flame"/></svg></span><div><div class="stat-val">23</div><div class="stat-lbl">Day Streak</div></div></div>
+            <div class="stat-div"></div>
+            <div class="stat-item"><span class="icon icon-18" style="color:var(--rose)"><svg><use href="#ic-pray"/></svg></span><div><div class="stat-val">12</div><div class="stat-lbl">Praying · 7d</div></div></div>
+          </div>
+          <div class="quick-actions">
+            <div class="quick-btn" onclick="show('s-rooms',document.querySelectorAll('.side-btn')[4])"><span class="icon icon-12"><svg><use href="#ic-live"/></svg></span> Join Room</div>
+            <div class="quick-btn" onclick="show('s-devo',document.querySelectorAll('.side-btn')[7])"><span class="icon icon-12"><svg><use href="#ic-book"/></svg></span> Devotional</div>
+            <div class="quick-btn" onclick="show('s-pray',document.querySelectorAll('.side-btn')[2])"><span class="icon icon-12"><svg><use href="#ic-groups"/></svg></span> My Groups</div>
+          </div>
         </div>
-        <div class="live-scroll">
-          <div class="live-room-card" onclick="show('s-live',document.querySelectorAll('.side-btn')[3])">
-            <div class="live-room-host"><span class="icon icon-10"><svg><use href="#ic-dove"/></svg></span></div>
-            <div class="pill pill-live" style="margin-bottom:6px"><div class="live-dot"></div>Live</div>
-            <div class="live-room-name">Global Intercession</div>
-            <div class="live-room-count"><span class="icon icon-10"><svg><use href="#ic-radio"/></svg></span> 247 listening</div>
+
+        <div class="sec-header"><div class="sec-title">My Groups</div><div class="sec-more" onclick="show('s-pray',document.querySelectorAll('.side-btn')[2])">View All</div></div>
+        <div class="group-glass live" style="margin:0 16px 10px" onclick="show('s-chat',document.querySelectorAll('.side-btn')[6])">
+          <div class="group-avatar">MS<div class="live-dot-sm"></div></div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+              <div style="font-size:15px;font-weight:600;color:var(--text)">Morning Seekers</div>
+              <div class="pill pill-live" style="padding:2px 7px;font-size:9px"><div class="live-dot"></div>LIVE</div>
+            </div>
+            <div style="font-size:12px;color:#2f855a">6 praying now</div>
           </div>
-          <div class="live-room-card" onclick="show('s-live',document.querySelectorAll('.side-btn')[3])">
-            <div class="live-room-host"><span class="icon icon-10"><svg><use href="#ic-heart"/></svg></span></div>
-            <div class="pill pill-live" style="margin-bottom:6px"><div class="live-dot"></div>Live</div>
-            <div class="live-room-name">Healing & Restoration</div>
-            <div class="live-room-count"><span class="icon icon-10"><svg><use href="#ic-radio"/></svg></span> 89 listening</div>
+          <span class="icon icon-16" style="color:var(--text3)"><svg><use href="#ic-chevron-r"/></svg></span>
+        </div>
+        <div class="group-glass" style="margin:0 16px 10px" onclick="show('s-chat',document.querySelectorAll('.side-btn')[6])">
+          <div class="group-avatar">TN<div class="unread-badge">3</div></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:2px">Thursday Night Study</div>
+            <div style="font-size:12px;color:var(--rose)">3 unread messages</div>
           </div>
-          <div class="live-room-card">
-            <div class="live-room-host"><span class="icon icon-10"><svg><use href="#ic-waves"/></svg></span></div>
-            <div class="pill pill-gold" style="margin-bottom:6px">Starts 10 AM</div>
-            <div class="live-room-name">Praise & Worship</div>
-            <div class="live-room-count"><span class="icon icon-10"><svg><use href="#ic-bell"/></svg></span> 41 going</div>
-          </div>
+          <span class="icon icon-16" style="color:var(--text3)"><svg><use href="#ic-chevron-r"/></svg></span>
         </div>
         <div style="height:16px"></div>
       </div>
       <div class="bottom-nav">
         <div class="nav-item active"><span class="icon icon-18"><svg><use href="#ic-home"/></svg></span><div class="nav-label">Home</div></div>
-        <div class="nav-item" onclick="show('s-groups',document.querySelectorAll('.side-btn')[2])"><span class="icon icon-18"><svg><use href="#ic-groups"/></svg></span><div class="nav-label">Groups</div></div>
-        <div class="nav-item" onclick="show('s-live',document.querySelectorAll('.side-btn')[3])"><span class="icon icon-18"><svg><use href="#ic-live"/></svg></span><div class="nav-label">Live</div></div>
-        <div class="nav-item" onclick="show('s-devo',document.querySelectorAll('.side-btn')[5])"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile',document.querySelectorAll('.side-btn')[6])"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item" onclick="show('s-pray',document.querySelectorAll('.side-btn')[2])"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item" onclick="show('s-rooms',document.querySelectorAll('.side-btn')[4])"><span class="icon icon-18"><svg><use href="#ic-live"/></svg></span><div class="nav-label">Live</div></div>
+        <div class="nav-item" onclick="show('s-devo',document.querySelectorAll('.side-btn')[7])"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item" onclick="show('s-profile',document.querySelectorAll('.side-btn')[9])"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
       </div>
     </div>
 
-    <!-- ③ PRAYER GROUPS -->
-    <div class="phone-screen" id="s-groups">
+    <!-- PRAY · MY GROUPS -->
+    <div class="phone-screen" id="s-pray">
       <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
-      <div class="app-screen">
-        <div class="page-header">
-          <div class="page-title">Prayer Groups</div>
-          <div class="icon-btn"><span class="icon icon-18"><svg><use href="#ic-plus"/></svg></span></div>
+      <div class="app-screen" style="padding-bottom:80px">
+        <div class="header-row">
+          <div class="page-title" style="font-size:26px">Prayer Groups</div>
+          <div class="header-action"><span class="icon icon-12"><svg><use href="#ic-plus"/></svg></span> New Group</div>
+        </div>
+        <div class="tab-switch">
+          <div class="tab-switch-btn active">My Groups <span style="position:absolute;top:4px;right:10px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--rose);color:#fff;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center">3</span></div>
+          <div class="tab-switch-btn" onclick="show('s-wall',document.querySelectorAll('.side-btn')[3])">Prayer Wall</div>
         </div>
 
-        <div class="sec-header" style="padding-top:0"><div class="sec-title">My Groups</div></div>
-
-        <div class="my-group-card" onclick="show('s-chat',document.querySelectorAll('.side-btn')[4])">
+        <div class="my-group-card" onclick="show('s-chat',document.querySelectorAll('.side-btn')[6])">
           <div class="mgc-top">
             <div class="mgc-icon"><span class="icon icon-18"><svg><use href="#ic-sunrise"/></svg></span></div>
-            <div style="flex:1"><div class="mgc-name">Morning Seekers</div><div class="mgc-members">6 members · You're the host</div></div>
-            <div class="pill pill-sage">Active</div>
+            <div style="flex:1"><div class="mgc-name">Morning Seekers</div><div class="mgc-members" style="color:#34d399">6 praying now · LIVE</div></div>
           </div>
           <div class="mgc-next">
-            <div><div class="mgc-next-label">Next session</div><div class="mgc-next-time">Today · 7:00 AM · Video</div></div>
-            <button class="mgc-join-btn">Join</button>
+            <div><div class="mgc-next-label">Members</div><div class="mgc-next-time">6 members</div></div>
+            <span class="icon icon-16" style="color:var(--text3)"><svg><use href="#ic-chevron-r"/></svg></span>
           </div>
         </div>
 
-        <div class="my-group-card" style="border-color:var(--border2)">
+        <div class="my-group-card">
           <div class="mgc-top">
             <div class="mgc-icon"><span class="icon icon-18"><svg><use href="#ic-cross"/></svg></span></div>
-            <div style="flex:1"><div class="mgc-name">Thursday Night Study</div><div class="mgc-members">12 members · Pastor James</div></div>
+            <div style="flex:1"><div class="mgc-name">Thursday Night Study</div><div class="mgc-members" style="color:var(--rose)">3 unread messages</div></div>
           </div>
           <div class="mgc-next">
-            <div><div class="mgc-next-label">Next session</div><div class="mgc-next-time">Thu · 8:00 PM · Audio</div></div>
-            <button class="mgc-join-btn" style="background:var(--gold)">RSVP</button>
+            <div><div class="mgc-next-label">Members</div><div class="mgc-next-time">12 members</div></div>
+            <span class="icon icon-16" style="color:var(--text3)"><svg><use href="#ic-chevron-r"/></svg></span>
           </div>
         </div>
 
-        <div class="sec-header" style="margin-top:8px">
-          <div class="sec-title">Upcoming Sessions</div>
-          <div class="sec-more">Calendar</div>
-        </div>
+        <div class="sec-header" style="margin-top:8px"><div class="sec-title">Upcoming Sessions</div></div>
         <div class="sched-card">
-          <div class="sched-date"><div class="sched-day">17</div><div class="sched-mon">Mar</div></div>
-          <div class="sched-info"><div class="sched-title">Morning Seekers — Weekly</div><div class="sched-meta">7:00 AM · 45 min · Video · Recurring</div></div>
-          <div class="sched-type-icon"><span class="icon icon-16"><svg><use href="#ic-video"/></svg></span></div>
-        </div>
-        <div class="sched-card">
-          <div class="sched-date"><div class="sched-day">20</div><div class="sched-mon">Mar</div></div>
-          <div class="sched-info"><div class="sched-title">Thursday Night Study</div><div class="sched-meta">8:00 PM · 60 min · Audio · Recurring</div></div>
-          <div class="sched-type-icon"><span class="icon icon-16"><svg><use href="#ic-live"/></svg></span></div>
-        </div>
-        <div class="sched-card">
-          <div class="sched-date"><div class="sched-day">24</div><div class="sched-mon">Mar</div></div>
-          <div class="sched-info"><div class="sched-title">Easter Preparation Prayer</div><div class="sched-meta">6:00 PM · 90 min · Video · Special</div></div>
-          <div class="sched-type-icon"><span class="icon icon-16"><svg><use href="#ic-cross"/></svg></span></div>
-        </div>
-
-        <div class="sec-header" style="margin-top:8px"><div class="sec-title">Discover Groups</div></div>
-        <div class="discover-card">
-          <div class="disc-av"><span class="icon icon-16"><svg><use href="#ic-sunrise"/></svg></span></div>
-          <div class="disc-info"><div class="disc-name">New Believers Circle</div><div class="disc-meta">23 members · Sun & Wed evenings</div></div>
-          <button class="disc-join">Join</button>
-        </div>
-        <div class="discover-card">
-          <div class="disc-av"><span class="icon icon-16"><svg><use href="#ic-heart"/></svg></span></div>
-          <div class="disc-info"><div class="disc-name">Married Couples Prayer</div><div class="disc-meta">18 members · Fri evenings</div></div>
-          <button class="disc-join">Join</button>
+          <div class="sched-date"><div class="sched-day">1</div><div class="sched-mon">Jun</div></div>
+          <div class="sched-info"><div class="sched-title">Morning Seekers</div><div class="sched-meta">Today at 7:00 AM · Pastor James</div></div>
+          <div class="sched-type-icon"><span class="icon icon-16"><svg><use href="#ic-calendar"/></svg></span></div>
         </div>
         <div style="height:16px"></div>
       </div>
       <div class="bottom-nav">
         <div class="nav-item" onclick="show('s-home',document.querySelectorAll('.side-btn')[1])"><span class="icon icon-18"><svg><use href="#ic-home"/></svg></span><div class="nav-label">Home</div></div>
-        <div class="nav-item active"><span class="icon icon-18"><svg><use href="#ic-groups"/></svg></span><div class="nav-label">Groups</div></div>
-        <div class="nav-item" onclick="show('s-live',document.querySelectorAll('.side-btn')[3])"><span class="icon icon-18"><svg><use href="#ic-live"/></svg></span><div class="nav-label">Live</div></div>
-        <div class="nav-item" onclick="show('s-devo',document.querySelectorAll('.side-btn')[5])"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile',document.querySelectorAll('.side-btn')[6])"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item active"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item" onclick="show('s-rooms',document.querySelectorAll('.side-btn')[4])"><span class="icon icon-18"><svg><use href="#ic-live"/></svg></span><div class="nav-label">Live</div></div>
+        <div class="nav-item" onclick="show('s-devo',document.querySelectorAll('.side-btn')[7])"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item" onclick="show('s-profile',document.querySelectorAll('.side-btn')[9])"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
       </div>
     </div>
 
-    <!-- ④ LIVE PRAYER ROOM -->
-    <div class="phone-screen" id="s-live">
+    <!-- PRAYER WALL -->
+    <div class="phone-screen" id="s-wall">
+      <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
+      <div class="app-screen">
+        <div class="header-row">
+          <div class="page-title" style="font-size:26px">Prayer Wall</div>
+          <div class="header-action gold"><span class="icon icon-12"><svg><use href="#ic-plus"/></svg></span> Pray</div>
+        </div>
+        <div class="tab-switch">
+          <div class="tab-switch-btn" onclick="show('s-pray',document.querySelectorAll('.side-btn')[2])">My Groups</div>
+          <div class="tab-switch-btn active">Prayer Wall</div>
+        </div>
+        <div style="font-size:12px;color:var(--text3);text-align:center;margin:0 22px 16px">Community prayers · Global watch</div>
+
+        <div class="wall-card">
+          <div class="wall-header">
+            <div class="wall-av"><span class="icon icon-18"><svg><use href="#ic-globe"/></svg></span></div>
+            <div><div style="font-size:14px;font-weight:700;color:var(--text)">Global Prayer Watch</div><div style="font-size:11px;color:var(--text3)">2h ago · Ukraine, Sudan</div></div>
+          </div>
+          <div style="font-size:14px;color:var(--text2);line-height:1.6">Lord, bring comfort to families displaced by conflict. Strengthen aid workers and open doors for peace…</div>
+          <div class="wall-pray-btn"><span class="icon icon-10"><svg><use href="#ic-pray"/></svg></span> I prayed</div>
+        </div>
+
+        <div class="wall-card community">
+          <div class="wall-header">
+            <div class="wall-av" style="background:var(--gold-dim);border-color:var(--border2);color:var(--gold)"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span></div>
+            <div><div style="font-size:14px;font-weight:700;color:var(--text)">Anonymous</div><div style="font-size:11px;color:var(--text3)">5h ago</div></div>
+          </div>
+          <div style="font-size:14px;color:var(--text);line-height:1.6;margin-bottom:6px">Please pray for my mother's surgery tomorrow. She's anxious and we need God's peace.</div>
+          <div class="wall-pray-btn"><span class="icon icon-10"><svg><use href="#ic-pray"/></svg></span> Pray · 24</div>
+        </div>
+        <div style="height:16px"></div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item" onclick="show('s-home',document.querySelectorAll('.side-btn')[1])"><span class="icon icon-18"><svg><use href="#ic-home"/></svg></span><div class="nav-label">Home</div></div>
+        <div class="nav-item active"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item" onclick="show('s-rooms',document.querySelectorAll('.side-btn')[4])"><span class="icon icon-18"><svg><use href="#ic-live"/></svg></span><div class="nav-label">Live</div></div>
+        <div class="nav-item" onclick="show('s-devo',document.querySelectorAll('.side-btn')[7])"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item" onclick="show('s-profile',document.querySelectorAll('.side-btn')[9])"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+      </div>
+    </div>
+
+    <!-- PRAYER ROOMS LIST -->
+    <div class="phone-screen" id="s-rooms">
+      <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
+      <div class="app-screen">
+        <div class="header-row">
+          <div class="page-title" style="font-size:26px">Prayer Rooms</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <div class="header-action" style="background:var(--gold-dim);color:var(--gold);border:1px solid var(--border2)" onclick="show('s-voice-call',document.querySelectorAll('.side-btn')[10])">Voice link</div>
+            <div class="header-action sage">+ Create</div>
+          </div>
+        </div>
+        <div class="tab-switch">
+          <div class="tab-switch-btn active">Live (2)</div>
+          <div class="tab-switch-btn">Scheduled</div>
+        </div>
+
+        <div class="room-card" onclick="show('s-room',document.querySelectorAll('.side-btn')[5])">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+            <div style="flex:1;margin-right:12px">
+              <div class="pill pill-live" style="margin-bottom:6px;display:inline-flex"><div class="live-dot"></div>Live</div>
+              <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px">Global Intercession</div>
+              <div style="font-size:13px;color:var(--text2)">Hosted by Pastor Mark</div>
+            </div>
+            <button class="room-join">Join</button>
+          </div>
+          <div style="display:flex;gap:14px;font-size:12px;color:var(--text3)">
+            <span style="display:flex;align-items:center;gap:5px"><span class="icon icon-12"><svg><use href="#ic-mic"/></svg></span> 4 speaking</span>
+            <span style="display:flex;align-items:center;gap:5px"><span class="icon icon-12"><svg><use href="#ic-radio"/></svg></span> 243 listening</span>
+          </div>
+        </div>
+
+        <div class="room-card">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+            <div style="flex:1;margin-right:12px">
+              <div class="pill pill-live" style="margin-bottom:6px;display:inline-flex"><div class="live-dot"></div>Live</div>
+              <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px">Healing &amp; Restoration</div>
+              <div style="font-size:13px;color:var(--text2)">Hosted by Sarah M.</div>
+            </div>
+            <button class="room-join">Join</button>
+          </div>
+          <div style="display:flex;gap:14px;font-size:12px;color:var(--text3)">
+            <span style="display:flex;align-items:center;gap:5px"><span class="icon icon-12"><svg><use href="#ic-mic"/></svg></span> 2 speaking</span>
+            <span style="display:flex;align-items:center;gap:5px"><span class="icon icon-12"><svg><use href="#ic-radio"/></svg></span> 89 listening</span>
+          </div>
+        </div>
+
+        <div class="room-card sched">
+          <div class="sched-date"><div class="sched-day">3</div><div class="sched-mon">Jun</div></div>
+          <div style="flex:1">
+            <div class="pill pill-gold" style="margin-bottom:6px;display:inline-block;font-size:11px">Today · 10:00 AM</div>
+            <div style="font-size:15px;font-weight:700;color:var(--text)">Praise &amp; Worship</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:4px">by James · 41 RSVPs</div>
+          </div>
+          <button class="btn btn-outline btn-sm">RSVP</button>
+        </div>
+        <div style="height:16px"></div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item" onclick="show('s-home',document.querySelectorAll('.side-btn')[1])"><span class="icon icon-18"><svg><use href="#ic-home"/></svg></span><div class="nav-label">Home</div></div>
+        <div class="nav-item" onclick="show('s-pray',document.querySelectorAll('.side-btn')[2])"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item active"><span class="icon icon-18"><svg><use href="#ic-live"/></svg></span><div class="nav-label">Live</div></div>
+        <div class="nav-item" onclick="show('s-devo',document.querySelectorAll('.side-btn')[7])"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item" onclick="show('s-profile',document.querySelectorAll('.side-btn')[9])"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+      </div>
+    </div>
+
+    <!-- IN PRAYER ROOM -->
+    <div class="phone-screen" id="s-room">
       <div class="status-bar" style="background:transparent"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
       <div class="live-top-bar">
-        <div class="live-back" onclick="show('s-home',document.querySelectorAll('.side-btn')[1])"><span class="icon icon-16"><svg><use href="#ic-back"/></svg></span></div>
+        <div class="live-back" onclick="show('s-rooms',document.querySelectorAll('.side-btn')[4])"><span class="icon icon-16"><svg><use href="#ic-back"/></svg></span></div>
         <div class="live-title-block"><div class="live-room-title">Global Intercession</div><div class="live-room-sub"><span style="color:var(--sage)">●</span> 247 praying now</div></div>
         <div class="live-share-btn"><span class="icon icon-16"><svg><use href="#ic-share"/></svg></span></div>
       </div>
@@ -987,7 +1155,7 @@ html, body {
           <div class="listener-av"><span class="icon icon-16"><svg><use href="#ic-profile"/></svg></span></div>
           <div class="listener-av"><span class="icon icon-16"><svg><use href="#ic-profile"/></svg></span></div>
           <div class="listener-av"><span class="icon icon-16"><svg><use href="#ic-profile"/></svg></span></div>
-          <div class="listener-av" style="font-size:10px;color:var(--text3);font-family:'Syne',sans-serif;font-weight:600">+236</div>
+          <div class="listener-av" style="font-size:10px;color:var(--text3);font-weight: 600">+236</div>
         </div>
       </div>
 
@@ -1021,15 +1189,49 @@ html, body {
       <div style="height:12px"></div>
     </div>
 
+    <!-- VOICE CALL (1:1 link) -->
+    <div class="phone-screen" id="s-voice-call">
+      <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
+      <div class="app-screen" style="display:flex;flex-direction:column;min-height:calc(100% - 44px)">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px 24px">
+          <div class="live-back" onclick="show('s-rooms',document.querySelectorAll('.side-btn')[4])"><span class="icon icon-16"><svg><use href="#ic-back"/></svg></span></div>
+          <div style="color:var(--gold);font-size:14px;font-weight:600">Voice call</div>
+          <div style="color:var(--text3);font-size:13px;font-variant-numeric:tabular-nums">9:42</div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 28px 32px;text-align:center">
+          <div style="width:88px;height:88px;border-radius:44px;background:var(--gold-dim);display:flex;align-items:center;justify-content:center;margin-bottom:20px">
+            <span class="icon icon-32"><svg><use href="#ic-audio"/></svg></span>
+          </div>
+          <div style="font-size:22px;font-weight:600;color:var(--text);margin-bottom:8px">Waiting for guest</div>
+          <div style="font-size:15px;color:var(--text2);line-height:1.5;margin-bottom:28px">Share the link so they can join from any browser.</div>
+          <button class="btn btn-fill" style="width:auto;padding:14px 24px;margin-bottom:12px">Share call link</button>
+        </div>
+        <div class="live-controls" style="padding-bottom:28px;gap:28px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+            <div class="ctrl-btn"><span class="icon icon-16"><svg><use href="#ic-mic"/></svg></span></div>
+            <div style="font-size:11px;color:var(--text3)">Mute</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+            <div class="ctrl-btn"><span class="icon icon-16"><svg><use href="#ic-audio"/></svg></span></div>
+            <div style="font-size:11px;color:var(--text3)">Speaker</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+            <div class="ctrl-btn ctrl-leave"><span class="icon icon-16"><svg><use href="#ic-leave"/></svg></span></div>
+            <div style="font-size:11px;color:var(--rose)">End</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ⑤ GROUP CHAT -->
     <div class="phone-screen" id="s-chat">
       <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
       <div class="chat-header">
-        <div style="cursor:pointer;color:var(--text2);display:flex;align-items:center" onclick="show('s-groups',document.querySelectorAll('.side-btn')[2])"><span class="icon icon-16"><svg><use href="#ic-back"/></svg></span></div>
+        <div style="cursor:pointer;color:var(--text2);display:flex;align-items:center" onclick="show('s-pray',document.querySelectorAll('.side-btn')[2])"><span class="icon icon-16"><svg><use href="#ic-back"/></svg></span></div>
         <div class="chat-header-av"><span class="icon icon-10"><svg><use href="#ic-sunrise"/></svg></span></div>
         <div style="flex:1"><div class="chat-header-name">Morning Seekers</div><div class="chat-header-meta">6 members · Next session Today 7 AM</div></div>
         <div class="chat-header-btns">
-          <div class="icon-btn" onclick="show('s-live',document.querySelectorAll('.side-btn')[3])"><span class="icon icon-16"><svg><use href="#ic-video"/></svg></span></div>
+          <div class="icon-btn" onclick="show('s-room',document.querySelectorAll('.side-btn')[5])"><span class="icon icon-16"><svg><use href="#ic-video"/></svg></span></div>
           <div class="icon-btn"><span class="icon icon-16"><svg><use href="#ic-more"/></svg></span></div>
         </div>
       </div>
@@ -1076,125 +1278,133 @@ html, body {
       <div style="height:8px;background:var(--bg)"></div>
     </div>
 
-    <!-- ⑥ DEVOTIONAL (AI) -->
+    <!-- DEVOTIONAL -->
     <div class="phone-screen" id="s-devo">
       <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
       <div class="app-screen">
-        <div class="page-header">
-          <div class="page-title">My Devotional</div>
-          <div class="icon-btn" style="width:auto;padding:0 12px;font-size:11px;color:var(--violet);border-color:rgba(112,64,184,.2);background:rgba(112,64,184,.06)">
-            <span class="icon icon-11" style="color:var(--violet)"><svg><use href="#ic-sparkle"/></svg></span>&nbsp;AI
+        <div class="devo-hub-header">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+              <div class="devo-ai-pill"><span class="icon icon-9"><svg><use href="#ic-sparkle"/></svg></span> AI-Powered</div>
+              <div class="page-title">My Devotionals</div>
+            </div>
+            <div class="icon-btn" style="background:var(--gold-dim);border-color:var(--border2);color:var(--gold)"><span class="icon icon-16"><svg><use href="#ic-bell"/></svg></span></div>
           </div>
         </div>
 
-        <div class="devo-week">
-          <div class="devo-week-title">This Week</div>
-          <div class="week-days">
-            <div class="week-day done"><div class="wd-name">Mon</div><div class="wd-num">11</div><div class="wd-dot"></div></div>
-            <div class="week-day done"><div class="wd-name">Tue</div><div class="wd-num">12</div><div class="wd-dot"></div></div>
-            <div class="week-day done"><div class="wd-name">Wed</div><div class="wd-num">13</div><div class="wd-dot"></div></div>
-            <div class="week-day done"><div class="wd-name">Thu</div><div class="wd-num">14</div><div class="wd-dot"></div></div>
-            <div class="week-day done"><div class="wd-name">Fri</div><div class="wd-num">15</div><div class="wd-dot"></div></div>
-            <div class="week-day done"><div class="wd-name">Sat</div><div class="wd-num">16</div><div class="wd-dot"></div></div>
-            <div class="week-day today"><div class="wd-name">Sun</div><div class="wd-num">17</div><div class="wd-dot"></div></div>
+        <div class="create-plan-cta">
+          <div style="width:44px;height:44px;border-radius:14px;background:var(--gold);display:flex;align-items:center;justify-content:center;color:#fff"><span class="icon icon-20"><svg><use href="#ic-plus"/></svg></span></div>
+          <div style="flex:1"><div style="font-size:16px;font-weight:700;color:var(--text)">Create New Plan</div><div style="font-size:12px;color:var(--text2);margin-top:2px">AI-generated scripture, reflection &amp; prayer</div></div>
+          <span class="icon icon-16" style="color:var(--gold)"><svg><use href="#ic-chevron-r"/></svg></span>
+        </div>
+
+        <div class="sec-header" style="padding-top:0"><div class="sec-title">Your Plans</div></div>
+
+        <div class="plan-list-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div style="font-size:15px;font-weight:700;color:var(--text)">Trusting God Through Uncertainty</div>
+            <div class="pill pill-gold" style="font-size:10px;padding:2px 8px">Day 23</div>
+          </div>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Faith &amp; Trust · 30 days</div>
+          <div style="display:flex;align-items:center;gap:12px;font-size:12px;color:var(--text2)">
+            <span>23/30 days</span>
+            <div class="plan-progress" style="flex:1;margin:0"><div class="plan-progress-fill" style="width:77%"></div></div>
+            <span style="display:flex;align-items:center;gap:3px;color:var(--gold);font-weight:600"><span class="icon icon-12"><svg><use href="#ic-flame"/></svg></span> 23</span>
           </div>
         </div>
 
-        <div class="devo-hero">
-          <div class="devo-ai-tag"><span class="icon icon-9"><svg><use href="#ic-sparkle"/></svg></span> AI-Powered Plan</div>
-          <div class="devo-plan-title">Trusting God Through<br/>Uncertainty</div>
-          <div class="devo-plan-meta">30-day plan · Personalized for you · Week 4</div>
-          <div class="devo-progress-bar"><div class="devo-progress-fill"></div></div>
-          <div class="devo-progress-label">Day 23 of 30 · 77% complete</div>
-        </div>
-
-        <div class="sec-header"><div class="sec-title">Today's Reading</div><div class="sec-more">Day 23</div></div>
-        <div class="today-reading">
-          <div class="tr-image"><span class="icon icon-18" style="position:relative;z-index:1"><svg><use href="#ic-scroll"/></svg></span></div>
-          <div class="tr-body">
-            <div class="tr-day">Day 23 · Psalms</div>
-            <div class="tr-title">The Shepherd's Provision</div>
-            <div class="tr-verse">"The Lord is my shepherd; I shall not want. He makes me lie down in green pastures…" — Psalm 23</div>
-            <button class="btn btn-fill btn-sm tr-btn" style="display:inline-flex;margin-top:12px"><span class="icon icon-10"><svg><use href="#ic-play"/></svg></span> Begin Reading</button>
+        <div class="plan-list-card" style="border-color:var(--border);background:var(--bg3)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div style="font-size:15px;font-weight:700;color:var(--text)">Peace &amp; Stillness</div>
+            <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--sage)"><span class="icon icon-10"><svg><use href="#ic-cross"/></svg></span> Complete</div>
           </div>
-        </div>
-
-        <div class="ai-suggest">
-          <div class="ai-label"><span class="icon icon-10"><svg><use href="#ic-sparkle"/></svg></span> AI Suggests for you</div>
-          <div class="ai-body">Based on your group focus on <strong style="color:var(--violet)">breakthrough prayers</strong> this week:</div>
-          <div class="ai-chips">
-            <div class="ai-chip"><span class="icon icon-10"><svg><use href="#ic-scroll"/></svg></span> Ephesians 3:20</div>
-            <div class="ai-chip"><span class="icon icon-10"><svg><use href="#ic-cross"/></svg></span> Faith & Perseverance</div>
-            <div class="ai-chip"><span class="icon icon-10"><svg><use href="#ic-book"/></svg></span> New 5-day plan</div>
-            <div class="ai-chip"><span class="icon icon-10"><svg><use href="#ic-headphones"/></svg></span> Audio reflection</div>
-          </div>
-        </div>
-
-        <div class="sec-header"><div class="sec-title">Explore Plans</div><div class="sec-more">All Plans</div></div>
-        <div class="plan-cards">
-          <div class="plan-card">
-            <div class="plan-icon"><span class="icon icon-10"><svg><use href="#ic-anchor"/></svg></span></div>
-            <div class="plan-title">Anchored in Faith</div>
-            <div class="plan-days">21 days</div>
-          </div>
-          <div class="plan-card">
-            <div class="plan-icon"><span class="icon icon-10"><svg><use href="#ic-seedling"/></svg></span></div>
-            <div class="plan-title">New Life in Christ</div>
-            <div class="plan-days">14 days</div>
-          </div>
-          <div class="plan-card ai">
-            <div class="plan-icon"><span class="icon icon-10"><svg><use href="#ic-sparkle"/></svg></span></div>
-            <div class="plan-title">Build My Own Plan</div>
-            <div class="plan-days">AI-powered</div>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Peace &amp; Stillness · 7 days</div>
+          <div style="display:flex;align-items:center;gap:12px;font-size:12px;color:var(--text2)">
+            <span>7/7 days</span>
+            <div class="plan-progress" style="flex:1;margin:0"><div class="plan-progress-fill" style="width:100%;background:var(--sage)"></div></div>
           </div>
         </div>
         <div style="height:20px"></div>
       </div>
       <div class="bottom-nav">
         <div class="nav-item" onclick="show('s-home',document.querySelectorAll('.side-btn')[1])"><span class="icon icon-18"><svg><use href="#ic-home"/></svg></span><div class="nav-label">Home</div></div>
-        <div class="nav-item" onclick="show('s-groups',document.querySelectorAll('.side-btn')[2])"><span class="icon icon-18"><svg><use href="#ic-groups"/></svg></span><div class="nav-label">Groups</div></div>
-        <div class="nav-item" onclick="show('s-live',document.querySelectorAll('.side-btn')[3])"><span class="icon icon-18"><svg><use href="#ic-live"/></svg></span><div class="nav-label">Live</div></div>
+        <div class="nav-item" onclick="show('s-pray',document.querySelectorAll('.side-btn')[2])"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item" onclick="show('s-rooms',document.querySelectorAll('.side-btn')[4])"><span class="icon icon-18"><svg><use href="#ic-live"/></svg></span><div class="nav-label">Live</div></div>
         <div class="nav-item active"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile',document.querySelectorAll('.side-btn')[6])"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item" onclick="show('s-profile',document.querySelectorAll('.side-btn')[9])"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
       </div>
     </div>
 
-    <!-- ⑦ PROFILE -->
+    <!-- ACTIVITY -->
+    <div class="phone-screen" id="s-activity">
+      <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
+      <div class="app-screen" style="padding:12px 22px 80px">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+          <div class="icon-btn" onclick="show('s-home',document.querySelectorAll('.side-btn')[1])"><span class="icon icon-16"><svg><use href="#ic-back"/></svg></span></div>
+          <div>
+            <div style="font-size:22px;font-weight:700;color:var(--text);letter-spacing:-.3px">Activity</div>
+            <div style="font-size:13px;color:var(--text3);margin-top:2px">Community prayer wall and your groups · 3 unread</div>
+          </div>
+        </div>
+
+        <div class="activity-card" onclick="show('s-wall',document.querySelectorAll('.side-btn')[3])">
+          <div style="width:48px;height:48px;border-radius:14px;background:var(--gold-dim);display:flex;align-items:center;justify-content:center;color:var(--gold)"><span class="icon icon-22"><svg><use href="#ic-pray"/></svg></span></div>
+          <div style="flex:1"><div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:4px">Prayer Wall</div><div style="font-size:13px;color:var(--text3);line-height:1.4">See prayer requests from the community.</div></div>
+          <span class="icon icon-16" style="color:var(--text3)"><svg><use href="#ic-chevron-r"/></svg></span>
+        </div>
+
+        <div style="font-size:16px;font-weight:700;color:var(--text);margin:24px 0 12px">Group chats</div>
+        <div class="group-glass" style="margin:0 0 10px" onclick="show('s-chat',document.querySelectorAll('.side-btn')[6])">
+          <div class="group-avatar">MS</div>
+          <div style="flex:1"><div style="font-size:15px;font-weight:600;color:var(--text)">Morning Seekers</div><div style="font-size:12px;color:var(--text3)">Pastor James · 2h ago</div></div>
+        </div>
+        <div class="group-glass live" style="margin:0" onclick="show('s-chat',document.querySelectorAll('.side-btn')[6])">
+          <div class="group-avatar">TN<div class="unread-badge">3</div></div>
+          <div style="flex:1"><div style="font-size:15px;font-weight:600;color:var(--text)">Thursday Night Study</div><div style="font-size:12px;color:var(--rose)">3 unread messages</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROFILE -->
     <div class="phone-screen" id="s-profile">
       <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
       <div class="app-screen">
-        <div class="page-header" style="padding-bottom:8px">
+        <div class="page-header" style="padding-bottom:8px;display:flex;align-items:center;justify-content:space-between">
           <div class="page-title">Profile</div>
-          <div class="icon-btn" style="width:auto;padding:0 14px;font-size:12px;color:var(--gold)">Edit</div>
+          <div class="header-action gold" style="border-radius:50px;padding:6px 14px">Edit</div>
         </div>
 
         <div class="profile-hero">
           <div class="profile-av-wrap">
-            <div class="profile-av"><span class="icon icon-28"><svg><use href="#ic-profile"/></svg></span></div>
+            <div class="profile-av" style="font-size:22px;font-weight:700;color:var(--gold)">SM</div>
             <div class="profile-edit-btn"><span class="icon icon-10"><svg><use href="#ic-edit"/></svg></span></div>
           </div>
           <div class="profile-name">Sarah Mitchell</div>
-          <div class="profile-role">Member since Jan 2024 · Texas, USA</div>
+          <div class="profile-role">sarah@example.com</div>
         </div>
 
         <div class="profile-stats">
-          <div class="ps-item"><div class="ps-num">148</div><div class="ps-lbl">Prayers</div></div>
-          <div class="ps-item"><div class="ps-num">4</div><div class="ps-lbl">Groups</div></div>
-          <div class="ps-item"><div class="ps-num">23</div><div class="ps-lbl">Streak</div></div>
-          <div class="ps-item"><div class="ps-num">3</div><div class="ps-lbl">Plans</div></div>
+          <div class="ps-item"><span class="icon icon-18" style="color:var(--gold);margin-bottom:4px"><svg><use href="#ic-groups"/></svg></span><div class="ps-num">4</div><div class="ps-lbl">Groups</div></div>
+          <div class="ps-item"><span class="icon icon-18" style="color:var(--gold);margin-bottom:4px"><svg><use href="#ic-flame"/></svg></span><div class="ps-num">23</div><div class="ps-lbl">Streak</div></div>
+          <div class="ps-item"><span class="icon icon-18" style="color:var(--gold);margin-bottom:4px"><svg><use href="#ic-book"/></svg></span><div class="ps-num">3</div><div class="ps-lbl">Plans</div></div>
         </div>
 
-        <div class="streak-card">
-          <div class="streak-icon-wrap"><span class="icon icon-18"><svg><use href="#ic-flame"/></svg></span></div>
-          <div class="streak-info">
-            <div class="streak-num">23 Days</div>
-            <div class="streak-lbl">Current prayer streak</div>
-            <div class="streak-bar">
-              <div class="streak-seg filled"></div><div class="streak-seg filled"></div>
-              <div class="streak-seg filled"></div><div class="streak-seg filled"></div>
-              <div class="streak-seg filled"></div><div class="streak-seg filled"></div>
-              <div class="streak-seg filled"></div>
-            </div>
+        <div class="settings-section">
+          <div class="settings-title">Account</div>
+          <div class="setting-row">
+            <div class="setting-icon-wrap"><span class="icon icon-16"><svg><use href="#ic-profile"/></svg></span></div>
+            <div class="setting-label">Display Name</div>
+            <span style="font-size:13px;color:var(--text3)">Sarah Mitchell</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-icon-wrap"><span class="icon icon-16"><svg><use href="#ic-email"/></svg></span></div>
+            <div class="setting-label">Email</div>
+            <span style="font-size:13px;color:var(--text3)">sarah@example.com</span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-icon-wrap"><span class="icon icon-16"><svg><use href="#ic-globe"/></svg></span></div>
+            <div class="setting-label">Phone</div>
+            <span style="font-size:13px;color:var(--text3)">Not set</span>
           </div>
         </div>
 
@@ -1218,15 +1428,25 @@ html, body {
         </div>
 
         <div class="settings-section">
-          <div class="settings-title">Account</div>
+          <div class="settings-title">Account Settings</div>
           <div class="setting-row">
             <div class="setting-icon-wrap"><span class="icon icon-16"><svg><use href="#ic-lock"/></svg></span></div>
-            <div class="setting-label">Privacy settings</div>
+            <div class="setting-label">Change Password</div>
             <span class="icon icon-16" style="color:var(--text3)"><svg><use href="#ic-chevron-r"/></svg></span>
           </div>
           <div class="setting-row">
-            <div class="setting-icon-wrap"><span class="icon icon-16"><svg><use href="#ic-language"/></svg></span></div>
-            <div class="setting-label">Language & Region</div>
+            <div class="setting-icon-wrap"><span class="icon icon-16"><svg><use href="#ic-scroll"/></svg></span></div>
+            <div class="setting-label">Privacy Policy</div>
+            <span class="icon icon-16" style="color:var(--text3)"><svg><use href="#ic-chevron-r"/></svg></span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-icon-wrap"><span class="icon icon-16"><svg><use href="#ic-scroll"/></svg></span></div>
+            <div class="setting-label">Terms of Service</div>
+            <span class="icon icon-16" style="color:var(--text3)"><svg><use href="#ic-chevron-r"/></svg></span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-icon-wrap"><span class="icon icon-16"><svg><use href="#ic-chat"/></svg></span></div>
+            <div class="setting-label">Help &amp; FAQ</div>
             <span class="icon icon-16" style="color:var(--text3)"><svg><use href="#ic-chevron-r"/></svg></span>
           </div>
           <div class="setting-row" style="border-color:rgba(176,90,80,.15)">
@@ -1239,9 +1459,9 @@ html, body {
       </div>
       <div class="bottom-nav">
         <div class="nav-item" onclick="show('s-home',document.querySelectorAll('.side-btn')[1])"><span class="icon icon-18"><svg><use href="#ic-home"/></svg></span><div class="nav-label">Home</div></div>
-        <div class="nav-item" onclick="show('s-groups',document.querySelectorAll('.side-btn')[2])"><span class="icon icon-18"><svg><use href="#ic-groups"/></svg></span><div class="nav-label">Groups</div></div>
-        <div class="nav-item" onclick="show('s-live',document.querySelectorAll('.side-btn')[3])"><span class="icon icon-18"><svg><use href="#ic-live"/></svg></span><div class="nav-label">Live</div></div>
-        <div class="nav-item" onclick="show('s-devo',document.querySelectorAll('.side-btn')[5])"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item" onclick="show('s-pray',document.querySelectorAll('.side-btn')[2])"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item" onclick="show('s-rooms',document.querySelectorAll('.side-btn')[4])"><span class="icon icon-18"><svg><use href="#ic-live"/></svg></span><div class="nav-label">Live</div></div>
+        <div class="nav-item" onclick="show('s-devo',document.querySelectorAll('.side-btn')[7])"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
         <div class="nav-item active"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
       </div>
     </div>
@@ -1249,15 +1469,15 @@ html, body {
   </div><!-- /phone -->
 
   <!-- RIGHT INFO -->
-  <div style="display:flex;flex-direction:column;gap:10px;max-width:160px">
-    <div style="color:rgba(80,60,30,.4);font-family:'Syne',sans-serif;font-size:10px;letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px">Features</div>
-    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">① Onboarding</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Welcome flow, sign up & sign in</div></div>
-    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">② Home</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Daily verse, groups preview, live rooms</div></div>
-    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">③ Groups</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Manage, schedule recurring sessions</div></div>
-    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">④ Live Room</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Audio/video, speakers, live chat</div></div>
-    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">⑤ Chat</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Group messaging, shared prayers</div></div>
-    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">⑥ Devotional</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">AI plan, progress, reading</div></div>
-    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">⑦ Profile</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Stats, streak, settings</div></div>
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:180px">
+    <div style="color:rgba(80,60,30,.4);font-size:10px;letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px">Screens · Expo app</div>
+    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Login</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Auth entry · sign in / sign up</div></div>
+    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Home</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Verse hero, global prayer, stats, groups</div></div>
+    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Pray tab</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">My Groups + Prayer Wall sub-tabs</div></div>
+    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Live tab</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Prayer rooms list · live &amp; scheduled</div></div>
+    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Devotional</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">AI plans hub · create &amp; track</div></div>
+    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Activity</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Bell hub · wall shortcut + group chats</div></div>
+    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Profile</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Account, prefs, sign out</div></div>
   </div>
 
 </div><!-- /stage -->

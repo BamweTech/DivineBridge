@@ -1,13 +1,13 @@
 import { useState, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Alert, TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Alert, TextInput, Share } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { roomApi, scheduledApi } from '@/services/api';
+import { roomApi, scheduledApi, voiceLinkApi } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/stores/authStore';
 import { THEME_COLORS } from '@/lib/constants';
@@ -203,6 +203,7 @@ export default function RoomsScreen() {
   const [tab, setTab] = useState<'live' | 'scheduled'>('live');
   const [liveRefreshing, setLiveRefreshing] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [startingVoiceLink, setStartingVoiceLink] = useState(false);
 
   // Real-time Firestore listener — no polling delay
   const { rooms: liveRooms, isLoading: liveLoading } = useLiveRooms();
@@ -220,6 +221,27 @@ export default function RoomsScreen() {
   function handleCreateRoom() {
     if (!user) { Alert.alert('Sign in to create a room'); return; }
     setShowCreate(true);
+  }
+
+  async function handleStartVoiceLink() {
+    if (!user) { Alert.alert('Sign in to start a voice call'); return; }
+    if (startingVoiceLink) return;
+    setStartingVoiceLink(true);
+    try {
+      const result = await voiceLinkApi.create();
+      await Share.share({
+        message: `Join my voice call on Divine Bridge:\n\n${result.share_url}`,
+        url: result.share_url,
+      });
+      const href =
+        `/voice-call/${result.room_id}?code=${encodeURIComponent(result.room_code)}` +
+        `&shareUrl=${encodeURIComponent(result.share_url)}`;
+      router.push(href as Href);
+    } catch (err: any) {
+      Alert.alert('Could not start call', err?.message || 'Please try again.');
+    } finally {
+      setStartingVoiceLink(false);
+    }
   }
 
   async function handleJoinRoom(roomId: string) {
@@ -268,6 +290,21 @@ export default function RoomsScreen() {
           <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 26, letterSpacing: -0.5 }}>
             Prayer Rooms
           </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Pressable
+            onPress={() => void handleStartVoiceLink()}
+            disabled={startingVoiceLink}
+            style={{
+              backgroundColor: THEME_COLORS.goldDim,
+              borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
+              borderWidth: 1, borderColor: THEME_COLORS.goldBorder,
+              opacity: startingVoiceLink ? 0.6 : 1,
+            }}
+          >
+            <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('700'), fontSize: 13 }}>
+              {startingVoiceLink ? '…' : 'Voice link'}
+            </Text>
+          </Pressable>
           <Pressable
             onPress={handleCreateRoom}
             style={{
@@ -277,6 +314,7 @@ export default function RoomsScreen() {
           >
             <Text style={{ color: '#ffffff', ...iosFontStyle('700'), fontSize: 13 }}>+ Create</Text>
           </Pressable>
+        </View>
         </View>
 
         <View style={{ flexDirection: 'row', backgroundColor: THEME_COLORS.bg3, borderRadius: 12, padding: 4 }}>

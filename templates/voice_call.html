@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Voice Call — Divine Bridge</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/voice-call.css') }}">
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script>
+        window.VOICE_CALL_CONFIG = {
+            roomId: {{ room_id | tojson }},
+            roomCode: {{ room_code | tojson }},
+            hostName: {{ host_name | tojson }},
+            firebaseConfig: {{ firebase_config | tojson }},
+            isActive: {{ is_active | tojson }},
+            isExpired: {{ is_expired | tojson }},
+            isFull: {{ is_full | tojson }},
+            expiresAt: {{ expires_at | tojson }},
+            linkInvalid: {{ link_invalid | tojson }},
+        };
+    </script>
+</head>
+<body>
+    <main class="vc-shell">
+        <header class="vc-header">
+            <span class="vc-brand">Divine Bridge</span>
+            <span id="vc-timer" class="vc-timer" hidden></span>
+        </header>
+
+        <section id="vc-state-landing" class="vc-panel">
+            <h1 class="vc-title">Join voice call</h1>
+            <p id="vc-subtitle" class="vc-subtitle">
+                {% if host_name %}{{ host_name }} invited you to a private call.{% else %}Enter your name to join.{% endif %}
+            </p>
+            <label class="vc-label" for="vc-name">Your name</label>
+            <input id="vc-name" class="vc-input" type="text" maxlength="30" placeholder="Your name" autocomplete="name">
+            <p id="vc-landing-error" class="vc-error" hidden></p>
+            <button id="vc-join-btn" type="button" class="vc-btn vc-btn-primary">Join call</button>
+        </section>
+
+        <section id="vc-state-connecting" class="vc-panel" hidden>
+            <div class="vc-spinner"></div>
+            <p class="vc-status">Connecting…</p>
+        </section>
+
+        <section id="vc-state-incall" class="vc-panel" hidden>
+            <p id="vc-status-text" class="vc-status">Connected</p>
+            <p id="vc-peer-label" class="vc-peer"></p>
+            <div class="vc-controls">
+                <button id="vc-mute-btn" type="button" class="vc-control" aria-label="Mute">
+                    <span class="vc-control-icon">🎤</span>
+                    <span class="vc-control-label">Mute</span>
+                </button>
+                <button id="vc-speaker-btn" type="button" class="vc-control" aria-label="Speaker">
+                    <span class="vc-control-icon">🔊</span>
+                    <span class="vc-control-label">Speaker</span>
+                </button>
+                <button id="vc-end-btn" type="button" class="vc-control vc-control-danger" aria-label="End call">
+                    <span class="vc-control-icon">📵</span>
+                    <span class="vc-control-label">End</span>
+                </button>
+            </div>
+        </section>
+
+        <section id="vc-state-ended" class="vc-panel" hidden>
+            <h2 class="vc-title">Call ended</h2>
+            <p id="vc-ended-reason" class="vc-subtitle">The call has ended.</p>
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/sfu-bundle.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/sfu-client.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/voice-call.js') }}"></script>
+</body>
+</html>

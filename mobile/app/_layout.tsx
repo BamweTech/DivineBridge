@@ -395,6 +395,10 @@ function RootLayoutInner() {
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen
+              name="voice-call/[id]"
+              options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+            />
+            <Stack.Screen
               name="room/[id]"
               options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
             />

@@ -17,12 +17,14 @@ When adding a feature that spans multiple parts of the stack, follow this checkl
 
 4. **Flask route**: Follow blueprint pattern in `routes/`. Register in `app.py` with `csrf.exempt()` and `url_prefix`.
 5. **Mobile screen**: Add file in `mobile/app/`, register in `_layout.tsx`, add API call in `mobile/services/api.ts`.
-6. **Firestore**: If adding a new collection, update `firestore.rules` and `firestore.indexes.json`.
-7. **Web template**: Extend `base.html`, wire route in `app.py` or the relevant blueprint.
+6. **Mobile wireframe**: Update `divinebridge-app-v4.html` (see `update-mobile-wireframe` skill) when the change is user-visible.
+7. **Firestore**: If adding a new collection, update `firestore.rules` and `firestore.indexes.json`.
+8. **Web template**: Extend `base.html`, wire route in `app.py` or the relevant blueprint.
 
 ## After coding
 
-8. Add tests: pytest for Flask, tsc check for mobile.
-9. Update `docs/ARCHITECTURE.md` if the feature introduces new architectural patterns.
-10. Update the relevant `AGENTS.md` file if the directory conventions changed.
-11. Update `.env.example` if new environment variables were added.
+9. Add tests: pytest for Flask, tsc check for mobile.
+10. Update `docs/ARCHITECTURE.md` if the feature introduces new architectural patterns.
+11. Update the relevant `AGENTS.md` file if the directory conventions changed.
+12. Update `.env.example` if new environment variables were added.
+13. Confirm `divinebridge-app-v4.html` matches any mobile UI delivered in the feature.

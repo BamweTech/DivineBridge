@@ -29,7 +29,92 @@ from google.cloud import firestore
 prayer_room_bp = Blueprint('prayer_room', __name__)
 
 MAX_ACTIVE_SPEAKERS = 20
+VOICE_LINK_MAX_PARTICIPANTS = 2
+VOICE_LINK_TTL_MINUTES = 10
 VALID_PARTICIPANT_ROLES = {'speaker', 'listener'}
+
+
+def _generate_room_id():
+    return ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
+
+
+def _generate_room_code(length=8):
+    return ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:length]])
+
+
+def _is_voice_link_room(room_data):
+    return bool(room_data) and room_data.get('room_type') == 'voice_link'
+
+
+def _is_voice_link_expired(room_data, now=None):
+    if not _is_voice_link_room(room_data):
+        return False
+    now = now or datetime.utcnow()
+    expires_at = room_data.get('expires_at')
+    if not expires_at:
+        return False
+    return expires_at <= now
+
+
+def _active_participant_count(participants):
+    return sum(
+        1 for p in (participants or [])
+        if p.get('is_active', True) is not False
+    )
+
+
+def _is_room_participant(room_data, user_id):
+    for participant in room_data.get('participants', []):
+        if participant.get('user_id') == user_id and participant.get('is_active', True) is not False:
+            return True
+    return False
+
+
+def _is_anonymous_user(user):
+    return bool(user and user.get('is_anonymous'))
+
+
+def _voice_link_code_matches(room_data, provided_code):
+    stored = (room_data.get('room_code') or '').strip().upper()
+    provided = (provided_code or '').strip().upper()
+    return bool(stored and provided and stored == provided)
+
+
+def _reject_anonymous_outside_voice_link(user, room_data):
+    """Anonymous Firebase sessions may only access voice_link rooms."""
+    if not _is_anonymous_user(user):
+        return None
+    if not _is_voice_link_room(room_data):
+        return jsonify({'error': 'Anonymous access is limited to voice call links'}), 403
+    return None
+
+
+def _public_base_url():
+    return os.getenv('PUBLIC_BASE_URL', 'https://divinebridge.io').rstrip('/')
+
+
+def _expire_stale_voice_links(db, now=None):
+    """Mark active voice_link rooms past expires_at as ended (timeout)."""
+    now = now or datetime.utcnow()
+    expired_count = 0
+    try:
+        rooms = db.collection('prayer_rooms').where('is_active', '==', True).stream()
+        for doc in rooms:
+            data = doc.to_dict() or {}
+            if data.get('room_type') != 'voice_link':
+                continue
+            expires_at = data.get('expires_at')
+            if expires_at and expires_at <= now:
+                doc.reference.update({
+                    'is_active': False,
+                    'ended_at': now,
+                    'ended_by': 'system',
+                    'ended_reason': 'timeout',
+                })
+                expired_count += 1
+    except Exception as e:
+        logging.warning('expire_stale_voice_links failed: %s', e)
+    return expired_count
 
 
 def _mirror_chat_message_to_rtdb(
@@ -347,6 +432,24 @@ def get_sfu_token(room_id):
         user_id = user['user_id']
         user_name = user.get('display_name') or user.get('name') or 'Anonymous'
 
+        db = get_firestore_client()
+        room_doc = db.collection('prayer_rooms').document(room_id).get()
+        if not room_doc.exists:
+            return jsonify({'error': 'Room not found'}), 404
+        room_data = room_doc.to_dict() or {}
+
+        anon_reject = _reject_anonymous_outside_voice_link(user, room_data)
+        if anon_reject:
+            return anon_reject
+
+        if _is_voice_link_room(room_data):
+            err, code = _voice_link_room_access_checks(room_data, user_id)
+            if err:
+                return jsonify({'error': err}), code
+            participant = find_participant(room_data.get('participants', []), user_id)
+            if participant and participant.get('user_name'):
+                user_name = participant.get('user_name')
+
         # Embed roomId + userName as custom claims so the SFU can read them
         # without a separate DB lookup.
         custom_token = fa.create_custom_token(
@@ -373,6 +476,90 @@ def get_sfu_token(room_id):
         return jsonify({'error': 'Failed to generate SFU token'}), 500
 
 
+def _voice_link_room_access_checks(room_data, user_id):
+    """Shared guards for voice_link join/sfu-token."""
+    if not room_data.get('is_active', False):
+        return 'Room is not active', 400
+    if _is_voice_link_expired(room_data):
+        return 'This call has expired', 400
+    if not _is_room_participant(room_data, user_id):
+        return 'You are not a participant in this call', 403
+    return None, None
+
+
+@prayer_room_bp.route('/voice-link/create', methods=['POST'])
+def create_voice_link_room():
+    """Create a private 1:1 voice-only call room with a 10-minute TTL."""
+    try:
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required to create voice links'}), 401
+
+        if _is_anonymous_user(user):
+            return jsonify({'error': 'Sign in required to start a voice call'}), 403
+
+        host_id = user['user_id']
+        host_name = user.get('user_name') or user.get('name') or 'Host'
+        if len(host_name) > 30:
+            return jsonify({'error': 'Host name must be 30 characters or less'}), 400
+
+        room_id = _generate_room_id()
+        room_code = _generate_room_code(8)
+        created_at = datetime.utcnow()
+        expires_at = created_at + timedelta(minutes=VOICE_LINK_TTL_MINUTES)
+
+        room_data = {
+            'room_id': room_id,
+            'room_name': f'Voice call with {host_name}',
+            'room_type': 'voice_link',
+            'room_privacy': 'private',
+            'room_code': room_code,
+            'host_id': host_id,
+            'host_name': host_name,
+            'created_at': created_at,
+            'expires_at': expires_at,
+            'media_mode': 'audio_only',
+            'participants': [{
+                'user_id': host_id,
+                'user_name': host_name,
+                'joined_at': created_at,
+                'is_muted': False,
+                'is_host': True,
+                'role': 'speaker',
+                'requested_role': None,
+                'request_timestamp': None,
+            }],
+            'is_active': True,
+            'is_locked': False,
+            'settings': {
+                'allow_anonymous': False,
+                'max_participants': VOICE_LINK_MAX_PARTICIPANTS,
+                'auto_mute_new_participants': False,
+            },
+            'max_speakers': VOICE_LINK_MAX_PARTICIPANTS,
+            'ended_reason': None,
+        }
+
+        db = get_firestore_client()
+        db.collection('prayer_rooms').document(room_id).set(room_data)
+
+        share_url = f"{_public_base_url()}/call/{room_id}?code={room_code}"
+
+        return jsonify({
+            'success': True,
+            'room_id': room_id,
+            'room_code': room_code,
+            'share_url': share_url,
+            'expires_at': expires_at.isoformat() + 'Z',
+            'host_id': host_id,
+            'host_name': host_name,
+        })
+
+    except Exception as e:
+        logging.error(f'Error creating voice link room: {e}', exc_info=True)
+        return jsonify({'error': 'Failed to create voice link'}), 500
+
+
 @prayer_room_bp.route('/create', methods=['POST'])
 def create_prayer_room():
     """Create a new prayer room"""
@@ -381,6 +568,9 @@ def create_prayer_room():
         user = get_user_from_session()
         if not user:
             return jsonify({'error': 'Authentication required to create rooms'}), 401
+
+        if _is_anonymous_user(user):
+            return jsonify({'error': 'Sign in required to create a room'}), 403
         
         data = request.get_json()
         room_name = data.get('room_name', 'Prayer Room')
@@ -603,6 +793,7 @@ def join_prayer_room(room_id):
         
         user_id = user['user_id']
         user_name = user['user_name']
+        data = request.get_json(silent=True) or {}
         
         # Validate user name length
         if len(user_name) > 30:
@@ -617,11 +808,26 @@ def join_prayer_room(room_id):
         
         room_data = room_doc.to_dict()
         
+        anon_reject = _reject_anonymous_outside_voice_link(user, room_data)
+        if anon_reject:
+            return anon_reject
+
         if not room_data.get('is_active', False):
             return jsonify({'error': 'Room is not active'}), 400
         
         if room_data.get('is_locked', False):
             return jsonify({'error': 'Room is locked'}), 400
+
+        if _is_voice_link_room(room_data):
+            if _is_voice_link_expired(room_data):
+                return jsonify({'error': 'This call has expired'}), 400
+            if not _voice_link_code_matches(room_data, data.get('room_code')):
+                return jsonify({'error': 'Invalid call link'}), 403
+            display_name = sanitize_string(data.get('display_name', '')).strip()
+            if display_name:
+                user_name = display_name[:30]
+            elif user_name in ('Anonymous', '') or not user_name.strip():
+                return jsonify({'error': 'Display name is required'}), 400
         
         # Check room privacy and validate room code for private rooms
         room_privacy = room_data.get('room_privacy', 'public')
@@ -633,7 +839,6 @@ def join_prayer_room(room_id):
         )
 
         if room_privacy == 'private' and not skip_private_code:
-            data = request.get_json(silent=True) or {}
             raw_room_code = data.get('room_code', '')
             
             if isinstance(raw_room_code, (list, dict)):
@@ -664,6 +869,11 @@ def join_prayer_room(room_id):
 
         participants, speaker_count, participants_changed = normalize_participants(participants, host_id)
 
+        if _is_voice_link_room(room_data):
+            already_in = _is_room_participant(room_data, user_id)
+            if not already_in and _active_participant_count(participants) >= VOICE_LINK_MAX_PARTICIPANTS:
+                return jsonify({'error': 'This call is full'}), 403
+
         participant_updated = False
         existing_participant = None
         for p in participants:
@@ -686,7 +896,9 @@ def join_prayer_room(room_id):
             'joined_at': datetime.utcnow(),
             'is_muted': False,
             'is_host': user_id == host_id,
-            'role': 'speaker' if (user_id == host_id or speaker_count < max_speakers) else 'listener',
+            'role': 'speaker' if _is_voice_link_room(room_data) else (
+                'speaker' if (user_id == host_id or speaker_count < max_speakers) else 'listener'
+            ),
             'requested_role': None,
             'request_timestamp': None
         }
@@ -701,14 +913,21 @@ def join_prayer_room(room_id):
             'max_speakers': max_speakers
         })
         
-        return jsonify({
+        response = {
             'success': True,
             'room_id': room_id,
             'room_name': room_data.get('room_name'),
             'host_id': host_id,
             'participants': participants,
-            'max_speakers': max_speakers
-        })
+            'max_speakers': max_speakers,
+        }
+        if _is_voice_link_room(room_data):
+            response['room_type'] = 'voice_link'
+            response['host_name'] = room_data.get('host_name')
+            expires_at = room_data.get('expires_at')
+            if expires_at:
+                response['expires_at'] = expires_at.isoformat() + 'Z'
+        return jsonify(response)
         
     except Exception as e:
         logging.error(f"Error joining prayer room {room_id}: {str(e)}", exc_info=True)
@@ -733,6 +952,11 @@ def leave_prayer_room(room_id):
             return jsonify({'error': 'Room not found'}), 404
         
         room_data = room_doc.to_dict()
+        
+        anon_reject = _reject_anonymous_outside_voice_link(user, room_data)
+        if anon_reject:
+            return anon_reject
+
         participants_before = list(room_data.get('participants', []))
 
         # Resolve host display name before mutating the participant list (host was incorrectly looked up after removal).
@@ -937,6 +1161,11 @@ def self_mute_participant(room_id):
             return jsonify({'error': 'Room not found'}), 404
         
         room_data = room_doc.to_dict()
+        
+        anon_reject = _reject_anonymous_outside_voice_link(requesting_user, room_data)
+        if anon_reject:
+            return anon_reject
+
         participants = room_data.get('participants', [])
         
         # Find and update the requesting user's mute status
@@ -1437,6 +1666,8 @@ def get_active_rooms():
         rooms = []
         for doc in rooms_query.stream():
             room_data = doc.to_dict()
+            if room_data.get('room_type') == 'voice_link':
+                continue
             # Convert datetime objects to strings for JSON serialization
             if 'created_at' in room_data:
                 room_data['created_at'] = room_data['created_at'].isoformat()
@@ -1525,7 +1756,7 @@ def update_room_settings(room_id):
 
 @prayer_room_bp.route('/room/<room_id>/end', methods=['POST'])
 def end_room(room_id):
-    """End a prayer room (host only)"""
+    """End a prayer room (host only; voice_link allows either participant)."""
     try:
         user = get_user_from_session()
         
@@ -1534,17 +1765,31 @@ def end_room(room_id):
         
         db = get_firestore_client()
         room_doc = db.collection('prayer_rooms').document(room_id)
-        room_data = room_doc.get().to_dict()
-        
-        # Check if user is the host
-        if room_data.get('host_id') != user['user_id']:
+        room_snap = room_doc.get()
+        if not room_snap.exists:
+            return jsonify({'error': 'Room not found'}), 404
+        room_data = room_snap.to_dict() or {}
+
+        anon_reject = _reject_anonymous_outside_voice_link(user, room_data)
+        if anon_reject:
+            return anon_reject
+
+        data = request.get_json(silent=True) or {}
+        ended_reason = data.get('ended_reason', 'user')
+        if ended_reason not in ('user', 'timeout'):
+            ended_reason = 'user'
+
+        if _is_voice_link_room(room_data):
+            if not _is_room_participant(room_data, user['user_id']):
+                return jsonify({'error': 'Only call participants can end this call'}), 403
+        elif room_data.get('host_id') != user['user_id']:
             return jsonify({'error': 'Only the host can end the room'}), 403
         
-        # Mark room as inactive
         room_doc.update({
             'is_active': False,
             'ended_at': datetime.utcnow(),
-            'ended_by': user['user_id']
+            'ended_by': user['user_id'],
+            'ended_reason': ended_reason,
         })
         
         return jsonify({'success': True})
@@ -3177,6 +3422,8 @@ def activate_scheduled_rooms():
     try:
         db = get_firestore_client()
         now = datetime.utcnow()
+
+        expired_voice_links = _expire_stale_voice_links(db, now)
         
         logging.info(f"Checking for scheduled rooms to activate at {now}")
         
@@ -3230,7 +3477,8 @@ def activate_scheduled_rooms():
             'success': True,
             'timestamp': now.isoformat(),
             'activated_count': activated_count,
-            'checked_rooms': activated_count + len(errors)
+            'checked_rooms': activated_count + len(errors),
+            'expired_voice_links': expired_voice_links,
         }
         
         if errors:

@@ -7,13 +7,18 @@ The Divine Bridge mobile app built with Expo ~54, React Native, and TypeScript.
 File-based routing under `app/`:
 
 - `app/_layout.tsx` — Root Stack with auth guard, providers (QueryClient, GroupUnread, LiveRooms).
-- `app/(tabs)/_layout.tsx` — Tab bar (home, devotional, groups, rooms, profile).
+- `app/(tabs)/_layout.tsx` — Tab bar: Home, Pray (`groups`), Live (`rooms`), Devotional, Profile.
 - `app/(auth)/` — Login, register screens.
 - `app/room/[id].tsx` — Live prayer room (dynamic route).
+- `app/voice-call/[id].tsx` — 1:1 voice link call (share web URL; mute/speaker/end).
 - `app/group/[id].tsx` — Group detail (dynamic route).
 - `app/activity.tsx` — Activity feed.
 
 To add a new screen, create a file in `app/` and register in the nearest `_layout.tsx` if custom options are needed.
+
+## UI wireframe (design reference)
+
+Static HTML prototype at repo root: **`divinebridge-app-v4.html`** (not deployed). When you change user-visible mobile UI, update that file in the same change — use the **`update-mobile-wireframe`** skill in `.cursor/skills/`.
 
 ## Data architecture
 

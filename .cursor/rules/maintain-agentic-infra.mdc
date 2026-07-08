@@ -10,7 +10,8 @@ After completing a feature or significant change, check if the following need up
 ## When to update AGENTS.md
 
 - A new blueprint is added to `routes/` → update `routes/AGENTS.md` blueprint table.
-- A new screen is added to `mobile/app/` → update `mobile/AGENTS.md` navigation section.
+- A new screen is added to `mobile/app/` → update `mobile/AGENTS.md` navigation section and `divinebridge-app-v4.html` (see `update-mobile-wireframe` skill).
+- Mobile UI layout, tabs, or visible design changes → update `divinebridge-app-v4.html` in the same change.
 - A new SFU message type is added → update `media-server/AGENTS.md` protocol section.
 - A new script is added to `scripts/` → update `scripts/AGENTS.md`.
 - A new template is added to `templates/` → update `templates/AGENTS.md` key templates table.
@@ -30,6 +31,7 @@ After completing a feature or significant change, check if the following need up
 ## When to suggest using skills
 
 - Adding a new API route → reference the `add-api-route` skill.
-- Adding a new mobile screen → reference the `add-mobile-screen` skill.
+- Adding a new mobile screen → reference the `add-mobile-screen` skill, then `update-mobile-wireframe`.
+- Changing mobile UI / wireframes → reference the `update-mobile-wireframe` skill.
 - Deploying → reference the `deploy` skill.
 - Working with prayer content → reference the `prayer-check` skill.

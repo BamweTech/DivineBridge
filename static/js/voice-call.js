@@ -1,0 +1,299 @@
+'use strict';
+
+(function () {
+  const cfg = window.VOICE_CALL_CONFIG || {};
+  const roomId = cfg.roomId;
+  const roomCode = (cfg.roomCode || '').trim();
+  const hostName = cfg.hostName || 'Host';
+
+  let firebaseApp = null;
+  let auth = null;
+  let db = null;
+  let sfuClient = null;
+  let roomUnsub = null;
+  let expiryTimer = null;
+  let countdownTimer = null;
+  let isMuted = false;
+  let speakerOn = true;
+  let localUserId = null;
+  let expiresAtMs = cfg.expiresAt ? Date.parse(cfg.expiresAt) : null;
+  let ending = false;
+
+  const $ = (id) => document.getElementById(id);
+
+  function showState(name) {
+    ['landing', 'connecting', 'incall', 'ended'].forEach((s) => {
+      const el = $(`vc-state-${s}`);
+      if (el) el.hidden = s !== name;
+    });
+  }
+
+  function setLandingError(msg) {
+    const el = $('vc-landing-error');
+    if (!el) return;
+    if (msg) {
+      el.textContent = msg;
+      el.hidden = false;
+    } else {
+      el.hidden = true;
+      el.textContent = '';
+    }
+  }
+
+  async function apiFetch(path, options = {}) {
+    const user = auth && auth.currentUser;
+    if (!user) throw new Error('Not signed in');
+    const token = await user.getIdToken();
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    };
+    const res = await fetch(path, { ...options, headers });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || `Request failed (${res.status})`);
+    }
+    return data;
+  }
+
+  function updateRemoteAudio(peers) {
+    if (!peers || typeof peers.forEach !== 'function') return;
+    const active = new Set();
+    peers.forEach((peer, peerId) => {
+      if (peerId === localUserId || !peer.stream) return;
+      active.add(peerId);
+      const tracks = peer.stream.getAudioTracks();
+      if (!tracks.length) return;
+      const elId = `sfu-audio-${peerId}`;
+      let audioEl = document.getElementById(elId);
+      const stream = new MediaStream(tracks);
+      if (!audioEl) {
+        audioEl = document.createElement('audio');
+        audioEl.id = elId;
+        audioEl.autoplay = true;
+        audioEl.playsInline = true;
+        document.body.appendChild(audioEl);
+      }
+      if (audioEl.srcObject !== stream) {
+        audioEl.srcObject = stream;
+        audioEl.play().catch(() => {});
+      }
+      if (typeof audioEl.setSinkId === 'function' && speakerOn) {
+        audioEl.setSinkId('').catch(() => {});
+      }
+    });
+    document.querySelectorAll('audio[id^="sfu-audio-"]').forEach((el) => {
+      const peerId = el.id.replace('sfu-audio-', '');
+      if (!active.has(peerId)) {
+        el.srcObject = null;
+        el.remove();
+      }
+    });
+  }
+
+  function startCountdown() {
+    if (!expiresAtMs) return;
+    const timerEl = $('vc-timer');
+    if (timerEl) timerEl.hidden = false;
+
+    const tick = () => {
+      const remaining = Math.max(0, expiresAtMs - Date.now());
+      const mins = Math.floor(remaining / 60000);
+      const secs = Math.floor((remaining % 60000) / 1000);
+      if (timerEl) {
+        timerEl.textContent = `${mins}:${String(secs).padStart(2, '0')}`;
+      }
+      if (remaining <= 0) {
+        clearInterval(countdownTimer);
+        void endCall('timeout');
+      }
+    };
+    tick();
+    countdownTimer = setInterval(tick, 1000);
+
+    const delay = Math.max(0, expiresAtMs - Date.now());
+    expiryTimer = setTimeout(() => void endCall('timeout'), delay);
+  }
+
+  function watchRoom() {
+    if (!db || !roomId) return;
+    roomUnsub = db.collection('prayer_rooms').doc(roomId).onSnapshot((snap) => {
+      if (!snap.exists) return;
+      const data = snap.data() || {};
+      if (data.is_active === false && !ending) {
+        void teardown(`Call ended${data.ended_reason === 'timeout' ? ' (time limit)' : ''}`);
+      }
+      const count = (data.participants || []).filter((p) => p.is_active !== false).length;
+      const peerLabel = $('vc-peer-label');
+      if (peerLabel) {
+        peerLabel.textContent = count > 1 ? `Connected with ${hostName}` : 'Waiting for the other person…';
+      }
+    });
+  }
+
+  async function initFirebase() {
+    if (!cfg.firebaseConfig) throw new Error('Firebase not configured');
+    if (cfg.linkInvalid || !roomCode) {
+      throw new Error('Invalid call link');
+    }
+    if (!firebase.apps.length) {
+      firebaseApp = firebase.initializeApp(cfg.firebaseConfig);
+    } else {
+      firebaseApp = firebase.app();
+    }
+    auth = firebase.auth();
+    db = firebase.firestore();
+    if (!auth.currentUser) {
+      await auth.signInAnonymously();
+    }
+    localUserId = auth.currentUser.uid;
+  }
+
+  async function connectSfu(displayName) {
+    const joinResult = await apiFetch(`/api/prayer-room/join/${roomId}`, {
+      method: 'POST',
+      body: JSON.stringify({ room_code: roomCode, display_name: displayName }),
+    });
+
+    if (joinResult.expires_at) {
+      expiresAtMs = Date.parse(joinResult.expires_at);
+    }
+
+    const tokenResp = await apiFetch(`/api/prayer-room/sfu-token/${roomId}`, { method: 'POST' });
+    let sfuUrl = tokenResp.sfuUrl || 'wss://sfu.divinebridge.io/ws';
+    const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    if (!isLocal && (!sfuUrl || /localhost|127\.0\.0\.1/i.test(sfuUrl))) {
+      sfuUrl = 'wss://sfu.divinebridge.io/ws';
+    }
+
+    const userCred = await auth.signInWithCustomToken(tokenResp.customToken);
+    const idToken = await userCred.user.getIdToken();
+    localUserId = userCred.user.uid;
+
+    sfuClient = new window.SfuClient({
+      sfuUrl,
+      token: idToken,
+      roomId,
+      userId: localUserId,
+      userName: displayName,
+      isSpeaker: true,
+    });
+    sfuClient.onPeersChanged = updateRemoteAudio;
+    await sfuClient.start({ videoEnabled: false });
+  }
+
+  async function joinCall() {
+    const nameInput = $('vc-name');
+    const displayName = (nameInput && nameInput.value || '').trim();
+    if (!displayName) {
+      setLandingError('Please enter your name.');
+      return;
+    }
+    if (!roomCode) {
+      setLandingError('Invalid call link (missing code).');
+      return;
+    }
+
+    setLandingError('');
+    showState('connecting');
+
+    try {
+      await initFirebase();
+      await connectSfu(displayName.slice(0, 30));
+      showState('incall');
+      $('vc-status-text').textContent = 'In call';
+      $('vc-peer-label').textContent = 'Connecting audio…';
+      watchRoom();
+      startCountdown();
+    } catch (err) {
+      console.error('[voice-call]', err);
+      showState('landing');
+      setLandingError(err.message || 'Could not join the call.');
+    }
+  }
+
+  async function endCall(reason) {
+    if (ending) return;
+    ending = true;
+    try {
+      await apiFetch(`/api/prayer-room/room/${roomId}/end`, {
+        method: 'POST',
+        body: JSON.stringify({ ended_reason: reason || 'user' }),
+      });
+    } catch (e) {
+      console.warn('[voice-call] end failed', e);
+    }
+    await teardown(reason === 'timeout' ? 'This call reached the 10-minute limit.' : 'You left the call.');
+  }
+
+  async function teardown(message) {
+    ending = true;
+    if (countdownTimer) clearInterval(countdownTimer);
+    if (expiryTimer) clearTimeout(expiryTimer);
+    if (roomUnsub) roomUnsub();
+    if (sfuClient) {
+      await sfuClient.destroy();
+      sfuClient = null;
+    }
+    document.querySelectorAll('audio[id^="sfu-audio-"]').forEach((el) => {
+      el.srcObject = null;
+      el.remove();
+    });
+    showState('ended');
+    const reasonEl = $('vc-ended-reason');
+    if (reasonEl) reasonEl.textContent = message || 'The call has ended.';
+  }
+
+  function bindControls() {
+    $('vc-join-btn')?.addEventListener('click', () => void joinCall());
+    $('vc-mute-btn')?.addEventListener('click', async () => {
+      if (!sfuClient) return;
+      isMuted = !isMuted;
+      await sfuClient.setAudioEnabled(!isMuted);
+      $('vc-mute-btn')?.classList.toggle('active', isMuted);
+      const label = $('vc-mute-btn')?.querySelector('.vc-control-label');
+      if (label) label.textContent = isMuted ? 'Unmute' : 'Mute';
+      apiFetch(`/api/prayer-room/${roomId}/self-mute`, {
+        method: 'POST',
+        body: JSON.stringify({ muted: isMuted }),
+      }).catch(() => {});
+    });
+    $('vc-speaker-btn')?.addEventListener('click', () => {
+      speakerOn = !speakerOn;
+      $('vc-speaker-btn')?.classList.toggle('active', speakerOn);
+      const label = $('vc-speaker-btn')?.querySelector('.vc-control-label');
+      if (label) label.textContent = speakerOn ? 'Speaker' : 'Earpiece';
+    });
+    $('vc-end-btn')?.addEventListener('click', () => void endCall('user'));
+  }
+
+  function initLanding() {
+    if (cfg.linkInvalid) {
+      showState('ended');
+      $('vc-ended-reason').textContent = 'Invalid call link. Ask the host to share the full link again.';
+      return;
+    }
+    if (cfg.isExpired) {
+      showState('ended');
+      $('vc-ended-reason').textContent = 'This call link has expired.';
+      return;
+    }
+    if (!cfg.isActive) {
+      showState('ended');
+      $('vc-ended-reason').textContent = 'This call has already ended.';
+      return;
+    }
+    if (cfg.isFull) {
+      showState('ended');
+      $('vc-ended-reason').textContent = 'This call is full (2 participants max).';
+      return;
+    }
+    showState('landing');
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    bindControls();
+    initLanding();
+  });
+})();

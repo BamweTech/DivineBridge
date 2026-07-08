@@ -38,11 +38,13 @@ export interface Participant {
   is_host: boolean;
   role: ParticipantRole;
   requested_role: ParticipantRole | null;
+  is_active?: boolean;
 }
 
 export interface PrayerRoom {
   room_id: string;
   room_name: string;
+  room_type?: 'voice_link' | string;
   room_privacy: 'public' | 'private';
   /** When set, only members of this prayer group can join without a room code. */
   group_id?: string;
@@ -50,6 +52,7 @@ export interface PrayerRoom {
   host_id: string;
   host_name: string;
   created_at: number;
+  expires_at?: number | string;
   participants: Participant[];
   is_active: boolean;
   is_locked: boolean;
