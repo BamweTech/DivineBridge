@@ -1,4 +1,5 @@
 export const API_BASE_URL = 'https://divinebridge.io';
+/** Default US SFU; Voice Link uses per-room sfu_url from the API (us/eu/ap). */
 export const SFU_URL = 'wss://sfu.divinebridge.io/ws';
 
 export const ROOM_MODES = {

@@ -60,6 +60,22 @@ Defined in `mobile/lib/constants.ts`:
 
 Web (`static/js/sfu-client.js`) and mobile (`mobile/lib/sfu.ts`) must maintain protocol parity.
 
+## Multi-region (Voice Link)
+
+Voice Link rooms store `sfu_url` + `sfu_region` in Firestore at create. Both participants connect to the **same** regional SFU instance:
+
+| Region | Default WSS | GCE VM (ops) |
+|--------|-------------|--------------|
+| `us` | `wss://sfu.divinebridge.io/ws` | `divinebridge-sfu` (us-east1-b) |
+| `eu` | `wss://sfu-eu.divinebridge.io/ws` | `divinebridge-sfu-eu` (europe-west1-b) |
+| `ap` | `wss://sfu-ap.divinebridge.io/ws` | `divinebridge-sfu-ap` (future) |
+
+Geo selection: `sfu_regions.py` (Flask). Deploy: `scripts/deploy-sfu-region.sh`.
+
+Prayer rooms still default to the US SFU unless a room document includes `sfu_url`.
+
+**Guest-side migration (Phase 2b):** When the guest joins as the second participant, Flask runs `pick_optimal_voice_link_sfu_region()` — guest-weighted distance (60% guest / 40% host) across deployed regions (`SFU_REGIONS_ENABLED`, default `us,eu`). Example: US host + EU guest → EU SFU; EU host + US guest → US SFU. The host mobile client watches Firestore and reconnects automatically.
+
 ## Redis
 
 Used for room registry pub/sub in multi-instance deployments. Optional for single-instance dev.

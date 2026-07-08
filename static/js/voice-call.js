@@ -20,13 +20,15 @@
   let ending = false;
   let inCall = false;
   let tornDown = false;
+  let disconnectHandled = false;
+  let intentionalTeardown = false;
 
   const $ = (id) => document.getElementById(id);
 
   const GUEST_DISPLAY_NAME = 'Guest';
 
   function showState(name) {
-    ['connecting', 'incall', 'ended'].forEach((s) => {
+    ['connecting', 'incall', 'reconnect', 'ended'].forEach((s) => {
       const el = $(`vc-state-${s}`);
       if (!el) return;
       const active = s === name;
@@ -128,11 +130,30 @@
     }
   }
 
-  function updatePeerLabel(data) {
+  function updatePeerLabel(data, hostInMedia) {
     const count = (data.participants || []).filter((p) => p.is_active !== false).length;
     const peerLabel = $('vc-peer-label');
-    if (peerLabel) {
-      peerLabel.textContent = count > 1 ? `Connected with ${hostName}` : 'Waiting for the other person…';
+    if (!peerLabel) return;
+    if (hostInMedia === false) {
+      peerLabel.textContent = 'Reconnecting audio…';
+      return;
+    }
+    peerLabel.textContent = count > 1
+      ? `Connected with ${hostName}`
+      : 'Waiting for the other person…';
+  }
+
+  function updateHostMediaLabel() {
+    if (!sfuClient || !sfuClient.peers) return;
+    let hostPresent = false;
+    sfuClient.peers.forEach((peer, peerId) => {
+      if (peerId !== localUserId && peer.stream) hostPresent = true;
+    });
+    const peerLabel = $('vc-peer-label');
+    if (peerLabel && inCall) {
+      peerLabel.textContent = hostPresent
+        ? `Connected with ${hostName}`
+        : 'Connected — waiting for audio…';
     }
   }
 
@@ -179,7 +200,7 @@
       (snap) => {
         if (!snap.exists) return;
         const data = snap.data() || {};
-        updatePeerLabel(data);
+        updatePeerLabel(data, inCall);
         tryStartCountdownFromRoom(data);
 
         // Ignore cached/offline snapshots for end detection — stale cache caused false "call ended" UI.
@@ -220,15 +241,26 @@
   }
 
   async function connectSfu(displayName) {
+    let guestTimezone = '';
+    try {
+      guestTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    } catch {
+      guestTimezone = '';
+    }
+
     const joinResult = await apiFetch(`/api/prayer-room/join/${roomId}`, {
       method: 'POST',
-      body: JSON.stringify({ room_code: roomCode, display_name: displayName }),
+      body: JSON.stringify({
+        room_code: roomCode,
+        display_name: displayName,
+        timezone: guestTimezone,
+      }),
     });
 
     setExpiresFromJoin(joinResult);
 
     const tokenResp = await apiFetch(`/api/prayer-room/sfu-token/${roomId}`, { method: 'POST' });
-    let sfuUrl = tokenResp.sfuUrl || 'wss://sfu.divinebridge.io/ws';
+    let sfuUrl = joinResult.sfu_url || tokenResp.sfuUrl || 'wss://sfu.divinebridge.io/ws';
     const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
     if (!isLocal && (!sfuUrl || /localhost|127\.0\.0\.1/i.test(sfuUrl))) {
       sfuUrl = 'wss://sfu.divinebridge.io/ws';
@@ -246,8 +278,78 @@
       userName: displayName,
       isSpeaker: true,
     });
-    sfuClient.onPeersChanged = updateRemoteAudio;
+    sfuClient.onPeersChanged = (peers) => {
+      updateRemoteAudio(peers);
+      updateHostMediaLabel();
+    };
+    sfuClient.onDisconnected = (reason) => {
+      console.warn('[voice-call] SFU disconnected:', reason);
+      void handleMediaDisconnect(reason);
+    };
     await sfuClient.start({ videoEnabled: false });
+
+    if (joinResult.sfu_migrated) {
+      const peerLabel = $('vc-peer-label');
+      if (peerLabel) {
+        peerLabel.textContent = 'Connected via regional server optimized for your location';
+      }
+    }
+  }
+
+  async function leaveCallOnly() {
+    try {
+      await apiFetch(`/api/prayer-room/leave/${roomId}`, { method: 'POST' });
+    } catch (e) {
+      console.warn('[voice-call] leave failed', e);
+    }
+  }
+
+  async function destroySfuOnly() {
+    if (sfuClient) {
+      await sfuClient.destroy();
+      sfuClient = null;
+    }
+    document.querySelectorAll('audio[id^="sfu-audio-"]').forEach((el) => {
+      el.srcObject = null;
+      el.remove();
+    });
+  }
+
+  async function handleMediaDisconnect(reason) {
+    if (disconnectHandled || ending || tornDown || intentionalTeardown) return;
+    disconnectHandled = true;
+    inCall = false;
+    await destroySfuOnly();
+    await leaveCallOnly();
+    showState('reconnect');
+    const reasonEl = $('vc-reconnect-reason');
+    if (reasonEl) {
+      const isTransport = String(reason).includes('transport');
+      reasonEl.textContent = isTransport
+        ? 'Audio connection lost. This can happen on long-distance or mobile networks. Tap Rejoin to try again.'
+        : 'Connection lost. Tap Rejoin to try again.';
+    }
+  }
+
+  async function rejoinCall() {
+    if (ending || tornDown) return;
+    disconnectHandled = false;
+    showState('connecting');
+    $('vc-subtitle').textContent = 'Reconnecting…';
+    try {
+      await connectSfu(GUEST_DISPLAY_NAME);
+      inCall = true;
+      showState('incall');
+      $('vc-status-text').textContent = 'In call';
+      $('vc-peer-label').textContent = 'Connecting audio…';
+      if (!roomUnsub) watchRoom();
+      startCountdown();
+    } catch (err) {
+      console.error('[voice-call] rejoin failed', err);
+      showState('reconnect');
+      const reasonEl = $('vc-reconnect-reason');
+      if (reasonEl) reasonEl.textContent = err.message || 'Could not rejoin. Try again.';
+    }
   }
 
   async function autoJoin() {
@@ -298,17 +400,11 @@
     tornDown = true;
     ending = true;
     inCall = false;
+    intentionalTeardown = true;
     if (countdownTimer) clearInterval(countdownTimer);
     if (expiryTimer) clearTimeout(expiryTimer);
     if (roomUnsub) roomUnsub();
-    if (sfuClient) {
-      await sfuClient.destroy();
-      sfuClient = null;
-    }
-    document.querySelectorAll('audio[id^="sfu-audio-"]').forEach((el) => {
-      el.srcObject = null;
-      el.remove();
-    });
+    await destroySfuOnly();
     showState('ended');
     const reasonEl = $('vc-ended-reason');
     if (reasonEl) reasonEl.textContent = message || 'The call has ended.';
@@ -334,6 +430,7 @@
       if (label) label.textContent = speakerOn ? 'Speaker' : 'Earpiece';
     });
     $('vc-end-btn')?.addEventListener('click', () => void endCall('user'));
+    $('vc-rejoin-btn')?.addEventListener('click', () => void rejoinCall());
   }
 
   function initLanding() {

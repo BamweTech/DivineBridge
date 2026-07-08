@@ -112,6 +112,9 @@ export class SfuEngine {
   onPeersChanged?: OnPeersChanged;
   onModeChanged?: OnModeChanged;
   onActiveSpeakersChanged?: OnActiveSpeakersChanged;
+  onDisconnected?: (reason: string) => void;
+
+  private intentionalClose = false;
 
   constructor(options: {
     roomId: string;
@@ -276,6 +279,7 @@ export class SfuEngine {
 
   destroy() {
     this._stopHeartbeat();
+    this.intentionalClose = true;
     this.audioProducer?.close();
     this.videoProducer?.close();
     for (const c of this.consumers.values()) c.close();
@@ -312,6 +316,9 @@ export class SfuEngine {
         this._stopHeartbeat();
         this.pending.forEach(({ reject: rej }) => rej(new Error('WebSocket closed')));
         this.pending.clear();
+        if (!this.intentionalClose) {
+          this.onDisconnected?.('websocket_closed');
+        }
       };
       ws.onmessage = (e: MessageEvent) => this._onWsMessage(e.data);
     });
@@ -501,11 +508,22 @@ export class SfuEngine {
 
   // ─── Send Transport ─────────────────────────────────────────────────────────
 
+  private _watchTransport(transport: any, label: string) {
+    transport.on('connectionstatechange', (state: string) => {
+      if (state === 'failed' || state === 'closed') {
+        if (!this.intentionalClose) {
+          this.onDisconnected?.(`${label}_transport_${state}`);
+        }
+      }
+    });
+  }
+
   private async _setupSendTransport() {
     const params = await this._request('createTransport', { direction: 'send' });
 
     // device.createSendTransport wires up all ICE/DTLS via mediasoup-client internals
     this.sendTransport = this.device.createSendTransport(params);
+    this._watchTransport(this.sendTransport, 'send');
 
     // 'connect' fires once when the first produce() triggers ICE/DTLS
     this.sendTransport.on(
@@ -558,6 +576,7 @@ export class SfuEngine {
 
     console.log('[sfu] recvTransport params keys:', Object.keys(params ?? {}));
     this.recvTransport = this.device.createRecvTransport(params);
+    this._watchTransport(this.recvTransport, 'receive');
 
     this.recvTransport.on(
       'connect',

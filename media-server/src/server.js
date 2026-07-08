@@ -261,6 +261,10 @@ function handleConnection(ws) {
         }
 
         default:
+          if (action === 'ping') {
+            reply({ ok: true });
+            break;
+          }
           error(`Unknown action: ${action}`);
       }
     } catch (err) {

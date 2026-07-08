@@ -26,6 +26,12 @@ def exempt_from_rate_limit(f):
     return wrapper
 from google.cloud import firestore
 
+from sfu_regions import (
+    build_voice_link_sfu_fields,
+    get_sfu_url_for_room,
+    maybe_migrate_voice_link_sfu_at_guest_join,
+)
+
 prayer_room_bp = Blueprint('prayer_room', __name__)
 
 MAX_ACTIVE_SPEAKERS = 20
@@ -110,6 +116,18 @@ def _reject_anonymous_outside_voice_link(user, room_data):
 
 def _public_base_url():
     return os.getenv('PUBLIC_BASE_URL', 'https://divinebridge.io').rstrip('/')
+
+
+def _deactivate_participant(participants, user_id, reason='media_disconnected'):
+    """Mark a participant inactive (e.g. SFU dropped them without calling /leave)."""
+    changed = False
+    for participant in participants or []:
+        if participant.get('user_id') == user_id and participant.get('is_active', True) is not False:
+            participant['is_active'] = False
+            participant['archived_at'] = datetime.utcnow()
+            participant['reason_archived'] = reason
+            changed = True
+    return participants, changed
 
 
 def _voice_link_timer_start_if_needed(room_data, participants, now=None):
@@ -503,10 +521,8 @@ def get_sfu_token(room_id):
         if isinstance(custom_token, bytes):
             custom_token = custom_token.decode('utf-8')
 
-        # Production default must be the public WSS URL. Web clients use this value
-        # (mobile overrides with constants). If unset on Cloud Run, localhost here
-        # breaks all browser audio/video. Local dev: set SFU_URL=ws://127.0.0.1:3000/ws
-        sfu_url = os.getenv('SFU_URL', 'wss://sfu.divinebridge.io/ws')
+        # Use per-room SFU URL for voice_link (multi-region); default for other rooms.
+        sfu_url = get_sfu_url_for_room(room_data)
 
         return jsonify({'customToken': custom_token, 'sfuUrl': sfu_url})
 
@@ -545,6 +561,10 @@ def create_voice_link_room():
         room_id = _generate_room_id()
         room_code = _generate_room_code(8)
         created_at = datetime.utcnow()
+        sfu_fields = build_voice_link_sfu_fields(
+            headers=request.headers,
+            body=request.get_json(silent=True) or {},
+        )
 
         room_data = {
             'room_id': room_id,
@@ -556,6 +576,8 @@ def create_voice_link_room():
             'host_name': host_name,
             'created_at': created_at,
             'call_started_at': None,
+            'sfu_region': sfu_fields['sfu_region'],
+            'sfu_url': sfu_fields['sfu_url'],
             'media_mode': 'audio_only',
             'participants': [{
                 'user_id': host_id,
@@ -591,11 +613,57 @@ def create_voice_link_room():
             'expires_at': None,
             'host_id': host_id,
             'host_name': host_name,
+            'sfu_region': sfu_fields['sfu_region'],
+            'sfu_url': sfu_fields['sfu_url'],
         })
 
     except Exception as e:
         logging.error(f'Error creating voice link room: {e}', exc_info=True)
         return jsonify({'error': 'Failed to create voice link'}), 500
+
+
+@prayer_room_bp.route('/voice-link/participant-disconnected/<room_id>', methods=['POST'])
+def voice_link_participant_disconnected(room_id):
+    """Host marks a guest inactive when SFU drops them without calling /leave."""
+    try:
+        user = get_user_from_session()
+        if not user:
+            return jsonify({'error': 'Authentication required'}), 401
+
+        data = request.get_json() or {}
+        target_user_id = (data.get('user_id') or '').strip()
+        if not target_user_id:
+            return jsonify({'error': 'user_id is required'}), 400
+
+        db = get_firestore_client()
+        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_doc = room_ref.get()
+        if not room_doc.exists:
+            return jsonify({'error': 'Room not found'}), 404
+
+        room_data = room_doc.to_dict() or {}
+        if not _is_voice_link_room(room_data):
+            return jsonify({'error': 'Not a voice link room'}), 400
+        if room_data.get('host_id') != user['user_id']:
+            return jsonify({'error': 'Only the host can update participant status'}), 403
+        if target_user_id == room_data.get('host_id'):
+            return jsonify({'error': 'Cannot deactivate the host'}), 400
+
+        participants = list(room_data.get('participants', []))
+        participants, changed = _deactivate_participant(
+            participants, target_user_id, reason='media_disconnected'
+        )
+        if not changed:
+            return jsonify({'success': True, 'updated': False})
+
+        room_ref.update({
+            'participants': participants,
+            'last_activity': datetime.utcnow(),
+        })
+        return jsonify({'success': True, 'updated': True})
+    except Exception as e:
+        logging.error(f'Error deactivating voice link participant: {e}', exc_info=True)
+        return jsonify({'error': 'Failed to update participant'}), 500
 
 
 @prayer_room_bp.route('/create', methods=['POST'])
@@ -954,7 +1022,22 @@ def join_prayer_room(room_id):
             room_data, participants
         )
         update_fields.update(timer_fields)
+
+        sfu_migration = {}
+        if _is_voice_link_room(room_data):
+            sfu_migration = maybe_migrate_voice_link_sfu_at_guest_join(
+                room_data,
+                user_id,
+                host_id,
+                participants,
+                headers=request.headers,
+                body=data,
+            )
+            update_fields.update(sfu_migration)
+
         room_ref.update(update_fields)
+
+        effective_room = {**room_data, **update_fields}
 
         response = {
             'success': True,
@@ -967,7 +1050,13 @@ def join_prayer_room(room_id):
         if _is_voice_link_room(room_data):
             response['room_type'] = 'voice_link'
             response['host_name'] = room_data.get('host_name')
-            expires_at = started_expires_at or _normalize_utc_datetime(room_data.get('expires_at'))
+            response['sfu_region'] = effective_room.get('sfu_region')
+            response['sfu_url'] = get_sfu_url_for_room(effective_room)
+            if sfu_migration:
+                response['sfu_migrated'] = True
+            expires_at = started_expires_at or _normalize_utc_datetime(
+                effective_room.get('expires_at')
+            )
             response['call_started'] = bool(expires_at)
             if expires_at:
                 response['expires_at'] = _format_expires_at_iso(expires_at)

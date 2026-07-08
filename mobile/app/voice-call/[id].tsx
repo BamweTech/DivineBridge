@@ -47,7 +47,10 @@ export default function VoiceCallScreen() {
     joinError,
     audioOutputRoute,
     secondsRemaining,
+    hasGuestInRoom,
     isConnected,
+    isGuestDisconnected,
+    isMigratingSfu,
     guestName,
     guestIsSpeaking,
     join,
@@ -122,7 +125,7 @@ export default function VoiceCallScreen() {
         </Pressable>
         <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600'), fontSize: 14 }}>Voice call</Text>
         <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('500'), fontSize: 13, fontVariant: ['tabular-nums'] }}>
-          {formatCountdown(secondsRemaining, isJoined && !isConnected)}
+          {formatCountdown(secondsRemaining, isJoined && !hasGuestInRoom)}
         </Text>
       </View>
 
@@ -136,6 +139,13 @@ export default function VoiceCallScreen() {
             {joinError ? (
               <Text style={{ color: THEME_COLORS.rose, marginTop: 12, textAlign: 'center' }}>{joinError}</Text>
             ) : null}
+          </>
+        ) : isMigratingSfu ? (
+          <>
+            <ActivityIndicator color={THEME_COLORS.gold} size="large" />
+            <Text style={{ color: THEME_COLORS.text2, marginTop: 16, ...iosFontStyle('400'), fontSize: 15, textAlign: 'center' }}>
+              Optimizing connection for your guest…
+            </Text>
           </>
         ) : (
           <>
@@ -164,6 +174,18 @@ export default function VoiceCallScreen() {
                   {guestIsSpeaking ? 'Speaking' : 'Connected'}
                 </Text>
               </View>
+            ) : isGuestDisconnected ? (
+              <View style={{
+                width: 88,
+                height: 88,
+                borderRadius: 44,
+                backgroundColor: 'rgba(176,90,80,0.12)',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 20,
+              }}>
+                <Icon name="mic-off" size={32} color={THEME_COLORS.rose} />
+              </View>
             ) : (
               <View style={{
                 width: 88,
@@ -178,12 +200,14 @@ export default function VoiceCallScreen() {
               </View>
             )}
             <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('600'), fontSize: 22, marginBottom: 8 }}>
-              {isConnected ? 'Connected' : 'Waiting for guest'}
+              {isConnected ? 'Connected' : isGuestDisconnected ? 'Guest disconnected' : 'Waiting for guest'}
             </Text>
             <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('400'), fontSize: 15, textAlign: 'center', marginBottom: 28 }}>
               {isConnected
                 ? 'You are in a private 1:1 voice call.'
-                : 'Share the link so they can join from any browser.'}
+                : isGuestDisconnected
+                  ? 'The guest lost their connection. Ask them to reopen the call link to rejoin.'
+                  : 'Share the link so they can join from any browser.'}
             </Text>
             {!isConnected ? (
               <Pressable
@@ -196,7 +220,9 @@ export default function VoiceCallScreen() {
                   marginBottom: 12,
                 }}
               >
-                <Text style={{ color: '#fff', ...iosFontStyle('700'), fontSize: 15 }}>Share call link</Text>
+                <Text style={{ color: '#fff', ...iosFontStyle('700'), fontSize: 15 }}>
+                  {isGuestDisconnected ? 'Share link again' : 'Share call link'}
+                </Text>
               </Pressable>
             ) : null}
           </>

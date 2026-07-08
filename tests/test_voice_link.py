@@ -208,6 +208,127 @@ class TestAnonymousVoiceLinkAccess:
         room_ref.update.assert_not_called()
 
 
+class TestVoiceLinkCreate:
+    @patch('routes.prayer_room_bp.get_firestore_client')
+    @patch('routes.prayer_room_bp.get_user_from_session')
+    def test_create_stores_regional_sfu_for_eu_timezone(self, mock_user, mock_db, app):
+        mock_user.return_value = {
+            'user_id': 'host1',
+            'user_name': 'Jean',
+            'is_anonymous': False,
+        }
+        mock_db.return_value.collection.return_value.document.return_value.set = MagicMock()
+
+        with app.test_request_context(
+            json={'timezone': 'Europe/Paris'},
+            headers={'CF-IPCountry': 'US'},
+        ):
+            result = pr.create_voice_link_room()
+            status = result[1] if isinstance(result, tuple) else result.status_code
+            assert status == 200
+
+        room_data = mock_db.return_value.collection.return_value.document.return_value.set.call_args[0][0]
+        assert room_data['sfu_region'] == 'eu'
+        assert 'sfu-eu' in room_data['sfu_url']
+
+
+class TestGuestJoinSfuMigration:
+    @patch('routes.prayer_room_bp.get_firestore_client')
+    @patch('routes.prayer_room_bp.get_user_from_session')
+    def test_eu_guest_migrates_us_host_room(self, mock_user, mock_db, app):
+        mock_user.return_value = {
+            'user_id': 'guest1',
+            'user_name': 'Guest',
+            'is_anonymous': True,
+        }
+
+        room_ref = MagicMock()
+        room_snap = MagicMock()
+        room_snap.exists = True
+        room_snap.to_dict.return_value = {
+            'room_type': 'voice_link',
+            'room_privacy': 'private',
+            'room_code': 'GOODCODE',
+            'host_id': 'host1',
+            'is_active': True,
+            'expires_at': None,
+            'sfu_region': 'us',
+            'sfu_url': 'wss://sfu.divinebridge.io/ws',
+            'participants': [{'user_id': 'host1', 'is_active': True, 'role': 'speaker', 'is_host': True}],
+            'max_speakers': 2,
+        }
+        room_ref.get.return_value = room_snap
+        mock_db.return_value.collection.return_value.document.return_value = room_ref
+
+        with app.test_request_context(
+            json={'room_code': 'GOODCODE', 'timezone': 'Europe/Paris'},
+            headers={'CF-IPCountry': 'FR'},
+        ):
+            result = pr.join_prayer_room('ROOM01')
+            status = result[1] if isinstance(result, tuple) else result.status_code
+            assert status == 200
+
+        update_args = room_ref.update.call_args[0][0]
+        assert update_args['sfu_region'] == 'eu'
+        assert 'sfu-eu' in update_args['sfu_url']
+        assert update_args['sfu_selected_by'] == 'pair_optimal'
+
+
+class TestVoiceLinkParticipantDisconnected:
+    @patch('routes.prayer_room_bp.get_firestore_client')
+    @patch('routes.prayer_room_bp.get_user_from_session')
+    def test_host_can_deactivate_guest(self, mock_user, mock_db, app):
+        mock_user.return_value = {'user_id': 'host1', 'user_name': 'Host'}
+
+        room_ref = MagicMock()
+        room_snap = MagicMock()
+        room_snap.exists = True
+        room_snap.to_dict.return_value = {
+            'room_type': 'voice_link',
+            'host_id': 'host1',
+            'participants': [
+                {'user_id': 'host1', 'is_active': True, 'is_host': True},
+                {'user_id': 'guest1', 'is_active': True, 'is_host': False, 'user_name': 'Guest'},
+            ],
+        }
+        room_ref.get.return_value = room_snap
+        mock_db.return_value.collection.return_value.document.return_value = room_ref
+
+        with app.test_request_context(json={'user_id': 'guest1'}):
+            result = pr.voice_link_participant_disconnected('ROOM01')
+            status = result[1] if isinstance(result, tuple) else result.status_code
+            assert status == 200
+
+        update_args = room_ref.update.call_args[0][0]
+        guest = next(p for p in update_args['participants'] if p['user_id'] == 'guest1')
+        assert guest['is_active'] is False
+        assert guest['reason_archived'] == 'media_disconnected'
+
+    @patch('routes.prayer_room_bp.get_firestore_client')
+    @patch('routes.prayer_room_bp.get_user_from_session')
+    def test_guest_cannot_deactivate_participant(self, mock_user, mock_db, app):
+        mock_user.return_value = {'user_id': 'guest1', 'user_name': 'Guest'}
+
+        room_ref = MagicMock()
+        room_snap = MagicMock()
+        room_snap.exists = True
+        room_snap.to_dict.return_value = {
+            'room_type': 'voice_link',
+            'host_id': 'host1',
+            'participants': [
+                {'user_id': 'host1', 'is_active': True},
+                {'user_id': 'guest1', 'is_active': True},
+            ],
+        }
+        room_ref.get.return_value = room_snap
+        mock_db.return_value.collection.return_value.document.return_value = room_ref
+
+        with app.test_request_context(json={'user_id': 'guest1'}):
+            result = pr.voice_link_participant_disconnected('ROOM01')
+            assert result[1] == 403
+        room_ref.update.assert_not_called()
+
+
 class TestEndRoomVoiceLink:
     @patch('routes.prayer_room_bp.get_firestore_client')
     @patch('routes.prayer_room_bp.get_user_from_session')

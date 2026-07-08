@@ -36,6 +36,18 @@ After pushing **mobile** (or shared JS) changes to `main`, or when the user asks
 
 Requires `gcloud` auth and access to project `divinebridge`, VM `divinebridge-metro` (default zone `us-central1-a`). See also `gcp-metro-vm.sh`, `gcp-metro-tunnel.sh`, `gcp-metro-allow-my-ip.sh`.
 
+### Regional SFU (Voice Link media)
+
+Voice Link rooms pin `sfu_url` at create (geo: `CF-IPCountry`, mobile `timezone`, or `sfu_region`).
+
+```bash
+./scripts/deploy-sfu-region.sh --bootstrap --region eu   # first-time checklist
+./scripts/deploy-sfu-region.sh --region eu               # pull main + restart PM2 on EU VM
+./scripts/deploy-sfu-region.sh --region us               # US SFU (divinebridge-sfu, us-east1-b)
+```
+
+After EU VM is live, set Cloud Run env `SFU_URL_EU=wss://sfu-eu.divinebridge.io/ws` and redeploy Flask.
+
 ## Migrations
 
 Migration scripts are one-off Python scripts for Firestore data changes. They are not part of a formal migration framework.

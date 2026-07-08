@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Voice Call — Divine Bridge</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/voice-call.css') }}?v=3">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/voice-call.css') }}?v=4">
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -57,6 +57,12 @@
             </div>
         </section>
 
+        <section id="vc-state-reconnect" class="vc-panel" hidden>
+            <h2 class="vc-title">Connection lost</h2>
+            <p id="vc-reconnect-reason" class="vc-subtitle">Audio connection lost. Tap Rejoin to try again.</p>
+            <button id="vc-rejoin-btn" type="button" class="vc-primary-btn">Rejoin call</button>
+        </section>
+
         <section id="vc-state-ended" class="vc-panel" hidden>
             <h2 class="vc-title">Call ended</h2>
             <p id="vc-ended-reason" class="vc-subtitle">The call has ended.</p>
@@ -65,6 +71,6 @@
 
     <script src="{{ url_for('static', filename='js/sfu-bundle.js') }}"></script>
     <script src="{{ url_for('static', filename='js/sfu-client.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/voice-call.js') }}?v=3"></script>
+    <script src="{{ url_for('static', filename='js/voice-call.js') }}?v=4"></script>
 </body>
 </html>

@@ -170,6 +170,18 @@ html, body {
   animation: vc-spin 0.8s linear infinite;
 }
 
+.vc-primary-btn {
+  margin-top: 20px;
+  background: #b07d20;
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 14px 28px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 @keyframes vc-spin {
   to { transform: rotate(360deg); }
 }

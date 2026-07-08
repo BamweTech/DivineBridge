@@ -20,16 +20,106 @@ export function useVoiceLink(roomId: string, roomCode?: string) {
   const { user, profile } = useAuthStore();
   const engineRef = useRef<SfuEngine | null>(null);
   const endHandledRef = useRef(false);
+  const guestWasInMediaRef = useRef(false);
+  const syncingGuestRef = useRef(false);
+  const peersRef = useRef<Map<string, PeerEntry>>(new Map());
+  const connectedSfuUrlRef = useRef<string | null>(null);
+  const reconnectingSfuRef = useRef(false);
 
   const [room, setRoom] = useState<PrayerRoom | null>(null);
   const [peers, setPeers] = useState<Map<string, PeerEntry>>(new Map());
   const [isMuted, setIsMuted] = useState(false);
   const [isJoined, setIsJoined] = useState(false);
+  const [isMigratingSfu, setIsMigratingSfu] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [audioOutputRoute, setAudioOutputRouteState] = useState<LiveRoomAudioRoute>('speaker');
   const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
   const [activeSpeakers, setActiveSpeakers] = useState<string[]>([]);
   const audioOutputRouteRef = useRef<LiveRoomAudioRoute>('speaker');
+
+  const syncGuestDisconnected = useCallback(async (guestUserId: string) => {
+    if (!roomId || syncingGuestRef.current) return;
+    syncingGuestRef.current = true;
+    try {
+      await voiceLinkApi.markParticipantDisconnected(roomId, guestUserId);
+    } catch (e) {
+      console.warn('[voice-link] failed to sync guest disconnect:', e);
+    } finally {
+      syncingGuestRef.current = false;
+    }
+  }, [roomId]);
+
+  const attachPeerHandlers = useCallback((engine: SfuEngine) => {
+    if (!user) return;
+    engine.onPeersChanged = (p) => {
+      const prevGuest = Array.from(peersRef.current.values()).find(
+        (peer) => peer.userId !== user.uid,
+      );
+      const next = new Map(p);
+      peersRef.current = next;
+      setPeers(next);
+      const nextGuest = Array.from(next.values()).find((peer) => peer.userId !== user.uid);
+      if (nextGuest) {
+        guestWasInMediaRef.current = true;
+      } else if (guestWasInMediaRef.current && prevGuest?.userId) {
+        void syncGuestDisconnected(prevGuest.userId);
+      }
+    };
+    engine.onActiveSpeakersChanged = setActiveSpeakers;
+  }, [user, syncGuestDisconnected]);
+
+  const startSfuEngine = useCallback(async (preferredUrl?: string) => {
+    if (!user || !roomId) throw new Error('Not authenticated');
+
+    const resp = await voiceLinkApi.sfuToken(roomId);
+    const sfuUrl = resp.sfuUrl || preferredUrl || SFU_URL;
+    const userCred = await signInWithCustomToken(auth, resp.customToken);
+    const token = await userCred.user.getIdToken();
+
+    const engine = new SfuEngine({
+      roomId,
+      userId: user.uid,
+      userName: getDisplayName(profile, user),
+      isSpeaker: true,
+      sfuUrl,
+      token,
+    });
+    attachPeerHandlers(engine);
+    await engine.start({ videoEnabled: false });
+
+    engineRef.current = engine;
+    connectedSfuUrlRef.current = sfuUrl;
+    return engine;
+  }, [roomId, user, profile, attachPeerHandlers]);
+
+  const reconnectToSfu = useCallback(async (sfuUrl: string) => {
+    if (!user || !roomId || reconnectingSfuRef.current) return;
+    if (connectedSfuUrlRef.current === sfuUrl) return;
+
+    reconnectingSfuRef.current = true;
+    setIsMigratingSfu(true);
+    const wasMuted = isMuted;
+    try {
+      engineRef.current?.destroy();
+      engineRef.current = null;
+      peersRef.current = new Map();
+      setPeers(new Map());
+      setActiveSpeakers([]);
+      guestWasInMediaRef.current = false;
+
+      const engine = await startSfuEngine(sfuUrl);
+      if (wasMuted) {
+        engine.setAudioEnabled(false);
+      }
+      console.log('[voice-link] reconnected to SFU:', connectedSfuUrlRef.current);
+    } catch (err) {
+      console.error('[voice-link] SFU reconnect failed:', err);
+      setJoinError('Could not switch to the guest-optimized server.');
+    } finally {
+      reconnectingSfuRef.current = false;
+      setIsMigratingSfu(false);
+    }
+  }, [user, roomId, isMuted, startSfuEngine]);
 
   useEffect(() => {
     if (!roomId) return;
@@ -41,6 +131,13 @@ export function useVoiceLink(roomId: string, roomCode?: string) {
     return unsub;
   }, [roomId]);
 
+  useEffect(() => {
+    if (!room?.sfu_url || !isJoined || !user || room.host_id !== user.uid) return;
+    if (connectedSfuUrlRef.current && room.sfu_url !== connectedSfuUrlRef.current) {
+      void reconnectToSfu(room.sfu_url);
+    }
+  }, [room?.sfu_url, isJoined, user, room?.host_id, reconnectToSfu]);
+
   const join = useCallback(async () => {
     if (!user || !roomId || !roomCode) {
       setJoinError('Missing call code.');
@@ -49,23 +146,8 @@ export function useVoiceLink(roomId: string, roomCode?: string) {
     setJoinError(null);
     try {
       await voiceLinkApi.join(roomId, roomCode);
-      const resp = await voiceLinkApi.sfuToken(roomId);
-      const userCred = await signInWithCustomToken(auth, resp.customToken);
-      const token = await userCred.user.getIdToken();
+      await startSfuEngine();
 
-      const engine = new SfuEngine({
-        roomId,
-        userId: user.uid,
-        userName: getDisplayName(profile, user),
-        isSpeaker: true,
-        sfuUrl: SFU_URL,
-        token,
-      });
-      engine.onPeersChanged = (p) => setPeers(new Map(p));
-      engine.onActiveSpeakersChanged = setActiveSpeakers;
-      await engine.start({ videoEnabled: false });
-
-      engineRef.current = engine;
       audioOutputRouteRef.current = 'speaker';
       setAudioOutputRouteState('speaker');
       await setLiveRoomAudioRoute('speaker');
@@ -76,11 +158,12 @@ export function useVoiceLink(roomId: string, roomCode?: string) {
       setJoinError(err?.message || 'Could not join the call.');
       throw err;
     }
-  }, [roomId, roomCode, user, profile]);
+  }, [roomId, roomCode, user, startSfuEngine]);
 
   const leave = useCallback(async () => {
     engineRef.current?.destroy();
     engineRef.current = null;
+    connectedSfuUrlRef.current = null;
     setIsJoined(false);
     await stopCallKeepAlive();
     await resetLiveRoomAudio();
@@ -113,7 +196,7 @@ export function useVoiceLink(roomId: string, roomCode?: string) {
   }, []);
 
   const activePeerCount = room?.participants?.filter((p: Participant) => p.is_active !== false).length ?? 0;
-  const isConnected = activePeerCount >= 2;
+  const hasGuestInRoom = activePeerCount >= 2;
 
   const guestParticipant = room?.participants?.find(
     (p: Participant) => p.is_active !== false && !p.is_host,
@@ -121,7 +204,23 @@ export function useVoiceLink(roomId: string, roomCode?: string) {
   const guestPeer = Array.from(peers.values()).find((p) => p.userId !== user?.uid);
   const guestUserId = guestPeer?.userId ?? guestParticipant?.user_id;
   const guestName = guestPeer?.userName ?? guestParticipant?.user_name ?? 'Guest';
-  const guestIsSpeaking = Boolean(guestUserId && activeSpeakers.includes(guestUserId));
+  const isGuestInMedia = Boolean(guestPeer);
+  const isGuestDisconnected = Boolean(
+    guestWasInMediaRef.current && hasGuestInRoom && !isGuestInMedia,
+  );
+  const isConnected = isGuestInMedia;
+  const guestIsSpeaking = Boolean(guestUserId && isGuestInMedia && activeSpeakers.includes(guestUserId));
+
+  useEffect(() => {
+    if (guestPeer) {
+      guestWasInMediaRef.current = true;
+    }
+  }, [guestPeer?.userId]);
+
+  useEffect(() => {
+    if (!isGuestDisconnected || !guestParticipant?.user_id) return;
+    void syncGuestDisconnected(guestParticipant.user_id);
+  }, [isGuestDisconnected, guestParticipant?.user_id, syncGuestDisconnected]);
 
   useEffect(() => {
     if (!room?.expires_at) return;
@@ -160,6 +259,7 @@ export function useVoiceLink(roomId: string, roomCode?: string) {
     return () => {
       engineRef.current?.destroy();
       engineRef.current = null;
+      connectedSfuUrlRef.current = null;
       void stopCallKeepAlive();
       resetLiveRoomAudio().catch(() => null);
     };
@@ -170,11 +270,14 @@ export function useVoiceLink(roomId: string, roomCode?: string) {
     peers,
     isMuted,
     isJoined,
+    isMigratingSfu,
     joinError,
     audioOutputRoute,
     secondsRemaining,
     activePeerCount,
+    hasGuestInRoom,
     isConnected,
+    isGuestDisconnected,
     guestName,
     guestIsSpeaking,
     join,

@@ -185,15 +185,23 @@ export const roomApi = {
 // ─── Voice Link (1:1 web-shareable calls) ─────────────────────────────────────
 
 export const voiceLinkApi = {
-  create: () =>
+  create: (opts?: { timezone?: string; sfu_region?: string }) =>
     request<{
       success: boolean;
       room_id: string;
       room_code: string;
       share_url: string;
-      expires_at: string;
+      expires_at: string | null;
       host_name: string;
-    }>('/api/prayer-room/voice-link/create', { method: 'POST' }),
+      sfu_region: string;
+      sfu_url: string;
+    }>('/api/prayer-room/voice-link/create', {
+      method: 'POST',
+      body: JSON.stringify({
+        timezone: opts?.timezone,
+        sfu_region: opts?.sfu_region,
+      }),
+    }),
   join: (roomId: string, code: string) =>
     request<any>(`/api/prayer-room/join/${roomId}`, {
       method: 'POST',
@@ -213,6 +221,11 @@ export const voiceLinkApi = {
     }),
   sfuToken: (roomId: string) =>
     request<{ customToken: string; sfuUrl: string }>(`/api/prayer-room/sfu-token/${roomId}`, { method: 'POST' }),
+  markParticipantDisconnected: (roomId: string, userId: string) =>
+    request<any>(`/api/prayer-room/voice-link/participant-disconnected/${roomId}`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId }),
+    }),
 };
 
 // ─── Scheduled Sessions ────────────────────────────────────────────────────────

@@ -229,7 +229,9 @@ export default function RoomsScreen() {
     if (startingVoiceLink) return;
     setStartingVoiceLink(true);
     try {
-      const result = await voiceLinkApi.create();
+      const result = await voiceLinkApi.create({
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      });
       const href =
         `/voice-call/${result.room_id}?code=${encodeURIComponent(result.room_code)}` +
         `&shareUrl=${encodeURIComponent(result.share_url)}`;

@@ -101,6 +101,11 @@ class SfuClient {
     this.onPeersChanged   = null;
     /** @type {((ids: string[]) => void) | null} */
     this.onActiveSpeakers = null;
+    /** @type {((reason: string) => void) | null} */
+    this.onDisconnected   = null;
+
+    this._intentionalClose = false;
+    this._heartbeatTimer   = null;
     /** @type {((mode: string) => void) | null} */
     this.onModeChanged    = null;
   }
@@ -229,6 +234,8 @@ class SfuClient {
 
   /** Tear down all transports, consumers, and the WebSocket connection. */
   async destroy() {
+    this._stopHeartbeat();
+    this._intentionalClose = true;
     this._audioProducer?.close();
     this._videoProducer?.close();
     for (const c of this._consumers.values()) c.close();
@@ -247,13 +254,44 @@ class SfuClient {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(this.sfuUrl);
       this._ws = ws;
-      ws.onopen  = () => resolve();
+      ws.onopen  = () => {
+        this._startHeartbeat();
+        resolve();
+      };
       ws.onerror = () => reject(new Error('SFU WebSocket connection failed'));
       ws.onclose = () => {
+        this._stopHeartbeat();
         for (const { reject: rej } of this._pending.values()) rej(new Error('WebSocket closed'));
         this._pending.clear();
+        if (!this._intentionalClose) {
+          this.onDisconnected?.('websocket_closed');
+        }
       };
       ws.onmessage = (e) => this._onMessage(e.data);
+    });
+  }
+
+  _startHeartbeat() {
+    this._stopHeartbeat();
+    this._heartbeatTimer = setInterval(() => {
+      if (this._ws?.readyState === WebSocket.OPEN) {
+        this._ws.send(JSON.stringify({ action: 'ping' }));
+      }
+    }, 25_000);
+  }
+
+  _stopHeartbeat() {
+    if (this._heartbeatTimer) {
+      clearInterval(this._heartbeatTimer);
+      this._heartbeatTimer = null;
+    }
+  }
+
+  _watchTransport(transport, label) {
+    transport.on('connectionstatechange', (state) => {
+      if ((state === 'failed' || state === 'closed') && !this._intentionalClose) {
+        this.onDisconnected?.(`${label}_transport_${state}`);
+      }
     });
   }
 
@@ -400,6 +438,7 @@ class SfuClient {
 
     // mediasoup-client Device.createSendTransport handles ICE/DTLS/SDP internally
     this._sendTransport = this._device.createSendTransport(params);
+    this._watchTransport(this._sendTransport, 'send');
 
     // 'connect' fires once when the first produce() triggers the DTLS handshake
     this._sendTransport.on('connect', ({ dtlsParameters }, callback, errback) => {
@@ -435,6 +474,7 @@ class SfuClient {
     const params = await this._request('createTransport', { direction: 'receive' });
 
     this._recvTransport = this._device.createRecvTransport(params);
+    this._watchTransport(this._recvTransport, 'receive');
 
     this._recvTransport.on('connect', ({ dtlsParameters }, callback, errback) => {
       this._request('connectTransport', {

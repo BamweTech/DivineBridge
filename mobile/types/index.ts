@@ -53,6 +53,8 @@ export interface PrayerRoom {
   host_name: string;
   created_at: number;
   expires_at?: number | string;
+  sfu_region?: 'us' | 'eu' | 'ap' | string;
+  sfu_url?: string;
   participants: Participant[];
   is_active: boolean;
   is_locked: boolean;
