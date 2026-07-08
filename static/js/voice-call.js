@@ -28,8 +28,17 @@
   function showState(name) {
     ['connecting', 'incall', 'ended'].forEach((s) => {
       const el = $(`vc-state-${s}`);
-      if (el) el.hidden = s !== name;
+      if (!el) return;
+      const active = s === name;
+      el.hidden = !active;
+      el.style.display = active ? 'flex' : 'none';
     });
+    // Hide legacy landing panel if a cached older HTML version is still served.
+    const legacy = $('vc-state-landing');
+    if (legacy) {
+      legacy.hidden = true;
+      legacy.style.display = 'none';
+    }
   }
 
   async function apiFetch(path, options = {}) {
@@ -331,6 +340,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     bindControls();
+    showState('connecting');
     initLanding();
   });
 })();
