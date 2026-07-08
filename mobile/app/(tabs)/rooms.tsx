@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, Pressable, RefreshControl, ActivityIndicator, Alert, TextInput, Share } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -232,6 +233,7 @@ export default function RoomsScreen() {
       const href =
         `/voice-call/${result.room_id}?code=${encodeURIComponent(result.room_code)}` +
         `&shareUrl=${encodeURIComponent(result.share_url)}`;
+      setStartingVoiceLink(false);
       router.push(href as Href);
       try {
         await Share.share({
@@ -243,10 +245,15 @@ export default function RoomsScreen() {
       }
     } catch (err: any) {
       Alert.alert('Could not start call', err?.message || 'Please try again.');
-    } finally {
       setStartingVoiceLink(false);
     }
   }
+
+  useFocusEffect(
+    useCallback(() => {
+      setStartingVoiceLink(false);
+    }, []),
+  );
 
   async function handleJoinRoom(roomId: string) {
     router.push(`/room/${roomId}`);

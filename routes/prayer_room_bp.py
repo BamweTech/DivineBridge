@@ -844,8 +844,8 @@ def join_prayer_room(room_id):
             display_name = sanitize_string(data.get('display_name', '')).strip()
             if display_name:
                 user_name = display_name[:30]
-            elif user_name in ('Anonymous', '') or not user_name.strip():
-                return jsonify({'error': 'Display name is required'}), 400
+            elif user_name in ('Anonymous', '') or not str(user_name).strip():
+                user_name = 'Guest'
         
         # Check room privacy and validate room code for private rooms
         room_privacy = room_data.get('room_privacy', 'public')

@@ -89,6 +89,39 @@ class TestAnonymousVoiceLinkAccess:
 
     @patch('routes.prayer_room_bp.get_firestore_client')
     @patch('routes.prayer_room_bp.get_user_from_session')
+    def test_anonymous_voice_link_defaults_guest_name(self, mock_user, mock_db, app):
+        mock_user.return_value = {
+            'user_id': 'anon1',
+            'user_name': 'Anonymous',
+            'is_anonymous': True,
+        }
+
+        room_ref = MagicMock()
+        room_snap = MagicMock()
+        room_snap.exists = True
+        room_snap.to_dict.return_value = {
+            'room_type': 'voice_link',
+            'room_privacy': 'private',
+            'room_code': 'GOODCODE',
+            'host_id': 'host1',
+            'is_active': True,
+            'expires_at': datetime.utcnow() + timedelta(minutes=5),
+            'participants': [{'user_id': 'host1', 'is_active': True, 'role': 'speaker'}],
+            'max_speakers': 2,
+        }
+        room_ref.get.return_value = room_snap
+        mock_db.return_value.collection.return_value.document.return_value = room_ref
+
+        with app.test_request_context(json={'room_code': 'GOODCODE'}):
+            result = pr.join_prayer_room('ROOM01')
+            status = result[1] if isinstance(result, tuple) else result.status_code
+            assert status == 200
+        update_args = room_ref.update.call_args[0][0]
+        guest = update_args['participants'][-1]
+        assert guest['user_name'] == 'Guest'
+
+    @patch('routes.prayer_room_bp.get_firestore_client')
+    @patch('routes.prayer_room_bp.get_user_from_session')
     def test_anonymous_rejected_with_invalid_voice_link_code(self, mock_user, mock_db, app):
         mock_user.return_value = {
             'user_id': 'anon1',

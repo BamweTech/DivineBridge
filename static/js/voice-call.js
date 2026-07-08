@@ -23,23 +23,13 @@
 
   const $ = (id) => document.getElementById(id);
 
+  const GUEST_DISPLAY_NAME = 'Guest';
+
   function showState(name) {
-    ['landing', 'connecting', 'incall', 'ended'].forEach((s) => {
+    ['connecting', 'incall', 'ended'].forEach((s) => {
       const el = $(`vc-state-${s}`);
       if (el) el.hidden = s !== name;
     });
-  }
-
-  function setLandingError(msg) {
-    const el = $('vc-landing-error');
-    if (!el) return;
-    if (msg) {
-      el.textContent = msg;
-      el.hidden = false;
-    } else {
-      el.hidden = true;
-      el.textContent = '';
-    }
   }
 
   async function apiFetch(path, options = {}) {
@@ -229,24 +219,18 @@
     await sfuClient.start({ videoEnabled: false });
   }
 
-  async function joinCall() {
-    const nameInput = $('vc-name');
-    const displayName = (nameInput && nameInput.value || '').trim();
-    if (!displayName) {
-      setLandingError('Please enter your name.');
-      return;
-    }
+  async function autoJoin() {
     if (!roomCode) {
-      setLandingError('Invalid call link (missing code).');
+      showState('ended');
+      $('vc-ended-reason').textContent = 'Invalid call link (missing code).';
       return;
     }
 
-    setLandingError('');
     showState('connecting');
 
     try {
       await initFirebase();
-      await connectSfu(displayName.slice(0, 30));
+      await connectSfu(GUEST_DISPLAY_NAME);
       inCall = true;
       showState('incall');
       $('vc-status-text').textContent = 'In call';
@@ -255,8 +239,8 @@
       startCountdown();
     } catch (err) {
       console.error('[voice-call]', err);
-      showState('landing');
-      setLandingError(err.message || 'Could not join the call.');
+      showState('ended');
+      $('vc-ended-reason').textContent = err.message || 'Could not join the call.';
     }
   }
 
@@ -300,7 +284,6 @@
   }
 
   function bindControls() {
-    $('vc-join-btn')?.addEventListener('click', () => void joinCall());
     $('vc-mute-btn')?.addEventListener('click', async () => {
       if (!sfuClient) return;
       isMuted = !isMuted;
@@ -343,7 +326,7 @@
       $('vc-ended-reason').textContent = 'This call is full (2 participants max).';
       return;
     }
-    showState('landing');
+    void autoJoin();
   }
 
   document.addEventListener('DOMContentLoaded', () => {

@@ -7,7 +7,7 @@ import {
   Alert,
   Share,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useVoiceLink } from '@/hooks/useVoiceLink';
@@ -35,6 +35,7 @@ export default function VoiceCallScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const joinAttempted = useRef(false);
+  const wasInCall = useRef(false);
 
   const {
     room,
@@ -55,6 +56,18 @@ export default function VoiceCallScreen() {
     joinAttempted.current = true;
     join().catch(() => null);
   }, [roomId, roomCode, join]);
+
+  useEffect(() => {
+    if (isJoined) wasInCall.current = true;
+  }, [isJoined]);
+
+  useEffect(() => {
+    if (!room || room.is_active !== false || !wasInCall.current) return;
+    const timer = setTimeout(() => {
+      router.replace('/(tabs)/rooms' as Href);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [room?.is_active, room, router]);
 
   async function handleShare() {
     const url = linkUrl || (room?.room_code
@@ -81,7 +94,7 @@ export default function VoiceCallScreen() {
           text: 'End call',
           style: 'destructive',
           onPress: () => {
-            void endCall('user').then(() => router.back());
+            void endCall('user').then(() => router.replace('/(tabs)/rooms' as Href));
           },
         },
       ],

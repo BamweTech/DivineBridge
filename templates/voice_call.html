@@ -30,20 +30,12 @@
             <span id="vc-timer" class="vc-timer" hidden></span>
         </header>
 
-        <section id="vc-state-landing" class="vc-panel">
-            <h1 class="vc-title">Join voice call</h1>
-            <p id="vc-subtitle" class="vc-subtitle">
-                {% if host_name %}{{ host_name }} invited you to a private call.{% else %}Enter your name to join.{% endif %}
-            </p>
-            <label class="vc-label" for="vc-name">Your name</label>
-            <input id="vc-name" class="vc-input" type="text" maxlength="30" placeholder="Your name" autocomplete="name">
-            <p id="vc-landing-error" class="vc-error" hidden></p>
-            <button id="vc-join-btn" type="button" class="vc-btn vc-btn-primary">Join call</button>
-        </section>
-
-        <section id="vc-state-connecting" class="vc-panel" hidden>
+        <section id="vc-state-connecting" class="vc-panel">
             <div class="vc-spinner"></div>
             <p class="vc-status">Connecting…</p>
+            <p id="vc-subtitle" class="vc-subtitle">
+                {% if host_name %}{{ host_name }} invited you to a private call.{% else %}Joining voice call…{% endif %}
+            </p>
         </section>
 
         <section id="vc-state-incall" class="vc-panel" hidden>
