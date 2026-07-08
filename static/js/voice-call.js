@@ -16,8 +16,10 @@
   let isMuted = false;
   let speakerOn = true;
   let localUserId = null;
-  let expiresAtMs = cfg.expiresAt ? Date.parse(cfg.expiresAt) : null;
+  let expiresAtMs = null;
   let ending = false;
+  let inCall = false;
+  let tornDown = false;
 
   const $ = (id) => document.getElementById(id);
 
@@ -92,8 +94,42 @@
     });
   }
 
+  function setExpiresFromJoin(joinResult) {
+    if (joinResult == null) return;
+    if (typeof joinResult.seconds_remaining === 'number' && joinResult.seconds_remaining > 0) {
+      expiresAtMs = Date.now() + joinResult.seconds_remaining * 1000;
+      return;
+    }
+    if (joinResult.expires_at) {
+      const parsed = Date.parse(joinResult.expires_at);
+      if (Number.isFinite(parsed) && parsed > Date.now()) {
+        expiresAtMs = parsed;
+      }
+    }
+  }
+
+  function updatePeerLabel(data) {
+    const count = (data.participants || []).filter((p) => p.is_active !== false).length;
+    const peerLabel = $('vc-peer-label');
+    if (peerLabel) {
+      peerLabel.textContent = count > 1 ? `Connected with ${hostName}` : 'Waiting for the other person…';
+    }
+  }
+
+  async function confirmRoomEnded() {
+    try {
+      const res = await fetch(`/api/prayer-room/room/${roomId}`);
+      if (!res.ok) return false;
+      const data = await res.json().catch(() => ({}));
+      const room = data.room || data;
+      return room.is_active === false;
+    } catch {
+      return false;
+    }
+  }
+
   function startCountdown() {
-    if (!expiresAtMs) return;
+    if (!expiresAtMs || !Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) return;
     const timerEl = $('vc-timer');
     if (timerEl) timerEl.hidden = false;
 
@@ -118,18 +154,30 @@
 
   function watchRoom() {
     if (!db || !roomId) return;
-    roomUnsub = db.collection('prayer_rooms').doc(roomId).onSnapshot((snap) => {
-      if (!snap.exists) return;
-      const data = snap.data() || {};
-      if (data.is_active === false && !ending) {
-        void teardown(`Call ended${data.ended_reason === 'timeout' ? ' (time limit)' : ''}`);
-      }
-      const count = (data.participants || []).filter((p) => p.is_active !== false).length;
-      const peerLabel = $('vc-peer-label');
-      if (peerLabel) {
-        peerLabel.textContent = count > 1 ? `Connected with ${hostName}` : 'Waiting for the other person…';
-      }
-    });
+    roomUnsub = db.collection('prayer_rooms').doc(roomId).onSnapshot(
+      { includeMetadataChanges: true },
+      (snap) => {
+        if (!snap.exists) return;
+        const data = snap.data() || {};
+        updatePeerLabel(data);
+
+        // Ignore cached/offline snapshots for end detection — stale cache caused false "call ended" UI.
+        if (snap.metadata && snap.metadata.fromCache) return;
+        if (!inCall || data.is_active !== false || ending) return;
+
+        void (async () => {
+          const confirmed = await confirmRoomEnded();
+          if (!confirmed || ending) return;
+          const msg = data.ended_reason === 'timeout'
+            ? 'This call reached the 10-minute limit.'
+            : 'The other person ended the call.';
+          await teardown(msg);
+        })();
+      },
+      (err) => {
+        console.warn('[voice-call] room listener error', err);
+      },
+    );
   }
 
   async function initFirebase() {
@@ -156,9 +204,7 @@
       body: JSON.stringify({ room_code: roomCode, display_name: displayName }),
     });
 
-    if (joinResult.expires_at) {
-      expiresAtMs = Date.parse(joinResult.expires_at);
-    }
+    setExpiresFromJoin(joinResult);
 
     const tokenResp = await apiFetch(`/api/prayer-room/sfu-token/${roomId}`, { method: 'POST' });
     let sfuUrl = tokenResp.sfuUrl || 'wss://sfu.divinebridge.io/ws';
@@ -201,6 +247,7 @@
     try {
       await initFirebase();
       await connectSfu(displayName.slice(0, 30));
+      inCall = true;
       showState('incall');
       $('vc-status-text').textContent = 'In call';
       $('vc-peer-label').textContent = 'Connecting audio…';
@@ -221,14 +268,21 @@
         method: 'POST',
         body: JSON.stringify({ ended_reason: reason || 'user' }),
       });
+      await teardown(reason === 'timeout' ? 'This call reached the 10-minute limit.' : 'You left the call.');
     } catch (e) {
       console.warn('[voice-call] end failed', e);
+      ending = false;
+      inCall = true;
+      $('vc-status-text').textContent = 'In call';
+      showState('incall');
     }
-    await teardown(reason === 'timeout' ? 'This call reached the 10-minute limit.' : 'You left the call.');
   }
 
   async function teardown(message) {
+    if (tornDown) return;
+    tornDown = true;
     ending = true;
+    inCall = false;
     if (countdownTimer) clearInterval(countdownTimer);
     if (expiryTimer) clearTimeout(expiryTimer);
     if (roomUnsub) roomUnsub();

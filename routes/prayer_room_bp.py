@@ -942,9 +942,12 @@ def join_prayer_room(room_id):
         if _is_voice_link_room(room_data):
             response['room_type'] = 'voice_link'
             response['host_name'] = room_data.get('host_name')
-            expires_at = room_data.get('expires_at')
+            expires_at = _normalize_utc_datetime(room_data.get('expires_at'))
             if expires_at:
                 response['expires_at'] = _format_expires_at_iso(expires_at)
+                response['seconds_remaining'] = max(
+                    0, int((expires_at - datetime.utcnow()).total_seconds())
+                )
         return jsonify(response)
         
     except Exception as e:
