@@ -111,6 +111,7 @@ export function useVoiceLink(roomId: string, roomCode?: string) {
       if (wasMuted) {
         engine.setAudioEnabled(false);
       }
+      await setLiveRoomAudioRoute(audioOutputRouteRef.current);
       console.log('[voice-link] reconnected to SFU:', connectedSfuUrlRef.current);
     } catch (err) {
       console.error('[voice-link] SFU reconnect failed:', err);
@@ -204,7 +205,9 @@ export function useVoiceLink(roomId: string, roomCode?: string) {
   const guestPeer = Array.from(peers.values()).find((p) => p.userId !== user?.uid);
   const guestUserId = guestPeer?.userId ?? guestParticipant?.user_id;
   const guestName = guestPeer?.userName ?? guestParticipant?.user_name ?? 'Guest';
-  const isGuestInMedia = Boolean(guestPeer);
+  const isGuestInMedia = Boolean(
+    guestPeer?.stream?.getAudioTracks?.()?.length,
+  );
   const isGuestDisconnected = Boolean(
     guestWasInMediaRef.current && hasGuestInRoom && !isGuestInMedia,
   );

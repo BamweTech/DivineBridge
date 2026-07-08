@@ -11,6 +11,7 @@ import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useVoiceLink } from '@/hooks/useVoiceLink';
+import { RTCView } from '@/lib/sfu';
 import { THEME_COLORS } from '@/lib/constants';
 import { iosFontStyle } from '@/lib/typography';
 import Icon from '@/components/ui/Icon';
@@ -42,6 +43,7 @@ export default function VoiceCallScreen() {
 
   const {
     room,
+    peers,
     isMuted,
     isJoined,
     joinError,
@@ -119,6 +121,17 @@ export default function VoiceCallScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24 }}>
+      {/* Hidden RTCViews — react-native-webrtc requires a mounted RTCView for remote audio playback */}
+      {Array.from(peers.values()).map((peer) => (
+        peer.stream && !peer.isVideoEnabled ? (
+          <RTCView
+            key={`audio-${peer.userId}-r${peer.revision}`}
+            streamURL={peer.stream.toURL()}
+            style={{ width: 0, height: 0, opacity: 0, position: 'absolute' }}
+          />
+        ) : null
+      ))}
+
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 24 }}>
         <Pressable onPress={() => router.back()} hitSlop={12}>
           <Icon name="back" size={22} color={THEME_COLORS.text2} />

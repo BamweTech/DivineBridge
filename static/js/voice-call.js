@@ -80,8 +80,10 @@
       }
       if (audioEl.srcObject !== stream) {
         audioEl.srcObject = stream;
-        audioEl.play().catch(() => {});
       }
+      audioEl.muted = false;
+      audioEl.volume = 1;
+      audioEl.play().catch(() => {});
       if (typeof audioEl.setSinkId === 'function' && speakerOn) {
         audioEl.setSinkId('').catch(() => {});
       }
@@ -147,7 +149,7 @@
     if (!sfuClient || !sfuClient.peers) return;
     let hostPresent = false;
     sfuClient.peers.forEach((peer, peerId) => {
-      if (peerId !== localUserId && peer.stream) hostPresent = true;
+      if (peerId !== localUserId && peer.stream?.getAudioTracks?.()?.length) hostPresent = true;
     });
     const peerLabel = $('vc-peer-label');
     if (peerLabel && inCall) {
@@ -418,6 +420,7 @@
       $('vc-mute-btn')?.classList.toggle('active', isMuted);
       const label = $('vc-mute-btn')?.querySelector('.vc-control-label');
       if (label) label.textContent = isMuted ? 'Unmute' : 'Mute';
+      updateRemoteAudio(sfuClient.peers);
       apiFetch(`/api/prayer-room/${roomId}/self-mute`, {
         method: 'POST',
         body: JSON.stringify({ muted: isMuted }),
@@ -428,6 +431,7 @@
       $('vc-speaker-btn')?.classList.toggle('active', speakerOn);
       const label = $('vc-speaker-btn')?.querySelector('.vc-control-label');
       if (label) label.textContent = speakerOn ? 'Speaker' : 'Earpiece';
+      if (sfuClient) updateRemoteAudio(sfuClient.peers);
     });
     $('vc-end-btn')?.addEventListener('click', () => void endCall('user'));
     $('vc-rejoin-btn')?.addEventListener('click', () => void rejoinCall());
