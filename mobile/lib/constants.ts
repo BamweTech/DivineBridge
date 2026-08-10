@@ -18,6 +18,7 @@ export const COLLECTIONS = {
   SCHEDULED_ROOM_RSVPS: 'scheduled_room_rsvps',
   CHAT_MESSAGES: 'chat_messages',
   PRAYER_REQUESTS: 'prayer_requests',
+  PRIVATE_PRAYER_REQUESTS: 'private_prayer_requests',
   TESTIMONIES: 'testimonies',
   PRAYER_GROUPS: 'prayer_groups',
   GROUP_MEMBERS: 'group_members',

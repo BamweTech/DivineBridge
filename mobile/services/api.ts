@@ -1,5 +1,6 @@
 import { auth } from '@/lib/firebase';
 import { API_BASE_URL } from '@/lib/constants';
+import type { PrayerAvailabilityWindow, PrivatePrayerRequest } from '@/types';
 
 function localClientDateYmd(): string {
   const d = new Date();
@@ -339,6 +340,35 @@ export const prayerRequestApi = {
     }),
   pray: (requestId: string) =>
     request<any>(`/api/prayer/request/${requestId}/pray`, { method: 'POST' }),
+};
+
+// ─── Private Prayer Matching ──────────────────────────────────────────────────
+
+export const privatePrayerRequestApi = {
+  list: () =>
+    request<{ success: boolean; data: PrivatePrayerRequest[]; is_prayer_leader: boolean }>(
+      '/api/prayer/private-requests'
+    ),
+  submit: (body: {
+    description: string;
+    preferred_language: string;
+    wants_live_call: boolean;
+    availability: PrayerAvailabilityWindow[];
+  }) =>
+    request<{ success: boolean; data: PrivatePrayerRequest }>('/api/prayer/private-request', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  claim: (requestId: string, slotStart?: string) =>
+    request<{ success: boolean; data: PrivatePrayerRequest }>(
+      `/api/prayer/private-request/${requestId}/claim`,
+      { method: 'POST', body: JSON.stringify({ slot_start: slotStart }) }
+    ),
+  openCall: (requestId: string) =>
+    request<{ success: boolean; data: { room_id: string; room_code: string; duration_minutes: number } }>(
+      `/api/prayer/private-request/${requestId}/call`,
+      { method: 'POST' }
+    ),
 };
 
 // ─── Profile (business card fields; same contract as web profile) ────────────

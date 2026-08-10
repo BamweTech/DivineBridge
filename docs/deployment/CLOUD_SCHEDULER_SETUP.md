@@ -67,6 +67,17 @@ gcloud scheduler jobs create http verse-context-warmer \
     --headers="Content-Type=application/json" \
     --oidc-service-account-email=prayer-scheduler@divinebridge.iam.gserviceaccount.com \
     --oidc-token-audience="https://divinebridge-<your-hash>-uc.a.run.app"
+
+# Private prayer matching lifecycle and call reminders (every 5 minutes)
+# Expires unclaimed requests after 48 hours and sends the one-hour/call-ready push.
+gcloud scheduler jobs create http private-prayer-request-maintenance \
+    --location=us-central1 \
+    --schedule="*/5 * * * *" \
+    --time-zone="UTC" \
+    --uri="https://divinebridge-<your-hash>-uc.a.run.app/api/prayer/private-request/maintenance" \
+    --http-method=POST \
+    --oidc-service-account-email=prayer-scheduler@divinebridge.iam.gserviceaccount.com \
+    --oidc-token-audience="https://divinebridge-<your-hash>-uc.a.run.app"
 ```
 
 **Note:** Replace `<your-hash>` with your actual Cloud Run service URL.

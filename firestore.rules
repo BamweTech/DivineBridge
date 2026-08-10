@@ -10,13 +10,24 @@ service cloud.firestore {
 
     // Users collection - users can only access their own data
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId;
+      // Leaders are provisioned by trusted server/admin tooling, never by a
+      // profile edit from the mobile client.
+      allow create: if request.auth != null && request.auth.uid == userId &&
+                    !request.resource.data.keys().hasAny(['is_prayer_leader', 'prayer_languages']);
+      allow update: if request.auth != null && request.auth.uid == userId &&
+                    !request.resource.data.diff(resource.data).affectedKeys()
+                      .hasAny(['is_prayer_leader', 'prayer_languages']);
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
     
     // Prayer rooms collection - enhanced security with room membership validation
     match /prayer_rooms/{roomId} {
-      // Allow read for authenticated users
-      allow read: if request.auth != null;
+      // Matched prayer calls are private to the two server-selected people.
+      // All other room behavior remains unchanged.
+      allow read: if request.auth != null &&
+                  (resource.data.room_type != 'matched_prayer_call' ||
+                   request.auth.uid in resource.data.participant_ids);
       
       // Allow create only for authenticated users with proper data structure
       allow create: if request.auth != null && 
@@ -232,6 +243,13 @@ service cloud.firestore {
                   request.resource.data.request is string &&
                   request.resource.data.request.size() <= 1000 &&
                   request.resource.data.status in ['pending', 'fulfilled', 'closed'];
+    }
+
+    // Private matching requests are read and written only by authenticated Flask
+    // endpoints. This prevents direct clients from viewing request descriptions,
+    // assigning themselves as leaders, or racing the transactional claim.
+    match /private_prayer_requests/{requestId} {
+      allow read, write: if false;
     }
     
     // User interactions - users can only access their own data

@@ -50,7 +50,7 @@ def _generate_room_code(length=8):
 
 
 def _is_voice_link_room(room_data):
-    return bool(room_data) and room_data.get('room_type') == 'voice_link'
+    return bool(room_data) and room_data.get('room_type') in {'voice_link', 'matched_prayer_call'}
 
 
 def _normalize_utc_datetime(value):
@@ -139,7 +139,8 @@ def _voice_link_timer_start_if_needed(room_data, participants, now=None):
     if _active_participant_count(participants) < VOICE_LINK_MAX_PARTICIPANTS:
         return None, {}
     now = now or datetime.utcnow()
-    expires_at = now + timedelta(minutes=VOICE_LINK_TTL_MINUTES)
+    duration_minutes = room_data.get('call_duration_minutes', VOICE_LINK_TTL_MINUTES)
+    expires_at = now + timedelta(minutes=duration_minutes)
     return expires_at, {'expires_at': expires_at, 'call_started_at': now}
 
 
@@ -151,7 +152,7 @@ def _expire_stale_voice_links(db, now=None):
         rooms = db.collection('prayer_rooms').where('is_active', '==', True).stream()
         for doc in rooms:
             data = doc.to_dict() or {}
-            if data.get('room_type') != 'voice_link':
+            if not _is_voice_link_room(data):
                 continue
             expires_at = _normalize_utc_datetime(data.get('expires_at'))
             should_expire = False
@@ -927,6 +928,9 @@ def join_prayer_room(room_id):
         if _is_voice_link_room(room_data):
             if _is_voice_link_expired(room_data):
                 return jsonify({'error': 'This call has expired'}), 400
+            if room_data.get('room_type') == 'matched_prayer_call':
+                if user_id not in room_data.get('participant_ids', []):
+                    return jsonify({'error': 'You are not part of this private prayer call'}), 403
             if not _voice_link_code_matches(room_data, data.get('room_code')):
                 return jsonify({'error': 'Invalid call link'}), 403
             display_name = sanitize_string(data.get('display_name', '')).strip()
@@ -1048,7 +1052,7 @@ def join_prayer_room(room_id):
             'max_speakers': max_speakers,
         }
         if _is_voice_link_room(room_data):
-            response['room_type'] = 'voice_link'
+            response['room_type'] = room_data.get('room_type')
             response['host_name'] = room_data.get('host_name')
             response['sfu_region'] = effective_room.get('sfu_region')
             response['sfu_url'] = get_sfu_url_for_room(effective_room)
@@ -1802,7 +1806,7 @@ def get_active_rooms():
         rooms = []
         for doc in rooms_query.stream():
             room_data = doc.to_dict()
-            if room_data.get('room_type') == 'voice_link':
+            if _is_voice_link_room(room_data):
                 continue
             # Convert datetime objects to strings for JSON serialization
             if 'created_at' in room_data:
@@ -1842,6 +1846,17 @@ def get_room_details(room_id):
             return jsonify({'error': 'Room not found'}), 404
         
         room_data = room_doc.to_dict()
+        if room_data.get('room_type') == 'matched_prayer_call':
+            user = get_user_from_session()
+            if not user:
+                return jsonify({'error': 'Authentication required'}), 401
+            if user['user_id'] not in room_data.get('participant_ids', []):
+                return jsonify({'error': 'You are not part of this private prayer call'}), 403
+            # Credentials and internal request linkage are returned only through
+            # the authenticated private-prayer call endpoint.
+            room_data.pop('room_code', None)
+            room_data.pop('private_prayer_request_id', None)
+            room_data.pop('participant_ids', None)
         
         # Convert datetime objects to strings
         if 'created_at' in room_data:

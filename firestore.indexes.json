@@ -37,6 +37,20 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
+          "fieldPath": "is_active",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "room_type",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "prayer_rooms",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
           "fieldPath": "group_id",
           "order": "ASCENDING"
         },

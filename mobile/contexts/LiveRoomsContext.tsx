@@ -19,6 +19,8 @@ export function LiveRoomsProvider({ children }: { children: React.ReactNode }) {
     const q = query(
       collection(db, COLLECTIONS.PRAYER_ROOMS),
       where('is_active', '==', true),
+      // Keep participant-scoped private prayer calls out of this public feed.
+      where('room_type', '!=', 'matched_prayer_call'),
     );
     const unsub = onSnapshot(
       q,
@@ -28,7 +30,7 @@ export function LiveRoomsProvider({ children }: { children: React.ReactNode }) {
             ...d.data(),
             room_id: d.id,
           }) as PrayerRoom)
-          .filter((r) => r.room_type !== 'voice_link');
+          .filter((r) => r.room_type !== 'voice_link' && r.room_type !== 'matched_prayer_call');
         data.sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
         setRooms(data);
         setIsLoading(false);

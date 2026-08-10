@@ -193,12 +193,14 @@ Authoritative security rules: [firestore.rules](../firestore.rules). Below is a 
 | Live rooms | `prayer_rooms`, `scheduled_rooms`, `scheduled_room_rsvps` | Room metadata, scheduling, RSVPs |
 | Chat | `chat_messages`, `group_chat_messages/{id}/messages` | Room chat and group chat ([routes/prayer_room_bp.py](../routes/prayer_room_bp.py), [mobile/hooks/useGroups.ts](../mobile/hooks/useGroups.ts)) |
 | Community | `prayer_groups`, `group_members` | Small groups ([routes/groups_bp.py](../routes/groups_bp.py)) |
-| Content | `prayer_requests`, `testimonies` | Prayer wall and thanksgiving wall |
+| Content | `prayer_requests`, `private_prayer_requests`, `testimonies` | Public Prayer Wall (GCS-backed in production), private leader-matched prayer requests, and thanksgiving wall |
 | Devotionals | `devotional_plans` | Personalized plans ([routes/devotional_bp.py](../routes/devotional_bp.py)) |
 | Devotional templates | `devotional_templates` | Pre-generated plans for the 8 suggested themes × 3 durations (7/14/30 days). Backend-only (no client access). Keyed by `{theme-slug}_{duration}` (e.g. `faith-trust_7`). Refreshed monthly via `/admin/api/refresh-devotional-templates` or `scripts/pregen_devotional_templates.py`. |
 | Verse devotional context | `verse_contexts` | AI-generated short "sermon" for each daily verse (summary, context / meaning / application paragraphs, 2–4 Hebrew or Greek words with transliteration + gloss, 3 verse-specific reflection questions). Keyed by verse slug derived from the reference (e.g. `1-john-4-11`), **not** by date, because the underlying verse rotation in `static/bible_verses.json` repeats yearly — generate once per unique verse, reuse forever. Public read; writes go through `verse_context_generator.py` from `routes/verse_bp.py` (`/api/today-verse/context`) or `scripts/pregen_verse_contexts.py`. Backfill all verses once, then a nightly Cloud Scheduler call to `POST /api/today-verse/context/generate` pre-warms the next 7 days. |
 
 **Firebase Realtime Database** is used for **low-latency** live-room concerns on the web client (and related mobile hooks) — paths are managed in client code (e.g. [static/js/prayer-room.js](../static/js/prayer-room.js)).
+
+**Private prayer matching:** `private_prayer_requests` is server-only in Firestore. Trusted server/admin tooling grants a leader `is_prayer_leader: true` and `prayer_languages: string[]`; mobile profile writes cannot modify either field. Requests expire after 48 hours and the first eligible leader claims through a Firestore transaction.
 
 **Object storage:** User-generated and generated assets (e.g. images) via [storage_handler.py](../storage_handler.py) to **Google Cloud Storage**.
 
@@ -225,6 +227,7 @@ User journeys and screenshots-level detail: **[USER_FEATURES_DOCUMENTATION.md](U
 | Verse devotional context (AI sermon, original-language insights, reflection questions) | [verse_context_generator.py](../verse_context_generator.py), [config/verse_context_prompt.txt](../config/verse_context_prompt.txt), [routes/verse_bp.py](../routes/verse_bp.py) (`/api/today-verse/context`), [scripts/pregen_verse_contexts.py](../scripts/pregen_verse_contexts.py), [mobile/app/verse-reader.tsx](../mobile/app/verse-reader.tsx) |
 | Disaster / SEO pages | [routes/seo_bp.py](../routes/seo_bp.py), [disaster_prayer_service.py](../disaster_prayer_service.py) |
 | Prayer requests | [routes/prayer_bp.py](../routes/prayer_bp.py), [content_moderator.py](../content_moderator.py) |
+| Private prayer matching | [private_prayer_request_service.py](../private_prayer_request_service.py), [routes/prayer_bp.py](../routes/prayer_bp.py), [mobile/app/prayer-requests.tsx](../mobile/app/prayer-requests.tsx) |
 | Testimonies | [routes/testimony_bp.py](../routes/testimony_bp.py) |
 | Live prayer room (web) | [static/js/prayer-room.js](../static/js/prayer-room.js), [static/js/sfu-client.js](../static/js/sfu-client.js) |
 | Live room (mobile) | [mobile/app/room/[id].tsx](../mobile/app/room/[id].tsx), [mobile/lib/sfu.ts](../mobile/lib/sfu.ts), [mobile/hooks/usePrayerRoom.ts](../mobile/hooks/usePrayerRoom.ts) |

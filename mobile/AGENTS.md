@@ -13,6 +13,7 @@ File-based routing under `app/`:
 - `app/voice-call/[id].tsx` — 1:1 voice link call (share web URL; mute/speaker/end).
 - `app/group/[id].tsx` — Group detail (dynamic route).
 - `app/activity.tsx` — Activity feed.
+- `app/prayer-requests.tsx` — Private prayer matching: requester submission/status and approved leader inbox.
 
 To add a new screen, create a file in `app/` and register in the nearest `_layout.tsx` if custom options are needed.
 

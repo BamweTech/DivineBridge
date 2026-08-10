@@ -58,6 +58,7 @@ function normalizeProfile(uid: string, data: Record<string, unknown>): UserProfi
     notifyDailyVerse: Boolean(data.notify_daily_verse),
     notifyDevotional: Boolean(data.notify_devotional),
     sessionRemindersEnabled: Boolean(data.session_reminders_enabled),
+    preferredPrayerLanguage: data.preferred_prayer_language as string | undefined,
     createdAt: createdNum,
     groups: (data.groups as string[] | undefined) ?? [],
   };

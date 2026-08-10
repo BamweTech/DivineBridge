@@ -1,13 +1,21 @@
-from flask import Blueprint, request, jsonify, current_app, send_file
+from flask import Blueprint, request, jsonify, current_app, send_file, g
 from datetime import datetime, timedelta
 import logging
 import os
 from extensions import limiter
 from input_validation import validate_request, sanitize_string
 from auth_decorators import verify_cloud_scheduler
-from auth_helpers import get_user_from_session
+from auth_helpers import get_user_from_session, require_auth
 from firebase_auth import get_firestore_client
 from qa_wall_filters import is_hidden_production_test_wall_item
+from private_prayer_request_service import (
+    claim_request,
+    create_request,
+    expire_requests,
+    list_for_user,
+    open_scheduled_call,
+    send_due_call_reminders,
+)
 
 logger = logging.getLogger(__name__)
 prayer_bp = Blueprint('prayer', __name__)
@@ -286,6 +294,111 @@ def submit_prayer_request():
     except Exception as e:
         logger.error(f"Error submitting prayer request: {e}")
         return jsonify({'error': 'Failed to submit prayer request'}), 500
+
+
+@prayer_bp.route('/private-request', methods=['POST'])
+@limiter.limit("5 per hour")
+@require_auth
+def submit_private_prayer_request():
+    """Create a private, leader-matched request. Public Prayer Wall records are not used."""
+    try:
+        data = request.get_json(silent=True) or {}
+        description = sanitize_string(data.get('description'), max_length=500)
+        if len(description) < 10:
+            return jsonify({'success': False, 'error': 'Describe your request in 10 to 500 characters'}), 400
+        from content_moderator import get_content_moderator
+
+        approved, reason, _ = get_content_moderator().moderate_content(
+            'Private prayer request', description, 'private prayer request'
+        )
+        if not approved:
+            return jsonify({'success': False, 'error': 'Content not approved', 'reason': reason}), 400
+        result = create_request(
+            get_firestore_client(),
+            g.user,
+            description,
+            data.get('preferred_language'),
+            bool(data.get('wants_live_call')),
+            data.get('availability', []),
+        )
+        return jsonify({'success': True, 'data': result}), 201
+    except ValueError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 400
+    except PermissionError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 403
+    except Exception:
+        logger.error('Failed to create private prayer request', exc_info=True)
+        return jsonify({'success': False, 'error': 'Failed to submit prayer request'}), 500
+
+
+@prayer_bp.route('/private-requests', methods=['GET'])
+@require_auth
+def get_private_prayer_requests():
+    """Return a requester's own requests plus compatible requests for approved leaders."""
+    try:
+        db = get_firestore_client()
+        requests, is_leader = list_for_user(db, g.user_id)
+        return jsonify({'success': True, 'data': requests, 'is_prayer_leader': is_leader}), 200
+    except Exception:
+        logger.error('Failed to list private prayer requests', exc_info=True)
+        return jsonify({'success': False, 'error': 'Failed to load prayer requests'}), 500
+
+
+@prayer_bp.route('/private-request/<request_id>/claim', methods=['POST'])
+@require_auth
+def claim_private_prayer_request(request_id):
+    """Atomically assign the request to the first eligible leader."""
+    try:
+        data = request.get_json(silent=True) or {}
+        result = claim_request(get_firestore_client(), request_id, g.user, data.get('slot_start'))
+        return jsonify({'success': True, 'data': result}), 200
+    except LookupError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 404
+    except PermissionError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 403
+    except (ValueError, RuntimeError) as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 400
+    except Exception:
+        logger.error('Failed to claim private prayer request', exc_info=True)
+        return jsonify({'success': False, 'error': 'Failed to claim prayer request'}), 500
+
+
+@prayer_bp.route('/private-request/<request_id>/call', methods=['POST'])
+@require_auth
+def open_private_prayer_call(request_id):
+    """Return the private call credentials shortly before the scheduled time."""
+    try:
+        if g.user.get('is_anonymous'):
+            return jsonify({'success': False, 'error': 'Sign in is required to join private prayer'}), 403
+        result = open_scheduled_call(get_firestore_client(), request_id, g.user_id)
+        return jsonify({'success': True, 'data': result}), 200
+    except LookupError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 404
+    except PermissionError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 403
+    except RuntimeError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 400
+    except Exception:
+        logger.error('Failed to open private prayer call', exc_info=True)
+        return jsonify({'success': False, 'error': 'Failed to open prayer call'}), 500
+
+
+@prayer_bp.route('/private-request/maintenance', methods=['POST'])
+@verify_cloud_scheduler()
+def maintain_private_prayer_requests():
+    """Expire unclaimed requests and deliver scheduled-call reminders."""
+    try:
+        db = get_firestore_client()
+        return jsonify({
+            'success': True,
+            'data': {
+                'expired_requests': expire_requests(db),
+                'reminders_sent': send_due_call_reminders(db),
+            },
+        }), 200
+    except Exception:
+        logger.error('Private prayer request maintenance failed', exc_info=True)
+        return jsonify({'success': False, 'error': 'Maintenance failed'}), 500
 
 @prayer_bp.route('/request/<request_id>', methods=['DELETE'])
 def delete_prayer_request(request_id):

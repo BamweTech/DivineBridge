@@ -27,14 +27,16 @@ function formatCountdown(seconds: number | null, waiting: boolean): string {
 }
 
 export default function VoiceCallScreen() {
-  const { id, code, shareUrl } = useLocalSearchParams<{
+  const { id, code, shareUrl, matchedPrayerCall } = useLocalSearchParams<{
     id: string;
     code?: string;
     shareUrl?: string;
+    matchedPrayerCall?: string;
   }>();
   const roomId = Array.isArray(id) ? id[0] : id;
   const roomCode = Array.isArray(code) ? code[0] : code;
   const linkUrl = Array.isArray(shareUrl) ? shareUrl[0] : shareUrl;
+  const isMatchedPrayerCall = matchedPrayerCall === '1';
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -219,10 +221,10 @@ export default function VoiceCallScreen() {
               {isConnected
                 ? 'You are in a private 1:1 voice call.'
                 : isGuestDisconnected
-                  ? 'The guest lost their connection. Ask them to reopen the call link to rejoin.'
-                  : 'Share the link so they can join from any browser.'}
+                  ? isMatchedPrayerCall ? 'Your prayer partner lost their connection. They can reopen this call from their request.' : 'The guest lost their connection. Ask them to reopen the call link to rejoin.'
+                  : isMatchedPrayerCall ? 'Waiting for your prayer partner to join.' : 'Share the link so they can join from any browser.'}
             </Text>
-            {!isConnected ? (
+            {!isConnected && !isMatchedPrayerCall ? (
               <Pressable
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); void handleShare(); }}
                 style={{

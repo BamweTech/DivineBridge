@@ -324,6 +324,8 @@ function RootLayoutInner() {
       const data = response.notification.request.content.data;
       if ((data?.type === 'group_live' || data?.type === 'group_chat') && data?.groupId) {
         routerRef.current.push(`/group/${data.groupId}` as any);
+      } else if (data?.type === 'private_prayer_request') {
+        routerRef.current.push('/prayer-requests' as any);
       }
     });
     return () => sub.remove();
@@ -408,6 +410,10 @@ function RootLayoutInner() {
             />
             <Stack.Screen
               name="activity"
+              options={{ animation: 'slide_from_right' }}
+            />
+            <Stack.Screen
+              name="prayer-requests"
               options={{ animation: 'slide_from_right' }}
             />
             <Stack.Screen

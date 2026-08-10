@@ -607,7 +607,15 @@ type FeedItem =
   | { kind: 'community'; data: PrayerPost }
   | { kind: 'global'; data: GlobalWatchPost };
 
-function PrayerWallFeed({ currentUserId, onCompose }: { currentUserId?: string; onCompose: () => void }) {
+function PrayerWallFeed({
+  currentUserId,
+  onCompose,
+  onPrivateRequest,
+}: {
+  currentUserId?: string;
+  onCompose: () => void;
+  onPrivateRequest: () => void;
+}) {
   const queryClient = useQueryClient();
 
   const { data: communityData, isLoading: communityLoading, refetch: refetchCommunity, isFetching: communityFetching } = useQuery({
@@ -764,6 +772,17 @@ function PrayerWallFeed({ currentUserId, onCompose }: { currentUserId?: string; 
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <Animated.View entering={FadeIn.duration(400)} style={{ marginBottom: 16 }}>
+              <Pressable
+                onPress={onPrivateRequest}
+                style={{ backgroundColor: THEME_COLORS.sageDim, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(74,124,94,0.24)', padding: 13, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+              >
+                <Icon name="lock" size={15} color={THEME_COLORS.sage} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: THEME_COLORS.sage, ...iosFontStyle('600'), fontSize: 13 }}>Need private prayer?</Text>
+                  <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('400'), fontSize: 11, marginTop: 2 }}>Match with a prayer leader in your language</Text>
+                </View>
+                <Icon name="chevron-r" size={15} color={THEME_COLORS.sage} />
+              </Pressable>
               <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, textAlign: 'center' }}>
                 Community prayers · Global watch
               </Text>
@@ -921,6 +940,7 @@ export default function GroupsScreen() {
         <PrayerWallFeed
           currentUserId={user?.uid}
           onCompose={() => setShowCompose(true)}
+          onPrivateRequest={() => router.push('/prayer-requests' as any)}
         />
       ) : (
         <ScrollView

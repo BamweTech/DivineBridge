@@ -19,10 +19,44 @@ export interface UserProfile {
   notifyDailyVerse?: boolean;
   /** Preference for future session reminder push/in-app (Firestore). */
   sessionRemindersEnabled?: boolean;
+  /** Language saved after the first private prayer-request submission. */
+  preferredPrayerLanguage?: string;
   /** Devotional daily reminder (Firestore + scheduled local notification). */
   notifyDevotional?: boolean;
   createdAt?: number;
   groups?: string[];
+}
+
+// ─── Private Prayer Matching ──────────────────────────────────────────────────
+
+export type PrivatePrayerRequestStatus =
+  | 'active'
+  | 'claimed'
+  | 'scheduled'
+  | 'completed'
+  | 'expired'
+  | 'cancelled';
+
+export interface PrayerAvailabilityWindow {
+  start_at: string;
+  end_at: string;
+}
+
+export interface PrivatePrayerRequest {
+  id: string;
+  status: PrivatePrayerRequestStatus;
+  requester_first_name: string;
+  description: string;
+  preferred_language: string;
+  wants_live_call: boolean;
+  availability: PrayerAvailabilityWindow[];
+  created_at: string;
+  expires_at: string;
+  leader_first_name?: string;
+  scheduled_at?: string;
+  room_id?: string;
+  viewer_role?: 'requester' | 'leader';
+  available_to_lead?: boolean;
 }
 
 // ─── Prayer Rooms ─────────────────────────────────────────────────────────────
