@@ -88,6 +88,16 @@ export default function PrayerRequestsScreen() {
     },
     onError: (error: Error) => Alert.alert('Call not ready', error.message),
   });
+  const cancel = useMutation({
+    mutationFn: privatePrayerRequestApi.cancel,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['private-prayer-requests'] }),
+    onError: (error: Error) => Alert.alert('Could not cancel request', error.message),
+  });
+  const pray = useMutation({
+    mutationFn: privatePrayerRequestApi.pray,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['private-prayer-requests'] }),
+    onError: (error: Error) => Alert.alert('Could not record prayer', error.message),
+  });
 
   function submitRequest() {
     if (description.trim().length < 10) {
@@ -103,6 +113,18 @@ export default function PrayerRequestsScreen() {
 
   const myRequests = requests.filter((item) => item.viewer_role === 'requester');
   const leaderRequests = isLeader ? requests.filter((item) => item.available_to_lead) : [];
+  const assignedRequests = isLeader ? requests.filter((item) => item.viewer_role === 'leader') : [];
+
+  function confirmCancel(requestId: string) {
+    Alert.alert(
+      'Cancel prayer request?',
+      'This will remove the request from the leader inbox and end any scheduled call.',
+      [
+        { text: 'Keep request', style: 'cancel' },
+        { text: 'Cancel request', style: 'destructive', onPress: () => cancel.mutate(requestId) },
+      ],
+    );
+  }
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: THEME_COLORS.bg }} contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 22, paddingBottom: insets.bottom + 36 }}>
@@ -175,6 +197,8 @@ export default function PrayerRequestsScreen() {
           request={item}
           onJoin={() => openCall.mutate(item.id)}
           joining={openCall.isPending}
+          onCancel={() => confirmCancel(item.id)}
+          cancelling={cancel.isPending}
           onResubmit={() => {
             setDescription(item.description);
             setLanguage(item.preferred_language);
@@ -199,19 +223,33 @@ export default function PrayerRequestsScreen() {
               leader
             />
           ))}
+          {assignedRequests.map((item) => (
+            <RequestCard
+              key={item.id}
+              request={item}
+              onJoin={() => openCall.mutate(item.id)}
+              onPray={() => pray.mutate(item.id)}
+              joining={openCall.isPending}
+              praying={pray.isPending}
+            />
+          ))}
         </>
       )}
     </ScrollView>
   );
 }
 
-function RequestCard({ request, onClaim, onJoin, onResubmit, claiming, joining, leader }: {
+function RequestCard({ request, onClaim, onJoin, onResubmit, onCancel, onPray, claiming, joining, cancelling, praying, leader }: {
   request: PrivatePrayerRequest;
   onClaim?: (slotStart?: string) => void;
   onJoin?: () => void;
   onResubmit?: () => void;
+  onCancel?: () => void;
+  onPray?: () => void;
   claiming?: boolean;
   joining?: boolean;
+  cancelling?: boolean;
+  praying?: boolean;
   leader?: boolean;
 }) {
   const firstSlot = request.availability[0]?.start_at;
@@ -222,10 +260,13 @@ function RequestCard({ request, onClaim, onJoin, onResubmit, claiming, joining, 
         <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600'), fontSize: 11, textTransform: 'uppercase' }}>{request.preferred_language}</Text>
       </View>
       <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('400'), fontSize: 13, lineHeight: 20, marginTop: 8 }}>{request.description}</Text>
+      {(request.prayer_count ?? 0) > 0 && <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 8 }}>{request.prayer_count} prayer{request.prayer_count === 1 ? '' : 's'} recorded</Text>}
       {request.scheduled_at && <Text style={{ color: THEME_COLORS.sage, ...iosFontStyle('500'), fontSize: 12, marginTop: 10 }}>Call scheduled · {formatSlot(request.scheduled_at)}</Text>}
       {leader && request.wants_live_call && firstSlot && <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 10 }}>Available: {formatSlot(firstSlot)}</Text>}
       {leader && onClaim && <Button label={claiming ? 'Accepting…' : request.wants_live_call ? 'Accept & schedule call' : 'Accept request'} onPress={() => onClaim(firstSlot)} isLoading={claiming} fullWidth style={{ marginTop: 14 }} />}
       {request.status === 'scheduled' && onJoin && <Button label={joining ? 'Opening…' : 'Join prayer call'} onPress={onJoin} isLoading={joining} fullWidth style={{ marginTop: 14 }} />}
+      {onPray && !['cancelled', 'expired'].includes(request.status) && <Button label={praying ? 'Saving…' : `I prayed for you${request.prayer_count ? ` · ${request.prayer_count}` : ''}`} onPress={onPray} isLoading={praying} variant="secondary" fullWidth style={{ marginTop: 10 }} />}
+      {onCancel && ['active', 'claimed', 'scheduled'].includes(request.status) && <Button label={cancelling ? 'Cancelling…' : 'Cancel request'} onPress={onCancel} isLoading={cancelling} variant="ghost" fullWidth style={{ marginTop: 8 }} />}
       {request.status === 'expired' && (
         <>
           <Text style={{ color: THEME_COLORS.rose, ...iosFontStyle('500'), fontSize: 12, marginTop: 10 }}>This request expired. You can submit it again.</Text>

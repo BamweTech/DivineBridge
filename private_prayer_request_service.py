@@ -92,6 +92,7 @@ def _request_payload(doc_id, request_data, viewer_id, leader_view=False):
             'availability': _serialize(data.get('availability', [])),
             'expires_at': _serialize(data.get('expires_at')),
             'created_at': _serialize(data.get('created_at')),
+            'prayer_count': data.get('prayer_count', 0),
             'available_to_lead': True,
         }
     if viewer_id not in (data.get('requester_id'), data.get('leader_id')):
@@ -144,6 +145,7 @@ def create_request(db, user, description, preferred_language, wants_live_call, a
         'scheduled_at': None,
         'room_id': None,
         'room_code': None,
+        'prayer_count': 0,
     }
     request_ref.set(data)
     # A request is also the safe, authenticated place to save this preference.
@@ -247,6 +249,68 @@ def claim_request(db, request_id, leader, slot_start):
         _get_profile(db, data['requester_id']),
     )
     return _request_payload(request_id, data, leader['user_id'])
+
+
+def cancel_request(db, request_id, requester_id):
+    """Cancel a request and any generated matched call as one transaction."""
+    request_ref = db.collection(COLLECTION).document(request_id)
+
+    @firestore.transactional
+    def cancel(transaction):
+        snapshot = request_ref.get(transaction=transaction)
+        if not snapshot.exists:
+            raise LookupError('Prayer request not found')
+        data = snapshot.to_dict() or {}
+        if data.get('requester_id') != requester_id:
+            raise PermissionError('Only the requester can cancel this prayer request')
+        if data.get('status') == 'cancelled':
+            return data, False
+        if data.get('status') not in {'active', 'claimed', 'scheduled'}:
+            raise RuntimeError('This prayer request can no longer be cancelled')
+
+        now = _now()
+        updates = {'status': 'cancelled', 'cancelled_at': now}
+        transaction.update(request_ref, updates)
+        if data.get('room_id'):
+            transaction.update(
+                db.collection('prayer_rooms').document(data['room_id']),
+                {'is_active': False, 'ended_at': now, 'ended_by': 'requester', 'ended_reason': 'request_cancelled'},
+            )
+        data.update(updates)
+        return data, True
+
+    data, changed = cancel(db.transaction())
+    if changed and data.get('leader_id'):
+        _send(
+            data['leader_id'],
+            'Prayer request cancelled',
+            'The requester cancelled their private prayer request.',
+            {'type': 'private_prayer_request', 'requestId': request_id},
+            'notify_prayer_requests',
+            _get_profile(db, data['leader_id']),
+        )
+    return _request_payload(request_id, data, requester_id)
+
+
+def record_prayer(db, request_id, user_id):
+    """Increment the private request's anonymous/count-only prayer total."""
+    request_ref = db.collection(COLLECTION).document(request_id)
+
+    @firestore.transactional
+    def increment(transaction):
+        snapshot = request_ref.get(transaction=transaction)
+        if not snapshot.exists:
+            raise LookupError('Prayer request not found')
+        data = snapshot.to_dict() or {}
+        if user_id not in (data.get('requester_id'), data.get('leader_id')):
+            raise PermissionError('You are not authorized to pray for this request')
+        if data.get('status') in {'cancelled', 'expired'}:
+            raise RuntimeError('This prayer request is no longer active')
+        prayer_count = int(data.get('prayer_count', 0)) + 1
+        transaction.update(request_ref, {'prayer_count': prayer_count})
+        return prayer_count
+
+    return increment(db.transaction())
 
 
 def expire_requests(db):

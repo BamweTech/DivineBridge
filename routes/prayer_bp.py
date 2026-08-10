@@ -9,11 +9,13 @@ from auth_helpers import get_user_from_session, require_auth
 from firebase_auth import get_firestore_client
 from qa_wall_filters import is_hidden_production_test_wall_item
 from private_prayer_request_service import (
+    cancel_request,
     claim_request,
     create_request,
     expire_requests,
     list_for_user,
     open_scheduled_call,
+    record_prayer,
     send_due_call_reminders,
 )
 
@@ -381,6 +383,42 @@ def open_private_prayer_call(request_id):
     except Exception:
         logger.error('Failed to open private prayer call', exc_info=True)
         return jsonify({'success': False, 'error': 'Failed to open prayer call'}), 500
+
+
+@prayer_bp.route('/private-request/<request_id>/cancel', methods=['POST'])
+@require_auth
+def cancel_private_prayer_request(request_id):
+    """Allow the requester to cancel an active, claimed, or scheduled request."""
+    try:
+        result = cancel_request(get_firestore_client(), request_id, g.user_id)
+        return jsonify({'success': True, 'data': result}), 200
+    except LookupError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 404
+    except PermissionError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 403
+    except RuntimeError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 400
+    except Exception:
+        logger.error('Failed to cancel private prayer request', exc_info=True)
+        return jsonify({'success': False, 'error': 'Failed to cancel prayer request'}), 500
+
+
+@prayer_bp.route('/private-request/<request_id>/pray', methods=['POST'])
+@require_auth
+def pray_for_private_request(request_id):
+    """Record an anonymous/count-only prayer from an authorized request participant."""
+    try:
+        count = record_prayer(get_firestore_client(), request_id, g.user_id)
+        return jsonify({'success': True, 'data': {'prayer_count': count}}), 200
+    except LookupError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 404
+    except PermissionError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 403
+    except RuntimeError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 400
+    except Exception:
+        logger.error('Failed to record private prayer', exc_info=True)
+        return jsonify({'success': False, 'error': 'Failed to record prayer'}), 500
 
 
 @prayer_bp.route('/private-request/maintenance', methods=['POST'])

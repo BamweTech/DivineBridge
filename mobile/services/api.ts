@@ -364,6 +364,16 @@ export const privatePrayerRequestApi = {
       `/api/prayer/private-request/${requestId}/claim`,
       { method: 'POST', body: JSON.stringify({ slot_start: slotStart }) }
     ),
+  cancel: (requestId: string) =>
+    request<{ success: boolean; data: PrivatePrayerRequest }>(
+      `/api/prayer/private-request/${requestId}/cancel`,
+      { method: 'POST' }
+    ),
+  pray: (requestId: string) =>
+    request<{ success: boolean; data: { prayer_count: number } }>(
+      `/api/prayer/private-request/${requestId}/pray`,
+      { method: 'POST' }
+    ),
   openCall: (requestId: string) =>
     request<{ success: boolean; data: { room_id: string; room_code: string; duration_minutes: number } }>(
       `/api/prayer/private-request/${requestId}/call`,

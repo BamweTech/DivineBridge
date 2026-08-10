@@ -200,7 +200,7 @@ Authoritative security rules: [firestore.rules](../firestore.rules). Below is a 
 
 **Firebase Realtime Database** is used for **low-latency** live-room concerns on the web client (and related mobile hooks) — paths are managed in client code (e.g. [static/js/prayer-room.js](../static/js/prayer-room.js)).
 
-**Private prayer matching:** `private_prayer_requests` is server-only in Firestore. Trusted server/admin tooling grants a leader `is_prayer_leader: true` and `prayer_languages: string[]`; mobile profile writes cannot modify either field. Requests expire after 48 hours and the first eligible leader claims through a Firestore transaction.
+**Private prayer matching:** `private_prayer_requests` is server-only in Firestore. Trusted server/admin tooling grants a leader `is_prayer_leader: true` and `prayer_languages: string[]`; mobile profile writes cannot modify either field. Requests expire after 48 hours, the first eligible leader claims through a Firestore transaction, requesters can cancel an active/claimed/scheduled request, and authorized participants can record an anonymous prayer count.
 
 **Object storage:** User-generated and generated assets (e.g. images) via [storage_handler.py](../storage_handler.py) to **Google Cloud Storage**.
 

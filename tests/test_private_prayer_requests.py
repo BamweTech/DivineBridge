@@ -3,8 +3,47 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import private_prayer_request_service as private_requests
 from private_prayer_request_service import _parse_availability
 from routes import prayer_room_bp as prayer_room
+
+
+class _FakeDocument:
+    def __init__(self, data, doc_id='request-1'):
+        self.data = data
+        self.id = doc_id
+        self.exists = data is not None
+        self.reference = self
+
+    def get(self, transaction=None):
+        return self
+
+    def to_dict(self):
+        return dict(self.data) if self.data is not None else None
+
+
+class _FakeCollection:
+    def __init__(self, documents):
+        self.documents = documents
+
+    def document(self, doc_id):
+        return self.documents[doc_id]
+
+
+class _FakeTransaction:
+    def update(self, reference, updates):
+        reference.data.update(updates)
+
+
+class _FakeDb:
+    def __init__(self, collections):
+        self.collections = collections
+
+    def collection(self, name):
+        return self.collections[name]
+
+    def transaction(self):
+        return _FakeTransaction()
 
 
 def test_availability_accepts_future_fifteen_minute_window():
@@ -101,3 +140,41 @@ def test_unmatched_user_cannot_join_private_prayer_call(mock_user, mock_db):
 
     assert result[1] == 403
     room_ref.update.assert_not_called()
+
+
+def test_requester_cancellation_ends_created_private_call():
+    request = _FakeDocument({
+        'requester_id': 'requester',
+        'leader_id': 'leader',
+        'status': 'scheduled',
+        'room_id': 'room-1',
+    })
+    room = _FakeDocument({'is_active': True}, doc_id='room-1')
+    db = _FakeDb({
+        private_requests.COLLECTION: _FakeCollection({'request-1': request}),
+        'prayer_rooms': _FakeCollection({'room-1': room}),
+        'users': _FakeCollection({'leader': _FakeDocument({})}),
+    })
+
+    with patch.object(private_requests.firestore, 'transactional', new=lambda fn: fn), \
+         patch.object(private_requests, '_send'):
+        result = private_requests.cancel_request(db, 'request-1', 'requester')
+
+    assert result['status'] == 'cancelled'
+    assert request.data['status'] == 'cancelled'
+    assert room.data['is_active'] is False
+
+
+def test_private_prayer_count_requires_authorized_participant():
+    request = _FakeDocument({
+        'requester_id': 'requester',
+        'leader_id': 'leader',
+        'status': 'claimed',
+        'prayer_count': 2,
+    })
+    db = _FakeDb({private_requests.COLLECTION: _FakeCollection({'request-1': request})})
+
+    with patch.object(private_requests.firestore, 'transactional', new=lambda fn: fn):
+        assert private_requests.record_prayer(db, 'request-1', 'leader') == 3
+        with pytest.raises(PermissionError):
+            private_requests.record_prayer(db, 'request-1', 'outsider')

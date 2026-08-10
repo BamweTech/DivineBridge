@@ -55,6 +55,8 @@ export interface PrivatePrayerRequest {
   leader_first_name?: string;
   scheduled_at?: string;
   room_id?: string;
+  prayer_count?: number;
+  cancelled_at?: string;
   viewer_role?: 'requester' | 'leader';
   available_to_lead?: boolean;
 }
