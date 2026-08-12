@@ -125,6 +125,23 @@ def test_private_prayer_call_uses_fifteen_minute_timer():
     assert expires_at == now + timedelta(minutes=15)
 
 
+@patch('routes.prayer_room_bp.get_rtdb_client')
+def test_prayer_room_chat_mirror_uses_message_id_as_rtdb_key(mock_rtdb_client):
+    rtdb = MagicMock()
+    mock_rtdb_client.return_value = rtdb
+
+    prayer_room._mirror_chat_message_to_rtdb(
+        'room-1',
+        'message-1',
+        'user-1',
+        'Member',
+        'Hello',
+    )
+
+    rtdb.reference.assert_called_once_with('/rooms/room-1/chat/message-1')
+    rtdb.reference.return_value.set.assert_called_once()
+
+
 @patch('routes.prayer_room_bp.get_firestore_client')
 @patch('routes.prayer_room_bp.get_user_from_session')
 def test_private_call_details_hide_join_code_and_request_link(mock_user, mock_db):

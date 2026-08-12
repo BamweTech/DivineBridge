@@ -140,6 +140,7 @@ export default function GroupScreen() {
   const { markGroupChatRead, unreadCountByGroup } = useGroupUnread();
   const { reads, isReadsReady } = useGroupChatLastReads();
   const [text, setText] = useState('');
+  const [isSendingMain, setIsSendingMain] = useState(false);
   const [showInviteSheet, setShowInviteSheet] = useState(false);
   const [replyTarget, setReplyTarget] = useState<GroupChatMessage | null>(null);
   const [reactionPopover, setReactionPopover] = useState<ReactionPopoverState | null>(null);
@@ -158,6 +159,7 @@ export default function GroupScreen() {
   const [startingLive, setStartingLive] = useState(false);
   const [fsChatOpen, setFsChatOpen] = useState(true);
   const [fsChatText, setFsChatText] = useState('');
+  const [isSendingFs, setIsSendingFs] = useState(false);
   const [showAttachTray, setShowAttachTray] = useState<'main' | 'fs' | null>(null);
   const [videoViewer, setVideoViewer] = useState<ViewerMedia | null>(null);
   const [imageViewerOpen, setImageViewerOpen] = useState<{
@@ -446,8 +448,9 @@ export default function GroupScreen() {
 
   async function handleSend() {
     const draft = text.trim();
-    if (!draft) return;
+    if (!draft || isSendingMain) return;
     const reply = replyTarget;
+    setIsSendingMain(true);
     setText('');
     setShowAttachTray(null);
     setReplyTarget(null);
@@ -458,13 +461,16 @@ export default function GroupScreen() {
       setText((current) => current || draft);
       setReplyTarget((current) => current ?? reply);
       Alert.alert('Message not sent', 'Please check your connection and try again.');
+    } finally {
+      setIsSendingMain(false);
     }
   }
 
   async function handleFsSend() {
     const draft = fsChatText.trim();
-    if (!draft) return;
+    if (!draft || isSendingFs) return;
     const reply = replyTarget;
+    setIsSendingFs(true);
     setFsChatText('');
     setShowAttachTray(null);
     setReplyTarget(null);
@@ -475,6 +481,8 @@ export default function GroupScreen() {
       setFsChatText((current) => current || draft);
       setReplyTarget((current) => current ?? reply);
       Alert.alert('Message not sent', 'Please check your connection and try again.');
+    } finally {
+      setIsSendingFs(false);
     }
   }
 
@@ -647,6 +655,7 @@ export default function GroupScreen() {
       const name = asset.fileName || `photo_${Date.now()}.jpg`;
       const att = await uploadGroupChatFile(id, blob, mime, name);
       if (asset.width && asset.height) { att.width = asset.width; att.height = asset.height; }
+      removePendingUpload(tempId);
       await sendMessage(caption, 'text', {
         attachments: [att],
         replyTo: replyTarget ? toReplyRef(replyTarget) : null,
@@ -694,6 +703,7 @@ export default function GroupScreen() {
       const name = asset.fileName || `photo_${Date.now()}.jpg`;
       const att = await uploadGroupChatFile(id, blob, mime, name);
       if (asset.width && asset.height) { att.width = asset.width; att.height = asset.height; }
+      removePendingUpload(tempId);
       await sendMessage(caption, 'text', {
         attachments: [att],
         replyTo: replyTarget ? toReplyRef(replyTarget) : null,
@@ -741,6 +751,7 @@ export default function GroupScreen() {
       const blob = await res.blob();
       const name = asset.fileName || `video_${Date.now()}.mp4`;
       const att = await uploadGroupChatFile(id, blob, mime, name);
+      removePendingUpload(tempId);
       await sendMessage(caption, 'text', {
         attachments: [att],
         replyTo: replyTarget ? toReplyRef(replyTarget) : null,
@@ -784,6 +795,7 @@ export default function GroupScreen() {
       const res = await fetch(asset.uri);
       const blob = await res.blob();
       const att = await uploadGroupChatFile(id, blob, mime, asset.name || 'document');
+      removePendingUpload(tempId);
       await sendMessage(caption, 'text', {
         attachments: [att],
         replyTo: replyTarget ? toReplyRef(replyTarget) : null,
@@ -818,6 +830,7 @@ export default function GroupScreen() {
       const res = await fetch(uri);
       const blob = await res.blob();
       const att = await uploadGroupChatFile(id, blob, mime, name);
+      removePendingUpload(tempId);
       await sendMessage('', 'text', {
         attachments: [att],
         replyTo: replyTarget ? toReplyRef(replyTarget) : null,
@@ -1260,6 +1273,7 @@ export default function GroupScreen() {
                     {fsChatText.trim() ? (
                       <Pressable
                         onPress={handleFsSend}
+                        disabled={isSendingFs}
                         hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                         style={{
                           width: 36,
@@ -1268,6 +1282,7 @@ export default function GroupScreen() {
                           alignItems: 'center',
                           justifyContent: 'center',
                           backgroundColor: THEME_COLORS.gold,
+                          opacity: isSendingFs ? 0.55 : 1,
                         }}
                       >
                         <Icon name="send" size={14} color="#ffffff" />
@@ -1330,10 +1345,12 @@ export default function GroupScreen() {
           {text.trim() ? (
             <Pressable
               onPress={handleSend}
+              disabled={isSendingMain}
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               style={{
                 width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
                 backgroundColor: THEME_COLORS.gold,
+                opacity: isSendingMain ? 0.55 : 1,
               }}
             >
               <Icon name="send" size={14} color="#ffffff" />

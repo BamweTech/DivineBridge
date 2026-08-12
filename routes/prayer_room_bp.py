@@ -189,7 +189,7 @@ def _mirror_chat_message_to_rtdb(
         if not rtdb:
             return
         import time as _time
-        rtdb.reference(f'/rooms/{room_id}/chat').push({
+        rtdb.reference(f'/rooms/{room_id}/chat/{message_id}').set({
             'message_id': message_id,
             'room_id': room_id,
             'user_id': user_id,

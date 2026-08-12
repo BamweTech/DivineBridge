@@ -1010,6 +1010,11 @@ class PrayerRoomService {
             }
             
             // Attach listeners
+            this.removePollingInterval('chat');
+            if (this.chatPollingInterval) {
+                clearInterval(this.chatPollingInterval);
+                this.chatPollingInterval = null;
+            }
             this.subscribeRTDBChat();
             this.subscribeRTDBSignals();
         } catch (e) {
@@ -1094,7 +1099,7 @@ class PrayerRoomService {
             const val = snap.val();
             if (!val) return;
             
-            const msgId = snap.key;
+            const msgId = val.message_id || snap.key;
             const msgTimestamp = val.timestamp ? (typeof val.timestamp === 'number' ? val.timestamp : new Date(val.timestamp).getTime()) : Date.now();
             
             // Normalize to existing message structure

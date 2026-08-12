@@ -95,19 +95,27 @@ export function usePrayerRoom(roomId: string) {
           timestamp: val.timestamp,
         });
       });
-      list.sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0));
+      const unique = new Map<string, ChatMessage>();
+      for (const message of list) {
+        const previous = unique.get(message.message_id);
+        if (!previous || Number(message.timestamp) >= Number(previous.timestamp)) {
+          unique.set(message.message_id, message);
+        }
+      }
+      const confirmedMessages = [...unique.values()]
+        .sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0));
       setMessages((current) => {
         const pending = current.filter(
           (message) =>
             message.message_id.startsWith('pending:') &&
-            !list.some(
+            !confirmedMessages.some(
               (confirmed) =>
                 confirmed.user_id === message.user_id &&
                 confirmed.message === message.message &&
                 Math.abs(Number(confirmed.timestamp) - Number(message.timestamp)) < 15_000,
             ),
         );
-        return [...list, ...pending].sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0));
+        return [...confirmedMessages, ...pending].sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0));
       });
     };
     onValue(q, handler);
