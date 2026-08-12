@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -6,6 +6,12 @@ import pytest
 import private_prayer_request_service as private_requests
 from private_prayer_request_service import _parse_availability
 from routes import prayer_room_bp as prayer_room
+
+
+def test_serializes_timezone_aware_timestamps_as_valid_iso_utc():
+    timestamp = datetime(2026, 8, 12, 12, 0, tzinfo=timezone.utc)
+
+    assert private_requests._serialize(timestamp) == '2026-08-12T12:00:00Z'
 
 
 class _FakeDocument:

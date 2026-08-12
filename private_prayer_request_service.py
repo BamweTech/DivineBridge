@@ -4,7 +4,7 @@ This intentionally does not share storage with the public Prayer Wall.  Private
 requests need transactional claiming, restricted access, and short-lived state.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import uuid
 
@@ -35,6 +35,8 @@ def _as_naive_utc(value):
 
 def _serialize(value):
     if isinstance(value, datetime):
+        if value.tzinfo is not None:
+            return value.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
         return value.isoformat() + 'Z'
     if isinstance(value, list):
         return [_serialize(item) for item in value]
