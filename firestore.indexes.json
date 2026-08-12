@@ -27,6 +27,20 @@
           "order": "ASCENDING"
         },
         {
+          "fieldPath": "ended_at",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "prayer_rooms",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "is_active",
+          "order": "ASCENDING"
+        },
+        {
           "fieldPath": "created_at",
           "order": "DESCENDING"
         }

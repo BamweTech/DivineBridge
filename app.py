@@ -515,60 +515,7 @@ def create_app():
             
             logger.info("WebSocket handlers registered")
         
-        # Start background cleanup thread with distributed lock so only one
-        # worker across all instances/processes runs cleanup at a time.
-        _cleanup_lock_id = f"cleanup-{os.getpid()}"
-
-        def _try_acquire_cleanup_lock(db_client):
-            """Acquire a Firestore-based distributed lock (5-min TTL).
-            Returns True if this process won the lock."""
-            from google.cloud.firestore_v1 import SERVER_TIMESTAMP
-            lock_ref = db_client.collection('_locks').document('cleanup')
-            try:
-                from datetime import datetime as _dt
-                now = _dt.utcnow()
-                lock_snap = lock_ref.get()
-                if lock_snap.exists:
-                    lock_data = lock_snap.to_dict()
-                    held_until = lock_data.get('held_until')
-                    if held_until:
-                        if hasattr(held_until, 'tzinfo') and held_until.tzinfo:
-                            held_until = held_until.replace(tzinfo=None)
-                        if held_until > now:
-                            return False
-                lock_ref.set({
-                    'holder': _cleanup_lock_id,
-                    'acquired_at': SERVER_TIMESTAMP,
-                    'held_until': now + timedelta(minutes=5),
-                })
-                return True
-            except Exception:
-                return False
-
-        def cleanup_worker():
-            while True:
-                try:
-                    time.sleep(300)  # Run every 5 minutes
-                    from firebase_admin import firestore as _fs
-                    db = _fs.client()
-                    if not _try_acquire_cleanup_lock(db):
-                        continue
-
-                    from routes.prayer_room_bp import cleanup_inactive_sessions, cleanup_signaling_artifacts, cleanup_old_chat_messages
-
-                    sessions_cleaned = cleanup_inactive_sessions()
-                    signaling_cleaned = cleanup_signaling_artifacts()
-                    chat_cleaned = cleanup_old_chat_messages()
-
-                    if sessions_cleaned + signaling_cleaned + chat_cleaned > 0:
-                        logger.info(f"Background cleanup: {sessions_cleaned} sessions, {signaling_cleaned} signaling, {chat_cleaned} chat messages")
-
-                except Exception as e:
-                    logger.error(f"Background cleanup error: {e}")
-
-        cleanup_thread = threading.Thread(target=cleanup_worker, daemon=True)
-        cleanup_thread.start()
-        logger.info("Background cleanup thread started")
+        logger.info("Prayer-room cleanup is run by Cloud Scheduler; no in-process sweep started")
         
     except Exception as e:
         error_msg = f"Failed to initialize application components: {str(e)}"

@@ -4401,9 +4401,13 @@ def join_scheduled_room(scheduled_room_id):
         return jsonify({'error': 'Failed to join scheduled room'}), 500
 
 @prayer_room_bp.route('/cleanup', methods=['POST'])
+@verify_cloud_scheduler()
 def run_cleanup():
-    """Run cleanup tasks for signaling artifacts and old data"""
+    """Run bounded cleanup for rooms that have been ended for at least an hour."""
     try:
+        db = get_firestore_client()
+        if not _acquire_cleanup_lease(db):
+            return jsonify({'success': True, 'skipped': 'cleanup already running'}), 200
         # Run all cleanup functions
         sessions_cleaned = cleanup_inactive_sessions()
         signaling_cleaned = cleanup_signaling_artifacts()
@@ -4422,6 +4426,25 @@ def run_cleanup():
     except Exception as e:
         logging.error(f"Error running cleanup: {str(e)}")
         return jsonify({'error': 'Failed to run cleanup'}), 500
+
+
+def _acquire_cleanup_lease(db):
+    lock_ref = db.collection('_locks').document('prayer-room-cleanup')
+
+    @firestore.transactional
+    def acquire(transaction):
+        now = datetime.utcnow()
+        snapshot = lock_ref.get(transaction=transaction)
+        data = snapshot.to_dict() if snapshot.exists else {}
+        held_until = data.get('held_until') if data else None
+        if held_until and getattr(held_until, 'tzinfo', None):
+            held_until = held_until.replace(tzinfo=None)
+        if held_until and held_until > now:
+            return False
+        transaction.set(lock_ref, {'held_until': now + timedelta(minutes=14), 'acquired_at': now})
+        return True
+
+    return acquire(db.transaction())
 
 @prayer_room_bp.route('/metrics', methods=['GET'])
 def get_metrics():
@@ -4463,14 +4486,26 @@ def get_metrics():
         logging.error(f"Error getting metrics: {str(e)}")
         return jsonify({'error': 'Failed to get metrics'}), 500
 
+def _ended_rooms_for_cleanup(db, limit=100):
+    """Never sweep active calls; keep each maintenance invocation bounded."""
+    cutoff = datetime.utcnow() - timedelta(hours=1)
+    return list(
+        db.collection('prayer_rooms')
+        .where('is_active', '==', False)
+        .where('ended_at', '<', cutoff)
+        .order_by('ended_at')
+        .limit(limit)
+        .stream(retry=Retry())
+    )
+
+
 def cleanup_inactive_sessions():
     """Clean up inactive device sessions older than 1 hour.
     Batched deletes with per-room isolation."""
     try:
         db = get_firestore_client()
         cutoff_time = datetime.utcnow() - timedelta(hours=1)
-
-        all_rooms = db.collection('prayer_rooms').stream(retry=Retry())
+        all_rooms = _ended_rooms_for_cleanup(db)
 
         cleaned_count = 0
         for room_doc in all_rooms:
@@ -4515,7 +4550,7 @@ def cleanup_signaling_artifacts():
         db = get_firestore_client()
         cutoff_time = datetime.utcnow() - timedelta(minutes=30)
 
-        all_rooms = db.collection('prayer_rooms').stream(retry=Retry())
+        all_rooms = _ended_rooms_for_cleanup(db)
 
         cleaned_count = 0
         subcollections = ('webrtc_offers', 'webrtc_answers', 'webrtc_candidates')
@@ -4554,7 +4589,7 @@ def cleanup_old_chat_messages():
     try:
         db = get_firestore_client()
 
-        all_rooms = db.collection('prayer_rooms').stream(retry=Retry())
+        all_rooms = _ended_rooms_for_cleanup(db)
 
         cleaned_count = 0
         for room_doc in all_rooms:

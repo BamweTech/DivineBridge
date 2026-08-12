@@ -78,6 +78,17 @@ gcloud scheduler jobs create http private-prayer-request-maintenance \
     --http-method=POST \
     --oidc-service-account-email=prayer-scheduler@divinebridge.iam.gserviceaccount.com \
     --oidc-token-audience="https://divinebridge-<your-hash>-uc.a.run.app"
+
+# Prayer-room cleanup (every 15 minutes). Only rooms ended over an hour ago
+# are processed; active calls are never swept.
+gcloud scheduler jobs create http prayer-room-cleanup \
+    --location=us-central1 \
+    --schedule="*/15 * * * *" \
+    --time-zone="UTC" \
+    --uri="https://divinebridge-<your-hash>-uc.a.run.app/api/prayer-room/cleanup" \
+    --http-method=POST \
+    --oidc-service-account-email=prayer-scheduler@divinebridge.iam.gserviceaccount.com \
+    --oidc-token-audience="https://divinebridge-<your-hash>-uc.a.run.app"
 ```
 
 **Note:** Replace `<your-hash>` with your actual Cloud Run service URL.
