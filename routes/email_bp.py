@@ -8,6 +8,11 @@ import logging
 email_bp = Blueprint('email', __name__)
 logger = logging.getLogger(__name__)
 
+
+def _normalize_email(value):
+    return str(value or '').strip().lower()
+
+
 def _get_firestore_client():
     """Get Firestore client (lazy import to keep startup stable)."""
     from firebase_admin import firestore
@@ -142,7 +147,7 @@ def send_daily_emails():
         
         # Get all subscribers from Firebase
         # Assuming subscribers are stored in Firestore: users collection with email_subscribed field
-        subscribers = []
+        subscribers_by_email = {}
         try:
             # Get all users who have email_subscribed = True
             users_ref = db.collection('users')
@@ -150,19 +155,29 @@ def send_daily_emails():
             
             for doc in query:
                 user_data = doc.to_dict()
-                if user_data.get('email') and user_data.get('firstName'):
-                    subscribers.append({
+                email = _normalize_email(user_data.get('email'))
+                if email and user_data.get('firstName'):
+                    candidate = {
                         'doc_id': doc.id,
-                        'email': user_data.get('email'),
+                        'email': email,
                         'firstName': user_data.get('firstName'),
                         'timezone': user_data.get('timezone', 'America/New_York'),
-                        'last_email_sent_date': user_data.get('last_email_sent_date', '')
-                    })
+                        'last_email_sent_date': user_data.get('last_email_sent_date', ''),
+                        'email_subscribed_at': user_data.get('email_subscribed_at', ''),
+                    }
+                    existing = subscribers_by_email.get(email)
+                    if existing and existing['email_subscribed_at'] >= candidate['email_subscribed_at']:
+                        logger.warning('Suppressing duplicate email subscriber profile for %s', email)
+                        continue
+                    if existing:
+                        logger.warning('Replacing duplicate email subscriber profile for %s', email)
+                    subscribers_by_email[email] = candidate
         except Exception as e:
             logger.error(f"Error fetching subscribers from Firebase: {e}")
             return jsonify({'error': 'Failed to fetch subscribers'}), 500
         
-        logger.info(f"Found {len(subscribers)} subscribers")
+        subscribers = list(subscribers_by_email.values())
+        logger.info(f"Found {len(subscribers)} unique subscribers")
         
         # Send emails
         email_service = get_email_service()

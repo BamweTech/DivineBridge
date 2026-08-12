@@ -125,6 +125,7 @@ class SheetHandler:
             first_name: Subscriber's first name
             last_name: Subscriber's last name
         """
+        email = (email or '').strip().lower()
         @retry.Retry(
             predicate=retry.if_exception_type(
                 (requests.exceptions.SSLError, requests.exceptions.ConnectionError,
@@ -142,7 +143,7 @@ class SheetHandler:
                 # Check if subscriber already exists
                 try:
                     subscribers = self.get_subscribers()
-                    if any(sub['email'] == email for sub in subscribers):
+                    if any((sub.get('email') or '').strip().lower() == email for sub in subscribers):
                         logger.warning(f"Subscriber already exists: {email}")
                         return True  # Consider this a success since the user is already subscribed
                 except Exception as e:

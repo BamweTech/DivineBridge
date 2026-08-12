@@ -103,7 +103,7 @@ def login():
                         # Create Firestore profile for new user
                         auth_provider = 'google' if 'google' in str(user.provider_data).lower() else 'email'
                         user_ref.set({
-                            'email': user.email,
+                            'email': (user.email or '').strip().lower(),
                             'firstName': first_name,
                             'lastName': last_name,
                             'email_subscribed': False,  # Opt-in after a “win” moment

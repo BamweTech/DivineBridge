@@ -77,6 +77,7 @@ Example: `migrate_users_to_firestore.py`.
 |--------|---------|
 | `delete_production_test_testimonies.py` | Remove QA posts from GCS: `testimonies/` **and** `prayer_requests/` (mobile Community / `/api/prayer/prayers` uses the latter). `--dry-run` to list only. |
 | `grant_existing_users_english_prayer_leader.py` | One-time migration granting every Firebase Auth user prayer-leader access for English. Preview by default; pass `--apply` to write. |
+| `reconcile_duplicate_email_subscribers.py` | Preview or suppress duplicate opted-in Firestore subscriber profiles; pass `--apply` to write. |
 | `pregen_devotional_templates.py` | Pre-generate the 24 canonical devotional plans (8 suggested themes × 3 durations) into the `devotional_templates` Firestore collection. Run once on first deploy; subsequent refreshes happen monthly via `/admin/api/refresh-devotional-templates`. Pass `--force` to regenerate all templates regardless of age. |
 | `pregen_verse_contexts.py` | Pre-generate the AI sermon + original-language words + reflection questions for every verse in `static/bible_verses.json` into the `verse_contexts` Firestore collection (keyed by verse slug, not date). Run once on first deploy so the mobile reader's "Today's Message" section is instant from day 1; nightly refresh happens via Cloud Scheduler → `POST /api/today-verse/context/generate` (7-day look-ahead). Pass `--force` to regenerate, `--limit N` for a smoke test. |
 
