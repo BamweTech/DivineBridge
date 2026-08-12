@@ -372,10 +372,16 @@ export default function RoomScreen() {
   }, [room?.is_active, isJoined, room, leave, router, user?.uid, room?.host_id]);
 
   async function handleSend() {
-    if (!chatText.trim()) return;
-    await sendMessage(chatText.trim());
+    const draft = chatText.trim();
+    if (!draft) return;
     setChatText('');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await sendMessage(draft);
+    } catch {
+      setChatText((current) => current || draft);
+      Alert.alert('Message not sent', 'Please check your connection and try again.');
+    }
   }
 
   const isGroupCall = roomMode === ROOM_MODES.GROUP_CALL;

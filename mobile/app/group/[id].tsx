@@ -445,25 +445,37 @@ export default function GroupScreen() {
   }
 
   async function handleSend() {
-    if (!text.trim()) return;
-    await sendMessage(text.trim(), 'text', {
-      replyTo: replyTarget ? toReplyRef(replyTarget) : null,
-    });
+    const draft = text.trim();
+    if (!draft) return;
+    const reply = replyTarget;
     setText('');
     setShowAttachTray(null);
     setReplyTarget(null);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await sendMessage(draft, 'text', { replyTo: reply ? toReplyRef(reply) : null });
+    } catch {
+      setText((current) => current || draft);
+      setReplyTarget((current) => current ?? reply);
+      Alert.alert('Message not sent', 'Please check your connection and try again.');
+    }
   }
 
   async function handleFsSend() {
-    if (!fsChatText.trim()) return;
-    await sendMessage(fsChatText.trim(), 'text', {
-      replyTo: replyTarget ? toReplyRef(replyTarget) : null,
-    });
+    const draft = fsChatText.trim();
+    if (!draft) return;
+    const reply = replyTarget;
     setFsChatText('');
     setShowAttachTray(null);
     setReplyTarget(null);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await sendMessage(draft, 'text', { replyTo: reply ? toReplyRef(reply) : null });
+    } catch {
+      setFsChatText((current) => current || draft);
+      setReplyTarget((current) => current ?? reply);
+      Alert.alert('Message not sent', 'Please check your connection and try again.');
+    }
   }
 
   async function handleOpenDocument(url: string, _fileName: string) {
