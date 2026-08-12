@@ -96,7 +96,19 @@ export function usePrayerRoom(roomId: string) {
         });
       });
       list.sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0));
-      setMessages(list);
+      setMessages((current) => {
+        const pending = current.filter(
+          (message) =>
+            message.message_id.startsWith('pending:') &&
+            !list.some(
+              (confirmed) =>
+                confirmed.user_id === message.user_id &&
+                confirmed.message === message.message &&
+                Math.abs(Number(confirmed.timestamp) - Number(message.timestamp)) < 15_000,
+            ),
+        );
+        return [...list, ...pending].sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0));
+      });
     };
     onValue(q, handler);
     return () => off(q, 'value', handler);
@@ -226,9 +238,35 @@ export function usePrayerRoom(roomId: string) {
 
   // ── Chat ─────────────────────────────────────────────────────────────────────
   const sendMessage = useCallback(async (text: string) => {
-    if (!roomId) return;
-    await roomApi.sendChat(roomId, text);
-  }, [roomId]);
+    if (!roomId || !user) return;
+    const message = text.trim();
+    if (!message) return;
+
+    const pendingId = `pending:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+    const pendingMessage: ChatMessage = {
+      message_id: pendingId,
+      room_id: roomId,
+      user_id: user.uid,
+      user_name: getDisplayName(profile, user),
+      message,
+      message_type: MESSAGE_TYPES.TEXT,
+      timestamp: Date.now(),
+    };
+    setMessages((current) => [...current, pendingMessage]);
+
+    try {
+      const result = await roomApi.sendChat(roomId, message);
+      setMessages((current) => {
+        const alreadyReceived = current.some((item) => item.message_id === result.message_id);
+        return current
+          .filter((item) => item.message_id !== pendingId || !alreadyReceived)
+          .map((item) => item.message_id === pendingId ? { ...item, message_id: result.message_id } : item);
+      });
+    } catch (error) {
+      setMessages((current) => current.filter((item) => item.message_id !== pendingId));
+      throw error;
+    }
+  }, [profile, roomId, user]);
 
   // ── Cleanup on unmount ───────────────────────────────────────────────────────
   useEffect(() => {

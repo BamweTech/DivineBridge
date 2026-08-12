@@ -320,11 +320,22 @@ function RootLayoutInner() {
   }, []);
 
   useEffect(() => {
+    const sub = Notifications.addNotificationReceivedListener((notification) => {
+      const data = notification.request.content.data;
+      if (data?.type === 'private_prayer_request') {
+        void queryClient.invalidateQueries({ queryKey: ['private-prayer-requests'] });
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data;
       if ((data?.type === 'group_live' || data?.type === 'group_chat') && data?.groupId) {
         routerRef.current.push(`/group/${data.groupId}` as any);
       } else if (data?.type === 'private_prayer_request') {
+        void queryClient.invalidateQueries({ queryKey: ['private-prayer-requests'] });
         routerRef.current.push('/prayer-requests' as any);
       }
     });

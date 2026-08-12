@@ -35,6 +35,12 @@ class _FakeCollection:
     def document(self, doc_id):
         return self.documents[doc_id]
 
+    def where(self, *_args):
+        return self
+
+    def stream(self):
+        return self.documents.values()
+
 
 class _FakeTransaction:
     def update(self, reference, updates):
@@ -75,6 +81,35 @@ def test_availability_rejects_windows_outside_next_week():
                 'end_at': (start + timedelta(minutes=30)).isoformat() + 'Z',
             }
         ])
+
+
+def test_notifies_only_eligible_leaders_of_private_request_changes():
+    english_leader = _FakeDocument(
+        {'is_prayer_leader': True, 'prayer_languages': ['english']},
+        doc_id='english-leader',
+    )
+    french_leader = _FakeDocument(
+        {'is_prayer_leader': True, 'prayer_languages': ['french']},
+        doc_id='french-leader',
+    )
+    db = _FakeDb({'users': _FakeCollection({
+        'english-leader': english_leader,
+        'french-leader': french_leader,
+    })})
+
+    with patch.object(private_requests, '_send') as send:
+        private_requests._notify_eligible_leaders(
+            db,
+            'request-1',
+            {'preferred_language': 'english', 'status': 'cancelled'},
+            'Prayer request cancelled',
+            'This request is no longer available in your inbox.',
+            'cancelled',
+        )
+
+    assert send.call_count == 1
+    assert send.call_args.args[0] == 'english-leader'
+    assert send.call_args.args[3]['event'] == 'cancelled'
 
 
 def test_private_prayer_call_uses_fifteen_minute_timer():

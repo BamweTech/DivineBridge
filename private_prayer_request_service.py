@@ -116,6 +116,31 @@ def _get_profile(db, user_id):
     return snapshot.to_dict() if snapshot.exists else {}
 
 
+def _notify_eligible_leaders(db, request_id, request_data, title, body, event, exclude_ids=()):
+    """Fan out inbox-state changes without exposing the private request content."""
+    language = request_data.get('preferred_language')
+    excluded = set(exclude_ids)
+    for leader_doc in db.collection('users').where('is_prayer_leader', '==', True).stream():
+        if leader_doc.id in excluded:
+            continue
+        leader = leader_doc.to_dict() or {}
+        languages = [str(item).lower() for item in leader.get('prayer_languages', [])]
+        if language in languages:
+            _send(
+                leader_doc.id,
+                title,
+                body,
+                {
+                    'type': 'private_prayer_request',
+                    'requestId': request_id,
+                    'event': event,
+                    'status': request_data.get('status'),
+                },
+                'notify_prayer_requests',
+                leader,
+            )
+
+
 def create_request(db, user, description, preferred_language, wants_live_call, availability):
     if user.get('is_anonymous'):
         raise PermissionError('Sign in is required to request private prayer')
@@ -155,20 +180,15 @@ def create_request(db, user, description, preferred_language, wants_live_call, a
         {'preferred_prayer_language': language}, merge=True
     )
 
-    # Leader status and supported languages are provisioned by trusted staff.
-    leaders = db.collection('users').where('is_prayer_leader', '==', True).stream()
-    for leader_doc in leaders:
-        leader = leader_doc.to_dict() or {}
-        languages = [str(item).lower() for item in leader.get('prayer_languages', [])]
-        if language in languages:
-            _send(
-                leader_doc.id,
-                'New prayer request',
-                'A prayer request is available in a language you serve.',
-                {'type': 'private_prayer_request', 'requestId': request_ref.id},
-                'notify_prayer_requests',
-                leader,
-            )
+    _notify_eligible_leaders(
+        db,
+        request_ref.id,
+        data,
+        'New prayer request',
+        'A prayer request is available in a language you serve.',
+        'created',
+        exclude_ids=(requester_id,),
+    )
     return _request_payload(request_ref.id, data, requester_id)
 
 
@@ -246,9 +266,23 @@ def claim_request(db, request_id, leader, slot_start):
         data['requester_id'],
         'A prayer leader has accepted',
         'A prayer leader is ready to pray with you.',
-        {'type': 'private_prayer_request', 'requestId': request_id},
+        {
+            'type': 'private_prayer_request',
+            'requestId': request_id,
+            'event': 'claimed',
+            'status': data['status'],
+        },
         'notify_prayer_requests',
         _get_profile(db, data['requester_id']),
+    )
+    _notify_eligible_leaders(
+        db,
+        request_id,
+        data,
+        'Prayer request claimed',
+        'This request is no longer available in your inbox.',
+        'claimed',
+        exclude_ids=(data['requester_id'], leader['user_id']),
     )
     return _request_payload(request_id, data, leader['user_id'])
 
@@ -287,9 +321,24 @@ def cancel_request(db, request_id, requester_id):
             data['leader_id'],
             'Prayer request cancelled',
             'The requester cancelled their private prayer request.',
-            {'type': 'private_prayer_request', 'requestId': request_id},
+            {
+                'type': 'private_prayer_request',
+                'requestId': request_id,
+                'event': 'cancelled',
+                'status': data['status'],
+            },
             'notify_prayer_requests',
             _get_profile(db, data['leader_id']),
+        )
+    if changed:
+        _notify_eligible_leaders(
+            db,
+            request_id,
+            data,
+            'Prayer request cancelled',
+            'This request is no longer available in your inbox.',
+            'cancelled',
+            exclude_ids=(data['requester_id'], data.get('leader_id')),
         )
     return _request_payload(request_id, data, requester_id)
 

@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
+import { Alert, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -30,6 +31,7 @@ export default function PrayerRequestsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const isFocused = useIsFocused();
   const profile = useAuthStore((state) => state.profile);
   const [description, setDescription] = useState('');
   const [language, setLanguage] = useState(profile?.preferredPrayerLanguage || 'English');
@@ -46,9 +48,15 @@ export default function PrayerRequestsScreen() {
   const requestsQuery = useQuery({
     queryKey: ['private-prayer-requests'],
     queryFn: privatePrayerRequestApi.list,
+    staleTime: 0,
+    refetchInterval: isFocused ? 15_000 : false,
   });
   const requests = requestsQuery.data?.data ?? [];
   const isLeader = requestsQuery.data?.is_prayer_leader ?? false;
+
+  useFocusEffect(useCallback(() => {
+    void requestsQuery.refetch();
+  }, [requestsQuery.refetch]));
 
   const submit = useMutation({
     mutationFn: () => privatePrayerRequestApi.submit({
@@ -127,7 +135,11 @@ export default function PrayerRequestsScreen() {
   }
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: THEME_COLORS.bg }} contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 22, paddingBottom: insets.bottom + 36 }}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}
+      contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 22, paddingBottom: insets.bottom + 36 }}
+      refreshControl={<RefreshControl refreshing={requestsQuery.isRefetching} onRefresh={() => void requestsQuery.refetch()} tintColor={THEME_COLORS.gold} />}
+    >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20 }}>
         <Pressable onPress={() => router.back()} hitSlop={12}>
           <Icon name="back" size={22} color={THEME_COLORS.text2} />
