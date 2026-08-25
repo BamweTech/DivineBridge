@@ -16,6 +16,24 @@
  */
 import type React from 'react';
 import Constants from 'expo-constants';
+import {
+  collection,
+  doc,
+  addDoc,
+  onSnapshot,
+  query,
+  where,
+  orderBy,
+  serverTimestamp,
+  Unsubscribe,
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import {
+  ACTIVE_SPEAKER_MAX_CONNECTIONS,
+  GROUP_CALL_MAX_PARTICIPANTS,
+  ROOM_MODES,
+} from '@/lib/constants';
+import type { RoomMode } from '@/types';
 
 // 'storeClient' = Expo Go  |  'standalone' / 'bare' = real build
 const _execEnv = Constants.executionEnvironment as string;
@@ -52,24 +70,6 @@ const mediaDevices = _mediaDevices;
 function _RTCViewStub(_props: Record<string, unknown>) { return null; }
 export const RTCView: React.ComponentType<any> = _RTCView ?? _RTCViewStub;
 export const isWebRTCAvailable = _nativeModuleAvailable;
-import {
-  collection,
-  doc,
-  addDoc,
-  onSnapshot,
-  query,
-  where,
-  orderBy,
-  serverTimestamp,
-  Unsubscribe,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import {
-  ACTIVE_SPEAKER_MAX_CONNECTIONS,
-  GROUP_CALL_MAX_PARTICIPANTS,
-  ROOM_MODES,
-} from '@/lib/constants';
-import type { RoomMode } from '@/types';
 
 // RTCView is exported at the top of this file via the try/catch guard
 

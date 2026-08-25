@@ -1,5 +1,5 @@
-from flask import Blueprint, request, jsonify, session, render_template, current_app
-from firebase_auth import get_firestore_client, get_rtdb_client
+from flask import Blueprint, request, jsonify, current_app
+from firebase_auth import get_rtdb_client
 from input_validation import validate_data, sanitize_string
 from auth_decorators import verify_cloud_scheduler
 from push_service import send_push_to_group
@@ -7,23 +7,27 @@ from google.api_core.retry import Retry
 import logging
 from datetime import datetime, timedelta
 import uuid
-import json
 import os
+
 
 def exempt_from_rate_limit(f):
     """Decorator to exempt endpoint from main app rate limiting"""
+
     def wrapper(*args, **kwargs):
         # Try to exempt from main app limiter if available
         try:
-            if 'limiter' in current_app.extensions:
-                limiter = current_app.extensions['limiter']
+            if "limiter" in current_app.extensions:
+                current_app.extensions["limiter"]
                 # This will be handled by the decorator below
                 pass
-        except:
+        except Exception:
             pass
         return f(*args, **kwargs)
+
     wrapper.__name__ = f.__name__
     return wrapper
+
+
 from google.cloud import firestore
 
 from sfu_regions import (
@@ -32,32 +36,32 @@ from sfu_regions import (
     maybe_migrate_voice_link_sfu_at_guest_join,
 )
 
-prayer_room_bp = Blueprint('prayer_room', __name__)
+prayer_room_bp = Blueprint("prayer_room", __name__)
 
 MAX_ACTIVE_SPEAKERS = 20
 VOICE_LINK_MAX_PARTICIPANTS = 2
 VOICE_LINK_TTL_MINUTES = 10
 VOICE_LINK_WAIT_MINUTES = 30
-VALID_PARTICIPANT_ROLES = {'speaker', 'listener'}
+VALID_PARTICIPANT_ROLES = {"speaker", "listener"}
 
 
 def _generate_room_id():
-    return ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
+    return "".join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
 
 
 def _generate_room_code(length=8):
-    return ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:length]])
+    return "".join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:length]])
 
 
 def _is_voice_link_room(room_data):
-    return bool(room_data) and room_data.get('room_type') in {'voice_link', 'matched_prayer_call'}
+    return bool(room_data) and room_data.get("room_type") in {"voice_link", "matched_prayer_call"}
 
 
 def _normalize_utc_datetime(value):
     """Normalize Firestore/datetime values to naive UTC for comparisons."""
     if value is None:
         return None
-    if hasattr(value, 'timestamp') and hasattr(value, 'tzinfo'):
+    if hasattr(value, "timestamp") and hasattr(value, "tzinfo"):
         if value.tzinfo is not None:
             return datetime.utcfromtimestamp(value.timestamp())
         return value.replace(tzinfo=None)
@@ -68,40 +72,37 @@ def _format_expires_at_iso(value):
     normalized = _normalize_utc_datetime(value)
     if not normalized:
         return None
-    return normalized.isoformat() + 'Z'
+    return normalized.isoformat() + "Z"
 
 
 def _is_voice_link_expired(room_data, now=None):
     if not _is_voice_link_room(room_data):
         return False
     now = _normalize_utc_datetime(now) or datetime.utcnow()
-    expires_at = _normalize_utc_datetime(room_data.get('expires_at'))
+    expires_at = _normalize_utc_datetime(room_data.get("expires_at"))
     if not expires_at:
         return False
     return expires_at <= now
 
 
 def _active_participant_count(participants):
-    return sum(
-        1 for p in (participants or [])
-        if p.get('is_active', True) is not False
-    )
+    return sum(1 for p in (participants or []) if p.get("is_active", True) is not False)
 
 
 def _is_room_participant(room_data, user_id):
-    for participant in room_data.get('participants', []):
-        if participant.get('user_id') == user_id and participant.get('is_active', True) is not False:
+    for participant in room_data.get("participants", []):
+        if participant.get("user_id") == user_id and participant.get("is_active", True) is not False:
             return True
     return False
 
 
 def _is_anonymous_user(user):
-    return bool(user and user.get('is_anonymous'))
+    return bool(user and user.get("is_anonymous"))
 
 
 def _voice_link_code_matches(room_data, provided_code):
-    stored = (room_data.get('room_code') or '').strip().upper()
-    provided = (provided_code or '').strip().upper()
+    stored = (room_data.get("room_code") or "").strip().upper()
+    provided = (provided_code or "").strip().upper()
     return bool(stored and provided and stored == provided)
 
 
@@ -110,22 +111,22 @@ def _reject_anonymous_outside_voice_link(user, room_data):
     if not _is_anonymous_user(user):
         return None
     if not _is_voice_link_room(room_data):
-        return jsonify({'error': 'Anonymous access is limited to voice call links'}), 403
+        return jsonify({"error": "Anonymous access is limited to voice call links"}), 403
     return None
 
 
 def _public_base_url():
-    return os.getenv('PUBLIC_BASE_URL', 'https://divinebridge.io').rstrip('/')
+    return os.getenv("PUBLIC_BASE_URL", "https://divinebridge.io").rstrip("/")
 
 
-def _deactivate_participant(participants, user_id, reason='media_disconnected'):
+def _deactivate_participant(participants, user_id, reason="media_disconnected"):
     """Mark a participant inactive (e.g. SFU dropped them without calling /leave)."""
     changed = False
     for participant in participants or []:
-        if participant.get('user_id') == user_id and participant.get('is_active', True) is not False:
-            participant['is_active'] = False
-            participant['archived_at'] = datetime.utcnow()
-            participant['reason_archived'] = reason
+        if participant.get("user_id") == user_id and participant.get("is_active", True) is not False:
+            participant["is_active"] = False
+            participant["archived_at"] = datetime.utcnow()
+            participant["reason_archived"] = reason
             changed = True
     return participants, changed
 
@@ -134,14 +135,14 @@ def _voice_link_timer_start_if_needed(room_data, participants, now=None):
     """Start the call TTL when the second participant joins (guest connected)."""
     if not _is_voice_link_room(room_data):
         return None, {}
-    if _normalize_utc_datetime(room_data.get('expires_at')):
+    if _normalize_utc_datetime(room_data.get("expires_at")):
         return None, {}
     if _active_participant_count(participants) < VOICE_LINK_MAX_PARTICIPANTS:
         return None, {}
     now = now or datetime.utcnow()
-    duration_minutes = room_data.get('call_duration_minutes', VOICE_LINK_TTL_MINUTES)
+    duration_minutes = room_data.get("call_duration_minutes", VOICE_LINK_TTL_MINUTES)
     expires_at = now + timedelta(minutes=duration_minutes)
-    return expires_at, {'expires_at': expires_at, 'call_started_at': now}
+    return expires_at, {"expires_at": expires_at, "call_started_at": now}
 
 
 def _expire_stale_voice_links(db, now=None):
@@ -149,29 +150,31 @@ def _expire_stale_voice_links(db, now=None):
     now = now or datetime.utcnow()
     expired_count = 0
     try:
-        rooms = db.collection('prayer_rooms').where('is_active', '==', True).stream()
+        rooms = db.collection("prayer_rooms").where("is_active", "==", True).stream()
         for doc in rooms:
             data = doc.to_dict() or {}
             if not _is_voice_link_room(data):
                 continue
-            expires_at = _normalize_utc_datetime(data.get('expires_at'))
+            expires_at = _normalize_utc_datetime(data.get("expires_at"))
             should_expire = False
             if expires_at and expires_at < now:
                 should_expire = True
             elif not expires_at:
-                created_at = _normalize_utc_datetime(data.get('created_at'))
+                created_at = _normalize_utc_datetime(data.get("created_at"))
                 if created_at and created_at + timedelta(minutes=VOICE_LINK_WAIT_MINUTES) < now:
                     should_expire = True
             if should_expire:
-                doc.reference.update({
-                    'is_active': False,
-                    'ended_at': now,
-                    'ended_by': 'system',
-                    'ended_reason': 'timeout',
-                })
+                doc.reference.update(
+                    {
+                        "is_active": False,
+                        "ended_at": now,
+                        "ended_by": "system",
+                        "ended_reason": "timeout",
+                    }
+                )
                 expired_count += 1
     except Exception as e:
-        logging.warning('expire_stale_voice_links failed: %s', e)
+        logging.warning("expire_stale_voice_links failed: %s", e)
     return expired_count
 
 
@@ -181,7 +184,7 @@ def _mirror_chat_message_to_rtdb(
     user_id: str,
     user_name: str,
     message: str,
-    message_type: str = 'text',
+    message_type: str = "text",
 ) -> None:
     """Mirror chat to RTDB for low-latency clients (same path as send_chat_message)."""
     try:
@@ -189,17 +192,20 @@ def _mirror_chat_message_to_rtdb(
         if not rtdb:
             return
         import time as _time
-        rtdb.reference(f'/rooms/{room_id}/chat/{message_id}').set({
-            'message_id': message_id,
-            'room_id': room_id,
-            'user_id': user_id,
-            'user_name': user_name,
-            'message': message,
-            'timestamp': int(_time.time() * 1000),
-            'message_type': message_type,
-        })
+
+        rtdb.reference(f"/rooms/{room_id}/chat/{message_id}").set(
+            {
+                "message_id": message_id,
+                "room_id": room_id,
+                "user_id": user_id,
+                "user_name": user_name,
+                "message": message,
+                "timestamp": int(_time.time() * 1000),
+                "message_type": message_type,
+            }
+        )
     except Exception as rtdb_err:
-        logging.warning('RTDB chat mirror failed (non-fatal): %s', rtdb_err)
+        logging.warning("RTDB chat mirror failed (non-fatal): %s", rtdb_err)
 
 
 def normalize_participants(participants, host_id):
@@ -214,50 +220,50 @@ def normalize_participants(participants, host_id):
     # First ensure host is marked as speaker and count existing speakers
     for participant in participants:
         participant_copy = dict(participant)
-        user_id = participant_copy.get('user_id')
-        role = participant_copy.get('role')
+        user_id = participant_copy.get("user_id")
+        role = participant_copy.get("role")
 
-        if user_id == host_id and role != 'speaker':
-            participant_copy['role'] = 'speaker'
-            role = 'speaker'
+        if user_id == host_id and role != "speaker":
+            participant_copy["role"] = "speaker"
+            role = "speaker"
             changed = True
 
-        if role == 'speaker':
+        if role == "speaker":
             speaker_count += 1
 
         normalized.append(participant_copy)
 
     # Second pass to add defaults and fill missing roles within the cap
     for participant in normalized:
-        role = participant.get('role')
+        role = participant.get("role")
 
         if role not in VALID_PARTICIPANT_ROLES:
-            if participant.get('user_id') == host_id:
-                participant['role'] = 'speaker'
-                role = 'speaker'
+            if participant.get("user_id") == host_id:
+                participant["role"] = "speaker"
+                role = "speaker"
             elif speaker_count < MAX_ACTIVE_SPEAKERS:
-                participant['role'] = 'speaker'
-                role = 'speaker'
+                participant["role"] = "speaker"
+                role = "speaker"
                 speaker_count += 1
             else:
-                participant['role'] = 'listener'
-                role = 'listener'
+                participant["role"] = "listener"
+                role = "listener"
             changed = True
 
-        if participant.get('requested_role') not in (None, 'speaker'):
-            participant['requested_role'] = None
+        if participant.get("requested_role") not in (None, "speaker"):
+            participant["requested_role"] = None
             changed = True
 
-        if 'requested_role' not in participant:
-            participant['requested_role'] = None
+        if "requested_role" not in participant:
+            participant["requested_role"] = None
             changed = True
 
-        if 'request_timestamp' not in participant:
-            participant['request_timestamp'] = None
+        if "request_timestamp" not in participant:
+            participant["request_timestamp"] = None
             changed = True
 
-        if 'is_muted' not in participant:
-            participant['is_muted'] = False
+        if "is_muted" not in participant:
+            participant["is_muted"] = False
             changed = True
 
     return normalized, speaker_count, changed
@@ -267,15 +273,15 @@ def set_participant_role(participants, user_id, new_role):
     """Set a participant's role and clear any outstanding requests."""
     updated = False
     for participant in participants:
-        if participant.get('user_id') == user_id:
-            if participant.get('role') != new_role:
-                participant['role'] = new_role
+        if participant.get("user_id") == user_id:
+            if participant.get("role") != new_role:
+                participant["role"] = new_role
                 updated = True
-            if participant.get('requested_role'):
-                participant['requested_role'] = None
+            if participant.get("requested_role"):
+                participant["requested_role"] = None
                 updated = True
-            if participant.get('request_timestamp'):
-                participant['request_timestamp'] = None
+            if participant.get("request_timestamp"):
+                participant["request_timestamp"] = None
                 updated = True
             break
     return participants, updated
@@ -283,18 +289,18 @@ def set_participant_role(participants, user_id, new_role):
 
 def find_participant(participants, user_id):
     for participant in participants:
-        if participant.get('user_id') == user_id:
+        if participant.get("user_id") == user_id:
             return participant
     return None
 
 
 def count_speakers(participants):
-    return sum(1 for participant in participants if participant.get('role') == 'speaker')
+    return sum(1 for participant in participants if participant.get("role") == "speaker")
 
 
 def get_max_speakers(room_data):
     try:
-        configured = int(room_data.get('max_speakers', MAX_ACTIVE_SPEAKERS))
+        configured = int(room_data.get("max_speakers", MAX_ACTIVE_SPEAKERS))
     except (TypeError, ValueError):
         configured = MAX_ACTIVE_SPEAKERS
     configured = max(1, configured)
@@ -305,21 +311,22 @@ def _is_group_member(db, group_id: str, user_id: str) -> bool:
     """True if user_id is in prayer_groups/{group_id}.member_ids."""
     if not group_id or not user_id:
         return False
-    snap = db.collection('prayer_groups').document(group_id).get()
+    snap = db.collection("prayer_groups").document(group_id).get()
     if not snap.exists:
         return False
-    members = snap.to_dict().get('member_ids') or []
+    members = snap.to_dict().get("member_ids") or []
     return user_id in members
 
 
 # Rate limiting is now handled centrally in app.py
 # Blueprint-level limiter removed to prevent conflicts
 
+
 def send_email(recipient_email, subject, html_body):
     """
     Helper function to send generic HTML emails.
     Uses the email_sender module to send emails with HTML content.
-    
+
     Args:
         recipient_email: Email address of recipient
         subject: Email subject line
@@ -331,54 +338,59 @@ def send_email(recipient_email, subject, html_body):
         from email.mime.text import MIMEText
         from email.utils import formataddr
         import smtplib
-        
+
         # Create EmailSender instance
         sender = EmailSender()
-        
+
         # Create message
-        msg = MIMEMultipart('alternative')
-        msg['From'] = formataddr(("Divine Bridge", sender.sender_email))
-        msg['To'] = recipient_email
-        msg['Subject'] = subject
-        
+        msg = MIMEMultipart("alternative")
+        msg["From"] = formataddr(("Divine Bridge", sender.sender_email))
+        msg["To"] = recipient_email
+        msg["Subject"] = subject
+
         # Add plain text fallback (extract from HTML if needed)
         plain_text = f"Please view this email in an HTML-enabled email client.\n\n{subject}"
-        
+
         # Attach both versions
-        msg.attach(MIMEText(plain_text, 'plain'))
-        msg.attach(MIMEText(html_body, 'html'))
-        
+        msg.attach(MIMEText(plain_text, "plain"))
+        msg.attach(MIMEText(html_body, "html"))
+
         # Send using SMTP
         with smtplib.SMTP(sender.smtp_server, sender.smtp_port) as server:
             server.starttls()
             server.login(sender.sender_email, sender.sender_password)
             server.send_message(msg)
-            
+
         logging.info(f"Email sent successfully to {recipient_email}")
         return True
-        
+
     except Exception as e:
         logging.error(f"Error sending email to {recipient_email}: {e}")
         return False
 
+
 def get_firestore_client():
     """Get Firestore client instance"""
     from firebase_auth import get_firestore_client as _get_firestore_client
+
     return _get_firestore_client()
+
 
 def get_user_from_session():
     """Get user information from session or Firebase ID token
-    
+
     Priority:
     1. Firebase ID token (most reliable, survives deployments)
     2. Flask session (regenerated if Firebase token is valid)
-    
+
     This function now uses the shared auth_helpers module.
     """
     from auth_helpers import get_user_from_session as get_user_helper
+
     return get_user_helper()
 
-@prayer_room_bp.route('/ice-config', methods=['GET'])
+
+@prayer_room_bp.route("/ice-config", methods=["GET"])
 def get_ice_config():
     """Return optimized ICE/TURN server configuration for WebRTC.
     Provides multiple STUN servers and TURN servers (UDP/TCP) for maximum reliability.
@@ -389,82 +401,83 @@ def get_ice_config():
     """
     try:
         # Defaults: multiple public Google STUN servers for redundancy
-        stun_urls = os.getenv('STUN_URLS', 'stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302,stun:stun2.l.google.com:19302').split(',')
-        turn_urls_env = os.getenv('TURN_URLS', '')
-        turn_username = os.getenv('TURN_USERNAME')
-        turn_password = os.getenv('TURN_PASSWORD')
+        stun_urls = os.getenv(
+            "STUN_URLS", "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302,stun:stun2.l.google.com:19302"
+        ).split(",")
+        turn_urls_env = os.getenv("TURN_URLS", "")
+        turn_username = os.getenv("TURN_USERNAME")
+        turn_password = os.getenv("TURN_PASSWORD")
 
         ice_servers = []
-        
+
         # Add STUN servers first (for NAT discovery)
         for url in stun_urls:
             url = url.strip()
             if url:
-                ice_servers.append({'urls': url})
+                ice_servers.append({"urls": url})
 
         # Handle TURN URLs - enhance with multiple transport options
         if turn_urls_env and turn_username and turn_password:
             # Parse base TURN URL (e.g., "turn:35.192.126.89:3478")
-            base_urls = [url.strip() for url in turn_urls_env.split(',') if url.strip()]
-            
+            base_urls = [url.strip() for url in turn_urls_env.split(",") if url.strip()]
+
             for base_url in base_urls:
                 # Extract host and port from TURN URL
                 # Format: turn:host:port or turn:host:port?transport=udp
-                if base_url.startswith('turn:'):
+                if base_url.startswith("turn:"):
                     # Remove 'turn:' prefix
                     url_part = base_url[5:]
-                    
+
                     # Remove any existing transport parameter
-                    if '?' in url_part:
-                        url_part = url_part.split('?')[0]
-                    
+                    if "?" in url_part:
+                        url_part = url_part.split("?")[0]
+
                     # Add TURN server with UDP transport (preferred for low latency)
-                    ice_servers.append({
-                        'urls': f'turn:{url_part}?transport=udp',
-                        'username': turn_username,
-                        'credential': turn_password
-                    })
-                    
+                    ice_servers.append(
+                        {
+                            "urls": f"turn:{url_part}?transport=udp",
+                            "username": turn_username,
+                            "credential": turn_password,
+                        }
+                    )
+
                     # Add TURN server with TCP transport (fallback for restrictive firewalls)
-                    ice_servers.append({
-                        'urls': f'turn:{url_part}?transport=tcp',
-                        'username': turn_username,
-                        'credential': turn_password
-                    })
-                    
+                    ice_servers.append(
+                        {
+                            "urls": f"turn:{url_part}?transport=tcp",
+                            "username": turn_username,
+                            "credential": turn_password,
+                        }
+                    )
+
                     # Also add without transport specifier (browser will choose)
-                    ice_servers.append({
-                        'urls': f'turn:{url_part}',
-                        'username': turn_username,
-                        'credential': turn_password
-                    })
+                    ice_servers.append(
+                        {"urls": f"turn:{url_part}", "username": turn_username, "credential": turn_password}
+                    )
         elif turn_urls_env:
             # TURN URLs without credentials (e.g., Twilio format or unauthenticated)
-            for url in turn_urls_env.split(','):
+            for url in turn_urls_env.split(","):
                 url = url.strip()
                 if url:
-                    ice_servers.append({'urls': url})
+                    ice_servers.append({"urls": url})
 
         # If no servers were configured at all, provide a fallback
         if not ice_servers:
-            ice_servers = [
-                {'urls': 'stun:stun.l.google.com:19302'},
-                {'urls': 'stun:stun1.l.google.com:19302'}
-            ]
+            ice_servers = [{"urls": "stun:stun.l.google.com:19302"}, {"urls": "stun:stun1.l.google.com:19302"}]
 
-        logging.info(f"Generated ICE Servers. Count: {len(ice_servers)} (STUN: {len([s for s in ice_servers if 'stun:' in s.get('urls', '')])}, TURN: {len([s for s in ice_servers if 'turn:' in s.get('urls', '')])})")
-        return jsonify({'iceServers': ice_servers})
-        
+        logging.info(
+            f"Generated ICE Servers. Count: {len(ice_servers)} (STUN: {len([s for s in ice_servers if 'stun:' in s.get('urls', '')])}, TURN: {len([s for s in ice_servers if 'turn:' in s.get('urls', '')])})"
+        )
+        return jsonify({"iceServers": ice_servers})
+
     except Exception as e:
         logging.error(f"Error generating ICE config: {str(e)}", exc_info=True)
         # Safe fallback to STUN-only
-        fallback_servers = [
-            {'urls': 'stun:stun.l.google.com:19302'},
-            {'urls': 'stun:stun1.l.google.com:19302'}
-        ]
-        return jsonify({'iceServers': fallback_servers}), 200
+        fallback_servers = [{"urls": "stun:stun.l.google.com:19302"}, {"urls": "stun:stun1.l.google.com:19302"}]
+        return jsonify({"iceServers": fallback_servers}), 200
 
-@prayer_room_bp.route('/sfu-token/<room_id>', methods=['POST'])
+
+@prayer_room_bp.route("/sfu-token/<room_id>", methods=["POST"])
 def get_sfu_token(room_id):
     """Issue a Firebase Custom Token for the SFU WebSocket server.
 
@@ -485,15 +498,15 @@ def get_sfu_token(room_id):
 
         user = get_user_from_session()
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
+            return jsonify({"error": "Authentication required"}), 401
 
-        user_id = user['user_id']
-        user_name = user.get('display_name') or user.get('name') or 'Anonymous'
+        user_id = user["user_id"]
+        user_name = user.get("display_name") or user.get("name") or "Anonymous"
 
         db = get_firestore_client()
-        room_doc = db.collection('prayer_rooms').document(room_id).get()
+        room_doc = db.collection("prayer_rooms").document(room_id).get()
         if not room_doc.exists:
-            return jsonify({'error': 'Room not found'}), 404
+            return jsonify({"error": "Room not found"}), 404
         room_data = room_doc.to_dict() or {}
 
         anon_reject = _reject_anonymous_outside_voice_link(user, room_data)
@@ -503,61 +516,61 @@ def get_sfu_token(room_id):
         if _is_voice_link_room(room_data):
             err, code = _voice_link_room_access_checks(room_data, user_id)
             if err:
-                return jsonify({'error': err}), code
-            participant = find_participant(room_data.get('participants', []), user_id)
-            if participant and participant.get('user_name'):
-                user_name = participant.get('user_name')
+                return jsonify({"error": err}), code
+            participant = find_participant(room_data.get("participants", []), user_id)
+            if participant and participant.get("user_name"):
+                user_name = participant.get("user_name")
 
         # Embed roomId + userName as custom claims so the SFU can read them
         # without a separate DB lookup.
         custom_token = fa.create_custom_token(
             user_id,
             developer_claims={
-                'roomId': room_id,
-                'userName': user_name,
-            }
+                "roomId": room_id,
+                "userName": user_name,
+            },
         )
 
         # custom_token is bytes from firebase-admin, decode to string
         if isinstance(custom_token, bytes):
-            custom_token = custom_token.decode('utf-8')
+            custom_token = custom_token.decode("utf-8")
 
         # Use per-room SFU URL for voice_link (multi-region); default for other rooms.
         sfu_url = get_sfu_url_for_room(room_data)
 
-        return jsonify({'customToken': custom_token, 'sfuUrl': sfu_url})
+        return jsonify({"customToken": custom_token, "sfuUrl": sfu_url})
 
     except Exception as e:
-        logging.error(f'SFU token error: {e}', exc_info=True)
-        return jsonify({'error': 'Failed to generate SFU token'}), 500
+        logging.error(f"SFU token error: {e}", exc_info=True)
+        return jsonify({"error": "Failed to generate SFU token"}), 500
 
 
 def _voice_link_room_access_checks(room_data, user_id):
     """Shared guards for voice_link join/sfu-token."""
-    if not room_data.get('is_active', False):
-        return 'Room is not active', 400
+    if not room_data.get("is_active", False):
+        return "Room is not active", 400
     if _is_voice_link_expired(room_data):
-        return 'This call has expired', 400
+        return "This call has expired", 400
     if not _is_room_participant(room_data, user_id):
-        return 'You are not a participant in this call', 403
+        return "You are not a participant in this call", 403
     return None, None
 
 
-@prayer_room_bp.route('/voice-link/create', methods=['POST'])
+@prayer_room_bp.route("/voice-link/create", methods=["POST"])
 def create_voice_link_room():
     """Create a private 1:1 voice-only call room; TTL starts when the guest joins."""
     try:
         user = get_user_from_session()
         if not user:
-            return jsonify({'error': 'Authentication required to create voice links'}), 401
+            return jsonify({"error": "Authentication required to create voice links"}), 401
 
         if _is_anonymous_user(user):
-            return jsonify({'error': 'Sign in required to start a voice call'}), 403
+            return jsonify({"error": "Sign in required to start a voice call"}), 403
 
-        host_id = user['user_id']
-        host_name = user.get('user_name') or user.get('name') or 'Host'
+        host_id = user["user_id"]
+        host_name = user.get("user_name") or user.get("name") or "Host"
         if len(host_name) > 30:
-            return jsonify({'error': 'Host name must be 30 characters or less'}), 400
+            return jsonify({"error": "Host name must be 30 characters or less"}), 400
 
         room_id = _generate_room_id()
         room_code = _generate_room_code(8)
@@ -568,190 +581,198 @@ def create_voice_link_room():
         )
 
         room_data = {
-            'room_id': room_id,
-            'room_name': f'Voice call with {host_name}',
-            'room_type': 'voice_link',
-            'room_privacy': 'private',
-            'room_code': room_code,
-            'host_id': host_id,
-            'host_name': host_name,
-            'created_at': created_at,
-            'call_started_at': None,
-            'sfu_region': sfu_fields['sfu_region'],
-            'sfu_url': sfu_fields['sfu_url'],
-            'media_mode': 'audio_only',
-            'participants': [{
-                'user_id': host_id,
-                'user_name': host_name,
-                'joined_at': created_at,
-                'is_muted': False,
-                'is_host': True,
-                'role': 'speaker',
-                'requested_role': None,
-                'request_timestamp': None,
-            }],
-            'is_active': True,
-            'is_locked': False,
-            'settings': {
-                'allow_anonymous': False,
-                'max_participants': VOICE_LINK_MAX_PARTICIPANTS,
-                'auto_mute_new_participants': False,
+            "room_id": room_id,
+            "room_name": f"Voice call with {host_name}",
+            "room_type": "voice_link",
+            "room_privacy": "private",
+            "room_code": room_code,
+            "host_id": host_id,
+            "host_name": host_name,
+            "created_at": created_at,
+            "call_started_at": None,
+            "sfu_region": sfu_fields["sfu_region"],
+            "sfu_url": sfu_fields["sfu_url"],
+            "media_mode": "audio_only",
+            "participants": [
+                {
+                    "user_id": host_id,
+                    "user_name": host_name,
+                    "joined_at": created_at,
+                    "is_muted": False,
+                    "is_host": True,
+                    "role": "speaker",
+                    "requested_role": None,
+                    "request_timestamp": None,
+                }
+            ],
+            "is_active": True,
+            "is_locked": False,
+            "settings": {
+                "allow_anonymous": False,
+                "max_participants": VOICE_LINK_MAX_PARTICIPANTS,
+                "auto_mute_new_participants": False,
             },
-            'max_speakers': VOICE_LINK_MAX_PARTICIPANTS,
-            'ended_reason': None,
+            "max_speakers": VOICE_LINK_MAX_PARTICIPANTS,
+            "ended_reason": None,
         }
 
         db = get_firestore_client()
-        db.collection('prayer_rooms').document(room_id).set(room_data)
+        db.collection("prayer_rooms").document(room_id).set(room_data)
 
         share_url = f"{_public_base_url()}/call/{room_id}?code={room_code}"
 
-        return jsonify({
-            'success': True,
-            'room_id': room_id,
-            'room_code': room_code,
-            'share_url': share_url,
-            'expires_at': None,
-            'host_id': host_id,
-            'host_name': host_name,
-            'sfu_region': sfu_fields['sfu_region'],
-            'sfu_url': sfu_fields['sfu_url'],
-        })
+        return jsonify(
+            {
+                "success": True,
+                "room_id": room_id,
+                "room_code": room_code,
+                "share_url": share_url,
+                "expires_at": None,
+                "host_id": host_id,
+                "host_name": host_name,
+                "sfu_region": sfu_fields["sfu_region"],
+                "sfu_url": sfu_fields["sfu_url"],
+            }
+        )
 
     except Exception as e:
-        logging.error(f'Error creating voice link room: {e}', exc_info=True)
-        return jsonify({'error': 'Failed to create voice link'}), 500
+        logging.error(f"Error creating voice link room: {e}", exc_info=True)
+        return jsonify({"error": "Failed to create voice link"}), 500
 
 
-@prayer_room_bp.route('/voice-link/participant-disconnected/<room_id>', methods=['POST'])
+@prayer_room_bp.route("/voice-link/participant-disconnected/<room_id>", methods=["POST"])
 def voice_link_participant_disconnected(room_id):
     """Host marks a guest inactive when SFU drops them without calling /leave."""
     try:
         user = get_user_from_session()
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
+            return jsonify({"error": "Authentication required"}), 401
 
         data = request.get_json() or {}
-        target_user_id = (data.get('user_id') or '').strip()
+        target_user_id = (data.get("user_id") or "").strip()
         if not target_user_id:
-            return jsonify({'error': 'user_id is required'}), 400
+            return jsonify({"error": "user_id is required"}), 400
 
         db = get_firestore_client()
-        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_ref = db.collection("prayer_rooms").document(room_id)
         room_doc = room_ref.get()
         if not room_doc.exists:
-            return jsonify({'error': 'Room not found'}), 404
+            return jsonify({"error": "Room not found"}), 404
 
         room_data = room_doc.to_dict() or {}
         if not _is_voice_link_room(room_data):
-            return jsonify({'error': 'Not a voice link room'}), 400
-        if room_data.get('host_id') != user['user_id']:
-            return jsonify({'error': 'Only the host can update participant status'}), 403
-        if target_user_id == room_data.get('host_id'):
-            return jsonify({'error': 'Cannot deactivate the host'}), 400
+            return jsonify({"error": "Not a voice link room"}), 400
+        if room_data.get("host_id") != user["user_id"]:
+            return jsonify({"error": "Only the host can update participant status"}), 403
+        if target_user_id == room_data.get("host_id"):
+            return jsonify({"error": "Cannot deactivate the host"}), 400
 
-        participants = list(room_data.get('participants', []))
-        participants, changed = _deactivate_participant(
-            participants, target_user_id, reason='media_disconnected'
-        )
+        participants = list(room_data.get("participants", []))
+        participants, changed = _deactivate_participant(participants, target_user_id, reason="media_disconnected")
         if not changed:
-            return jsonify({'success': True, 'updated': False})
+            return jsonify({"success": True, "updated": False})
 
-        room_ref.update({
-            'participants': participants,
-            'last_activity': datetime.utcnow(),
-        })
-        return jsonify({'success': True, 'updated': True})
+        room_ref.update(
+            {
+                "participants": participants,
+                "last_activity": datetime.utcnow(),
+            }
+        )
+        return jsonify({"success": True, "updated": True})
     except Exception as e:
-        logging.error(f'Error deactivating voice link participant: {e}', exc_info=True)
-        return jsonify({'error': 'Failed to update participant'}), 500
+        logging.error(f"Error deactivating voice link participant: {e}", exc_info=True)
+        return jsonify({"error": "Failed to update participant"}), 500
 
 
-@prayer_room_bp.route('/create', methods=['POST'])
+@prayer_room_bp.route("/create", methods=["POST"])
 def create_prayer_room():
     """Create a new prayer room"""
     try:
         # Check if user is authenticated
         user = get_user_from_session()
         if not user:
-            return jsonify({'error': 'Authentication required to create rooms'}), 401
+            return jsonify({"error": "Authentication required to create rooms"}), 401
 
         if _is_anonymous_user(user):
-            return jsonify({'error': 'Sign in required to create a room'}), 403
-        
+            return jsonify({"error": "Sign in required to create a room"}), 403
+
         data = request.get_json()
-        room_name = data.get('room_name', 'Prayer Room')
-        room_privacy = data.get('room_privacy', 'public')  # 'public' or 'private'
-        host_id = user['user_id']  # Use authenticated user's ID
-        host_name = user['user_name']  # Use authenticated user's name
-        
+        room_name = data.get("room_name", "Prayer Room")
+        room_privacy = data.get("room_privacy", "public")  # 'public' or 'private'
+        host_id = user["user_id"]  # Use authenticated user's ID
+        host_name = user["user_name"]  # Use authenticated user's name
+
         # Validate room privacy
-        if room_privacy not in ['public', 'private']:
-            return jsonify({'error': 'Room privacy must be either "public" or "private"'}), 400
-        
+        if room_privacy not in ["public", "private"]:
+            return jsonify({"error": 'Room privacy must be either "public" or "private"'}), 400
+
         # Validate room name length
         if len(room_name) > 50:
-            return jsonify({'error': 'Room name must be 50 characters or less'}), 400
-        
+            return jsonify({"error": "Room name must be 50 characters or less"}), 400
+
         # Validate host name length
         if len(host_name) > 30:
-            return jsonify({'error': 'Host name must be 30 characters or less'}), 400
-        
+            return jsonify({"error": "Host name must be 30 characters or less"}), 400
+
         # Generate room ID
-        room_id = ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
-        
+        room_id = "".join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
+
         # Generate room code for private rooms
         room_code = None
-        if room_privacy == 'private':
-            room_code = ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:8]])
-        
+        if room_privacy == "private":
+            room_code = "".join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:8]])
+
         # Create room document
         room_data = {
-            'room_id': room_id,
-            'room_name': room_name,
-            'room_privacy': room_privacy,
-            'room_code': room_code,  # Only set for private rooms
-            'host_id': host_id,
-            'host_name': host_name,
-            'created_at': datetime.utcnow(),
-            'participants': [{
-                'user_id': host_id,
-                'user_name': host_name,
-                'joined_at': datetime.utcnow(),
-                'is_muted': False,
-                'is_host': True,
-                'role': 'speaker',
-                'requested_role': None,
-                'request_timestamp': None
-            }],
-            'is_active': True,
-            'is_locked': False,
-            'settings': {
-                'allow_anonymous': room_privacy == 'public',  # Only allow anonymous for public rooms
-                'max_participants': 50,
-                'auto_mute_new_participants': False
+            "room_id": room_id,
+            "room_name": room_name,
+            "room_privacy": room_privacy,
+            "room_code": room_code,  # Only set for private rooms
+            "host_id": host_id,
+            "host_name": host_name,
+            "created_at": datetime.utcnow(),
+            "participants": [
+                {
+                    "user_id": host_id,
+                    "user_name": host_name,
+                    "joined_at": datetime.utcnow(),
+                    "is_muted": False,
+                    "is_host": True,
+                    "role": "speaker",
+                    "requested_role": None,
+                    "request_timestamp": None,
+                }
+            ],
+            "is_active": True,
+            "is_locked": False,
+            "settings": {
+                "allow_anonymous": room_privacy == "public",  # Only allow anonymous for public rooms
+                "max_participants": 50,
+                "auto_mute_new_participants": False,
             },
-            'max_speakers': MAX_ACTIVE_SPEAKERS
+            "max_speakers": MAX_ACTIVE_SPEAKERS,
         }
-        
+
         db = get_firestore_client()
-        db.collection('prayer_rooms').document(room_id).set(room_data)
-        
-        return jsonify({
-            'success': True,
-            'room_id': room_id,
-            'room_name': room_name,
-            'room_code': room_code,  # Include room code for private rooms
-            'host_id': host_id,
-            'message': f'Room "{room_name}" created successfully'
-        })
-        
+        db.collection("prayer_rooms").document(room_id).set(room_data)
+
+        return jsonify(
+            {
+                "success": True,
+                "room_id": room_id,
+                "room_name": room_name,
+                "room_code": room_code,  # Include room code for private rooms
+                "host_id": host_id,
+                "message": f'Room "{room_name}" created successfully',
+            }
+        )
+
     except Exception as e:
         logging.error(f"Error creating prayer room: {str(e)}")
-        return jsonify({'error': 'Failed to create prayer room'}), 500
+        return jsonify({"error": "Failed to create prayer room"}), 500
 
 
-@prayer_room_bp.route('/group-session', methods=['POST'])
+@prayer_room_bp.route("/group-session", methods=["POST"])
 def ensure_group_prayer_session():
     """Return an active group-bound private room, or create one.
 
@@ -760,221 +781,224 @@ def ensure_group_prayer_session():
     try:
         user = get_user_from_session()
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
+            return jsonify({"error": "Authentication required"}), 401
 
         data = request.get_json(silent=True) or {}
-        group_id = data.get('group_id')
+        group_id = data.get("group_id")
         if not group_id or not isinstance(group_id, str):
-            return jsonify({'error': 'group_id is required'}), 400
+            return jsonify({"error": "group_id is required"}), 400
 
-        uid = user['user_id']
-        host_name = user.get('user_name') or user.get('display_name') or 'Host'
+        uid = user["user_id"]
+        host_name = user.get("user_name") or user.get("display_name") or "Host"
         if len(host_name) > 30:
-            return jsonify({'error': 'User name must be 30 characters or less'}), 400
+            return jsonify({"error": "User name must be 30 characters or less"}), 400
 
         db = get_firestore_client()
         if not _is_group_member(db, group_id, uid):
-            return jsonify({'error': 'Not a member of this group'}), 403
+            return jsonify({"error": "Not a member of this group"}), 403
 
-        group_snap = db.collection('prayer_groups').document(group_id).get()
+        group_snap = db.collection("prayer_groups").document(group_id).get()
         group = group_snap.to_dict() if group_snap.exists else {}
-        gname = (group.get('name') or 'Group').strip() or 'Group'
-        room_name = data.get('room_name') or f'{gname} — Live'
+        gname = (group.get("name") or "Group").strip() or "Group"
+        room_name = data.get("room_name") or f"{gname} — Live"
         room_name = str(room_name).strip()[:50]
 
         rooms_query = (
-            db.collection('prayer_rooms')
-            .where('group_id', '==', group_id)
-            .where('is_active', '==', True)
-            .limit(1)
+            db.collection("prayer_rooms").where("group_id", "==", group_id).where("is_active", "==", True).limit(1)
         )
         existing = list(rooms_query.stream())
         if existing:
             rd = existing[0].to_dict()
-            return jsonify({
-                'success': True,
-                'room_id': rd.get('room_id'),
-                'room_name': rd.get('room_name'),
-                'room_code': rd.get('room_code'),
-                'reused': True,
-            })
+            return jsonify(
+                {
+                    "success": True,
+                    "room_id": rd.get("room_id"),
+                    "room_name": rd.get("room_name"),
+                    "room_code": rd.get("room_code"),
+                    "reused": True,
+                }
+            )
 
-        room_id = ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
-        room_code = ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:8]])
+        room_id = "".join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
+        room_code = "".join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:8]])
 
         room_data = {
-            'room_id': room_id,
-            'room_name': room_name,
-            'room_privacy': 'private',
-            'room_code': room_code,
-            'group_id': group_id,
-            'host_id': uid,
-            'host_name': host_name,
-            'created_at': datetime.utcnow(),
-            'participants': [{
-                'user_id': uid,
-                'user_name': host_name,
-                'joined_at': datetime.utcnow(),
-                'is_muted': False,
-                'is_host': True,
-                'role': 'speaker',
-                'requested_role': None,
-                'request_timestamp': None
-            }],
-            'is_active': True,
-            'is_locked': False,
-            'settings': {
-                'allow_anonymous': False,
-                'max_participants': 50,
-                'auto_mute_new_participants': False
-            },
-            'max_speakers': MAX_ACTIVE_SPEAKERS
+            "room_id": room_id,
+            "room_name": room_name,
+            "room_privacy": "private",
+            "room_code": room_code,
+            "group_id": group_id,
+            "host_id": uid,
+            "host_name": host_name,
+            "created_at": datetime.utcnow(),
+            "participants": [
+                {
+                    "user_id": uid,
+                    "user_name": host_name,
+                    "joined_at": datetime.utcnow(),
+                    "is_muted": False,
+                    "is_host": True,
+                    "role": "speaker",
+                    "requested_role": None,
+                    "request_timestamp": None,
+                }
+            ],
+            "is_active": True,
+            "is_locked": False,
+            "settings": {"allow_anonymous": False, "max_participants": 50, "auto_mute_new_participants": False},
+            "max_speakers": MAX_ACTIVE_SPEAKERS,
         }
 
-        db.collection('prayer_rooms').document(room_id).set(room_data)
+        db.collection("prayer_rooms").document(room_id).set(room_data)
 
         try:
             send_push_to_group(
                 group_id,
-                title=f'{gname} \u2014 Live Prayer',
-                body=f'{host_name} started a live prayer session. Tap to join.',
-                data={'type': 'group_live', 'groupId': group_id, 'roomId': room_id},
+                title=f"{gname} \u2014 Live Prayer",
+                body=f"{host_name} started a live prayer session. Tap to join.",
+                data={"type": "group_live", "groupId": group_id, "roomId": room_id},
                 exclude_user=uid,
-                priority='high',
-                channel_id='group-live',
+                priority="high",
+                channel_id="group-live",
             )
         except Exception as push_err:
-            logging.warning(f'Group session push failed (non-fatal): {push_err}')
+            logging.warning(f"Group session push failed (non-fatal): {push_err}")
 
-        return jsonify({
-            'success': True,
-            'room_id': room_id,
-            'room_name': room_name,
-            'room_code': room_code,
-            'reused': False,
-        })
+        return jsonify(
+            {
+                "success": True,
+                "room_id": room_id,
+                "room_name": room_name,
+                "room_code": room_code,
+                "reused": False,
+            }
+        )
     except Exception as e:
-        logging.error(f'ensure_group_prayer_session error: {e}', exc_info=True)
-        return jsonify({'error': 'Failed to start group session'}), 500
+        logging.error(f"ensure_group_prayer_session error: {e}", exc_info=True)
+        return jsonify({"error": "Failed to start group session"}), 500
 
 
-@prayer_room_bp.route('/find-by-code/<room_code>', methods=['GET'])
+@prayer_room_bp.route("/find-by-code/<room_code>", methods=["GET"])
 def find_room_by_code(room_code):
     """Find a room by its room code"""
     try:
         db = get_firestore_client()
-        
+
         # Query rooms by room_code
-        rooms_query = db.collection('prayer_rooms')\
-            .where('room_code', '==', room_code)\
-            .where('is_active', '==', True)\
-            .limit(1)
-        
+        rooms_query = (
+            db.collection("prayer_rooms").where("room_code", "==", room_code).where("is_active", "==", True).limit(1)
+        )
+
         rooms = list(rooms_query.stream())
-        
+
         if not rooms:
-            return jsonify({'error': 'Room not found'}), 404
-        
+            return jsonify({"error": "Room not found"}), 404
+
         room_doc = rooms[0]
         room_data = room_doc.to_dict()
-        
-        return jsonify({
-            'success': True,
-            'room_id': room_data.get('room_id'),
-            'room_name': room_data.get('room_name'),
-            'room_privacy': room_data.get('room_privacy', 'public')
-        })
-        
+
+        return jsonify(
+            {
+                "success": True,
+                "room_id": room_data.get("room_id"),
+                "room_name": room_data.get("room_name"),
+                "room_privacy": room_data.get("room_privacy", "public"),
+            }
+        )
+
     except Exception as e:
         logging.error(f"Error finding room by code: {str(e)}")
-        return jsonify({'error': 'Failed to find room'}), 500
+        return jsonify({"error": "Failed to find room"}), 500
 
-@prayer_room_bp.route('/join/<room_id>', methods=['POST'])
+
+@prayer_room_bp.route("/join/<room_id>", methods=["POST"])
 def join_prayer_room(room_id):
     """Join an existing prayer room"""
     try:
         # Get user from session first
         user = get_user_from_session()
         if not user:
-            return jsonify({'error': 'User not authenticated'}), 401
-        
-        user_id = user['user_id']
-        user_name = user['user_name']
+            return jsonify({"error": "User not authenticated"}), 401
+
+        user_id = user["user_id"]
+        user_name = user["user_name"]
         data = request.get_json(silent=True) or {}
-        
+
         # Validate user name length
         if len(user_name) > 30:
-            return jsonify({'error': 'User name must be 30 characters or less'}), 400
-        
+            return jsonify({"error": "User name must be 30 characters or less"}), 400
+
         db = get_firestore_client()
-        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_ref = db.collection("prayer_rooms").document(room_id)
         room_doc = room_ref.get()
-        
+
         if not room_doc.exists:
-            return jsonify({'error': 'Room not found'}), 404
-        
+            return jsonify({"error": "Room not found"}), 404
+
         room_data = room_doc.to_dict()
-        
+
         anon_reject = _reject_anonymous_outside_voice_link(user, room_data)
         if anon_reject:
             return anon_reject
 
-        if not room_data.get('is_active', False):
-            return jsonify({'error': 'Room is not active'}), 400
-        
-        if room_data.get('is_locked', False):
-            return jsonify({'error': 'Room is locked'}), 400
+        if not room_data.get("is_active", False):
+            return jsonify({"error": "Room is not active"}), 400
+
+        if room_data.get("is_locked", False):
+            return jsonify({"error": "Room is locked"}), 400
 
         if _is_voice_link_room(room_data):
             if _is_voice_link_expired(room_data):
-                return jsonify({'error': 'This call has expired'}), 400
-            if room_data.get('room_type') == 'matched_prayer_call':
-                if user_id not in room_data.get('participant_ids', []):
-                    return jsonify({'error': 'You are not part of this private prayer call'}), 403
-            if not _voice_link_code_matches(room_data, data.get('room_code')):
-                return jsonify({'error': 'Invalid call link'}), 403
-            display_name = sanitize_string(data.get('display_name', '')).strip()
+                return jsonify({"error": "This call has expired"}), 400
+            if room_data.get("room_type") == "matched_prayer_call":
+                if user_id not in room_data.get("participant_ids", []):
+                    return jsonify({"error": "You are not part of this private prayer call"}), 403
+            if not _voice_link_code_matches(room_data, data.get("room_code")):
+                return jsonify({"error": "Invalid call link"}), 403
+            display_name = sanitize_string(data.get("display_name", "")).strip()
             if display_name:
                 user_name = display_name[:30]
-            elif user_name in ('Anonymous', '') or not str(user_name).strip():
-                user_name = 'Guest'
-        
+            elif user_name in ("Anonymous", "") or not str(user_name).strip():
+                user_name = "Guest"
+
         # Check room privacy and validate room code for private rooms
-        room_privacy = room_data.get('room_privacy', 'public')
-        bonded_group_id = room_data.get('group_id')
+        room_privacy = room_data.get("room_privacy", "public")
+        bonded_group_id = room_data.get("group_id")
         skip_private_code = (
-            room_privacy == 'private'
-            and bonded_group_id
-            and _is_group_member(db, bonded_group_id, user_id)
+            room_privacy == "private" and bonded_group_id and _is_group_member(db, bonded_group_id, user_id)
         )
 
-        if room_privacy == 'private' and not skip_private_code:
-            raw_room_code = data.get('room_code', '')
-            
+        if room_privacy == "private" and not skip_private_code:
+            raw_room_code = data.get("room_code", "")
+
             if isinstance(raw_room_code, (list, dict)):
-                logging.warning(f"join_prayer_room received non-string room_code payload for room {room_id}: {raw_room_code}")
+                logging.warning(
+                    f"join_prayer_room received non-string room_code payload for room {room_id}: {raw_room_code}"
+                )
                 provided_code = str(raw_room_code)
             else:
-                provided_code = '' if raw_room_code is None else str(raw_room_code)
-            
+                provided_code = "" if raw_room_code is None else str(raw_room_code)
+
             provided_code = provided_code.strip().upper()
-            room_code = room_data.get('room_code')
-            
+            room_code = room_data.get("room_code")
+
             if not room_code:
                 logging.error(f"Private room {room_id} has no room_code set in database")
-                return jsonify({'error': 'Room configuration error: missing room code'}), 500
-            
+                return jsonify({"error": "Room configuration error: missing room code"}), 500
+
             if not provided_code:
-                return jsonify({'error': 'Room code is required for private rooms'}), 400
-            
+                return jsonify({"error": "Room code is required for private rooms"}), 400
+
             # Normalize both codes to uppercase for comparison
             if provided_code != room_code.upper():
-                logging.warning(f"Invalid room code provided for room {room_id}: expected {room_code}, got {provided_code}")
-                return jsonify({'error': 'Invalid room code'}), 400
-        
+                logging.warning(
+                    f"Invalid room code provided for room {room_id}: expected {room_code}, got {provided_code}"
+                )
+                return jsonify({"error": "Invalid room code"}), 400
+
         # Normalize participant metadata and check if user is already in the room
-        participants = room_data.get('participants', [])
-        host_id = room_data.get('host_id')
+        participants = room_data.get("participants", [])
+        host_id = room_data.get("host_id")
         max_speakers = get_max_speakers(room_data)
 
         participants, speaker_count, participants_changed = normalize_participants(participants, host_id)
@@ -982,49 +1006,46 @@ def join_prayer_room(room_id):
         if _is_voice_link_room(room_data):
             already_in = _is_room_participant(room_data, user_id)
             if not already_in and _active_participant_count(participants) >= VOICE_LINK_MAX_PARTICIPANTS:
-                return jsonify({'error': 'This call is full'}), 403
+                return jsonify({"error": "This call is full"}), 403
 
         participant_updated = False
-        existing_participant = None
         for p in participants:
-            if p.get('user_id') == user_id:
+            if p.get("user_id") == user_id:
                 # Archive the old session
-                p['is_active'] = False
-                p['archived_at'] = datetime.utcnow()
-                p['reason_archived'] = 'joined_from_new_device'
+                p["is_active"] = False
+                p["archived_at"] = datetime.utcnow()
+                p["reason_archived"] = "joined_from_new_device"
                 participant_updated = True
                 break
 
         # Remove the old participant entry if it was found and marked as inactive
         if participant_updated:
-            participants = [p for p in participants if p.get('user_id') != user_id or p.get('is_active')]
-        
+            participants = [p for p in participants if p.get("user_id") != user_id or p.get("is_active")]
+
         # Add participant to room
         new_participant = {
-            'user_id': user_id,
-            'user_name': user_name,
-            'joined_at': datetime.utcnow(),
-            'is_muted': False,
-            'is_host': user_id == host_id,
-            'role': 'speaker' if _is_voice_link_room(room_data) else (
-                'speaker' if (user_id == host_id or speaker_count < max_speakers) else 'listener'
-            ),
-            'requested_role': None,
-            'request_timestamp': None
+            "user_id": user_id,
+            "user_name": user_name,
+            "joined_at": datetime.utcnow(),
+            "is_muted": False,
+            "is_host": user_id == host_id,
+            "role": "speaker"
+            if _is_voice_link_room(room_data)
+            else ("speaker" if (user_id == host_id or speaker_count < max_speakers) else "listener"),
+            "requested_role": None,
+            "request_timestamp": None,
         }
 
-        if new_participant['role'] == 'speaker' and user_id != host_id:
+        if new_participant["role"] == "speaker" and user_id != host_id:
             speaker_count += 1
 
         participants.append(new_participant)
         update_fields = {
-            'participants': participants,
-            'last_activity': datetime.utcnow(),
-            'max_speakers': max_speakers,
+            "participants": participants,
+            "last_activity": datetime.utcnow(),
+            "max_speakers": max_speakers,
         }
-        started_expires_at, timer_fields = _voice_link_timer_start_if_needed(
-            room_data, participants
-        )
+        started_expires_at, timer_fields = _voice_link_timer_start_if_needed(room_data, participants)
         update_fields.update(timer_fields)
 
         sfu_migration = {}
@@ -1044,646 +1065,639 @@ def join_prayer_room(room_id):
         effective_room = {**room_data, **update_fields}
 
         response = {
-            'success': True,
-            'room_id': room_id,
-            'room_name': room_data.get('room_name'),
-            'host_id': host_id,
-            'participants': participants,
-            'max_speakers': max_speakers,
+            "success": True,
+            "room_id": room_id,
+            "room_name": room_data.get("room_name"),
+            "host_id": host_id,
+            "participants": participants,
+            "max_speakers": max_speakers,
         }
         if _is_voice_link_room(room_data):
-            response['room_type'] = room_data.get('room_type')
-            response['host_name'] = room_data.get('host_name')
-            response['sfu_region'] = effective_room.get('sfu_region')
-            response['sfu_url'] = get_sfu_url_for_room(effective_room)
+            response["room_type"] = room_data.get("room_type")
+            response["host_name"] = room_data.get("host_name")
+            response["sfu_region"] = effective_room.get("sfu_region")
+            response["sfu_url"] = get_sfu_url_for_room(effective_room)
             if sfu_migration:
-                response['sfu_migrated'] = True
-            expires_at = started_expires_at or _normalize_utc_datetime(
-                effective_room.get('expires_at')
-            )
-            response['call_started'] = bool(expires_at)
+                response["sfu_migrated"] = True
+            expires_at = started_expires_at or _normalize_utc_datetime(effective_room.get("expires_at"))
+            response["call_started"] = bool(expires_at)
             if expires_at:
-                response['expires_at'] = _format_expires_at_iso(expires_at)
-                response['seconds_remaining'] = max(
-                    0, int((expires_at - datetime.utcnow()).total_seconds())
-                )
+                response["expires_at"] = _format_expires_at_iso(expires_at)
+                response["seconds_remaining"] = max(0, int((expires_at - datetime.utcnow()).total_seconds()))
         return jsonify(response)
-        
+
     except Exception as e:
         logging.error(f"Error joining prayer room {room_id}: {str(e)}", exc_info=True)
-        return jsonify({'error': 'Failed to join prayer room'}), 500
+        return jsonify({"error": "Failed to join prayer room"}), 500
 
-@prayer_room_bp.route('/leave/<room_id>', methods=['POST'])
+
+@prayer_room_bp.route("/leave/<room_id>", methods=["POST"])
 def leave_prayer_room(room_id):
     """Leave a prayer room"""
     try:
         # Get authenticated user from session
         user = get_user_from_session()
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
-        user_id = user['user_id']
-        
+            return jsonify({"error": "Authentication required"}), 401
+
+        user_id = user["user_id"]
+
         db = get_firestore_client()
-        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_ref = db.collection("prayer_rooms").document(room_id)
         room_doc = room_ref.get()
-        
+
         if not room_doc.exists:
-            return jsonify({'error': 'Room not found'}), 404
-        
+            return jsonify({"error": "Room not found"}), 404
+
         room_data = room_doc.to_dict()
-        
+
         anon_reject = _reject_anonymous_outside_voice_link(user, room_data)
         if anon_reject:
             return anon_reject
 
-        participants_before = list(room_data.get('participants', []))
+        participants_before = list(room_data.get("participants", []))
 
         # Resolve host display name before mutating the participant list (host was incorrectly looked up after removal).
-        host_name_for_notice = room_data.get('host_name') or 'The host'
+        host_name_for_notice = room_data.get("host_name") or "The host"
         for _p in participants_before:
-            if _p.get('user_id') == user_id:
-                host_name_for_notice = _p.get('user_name') or host_name_for_notice
+            if _p.get("user_id") == user_id:
+                host_name_for_notice = _p.get("user_name") or host_name_for_notice
                 break
 
         # Remove leaver from participants
-        participants = [p for p in participants_before if p.get('user_id') != user_id]
+        participants = [p for p in participants_before if p.get("user_id") != user_id]
 
         # If host leaves, close the room and add notification message
-        if room_data.get('host_id') == user_id:
+        if room_data.get("host_id") == user_id:
             # Add notification message to chat
-            chat_ref = db.collection('chat_messages')
+            chat_ref = db.collection("chat_messages")
             sys_msg_id = str(uuid.uuid4())
             notification_message = {
-                'room_id': room_id,
-                'message_id': sys_msg_id,
-                'user_id': 'system',
-                'user_name': 'System',
-                'message': (
+                "room_id": room_id,
+                "message_id": sys_msg_id,
+                "user_id": "system",
+                "user_name": "System",
+                "message": (
                     f"⚠️ {host_name_for_notice} (host) has ended this prayer session. "
                     f"The room will close for everyone in a few seconds."
                 ),
-                'timestamp': datetime.utcnow(),
-                'message_type': 'system_notification'
+                "timestamp": datetime.utcnow(),
+                "message_type": "system_notification",
             }
             chat_ref.add(notification_message)
             _mirror_chat_message_to_rtdb(
                 room_id,
                 sys_msg_id,
-                'system',
-                'System',
-                notification_message['message'],
-                'system_notification',
+                "system",
+                "System",
+                notification_message["message"],
+                "system_notification",
             )
-            
-            room_ref.update({
-                'is_active': False,
-                'closed_at': datetime.utcnow(),
-                'participants': []
-            })
+
+            room_ref.update({"is_active": False, "closed_at": datetime.utcnow(), "participants": []})
         else:
-            normalized_participants, _, changed = normalize_participants(participants, room_data.get('host_id'))
+            normalized_participants, _, changed = normalize_participants(participants, room_data.get("host_id"))
             update_payload = {
-                'participants': normalized_participants,
-                'last_activity': datetime.utcnow(),
-                'max_speakers': get_max_speakers(room_data)
+                "participants": normalized_participants,
+                "last_activity": datetime.utcnow(),
+                "max_speakers": get_max_speakers(room_data),
             }
             room_ref.update(update_payload)
-        
-        return jsonify({'success': True})
-        
+
+        return jsonify({"success": True})
+
     except Exception as e:
         logging.error(f"Error leaving prayer room: {str(e)}")
-        return jsonify({'error': 'Failed to leave prayer room'}), 500
+        return jsonify({"error": "Failed to leave prayer room"}), 500
 
-@prayer_room_bp.route('/<room_id>/participants', methods=['GET'])
+
+@prayer_room_bp.route("/<room_id>/participants", methods=["GET"])
 def get_room_participants(room_id):
     """Get room participants - Optimized for fast loading"""
     try:
         # Get current user to update their name if needed
         user = get_user_from_session()
-        
+
         db = get_firestore_client()
-        room_doc = db.collection('prayer_rooms').document(room_id).get()
-        
+        room_doc = db.collection("prayer_rooms").document(room_id).get()
+
         if not room_doc.exists:
-            return jsonify({'error': 'Room not found'}), 404
-        
+            return jsonify({"error": "Room not found"}), 404
+
         room_data = room_doc.to_dict()
-        participants = room_data.get('participants', [])
-        host_id = room_data.get('host_id')
+        participants = room_data.get("participants", [])
+        host_id = room_data.get("host_id")
         max_speakers = get_max_speakers(room_data)
 
         # Filter out inactive participants (is_active defaults to True for backward compatibility)
-        participants = [p for p in participants if p.get('is_active', True)]
-        
+        participants = [p for p in participants if p.get("is_active", True)]
+
         participants, _, participants_changed = normalize_participants(participants, host_id)
-        
+
         # Only update participant name if necessary and user exists
         # This should be rare, so do it asynchronously after returning response
         if user:
-            user_id = user['user_id']
-            user_name = user.get('user_name') or user.get('name', 'Anonymous')
-            
+            user_id = user["user_id"]
+            user_name = user.get("user_name") or user.get("name", "Anonymous")
+
             # Check if update is needed (quick check first)
             participant_needs_update = False
             for participant in participants:
-                if participant.get('user_id') == user_id:
-                    if participant.get('user_name') != user_name:
+                if participant.get("user_id") == user_id:
+                    if participant.get("user_name") != user_name:
                         participant_needs_update = True
-                        participant['user_name'] = user_name
+                        participant["user_name"] = user_name
                     break
-            
+
             # Only write to Firestore if update is needed
             if participant_needs_update:
                 # Firestore update can happen asynchronously
-                room_ref = db.collection('prayer_rooms').document(room_id)
-                room_ref.update({
-                    'participants': participants,
-                    'last_activity': datetime.utcnow()
-                })
+                room_ref = db.collection("prayer_rooms").document(room_id)
+                room_ref.update({"participants": participants, "last_activity": datetime.utcnow()})
 
-        if participants_changed or room_data.get('max_speakers') != max_speakers:
-            room_ref = db.collection('prayer_rooms').document(room_id)
-            room_ref.update({
-                'participants': participants,
-                'last_activity': datetime.utcnow(),
-                'max_speakers': max_speakers
-            })
-        
-        return jsonify({
-            'success': True,
-            'participants': participants,
-            'room_name': room_data.get('room_name'),
-            'is_active': room_data.get('is_active', False),
-            'max_speakers': max_speakers
-        })
-        
+        if participants_changed or room_data.get("max_speakers") != max_speakers:
+            room_ref = db.collection("prayer_rooms").document(room_id)
+            room_ref.update(
+                {"participants": participants, "last_activity": datetime.utcnow(), "max_speakers": max_speakers}
+            )
+
+        return jsonify(
+            {
+                "success": True,
+                "participants": participants,
+                "room_name": room_data.get("room_name"),
+                "is_active": room_data.get("is_active", False),
+                "max_speakers": max_speakers,
+            }
+        )
+
     except Exception as e:
         logging.error(f"Error getting room participants: {str(e)}")
-        return jsonify({'error': 'Failed to get participants'}), 500
+        return jsonify({"error": "Failed to get participants"}), 500
 
-@prayer_room_bp.route('/<room_id>/mute', methods=['POST'])
+
+@prayer_room_bp.route("/<room_id>/mute", methods=["POST"])
 def mute_participant(room_id):
     """Mute/unmute a participant (host only - for muting other participants)"""
     try:
         data = request.get_json()
-        user_id = data.get('user_id')
-        is_muted = data.get('is_muted', False)
-        
+        user_id = data.get("user_id")
+        is_muted = data.get("is_muted", False)
+
         if not user_id:
-            return jsonify({'error': 'User ID is required'}), 400
-        
+            return jsonify({"error": "User ID is required"}), 400
+
         # Get the requesting user to check if they're the host
         requesting_user = get_user_from_session()
         if not requesting_user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
+            return jsonify({"error": "Authentication required"}), 401
+
         db = get_firestore_client()
-        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_ref = db.collection("prayer_rooms").document(room_id)
         room_doc = room_ref.get()
-        
+
         if not room_doc.exists:
-            return jsonify({'error': 'Room not found'}), 404
-        
+            return jsonify({"error": "Room not found"}), 404
+
         room_data = room_doc.to_dict()
-        
+
         # Check if requesting user is the host
-        if room_data.get('host_id') != requesting_user['user_id']:
-            return jsonify({'error': 'Only the host can mute participants'}), 403
-        
-        participants = room_data.get('participants', [])
-        
+        if room_data.get("host_id") != requesting_user["user_id"]:
+            return jsonify({"error": "Only the host can mute participants"}), 403
+
+        participants = room_data.get("participants", [])
+
         # Update participant mute status
         participant_found = False
         for participant in participants:
-            if participant['user_id'] == user_id:
-                participant['is_muted'] = is_muted
-                participant['mute_source'] = 'host'  # Track who muted
+            if participant["user_id"] == user_id:
+                participant["is_muted"] = is_muted
+                participant["mute_source"] = "host"  # Track who muted
                 participant_found = True
                 break
-        
+
         if not participant_found:
-            return jsonify({'error': 'Participant not found'}), 404
-        
-        normalized_participants, _, _ = normalize_participants(participants, room_data.get('host_id'))
-        room_ref.update({
-            'participants': normalized_participants,
-            'last_activity': datetime.utcnow(),
-            'max_speakers': get_max_speakers(room_data)
-        })
-        
-        return jsonify({'success': True, 'is_muted': is_muted})
-        
+            return jsonify({"error": "Participant not found"}), 404
+
+        normalized_participants, _, _ = normalize_participants(participants, room_data.get("host_id"))
+        room_ref.update(
+            {
+                "participants": normalized_participants,
+                "last_activity": datetime.utcnow(),
+                "max_speakers": get_max_speakers(room_data),
+            }
+        )
+
+        return jsonify({"success": True, "is_muted": is_muted})
+
     except Exception as e:
         logging.error(f"Error muting participant: {str(e)}")
-        return jsonify({'error': 'Failed to mute participant'}), 500
+        return jsonify({"error": "Failed to mute participant"}), 500
 
-@prayer_room_bp.route('/<room_id>/self-mute', methods=['POST'])
+
+@prayer_room_bp.route("/<room_id>/self-mute", methods=["POST"])
 def self_mute_participant(room_id):
     """Update own mute status (any authenticated user can mute/unmute themselves)"""
     try:
         data = request.get_json()
-        is_muted = data.get('is_muted', False)
-        
+        is_muted = data.get("is_muted", False)
+
         # Get the requesting user
         requesting_user = get_user_from_session()
         if not requesting_user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
-        user_id = requesting_user['user_id']
-        
+            return jsonify({"error": "Authentication required"}), 401
+
+        user_id = requesting_user["user_id"]
+
         db = get_firestore_client()
-        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_ref = db.collection("prayer_rooms").document(room_id)
         room_doc = room_ref.get()
-        
+
         if not room_doc.exists:
-            return jsonify({'error': 'Room not found'}), 404
-        
+            return jsonify({"error": "Room not found"}), 404
+
         room_data = room_doc.to_dict()
-        
+
         anon_reject = _reject_anonymous_outside_voice_link(requesting_user, room_data)
         if anon_reject:
             return anon_reject
 
-        participants = room_data.get('participants', [])
-        
+        participants = room_data.get("participants", [])
+
         # Find and update the requesting user's mute status
         participant_found = False
         for participant in participants:
-            if participant.get('user_id') == user_id:
-                participant['is_muted'] = is_muted
+            if participant.get("user_id") == user_id:
+                participant["is_muted"] = is_muted
                 # Store metadata about mute source (preserved by normalize_participants)
-                participant['mute_source'] = 'self'
-                participant['mute_updated_at'] = datetime.utcnow()
+                participant["mute_source"] = "self"
+                participant["mute_updated_at"] = datetime.utcnow()
                 participant_found = True
                 break
-        
+
         # If participant not found, create entry (shouldn't happen, but handle gracefully)
         if not participant_found:
-            user_name = requesting_user.get('name', requesting_user.get('user_name', 'Anonymous'))
+            user_name = requesting_user.get("name", requesting_user.get("user_name", "Anonymous"))
             new_participant = {
-                'user_id': user_id,
-                'user_name': user_name,
-                'joined_at': datetime.utcnow(),
-                'is_muted': is_muted,
-                'is_host': user_id == room_data.get('host_id'),
-                'role': 'listener',
-                'mute_source': 'self',
-                'mute_updated_at': datetime.utcnow()
+                "user_id": user_id,
+                "user_name": user_name,
+                "joined_at": datetime.utcnow(),
+                "is_muted": is_muted,
+                "is_host": user_id == room_data.get("host_id"),
+                "role": "listener",
+                "mute_source": "self",
+                "mute_updated_at": datetime.utcnow(),
             }
             participants.append(new_participant)
-        
+
         # Normalize participants (preserves all fields including mute_source and mute_updated_at)
-        normalized_participants, _, _ = normalize_participants(participants, room_data.get('host_id'))
-        room_ref.update({
-            'participants': normalized_participants,
-            'last_activity': datetime.utcnow(),
-            'max_speakers': get_max_speakers(room_data)
-        })
-        
+        normalized_participants, _, _ = normalize_participants(participants, room_data.get("host_id"))
+        room_ref.update(
+            {
+                "participants": normalized_participants,
+                "last_activity": datetime.utcnow(),
+                "max_speakers": get_max_speakers(room_data),
+            }
+        )
+
         logging.info(f"User {user_id} {'muted' if is_muted else 'unmuted'} themselves in room {room_id}")
-        return jsonify({'success': True, 'is_muted': is_muted})
-        
+        return jsonify({"success": True, "is_muted": is_muted})
+
     except Exception as e:
         logging.error(f"Error updating self mute status: {str(e)}", exc_info=True)
-        return jsonify({'error': 'Failed to update mute status'}), 500
+        return jsonify({"error": "Failed to update mute status"}), 500
 
 
-@prayer_room_bp.route('/room/<room_id>/request-speaker', methods=['POST'])
+@prayer_room_bp.route("/room/<room_id>/request-speaker", methods=["POST"])
 def request_speaker_role(room_id):
     """Listener requests or cancels a request to become a speaker."""
     try:
         user = get_user_from_session()
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
+            return jsonify({"error": "Authentication required"}), 401
 
         data = request.get_json(silent=True) or {}
-        action = data.get('action', 'request')
+        action = data.get("action", "request")
 
         db = get_firestore_client()
-        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_ref = db.collection("prayer_rooms").document(room_id)
         room_doc = room_ref.get()
 
         if not room_doc.exists:
-            return jsonify({'error': 'Room not found'}), 404
+            return jsonify({"error": "Room not found"}), 404
 
         room_data = room_doc.to_dict()
-        participants = room_data.get('participants', [])
-        host_id = room_data.get('host_id')
+        participants = room_data.get("participants", [])
+        host_id = room_data.get("host_id")
         max_speakers = get_max_speakers(room_data)
 
         participants, _, changed = normalize_participants(participants, host_id)
-        participant = find_participant(participants, user['user_id'])
+        participant = find_participant(participants, user["user_id"])
 
         if not participant:
-            return jsonify({'error': 'Participant not found in room'}), 404
+            return jsonify({"error": "Participant not found in room"}), 404
 
-        if participant.get('role') == 'speaker':
-            message = 'You are already a speaker.'
-        elif action == 'cancel':
-            if participant.get('requested_role'):
-                participant['requested_role'] = None
-                participant['request_timestamp'] = None
+        if participant.get("role") == "speaker":
+            message = "You are already a speaker."
+        elif action == "cancel":
+            if participant.get("requested_role"):
+                participant["requested_role"] = None
+                participant["request_timestamp"] = None
                 changed = True
-            message = 'Speaker request cancelled.'
+            message = "Speaker request cancelled."
         else:
-            if participant.get('requested_role') == 'speaker':
-                message = 'Speaker request already submitted.'
+            if participant.get("requested_role") == "speaker":
+                message = "Speaker request already submitted."
             else:
-                participant['requested_role'] = 'speaker'
-                participant['request_timestamp'] = datetime.utcnow()
+                participant["requested_role"] = "speaker"
+                participant["request_timestamp"] = datetime.utcnow()
                 changed = True
-                message = 'Speaker request sent.'
+                message = "Speaker request sent."
 
-        if changed or room_data.get('max_speakers') != max_speakers:
-            room_ref.update({
-                'participants': participants,
-                'last_activity': datetime.utcnow(),
-                'max_speakers': max_speakers
-            })
+        if changed or room_data.get("max_speakers") != max_speakers:
+            room_ref.update(
+                {"participants": participants, "last_activity": datetime.utcnow(), "max_speakers": max_speakers}
+            )
 
-        return jsonify({
-            'success': True,
-            'participants': participants,
-            'max_speakers': max_speakers,
-            'message': message
-        })
+        return jsonify(
+            {"success": True, "participants": participants, "max_speakers": max_speakers, "message": message}
+        )
 
     except Exception as e:
         logging.error(f"Error handling speaker request: {str(e)}", exc_info=True)
-        return jsonify({'error': 'Failed to update speaker request'}), 500
+        return jsonify({"error": "Failed to update speaker request"}), 500
 
 
-@prayer_room_bp.route('/room/<room_id>/promote-speaker', methods=['POST'])
+@prayer_room_bp.route("/room/<room_id>/promote-speaker", methods=["POST"])
 def promote_speaker(room_id):
     """Host promotes a participant to speaker role (up to cap)."""
     try:
         host = get_user_from_session()
         if not host:
-            return jsonify({'error': 'Authentication required'}), 401
+            return jsonify({"error": "Authentication required"}), 401
 
         data = request.get_json(silent=True) or {}
-        target_user_id = data.get('user_id')
+        target_user_id = data.get("user_id")
         if not target_user_id:
-            return jsonify({'error': 'Target user_id is required'}), 400
+            return jsonify({"error": "Target user_id is required"}), 400
 
         db = get_firestore_client()
-        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_ref = db.collection("prayer_rooms").document(room_id)
         room_doc = room_ref.get()
 
         if not room_doc.exists:
-            return jsonify({'error': 'Room not found'}), 404
+            return jsonify({"error": "Room not found"}), 404
 
         room_data = room_doc.to_dict()
-        if room_data.get('host_id') != host['user_id']:
-            return jsonify({'error': 'Only the host can promote speakers'}), 403
+        if room_data.get("host_id") != host["user_id"]:
+            return jsonify({"error": "Only the host can promote speakers"}), 403
 
-        participants = room_data.get('participants', [])
-        host_id = room_data.get('host_id')
+        participants = room_data.get("participants", [])
+        host_id = room_data.get("host_id")
         max_speakers = get_max_speakers(room_data)
 
         participants, _, changed = normalize_participants(participants, host_id)
         target = find_participant(participants, target_user_id)
 
         if not target:
-            return jsonify({'error': 'Participant not found'}), 404
+            return jsonify({"error": "Participant not found"}), 404
 
-        if target.get('role') == 'speaker':
-            return jsonify({
-                'success': True,
-                'participants': participants,
-                'max_speakers': max_speakers,
-                'message': 'Participant is already a speaker.'
-            })
+        if target.get("role") == "speaker":
+            return jsonify(
+                {
+                    "success": True,
+                    "participants": participants,
+                    "max_speakers": max_speakers,
+                    "message": "Participant is already a speaker.",
+                }
+            )
 
         current_speakers = count_speakers(participants)
         if current_speakers >= max_speakers:
-            return jsonify({'error': f'Maximum of {max_speakers} speakers reached.'}), 400
+            return jsonify({"error": f"Maximum of {max_speakers} speakers reached."}), 400
 
-        participants, role_changed = set_participant_role(participants, target_user_id, 'speaker')
+        participants, role_changed = set_participant_role(participants, target_user_id, "speaker")
         if role_changed:
             changed = True
 
-        if changed or room_data.get('max_speakers') != max_speakers:
-            room_ref.update({
-                'participants': participants,
-                'last_activity': datetime.utcnow(),
-                'max_speakers': max_speakers
-            })
+        if changed or room_data.get("max_speakers") != max_speakers:
+            room_ref.update(
+                {"participants": participants, "last_activity": datetime.utcnow(), "max_speakers": max_speakers}
+            )
 
-        return jsonify({
-            'success': True,
-            'participants': participants,
-            'max_speakers': max_speakers,
-            'message': 'Participant promoted to speaker.'
-        })
+        return jsonify(
+            {
+                "success": True,
+                "participants": participants,
+                "max_speakers": max_speakers,
+                "message": "Participant promoted to speaker.",
+            }
+        )
 
     except Exception as e:
         logging.error(f"Error promoting speaker: {str(e)}", exc_info=True)
-        return jsonify({'error': 'Failed to promote participant'}), 500
+        return jsonify({"error": "Failed to promote participant"}), 500
 
 
-@prayer_room_bp.route('/room/<room_id>/demote-speaker', methods=['POST'])
+@prayer_room_bp.route("/room/<room_id>/demote-speaker", methods=["POST"])
 def demote_speaker(room_id):
     """Host demotes a speaker to listener role."""
     try:
         host = get_user_from_session()
         if not host:
-            return jsonify({'error': 'Authentication required'}), 401
+            return jsonify({"error": "Authentication required"}), 401
 
         data = request.get_json(silent=True) or {}
-        target_user_id = data.get('user_id')
+        target_user_id = data.get("user_id")
         if not target_user_id:
-            return jsonify({'error': 'Target user_id is required'}), 400
+            return jsonify({"error": "Target user_id is required"}), 400
 
         db = get_firestore_client()
-        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_ref = db.collection("prayer_rooms").document(room_id)
         room_doc = room_ref.get()
 
         if not room_doc.exists:
-            return jsonify({'error': 'Room not found'}), 404
+            return jsonify({"error": "Room not found"}), 404
 
         room_data = room_doc.to_dict()
-        host_id = room_data.get('host_id')
-        
+        host_id = room_data.get("host_id")
+
         # Allow self-demotion or host demotion
-        is_self_demotion = target_user_id == host['user_id']
-        is_host = host_id == host['user_id']
-        
+        is_self_demotion = target_user_id == host["user_id"]
+        is_host = host_id == host["user_id"]
+
         if not is_self_demotion and not is_host:
-            return jsonify({'error': 'Only the host can demote other speakers'}), 403
+            return jsonify({"error": "Only the host can demote other speakers"}), 403
 
         if target_user_id == host_id:
-            return jsonify({'error': 'Host cannot be demoted from speaker role'}), 400
+            return jsonify({"error": "Host cannot be demoted from speaker role"}), 400
 
-        participants = room_data.get('participants', [])
+        participants = room_data.get("participants", [])
         max_speakers = get_max_speakers(room_data)
 
         participants, _, changed = normalize_participants(participants, host_id)
         target = find_participant(participants, target_user_id)
 
         if not target:
-            return jsonify({'error': 'Participant not found'}), 404
+            return jsonify({"error": "Participant not found"}), 404
 
-        if target.get('role') != 'speaker':
-            return jsonify({
-                'success': True,
-                'participants': participants,
-                'max_speakers': max_speakers,
-                'message': 'Participant is already a listener.'
-            })
+        if target.get("role") != "speaker":
+            return jsonify(
+                {
+                    "success": True,
+                    "participants": participants,
+                    "max_speakers": max_speakers,
+                    "message": "Participant is already a listener.",
+                }
+            )
 
-        participants, role_changed = set_participant_role(participants, target_user_id, 'listener')
+        participants, role_changed = set_participant_role(participants, target_user_id, "listener")
         if role_changed:
             target = find_participant(participants, target_user_id)
             if target:
-                target['is_muted'] = True
+                target["is_muted"] = True
             changed = True
 
-        if changed or room_data.get('max_speakers') != max_speakers:
-            room_ref.update({
-                'participants': participants,
-                'last_activity': datetime.utcnow(),
-                'max_speakers': max_speakers
-            })
+        if changed or room_data.get("max_speakers") != max_speakers:
+            room_ref.update(
+                {"participants": participants, "last_activity": datetime.utcnow(), "max_speakers": max_speakers}
+            )
 
-        return jsonify({
-            'success': True,
-            'participants': participants,
-            'max_speakers': max_speakers,
-            'message': 'Participant demoted to listener.'
-        })
+        return jsonify(
+            {
+                "success": True,
+                "participants": participants,
+                "max_speakers": max_speakers,
+                "message": "Participant demoted to listener.",
+            }
+        )
 
     except Exception as e:
         logging.error(f"Error demoting speaker: {str(e)}", exc_info=True)
-        return jsonify({'error': 'Failed to demote participant'}), 500
+        return jsonify({"error": "Failed to demote participant"}), 500
 
 
-@prayer_room_bp.route('/room/<room_id>/speaker-requests', methods=['GET'])
+@prayer_room_bp.route("/room/<room_id>/speaker-requests", methods=["GET"])
 def get_speaker_requests(room_id):
     """Return pending speaker requests for host moderation UI."""
     try:
         user = get_user_from_session()
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
+            return jsonify({"error": "Authentication required"}), 401
 
         db = get_firestore_client()
-        room_doc = db.collection('prayer_rooms').document(room_id).get()
+        room_doc = db.collection("prayer_rooms").document(room_id).get()
 
         if not room_doc.exists:
-            return jsonify({'error': 'Room not found'}), 404
+            return jsonify({"error": "Room not found"}), 404
 
         room_data = room_doc.to_dict()
-        if room_data.get('host_id') != user['user_id']:
-            return jsonify({'error': 'Only the host can view speaker requests'}), 403
+        if room_data.get("host_id") != user["user_id"]:
+            return jsonify({"error": "Only the host can view speaker requests"}), 403
 
-        participants = room_data.get('participants', [])
-        participants, _, _ = normalize_participants(participants, room_data.get('host_id'))
+        participants = room_data.get("participants", [])
+        participants, _, _ = normalize_participants(participants, room_data.get("host_id"))
 
         requests = []
         for participant in participants:
-            if participant.get('requested_role') == 'speaker':
-                timestamp = participant.get('request_timestamp')
+            if participant.get("requested_role") == "speaker":
+                timestamp = participant.get("request_timestamp")
                 if isinstance(timestamp, datetime):
                     ts_value = timestamp.isoformat()
                 else:
                     ts_value = timestamp
-                requests.append({
-                    'user_id': participant.get('user_id'),
-                    'user_name': participant.get('user_name'),
-                    'request_timestamp': ts_value
-                })
+                requests.append(
+                    {
+                        "user_id": participant.get("user_id"),
+                        "user_name": participant.get("user_name"),
+                        "request_timestamp": ts_value,
+                    }
+                )
 
-        requests.sort(key=lambda item: item.get('request_timestamp') or '')
+        requests.sort(key=lambda item: item.get("request_timestamp") or "")
 
-        return jsonify({
-            'success': True,
-            'requests': requests,
-            'max_speakers': get_max_speakers(room_data)
-        })
+        return jsonify({"success": True, "requests": requests, "max_speakers": get_max_speakers(room_data)})
 
     except Exception as e:
         logging.error(f"Error fetching speaker requests: {str(e)}", exc_info=True)
-        return jsonify({'error': 'Failed to fetch speaker requests'}), 500
+        return jsonify({"error": "Failed to fetch speaker requests"}), 500
 
-@prayer_room_bp.route('/<room_id>/remove', methods=['POST'])
+
+@prayer_room_bp.route("/<room_id>/remove", methods=["POST"])
 def remove_participant(room_id):
     """Remove a participant from the room (host only)"""
     try:
         data = request.get_json()
-        user_id = data.get('user_id')
-        
+        user_id = data.get("user_id")
+
         if not user_id:
-            return jsonify({'error': 'User ID is required'}), 400
-        
+            return jsonify({"error": "User ID is required"}), 400
+
         # Get the requesting user to check if they're the host
         requesting_user = get_user_from_session()
         if not requesting_user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
+            return jsonify({"error": "Authentication required"}), 401
+
         db = get_firestore_client()
-        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_ref = db.collection("prayer_rooms").document(room_id)
         room_doc = room_ref.get()
-        
+
         if not room_doc.exists:
-            return jsonify({'error': 'Room not found'}), 404
-        
+            return jsonify({"error": "Room not found"}), 404
+
         room_data = room_doc.to_dict()
-        
+
         # Check if requesting user is the host
-        if room_data.get('host_id') != requesting_user['user_id']:
-            return jsonify({'error': 'Only the host can remove participants'}), 403
-        
-        participants = room_data.get('participants', [])
-        
+        if room_data.get("host_id") != requesting_user["user_id"]:
+            return jsonify({"error": "Only the host can remove participants"}), 403
+
+        participants = room_data.get("participants", [])
+
         # Find the participant to remove
         participant_to_remove = None
         for participant in participants:
-            if participant['user_id'] == user_id:
+            if participant["user_id"] == user_id:
                 participant_to_remove = participant
                 break
-        
+
         if not participant_to_remove:
-            return jsonify({'error': 'Participant not found'}), 404
-        
+            return jsonify({"error": "Participant not found"}), 404
+
         # Remove participant
-        participants = [p for p in participants if p['user_id'] != user_id]
-        
+        participants = [p for p in participants if p["user_id"] != user_id]
+
         # Add notification message to chat
-        chat_ref = db.collection('chat_messages')
+        chat_ref = db.collection("chat_messages")
         sys_msg_id = str(uuid.uuid4())
         notification_message = {
-            'room_id': room_id,
-            'message_id': sys_msg_id,
-            'user_id': 'system',
-            'user_name': 'System',
-            'message': f"👋 {participant_to_remove.get('user_name', 'A participant')} has been removed from the room by the host.",
-            'timestamp': datetime.utcnow(),
-            'message_type': 'system_notification'
+            "room_id": room_id,
+            "message_id": sys_msg_id,
+            "user_id": "system",
+            "user_name": "System",
+            "message": f"👋 {participant_to_remove.get('user_name', 'A participant')} has been removed from the room by the host.",
+            "timestamp": datetime.utcnow(),
+            "message_type": "system_notification",
         }
         chat_ref.add(notification_message)
         _mirror_chat_message_to_rtdb(
             room_id,
             sys_msg_id,
-            'system',
-            'System',
-            notification_message['message'],
-            'system_notification',
+            "system",
+            "System",
+            notification_message["message"],
+            "system_notification",
         )
-        
-        room_ref.update({
-            'participants': participants,
-            'last_activity': datetime.utcnow()
-        })
-        
-        return jsonify({'success': True, 'removed_user': participant_to_remove.get('user_name', 'Unknown')})
-        
+
+        room_ref.update({"participants": participants, "last_activity": datetime.utcnow()})
+
+        return jsonify({"success": True, "removed_user": participant_to_remove.get("user_name", "Unknown")})
+
     except Exception as e:
         logging.error(f"Error removing participant: {str(e)}")
-        return jsonify({'error': 'Failed to remove participant'}), 500
+        return jsonify({"error": "Failed to remove participant"}), 500
 
-@prayer_room_bp.route('/<room_id>/chat', methods=['POST'])
+
+@prayer_room_bp.route("/<room_id>/chat", methods=["POST"])
 def send_chat_message(room_id):
     """Send a chat message to the room"""
     try:
@@ -1691,234 +1705,241 @@ def send_chat_message(room_id):
         user = get_user_from_session()
         if not user:
             logging.error("Chat message: No user in session")
-            return jsonify({'error': 'Authentication required'}), 401
-        
+            return jsonify({"error": "Authentication required"}), 401
+
         data = request.get_json()
         if not data:
             logging.error("Chat message: No JSON data in request")
-            return jsonify({'error': 'Invalid request: JSON data required'}), 400
-        
+            return jsonify({"error": "Invalid request: JSON data required"}), 400
+
         # Use authenticated user data, not from request body
-        user_id = user.get('user_id')
+        user_id = user.get("user_id")
         if not user_id:
             logging.error(f"Chat message: No user_id in session user: {user}")
-            return jsonify({'error': 'Invalid user session'}), 401
-        
-        user_name = user.get('name', 'Anonymous')
-        
+            return jsonify({"error": "Invalid user session"}), 401
+
+        user_name = user.get("name", "Anonymous")
+
         # Validate input data
-        is_valid, validation_errors = validate_data(data, 'chat_message')
+        is_valid, validation_errors = validate_data(data, "chat_message")
         if not is_valid:
             logging.error(f"Chat message validation failed: {validation_errors}")
-            return jsonify({'error': 'Invalid input', 'details': validation_errors}), 400
-        
-        message = sanitize_string(data['message'], max_length=1000)
+            return jsonify({"error": "Invalid input", "details": validation_errors}), 400
+
+        message = sanitize_string(data["message"], max_length=1000)
         if not message or not message.strip():
-            return jsonify({'error': 'Message cannot be empty'}), 400
-        
+            return jsonify({"error": "Message cannot be empty"}), 400
+
         db = get_firestore_client()
-        
+
         # Add message to chat collection
         chat_data = {
-            'room_id': room_id,
-            'user_id': user_id,
-            'user_name': user_name,
-            'message': message,
-            'timestamp': firestore.SERVER_TIMESTAMP,
-            'message_id': str(uuid.uuid4())
+            "room_id": room_id,
+            "user_id": user_id,
+            "user_name": user_name,
+            "message": message,
+            "timestamp": firestore.SERVER_TIMESTAMP,
+            "message_id": str(uuid.uuid4()),
         }
-        
-        message_ref = db.collection('chat_messages').add(chat_data)
+
+        db.collection("chat_messages").add(chat_data)
         logging.info(f"Chat message added successfully for room {room_id} by user {user_id}")
 
         # Also write to RTDB for real-time delivery to all connected clients
         _mirror_chat_message_to_rtdb(
             room_id,
-            chat_data['message_id'],
+            chat_data["message_id"],
             user_id,
             user_name,
             message,
-            'text',
+            "text",
         )
 
-        return jsonify({'success': True, 'message_id': chat_data['message_id']}), 200
-        
+        return jsonify({"success": True, "message_id": chat_data["message_id"]}), 200
+
     except KeyError as e:
         logging.error(f"Chat message KeyError: {str(e)}", exc_info=True)
-        return jsonify({'error': f'Missing required field: {str(e)}'}), 400
+        return jsonify({"error": f"Missing required field: {str(e)}"}), 400
     except Exception as e:
         logging.error(f"Error sending chat message: {str(e)}", exc_info=True)
-        return jsonify({'error': 'Failed to send message'}), 500
+        return jsonify({"error": "Failed to send message"}), 500
 
-@prayer_room_bp.route('/<room_id>/chat', methods=['GET'])
+
+@prayer_room_bp.route("/<room_id>/chat", methods=["GET"])
 def get_chat_messages(room_id):
     """Get chat messages for a room"""
     try:
         db = get_firestore_client()
-        
+
         # Try to get recent messages (last 50)
         try:
-            messages_query = db.collection('chat_messages')\
-                .where('room_id', '==', room_id)\
-                .order_by('timestamp', direction='DESCENDING')\
+            messages_query = (
+                db.collection("chat_messages")
+                .where("room_id", "==", room_id)
+                .order_by("timestamp", direction="DESCENDING")
                 .limit(50)
-            
+            )
+
             messages = []
             for doc in messages_query.stream():
                 message_data = doc.to_dict()
-                messages.append({
-                    'message_id': message_data.get('message_id'),
-                    'user_id': message_data.get('user_id'),
-                    'user_name': message_data.get('user_name'),
-                    'message': message_data.get('message'),
-                    'timestamp': message_data.get('timestamp').isoformat() if message_data.get('timestamp') else None
-                })
-            
+                messages.append(
+                    {
+                        "message_id": message_data.get("message_id"),
+                        "user_id": message_data.get("user_id"),
+                        "user_name": message_data.get("user_name"),
+                        "message": message_data.get("message"),
+                        "timestamp": message_data.get("timestamp").isoformat()
+                        if message_data.get("timestamp")
+                        else None,
+                    }
+                )
+
             # Reverse to get chronological order
             messages.reverse()
-            
+
         except Exception as index_error:
             # If index error, return empty messages array
             logging.warning(f"Firestore index error for chat messages: {str(index_error)}")
             messages = []
-        
-        return jsonify({
-            'success': True,
-            'messages': messages
-        })
-        
+
+        return jsonify({"success": True, "messages": messages})
+
     except Exception as e:
         logging.error(f"Error getting chat messages: {str(e)}")
-        return jsonify({'error': 'Failed to get messages'}), 500
+        return jsonify({"error": "Failed to get messages"}), 500
 
-@prayer_room_bp.route('/rooms', methods=['GET'])
+
+@prayer_room_bp.route("/rooms", methods=["GET"])
 def get_active_rooms():
     """Get list of active prayer rooms"""
     try:
         db = get_firestore_client()
-        
+
         # Get active rooms
-        rooms_query = db.collection('prayer_rooms')\
-            .where('is_active', '==', True)\
-            .order_by('created_at', direction='DESCENDING')\
+        rooms_query = (
+            db.collection("prayer_rooms")
+            .where("is_active", "==", True)
+            .order_by("created_at", direction="DESCENDING")
             .limit(20)
-        
+        )
+
         rooms = []
         for doc in rooms_query.stream():
             room_data = doc.to_dict()
             if _is_voice_link_room(room_data):
                 continue
             # Convert datetime objects to strings for JSON serialization
-            if 'created_at' in room_data:
-                room_data['created_at'] = room_data['created_at'].isoformat()
-            
+            if "created_at" in room_data:
+                room_data["created_at"] = room_data["created_at"].isoformat()
+
             # Add participant count
-            room_data['participant_count'] = len(room_data.get('participants', []))
-            
+            room_data["participant_count"] = len(room_data.get("participants", []))
+
             # Preserve host_name before removing participants
-            host_name = room_data.get('host_name', 'Anonymous')
-            room_privacy = room_data.get('room_privacy', 'public')
-            
+            host_name = room_data.get("host_name", "Anonymous")
+            room_privacy = room_data.get("room_privacy", "public")
+
             # Remove sensitive data
-            if 'participants' in room_data:
-                del room_data['participants']
-            
+            if "participants" in room_data:
+                del room_data["participants"]
+
             # Ensure host_name and privacy are included in the response
-            room_data['host_name'] = host_name
-            room_data['room_privacy'] = room_privacy
-            
+            room_data["host_name"] = host_name
+            room_data["room_privacy"] = room_privacy
+
             rooms.append(room_data)
-        
-        return jsonify({'rooms': rooms})
-        
+
+        return jsonify({"rooms": rooms})
+
     except Exception as e:
         logging.error(f"Error getting active rooms: {str(e)}")
-        return jsonify({'error': 'Failed to get rooms'}), 500
+        return jsonify({"error": "Failed to get rooms"}), 500
 
-@prayer_room_bp.route('/room/<room_id>', methods=['GET'])
+
+@prayer_room_bp.route("/room/<room_id>", methods=["GET"])
 def get_room_details(room_id):
     """Get details of a specific room"""
     try:
         db = get_firestore_client()
-        
-        room_doc = db.collection('prayer_rooms').document(room_id).get()
+
+        room_doc = db.collection("prayer_rooms").document(room_id).get()
         if not room_doc.exists:
-            return jsonify({'error': 'Room not found'}), 404
-        
+            return jsonify({"error": "Room not found"}), 404
+
         room_data = room_doc.to_dict()
-        if room_data.get('room_type') == 'matched_prayer_call':
+        if room_data.get("room_type") == "matched_prayer_call":
             user = get_user_from_session()
             if not user:
-                return jsonify({'error': 'Authentication required'}), 401
-            if user['user_id'] not in room_data.get('participant_ids', []):
-                return jsonify({'error': 'You are not part of this private prayer call'}), 403
+                return jsonify({"error": "Authentication required"}), 401
+            if user["user_id"] not in room_data.get("participant_ids", []):
+                return jsonify({"error": "You are not part of this private prayer call"}), 403
             # Credentials and internal request linkage are returned only through
             # the authenticated private-prayer call endpoint.
-            room_data.pop('room_code', None)
-            room_data.pop('private_prayer_request_id', None)
-            room_data.pop('participant_ids', None)
-        
+            room_data.pop("room_code", None)
+            room_data.pop("private_prayer_request_id", None)
+            room_data.pop("participant_ids", None)
+
         # Convert datetime objects to strings
-        if 'created_at' in room_data:
-            room_data['created_at'] = room_data['created_at'].isoformat()
-        
+        if "created_at" in room_data:
+            room_data["created_at"] = room_data["created_at"].isoformat()
+
         # Add participant count
-        room_data['participant_count'] = len(room_data.get('participants', []))
-        
-        return jsonify({'room': room_data})
-        
+        room_data["participant_count"] = len(room_data.get("participants", []))
+
+        return jsonify({"room": room_data})
+
     except Exception as e:
         logging.error(f"Error getting room details: {str(e)}")
-        return jsonify({'error': 'Failed to get room details'}), 500
+        return jsonify({"error": "Failed to get room details"}), 500
 
-@prayer_room_bp.route('/room/<room_id>/settings', methods=['PUT'])
+
+@prayer_room_bp.route("/room/<room_id>/settings", methods=["PUT"])
 def update_room_settings(room_id):
     """Update room settings (host only)"""
     try:
         data = request.get_json()
         user = get_user_from_session()
-        
+
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
+            return jsonify({"error": "Authentication required"}), 401
+
         db = get_firestore_client()
-        room_doc = db.collection('prayer_rooms').document(room_id)
+        room_doc = db.collection("prayer_rooms").document(room_id)
         room_data = room_doc.get().to_dict()
-        
+
         # Check if user is the host
-        if room_data.get('host_id') != user['user_id']:
-            return jsonify({'error': 'Only the host can update settings'}), 403
-        
+        if room_data.get("host_id") != user["user_id"]:
+            return jsonify({"error": "Only the host can update settings"}), 403
+
         # Update settings
-        new_settings = data.get('settings', {})
-        current_settings = room_data.get('settings', {})
+        new_settings = data.get("settings", {})
+        current_settings = room_data.get("settings", {})
         current_settings.update(new_settings)
-        
-        room_doc.update({
-            'settings': current_settings,
-            'updated_at': datetime.utcnow()
-        })
-        
-        return jsonify({'success': True, 'settings': current_settings})
-        
+
+        room_doc.update({"settings": current_settings, "updated_at": datetime.utcnow()})
+
+        return jsonify({"success": True, "settings": current_settings})
+
     except Exception as e:
         logging.error(f"Error updating room settings: {str(e)}")
-        return jsonify({'error': 'Failed to update settings'}), 500
+        return jsonify({"error": "Failed to update settings"}), 500
 
-@prayer_room_bp.route('/room/<room_id>/end', methods=['POST'])
+
+@prayer_room_bp.route("/room/<room_id>/end", methods=["POST"])
 def end_room(room_id):
     """End a prayer room (host only; voice_link allows either participant)."""
     try:
         user = get_user_from_session()
-        
+
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
+            return jsonify({"error": "Authentication required"}), 401
+
         db = get_firestore_client()
-        room_doc = db.collection('prayer_rooms').document(room_id)
+        room_doc = db.collection("prayer_rooms").document(room_id)
         room_snap = room_doc.get()
         if not room_snap.exists:
-            return jsonify({'error': 'Room not found'}), 404
+            return jsonify({"error": "Room not found"}), 404
         room_data = room_snap.to_dict() or {}
 
         anon_reject = _reject_anonymous_outside_voice_link(user, room_data)
@@ -1926,105 +1947,107 @@ def end_room(room_id):
             return anon_reject
 
         data = request.get_json(silent=True) or {}
-        ended_reason = data.get('ended_reason', 'user')
-        if ended_reason not in ('user', 'timeout'):
-            ended_reason = 'user'
+        ended_reason = data.get("ended_reason", "user")
+        if ended_reason not in ("user", "timeout"):
+            ended_reason = "user"
 
         if _is_voice_link_room(room_data):
-            if not _is_room_participant(room_data, user['user_id']):
-                return jsonify({'error': 'Only call participants can end this call'}), 403
-        elif room_data.get('host_id') != user['user_id']:
-            return jsonify({'error': 'Only the host can end the room'}), 403
-        
-        room_doc.update({
-            'is_active': False,
-            'ended_at': datetime.utcnow(),
-            'ended_by': user['user_id'],
-            'ended_reason': ended_reason,
-        })
-        
-        return jsonify({'success': True})
-        
+            if not _is_room_participant(room_data, user["user_id"]):
+                return jsonify({"error": "Only call participants can end this call"}), 403
+        elif room_data.get("host_id") != user["user_id"]:
+            return jsonify({"error": "Only the host can end the room"}), 403
+
+        room_doc.update(
+            {
+                "is_active": False,
+                "ended_at": datetime.utcnow(),
+                "ended_by": user["user_id"],
+                "ended_reason": ended_reason,
+            }
+        )
+
+        return jsonify({"success": True})
+
     except Exception as e:
         logging.error(f"Error ending room: {str(e)}")
-        return jsonify({'error': 'Failed to end room'}), 500
+        return jsonify({"error": "Failed to end room"}), 500
+
 
 # Multi-Device Session Management Endpoints
-@prayer_room_bp.route('/<room_id>/check-session', methods=['POST'])
+@prayer_room_bp.route("/<room_id>/check-session", methods=["POST"])
 def check_user_session(room_id):
     try:
         user = get_user_from_session()
-        user_id = user.get('user_id') if user else None
+        user_id = user.get("user_id") if user else None
 
         if not user_id:
-            return jsonify({'error': 'User not authenticated'}), 401
+            return jsonify({"error": "User not authenticated"}), 401
 
         db = get_firestore_client()
-        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_ref = db.collection("prayer_rooms").document(room_id)
         room_doc = room_ref.get()
 
         if not room_doc.exists:
-            return jsonify({'error': 'Room not found'}), 404
+            return jsonify({"error": "Room not found"}), 404
 
         room_data = room_doc.to_dict()
-        participants = room_data.get('participants', [])
+        participants = room_data.get("participants", [])
 
         session_exists = any(
-            p.get('user_id') == user_id and p.get('session_id') and p.get('is_active', True)
-            for p in participants
+            p.get("user_id") == user_id and p.get("session_id") and p.get("is_active", True) for p in participants
         )
 
-        return jsonify({'session_exists': session_exists})
+        return jsonify({"session_exists": session_exists})
     except Exception as e:
         logging.error(f"Error checking user session in room {room_id}: {e}", exc_info=True)
-        return jsonify({'error': 'Failed to check user session'}), 500
+        return jsonify({"error": "Failed to check user session"}), 500
 
-@prayer_room_bp.route('/<room_id>/register-session', methods=['POST'])
+
+@prayer_room_bp.route("/<room_id>/register-session", methods=["POST"])
 def register_user_session(room_id):
     """Register a new device session"""
     try:
         # Get authenticated user from session
         user = get_user_from_session()
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
+            return jsonify({"error": "Authentication required"}), 401
+
         data = request.get_json()
-        device_id = data.get('device_id')
-        device_info = data.get('device_info', {})
-        
+        device_id = data.get("device_id")
+        device_info = data.get("device_info", {})
+
         # Use authenticated user ID
-        user_id = user['user_id']
-        
+        user_id = user["user_id"]
+
         if not device_id:
-            return jsonify({'error': 'Device ID is required'}), 400
-        
+            return jsonify({"error": "Device ID is required"}), 400
+
         # Sanitize device info to prevent information disclosure
         sanitized_device_info = {
-            'user_agent': sanitize_string(device_info.get('user_agent', ''), max_length=200),
-            'platform': sanitize_string(device_info.get('platform', ''), max_length=50),
-            'language': sanitize_string(device_info.get('language', ''), max_length=10)
+            "user_agent": sanitize_string(device_info.get("user_agent", ""), max_length=200),
+            "platform": sanitize_string(device_info.get("platform", ""), max_length=50),
+            "language": sanitize_string(device_info.get("language", ""), max_length=10),
         }
-        
+
         db = get_firestore_client()
-        
+
         # Deactivate any existing sessions for this user across ALL rooms
         # This ensures users can only have one active session at a time
         # OPTIMIZED: Use collection group query for better performance
         try:
-            sessions_query = db.collection_group('device_sessions')\
-                .where('user_id', '==', user_id)\
-                .where('is_active', '==', True)\
+            sessions_query = (
+                db.collection_group("device_sessions")
+                .where("user_id", "==", user_id)
+                .where("is_active", "==", True)
                 .limit(10)
-            
+            )
+
             batch = db.batch()
             session_count = 0
             for session_doc in sessions_query.stream():
-                batch.update(session_doc.reference, {
-                    'is_active': False,
-                    'ended_at': datetime.utcnow()
-                })
+                batch.update(session_doc.reference, {"is_active": False, "ended_at": datetime.utcnow()})
                 session_count += 1
-            
+
             if session_count > 0:
                 batch.commit()
                 logging.info(f"Deactivated {session_count} existing session(s) for user {user_id}")
@@ -2032,300 +2055,309 @@ def register_user_session(room_id):
             logging.warning(f"Collection group query failed, using fallback: {e}")
             try:
                 # Fallback: only check current room
-                current_room_sessions = db.collection('prayer_rooms').document(room_id)\
-                    .collection('device_sessions')\
-                    .where('user_id', '==', user_id)\
-                    .where('is_active', '==', True)\
+                current_room_sessions = (
+                    db.collection("prayer_rooms")
+                    .document(room_id)
+                    .collection("device_sessions")
+                    .where("user_id", "==", user_id)
+                    .where("is_active", "==", True)
                     .stream()
-                
+                )
+
                 for session_doc in current_room_sessions:
-                    session_doc.reference.update({
-                        'is_active': False,
-                        'ended_at': datetime.utcnow()
-                    })
+                    session_doc.reference.update({"is_active": False, "ended_at": datetime.utcnow()})
             except Exception as fallback_error:
                 logging.error(f"Fallback session deactivation also failed: {fallback_error}")
-        
+
         # Register new session
         session_data = {
-            'user_id': user_id,
-            'device_id': device_id,
-            'device_info': sanitized_device_info,
-            'is_active': True,
-            'created_at': datetime.utcnow(),
-            'last_seen': datetime.utcnow()
+            "user_id": user_id,
+            "device_id": device_id,
+            "device_info": sanitized_device_info,
+            "is_active": True,
+            "created_at": datetime.utcnow(),
+            "last_seen": datetime.utcnow(),
         }
-        
-        db.collection('prayer_rooms').document(room_id)\
-            .collection('device_sessions').add(session_data)
-        
-        return jsonify({'success': True})
-        
+
+        db.collection("prayer_rooms").document(room_id).collection("device_sessions").add(session_data)
+
+        return jsonify({"success": True})
+
     except Exception as e:
         logging.error(f"Error registering session: {str(e)}", exc_info=True)
-        return jsonify({'error': 'Failed to register session'}), 500
+        return jsonify({"error": "Failed to register session"}), 500
 
-@prayer_room_bp.route('/<room_id>/disconnect-session', methods=['POST'])
+
+@prayer_room_bp.route("/<room_id>/disconnect-session", methods=["POST"])
 def disconnect_session(room_id):
     """Disconnect existing session (for device switching)"""
     try:
         # Get authenticated user from session
         user = get_user_from_session()
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
-        user_id = user['user_id']
-        
+            return jsonify({"error": "Authentication required"}), 401
+
+        user_id = user["user_id"]
+
         db = get_firestore_client()
-        
+
         # Deactivate all sessions for this user
-        sessions_ref = db.collection('prayer_rooms').document(room_id)\
-            .collection('device_sessions')\
-            .where('user_id', '==', user_id)\
-            .where('is_active', '==', True)
-        
+        sessions_ref = (
+            db.collection("prayer_rooms")
+            .document(room_id)
+            .collection("device_sessions")
+            .where("user_id", "==", user_id)
+            .where("is_active", "==", True)
+        )
+
         for session_doc in sessions_ref.stream():
-            session_doc.reference.update({
-                'is_active': False,
-                'ended_at': datetime.utcnow()
-            })
-        
-        return jsonify({'success': True})
-        
+            session_doc.reference.update({"is_active": False, "ended_at": datetime.utcnow()})
+
+        return jsonify({"success": True})
+
     except Exception as e:
         logging.error(f"Error disconnecting session: {str(e)}")
-        return jsonify({'error': 'Failed to disconnect session'}), 500
+        return jsonify({"error": "Failed to disconnect session"}), 500
 
-@prayer_room_bp.route('/my-rooms', methods=['GET'])
+
+@prayer_room_bp.route("/my-rooms", methods=["GET"])
 def get_my_rooms():
     """Get all rooms created by the current user"""
     try:
         user = get_user_from_session()
-        
+
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
+            return jsonify({"error": "Authentication required"}), 401
+
         db = get_firestore_client()
-        
+
         # Get rooms created by this user (simplified query to avoid composite index)
-        rooms_ref = db.collection('prayer_rooms')\
-            .where('host_id', '==', user['user_id'])\
-            .limit(50)
-        
+        rooms_ref = db.collection("prayer_rooms").where("host_id", "==", user["user_id"]).limit(50)
+
         rooms = []
         for doc in rooms_ref.stream():
             room_data = doc.to_dict()
-            room_data['room_id'] = doc.id
+            room_data["room_id"] = doc.id
             # Convert Firestore timestamps to ISO strings
-            if 'created_at' in room_data and hasattr(room_data['created_at'], 'timestamp'):
-                room_data['created_at'] = room_data['created_at'].timestamp()
-            if 'last_activity' in room_data and hasattr(room_data['last_activity'], 'timestamp'):
-                room_data['last_activity'] = room_data['last_activity'].timestamp()
+            if "created_at" in room_data and hasattr(room_data["created_at"], "timestamp"):
+                room_data["created_at"] = room_data["created_at"].timestamp()
+            if "last_activity" in room_data and hasattr(room_data["last_activity"], "timestamp"):
+                room_data["last_activity"] = room_data["last_activity"].timestamp()
             rooms.append(room_data)
-        
+
         # Sort by created_at in Python (since we can't order_by in the query)
-        rooms.sort(key=lambda x: x.get('created_at', 0), reverse=True)
-        
-        return jsonify({'rooms': rooms})
-        
+        rooms.sort(key=lambda x: x.get("created_at", 0), reverse=True)
+
+        return jsonify({"rooms": rooms})
+
     except Exception as e:
         logging.error(f"Error getting user rooms: {str(e)}")
-        return jsonify({'error': 'Failed to get user rooms'}), 500
+        return jsonify({"error": "Failed to get user rooms"}), 500
 
-@prayer_room_bp.route('/schedule', methods=['POST'])
+
+@prayer_room_bp.route("/schedule", methods=["POST"])
 def schedule_room():
     """Schedule a prayer room for a future time"""
     try:
         user = get_user_from_session()
-        
+
         if not user:
             logging.error("No user found in session for schedule request")
-            return jsonify({'error': 'Authentication required'}), 401
-        
+            return jsonify({"error": "Authentication required"}), 401
+
         data = request.get_json()
         logging.info(f"Schedule request data: {data}")
-        
-        room_name = data.get('room_name')
-        room_description = data.get('room_description', '')
-        scheduled_time = data.get('scheduled_time')
-        room_privacy = data.get('room_privacy', 'public')
-        host_name = user.get('user_name', 'Anonymous')
-        
+
+        room_name = data.get("room_name")
+        room_description = data.get("room_description", "")
+        scheduled_time = data.get("scheduled_time")
+        room_privacy = data.get("room_privacy", "public")
+        host_name = user.get("user_name", "Anonymous")
+
         logging.info(f"Parsed data - room_name: {room_name}, scheduled_time: {scheduled_time}")
-        
+
         if not room_name:
             logging.error("Room name is missing")
-            return jsonify({'error': 'Room name is required'}), 400
-        
+            return jsonify({"error": "Room name is required"}), 400
+
         if not scheduled_time:
             logging.error("Scheduled time is missing")
-            return jsonify({'error': 'Scheduled time is required'}), 400
-        
+            return jsonify({"error": "Scheduled time is required"}), 400
+
         # Validate room name length
         if len(room_name) > 50:
             logging.error(f"Room name too long: {len(room_name)} characters")
-            return jsonify({'error': 'Room name must be 50 characters or less'}), 400
-        
+            return jsonify({"error": "Room name must be 50 characters or less"}), 400
+
         # Validate host name length
         if len(host_name) > 30:
             logging.error(f"Host name too long: {len(host_name)} characters")
-            return jsonify({'error': 'Host name must be 30 characters or less'}), 400
-        
+            return jsonify({"error": "Host name must be 30 characters or less"}), 400
+
         # Parse scheduled time - handle local timezone
         try:
             # Get timezone offset from request (in minutes, negative for timezones ahead of UTC)
-            timezone_offset_minutes = data.get('timezone_offset', 0)
-            
+            timezone_offset_minutes = data.get("timezone_offset", 0)
+
             # The datetime-local input provides local time without timezone info
             # We need to convert it to UTC for storage
-            if 'T' in scheduled_time and '+' not in scheduled_time and 'Z' not in scheduled_time:
+            if "T" in scheduled_time and "+" not in scheduled_time and "Z" not in scheduled_time:
                 # This is a local datetime from datetime-local input
                 # Parse it as naive datetime (no timezone info)
                 local_datetime = datetime.fromisoformat(scheduled_time)
                 logging.info(f"Parsed scheduled time (local): {local_datetime}")
-                
+
                 # Convert local time to UTC
                 # getTimezoneOffset() returns minutes to ADD to local time to get UTC
                 # For CST (UTC-6), it returns +360 (6 hours behind UTC)
                 # So UTC = local + offset_minutes
-                from datetime import timezone, timedelta
+                from datetime import timedelta
+
                 offset_timedelta = timedelta(minutes=timezone_offset_minutes)
                 scheduled_datetime = local_datetime + offset_timedelta
-                logging.info(f"Converted to UTC: {scheduled_datetime} (local: {local_datetime}, offset: {timezone_offset_minutes} minutes = {timezone_offset_minutes/60} hours)")
+                logging.info(
+                    f"Converted to UTC: {scheduled_datetime} (local: {local_datetime}, offset: {timezone_offset_minutes} minutes = {timezone_offset_minutes/60} hours)"
+                )
             else:
                 # This has timezone info, parse normally
-                scheduled_datetime = datetime.fromisoformat(scheduled_time.replace('Z', '+00:00'))
+                scheduled_datetime = datetime.fromisoformat(scheduled_time.replace("Z", "+00:00"))
                 logging.info(f"Parsed scheduled time (with timezone): {scheduled_datetime}")
         except ValueError as e:
             logging.error(f"Invalid scheduled time format: {scheduled_time}, error: {e}")
-            return jsonify({'error': 'Invalid scheduled time format'}), 400
-        
+            return jsonify({"error": "Invalid scheduled time format"}), 400
+
         # Check if scheduled time is in the future (using UTC)
         now_utc = datetime.utcnow()
         if scheduled_datetime <= now_utc:
             logging.error(f"Scheduled time is in the past: {scheduled_datetime} UTC (current time: {now_utc} UTC)")
-            return jsonify({'error': 'Scheduled time must be in the future'}), 400
-        
+            return jsonify({"error": "Scheduled time must be in the future"}), 400
+
         db = get_firestore_client()
-        
+
         # Get recurring pattern data
-        is_recurring = data.get('is_recurring', False)
-        recurrence_pattern = data.get('recurrence_pattern')  # 'weekly', 'biweekly', 'monthly'
-        recurrence_end_date = data.get('recurrence_end_date')
-        recurrence_days = data.get('recurrence_days', [])  # For weekly: [0, 2, 4] = Monday, Wednesday, Friday
-        
+        is_recurring = data.get("is_recurring", False)
+        recurrence_pattern = data.get("recurrence_pattern")  # 'weekly', 'biweekly', 'monthly'
+        recurrence_end_date = data.get("recurrence_end_date")
+        recurrence_days = data.get("recurrence_days", [])  # For weekly: [0, 2, 4] = Monday, Wednesday, Friday
+
         # Create scheduled room data
         scheduled_room_data = {
-            'room_name': room_name,
-            'room_description': room_description,
-            'room_privacy': room_privacy,
-            'host_id': user['user_id'],
-            'host_name': host_name,
-            'scheduled_time': scheduled_datetime,
-            'created_at': datetime.utcnow(),
-            'status': 'scheduled',
-            'is_recurring': is_recurring
+            "room_name": room_name,
+            "room_description": room_description,
+            "room_privacy": room_privacy,
+            "host_id": user["user_id"],
+            "host_name": host_name,
+            "scheduled_time": scheduled_datetime,
+            "created_at": datetime.utcnow(),
+            "status": "scheduled",
+            "is_recurring": is_recurring,
         }
-        
+
         # Add recurring pattern data
         if is_recurring and recurrence_pattern:
-            scheduled_room_data['recurrence_pattern'] = recurrence_pattern
-            scheduled_room_data['recurrence_days'] = recurrence_days
-            
+            scheduled_room_data["recurrence_pattern"] = recurrence_pattern
+            scheduled_room_data["recurrence_days"] = recurrence_days
+
             # Parse end date if provided (also convert to UTC if it's a date-only input)
             if recurrence_end_date:
                 try:
                     # If it's a date-only input (YYYY-MM-DD), treat as local midnight
-                    if 'T' not in recurrence_end_date:
+                    if "T" not in recurrence_end_date:
                         # Date only - set to midnight local time and convert to UTC
-                        end_datetime_local = datetime.fromisoformat(recurrence_end_date + 'T00:00')
+                        end_datetime_local = datetime.fromisoformat(recurrence_end_date + "T00:00")
                         offset_timedelta = timedelta(minutes=timezone_offset_minutes)
                         end_datetime = end_datetime_local + offset_timedelta
-                    elif 'T' in recurrence_end_date and '+' not in recurrence_end_date and 'Z' not in recurrence_end_date:
+                    elif (
+                        "T" in recurrence_end_date and "+" not in recurrence_end_date and "Z" not in recurrence_end_date
+                    ):
                         # datetime-local input - convert to UTC
                         end_datetime_local = datetime.fromisoformat(recurrence_end_date)
                         offset_timedelta = timedelta(minutes=timezone_offset_minutes)
                         end_datetime = end_datetime_local + offset_timedelta
                     else:
                         # Has timezone info
-                        end_datetime = datetime.fromisoformat(recurrence_end_date.replace('Z', '+00:00'))
-                    scheduled_room_data['recurrence_end_date'] = end_datetime
+                        end_datetime = datetime.fromisoformat(recurrence_end_date.replace("Z", "+00:00"))
+                    scheduled_room_data["recurrence_end_date"] = end_datetime
                 except ValueError:
                     logging.warning(f"Invalid recurrence end date: {recurrence_end_date}")
-            
+
             # If no end date, default to 3 months from now
-            if 'recurrence_end_date' not in scheduled_room_data:
-                scheduled_room_data['recurrence_end_date'] = scheduled_datetime + timedelta(days=90)
-        
+            if "recurrence_end_date" not in scheduled_room_data:
+                scheduled_room_data["recurrence_end_date"] = scheduled_datetime + timedelta(days=90)
+
         # Generate room code for private rooms
-        if room_privacy == 'private':
-            scheduled_room_data['room_code'] = ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
-        
+        if room_privacy == "private":
+            scheduled_room_data["room_code"] = "".join(
+                [chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]]
+            )
+
         # Save the scheduled room
-        scheduled_room_ref = db.collection('scheduled_rooms').add(scheduled_room_data)
+        scheduled_room_ref = db.collection("scheduled_rooms").add(scheduled_room_data)
         scheduled_room_id = scheduled_room_ref[1].id
-        
+
         logging.info(f"Successfully scheduled room: {scheduled_room_id}")
-        
-        return jsonify({
-            'success': True,
-            'scheduled_room_id': scheduled_room_id,
-            'room_code': scheduled_room_data.get('room_code'),
-            'message': 'Room scheduled successfully'
-        })
-        
+
+        return jsonify(
+            {
+                "success": True,
+                "scheduled_room_id": scheduled_room_id,
+                "room_code": scheduled_room_data.get("room_code"),
+                "message": "Room scheduled successfully",
+            }
+        )
+
     except Exception as e:
         logging.error(f"Error scheduling room: {str(e)}")
-        return jsonify({'error': 'Failed to schedule room'}), 500
+        return jsonify({"error": "Failed to schedule room"}), 500
 
-@prayer_room_bp.route('/my-scheduled-rooms', methods=['GET'])
+
+@prayer_room_bp.route("/my-scheduled-rooms", methods=["GET"])
 def get_my_scheduled_rooms():
     """Get all scheduled rooms created by the current user"""
     try:
         user = get_user_from_session()
-        
+
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
+            return jsonify({"error": "Authentication required"}), 401
+
         db = get_firestore_client()
-        
+
         # Get scheduled rooms created by this user (simplified query to avoid composite index)
-        scheduled_rooms_ref = db.collection('scheduled_rooms')\
-            .where('host_id', '==', user['user_id'])\
-            .limit(50)
-        
+        scheduled_rooms_ref = db.collection("scheduled_rooms").where("host_id", "==", user["user_id"]).limit(50)
+
         scheduled_rooms = []
         for doc in scheduled_rooms_ref.stream():
             room_data = doc.to_dict()
-            room_data['scheduled_room_id'] = doc.id
+            room_data["scheduled_room_id"] = doc.id
             # Convert Firestore timestamps to ISO strings
-            if 'scheduled_time' in room_data and hasattr(room_data['scheduled_time'], 'timestamp'):
-                room_data['scheduled_time'] = room_data['scheduled_time'].timestamp()
-            if 'created_at' in room_data and hasattr(room_data['created_at'], 'timestamp'):
-                room_data['created_at'] = room_data['created_at'].timestamp()
+            if "scheduled_time" in room_data and hasattr(room_data["scheduled_time"], "timestamp"):
+                room_data["scheduled_time"] = room_data["scheduled_time"].timestamp()
+            if "created_at" in room_data and hasattr(room_data["created_at"], "timestamp"):
+                room_data["created_at"] = room_data["created_at"].timestamp()
             scheduled_rooms.append(room_data)
-        
+
         # Sort by scheduled_time in Python (since we can't order_by in the query)
-        scheduled_rooms.sort(key=lambda x: x.get('scheduled_time', 0), reverse=False)
-        
+        scheduled_rooms.sort(key=lambda x: x.get("scheduled_time", 0), reverse=False)
+
         # Filter out past scheduled meetings and cancelled rooms
         now = datetime.now().timestamp()
         future_scheduled_rooms = [
-            room for room in scheduled_rooms 
-            if room.get('scheduled_time', 0) > now 
-            and room.get('status') != 'cancelled'
+            room
+            for room in scheduled_rooms
+            if room.get("scheduled_time", 0) > now and room.get("status") != "cancelled"
         ]
-        
-        return jsonify({'scheduled_rooms': future_scheduled_rooms})
-        
+
+        return jsonify({"scheduled_rooms": future_scheduled_rooms})
+
     except Exception as e:
         logging.error(f"Error getting scheduled rooms: {str(e)}")
-        return jsonify({'error': 'Failed to get scheduled rooms'}), 500
+        return jsonify({"error": "Failed to get scheduled rooms"}), 500
 
-@prayer_room_bp.route('/scheduled-room/<scheduled_room_id>', methods=['DELETE'])
+
+@prayer_room_bp.route("/scheduled-room/<scheduled_room_id>", methods=["DELETE"])
 def cancel_scheduled_room(scheduled_room_id):
     """Cancel a scheduled room
-    
+
     Handles both regular scheduled rooms and recurring sessions:
     - If canceling a recurring parent (is_recurring=True), cancels all future instances
     - If canceling a recurring instance (is_recurring_instance=True), can cancel:
@@ -2334,62 +2366,62 @@ def cancel_scheduled_room(scheduled_room_id):
     """
     try:
         user = get_user_from_session()
-        
+
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
+            return jsonify({"error": "Authentication required"}), 401
+
         db = get_firestore_client()
-        
+
         # Get query parameter for canceling entire series
-        cancel_all = request.args.get('cancel_all', 'false').lower() == 'true'
-        
+        cancel_all = request.args.get("cancel_all", "false").lower() == "true"
+
         # Get the scheduled room
-        scheduled_room_ref = db.collection('scheduled_rooms').document(scheduled_room_id)
+        scheduled_room_ref = db.collection("scheduled_rooms").document(scheduled_room_id)
         scheduled_room_doc = scheduled_room_ref.get()
-        
+
         if not scheduled_room_doc.exists:
-            return jsonify({'error': 'Scheduled room not found'}), 404
-        
+            return jsonify({"error": "Scheduled room not found"}), 404
+
         scheduled_room_data = scheduled_room_doc.to_dict()
-        
+
         # Check if user is the host
-        if scheduled_room_data.get('host_id') != user['user_id']:
-            return jsonify({'error': 'Only the host can cancel scheduled rooms'}), 403
-        
-        is_recurring = scheduled_room_data.get('is_recurring', False)
-        is_recurring_instance = scheduled_room_data.get('is_recurring_instance', False)
-        parent_recurring_id = scheduled_room_data.get('parent_recurring_id')
-        
+        if scheduled_room_data.get("host_id") != user["user_id"]:
+            return jsonify({"error": "Only the host can cancel scheduled rooms"}), 403
+
+        is_recurring = scheduled_room_data.get("is_recurring", False)
+        is_recurring_instance = scheduled_room_data.get("is_recurring_instance", False)
+        parent_recurring_id = scheduled_room_data.get("parent_recurring_id")
+
         # Import timezone for timezone-aware datetime comparisons
         from datetime import timezone
-        
+
         # Handle recurring session cancellation
         if is_recurring:
             # This is a recurring parent - cancel all future instances
             logging.info(f"Canceling recurring parent session {scheduled_room_id}")
-            
+
             # Find all future instances linked to this parent
             # Query by parent_recurring_id only, then filter by status and scheduled_time in Python
             # This avoids needing any composite index
             now = datetime.now(timezone.utc)
-            all_instances = db.collection('scheduled_rooms')\
-                .where('parent_recurring_id', '==', scheduled_room_id)\
-                .stream()
-            
+            all_instances = (
+                db.collection("scheduled_rooms").where("parent_recurring_id", "==", scheduled_room_id).stream()
+            )
+
             instances_canceled = 0
             for instance_doc in all_instances:
                 instance_data = instance_doc.to_dict()
-                
+
                 # Filter by status in Python
-                if instance_data.get('status') != 'scheduled':
+                if instance_data.get("status") != "scheduled":
                     continue
-                
-                instance_time = instance_data.get('scheduled_time')
-                
+
+                instance_time = instance_data.get("scheduled_time")
+
                 # Handle Firestore timestamp conversion
                 if instance_time:
                     # Convert Firestore Timestamp to datetime if needed
-                    if hasattr(instance_time, 'timestamp') and callable(getattr(instance_time, 'timestamp', None)):
+                    if hasattr(instance_time, "timestamp") and callable(getattr(instance_time, "timestamp", None)):
                         # Firestore Timestamp object
                         instance_time = datetime.fromtimestamp(instance_time.timestamp(), tz=timezone.utc)
                     elif isinstance(instance_time, datetime):
@@ -2398,51 +2430,46 @@ def cancel_scheduled_room(scheduled_room_id):
                             instance_time = instance_time.replace(tzinfo=timezone.utc)
                     else:
                         # Skip if we can't convert
-                        logging.warning(f"Could not convert scheduled_time for instance {instance_doc.id}: {type(instance_time)}")
+                        logging.warning(
+                            f"Could not convert scheduled_time for instance {instance_doc.id}: {type(instance_time)}"
+                        )
                         continue
-                    
+
                     # Only delete future instances
                     if instance_time > now:
                         instance_doc.reference.delete()
                         instances_canceled += 1
-            
+
             # Mark the parent as cancelled (don't delete, so we can track it)
-            scheduled_room_ref.update({
-                'status': 'cancelled',
-                'cancelled_at': datetime.now(timezone.utc)
-            })
-            
+            scheduled_room_ref.update({"status": "cancelled", "cancelled_at": datetime.now(timezone.utc)})
+
             logging.info(f"Cancelled recurring parent {scheduled_room_id} and {instances_canceled} future instances")
-            return jsonify({
-                'success': True,
-                'recurring_parent': True,
-                'instances_canceled': instances_canceled
-            })
-        
+            return jsonify({"success": True, "recurring_parent": True, "instances_canceled": instances_canceled})
+
         elif is_recurring_instance and cancel_all:
             # Cancel entire recurring series by canceling the parent
             if not parent_recurring_id:
                 logging.error(f"Recurring instance {scheduled_room_id} has no parent_recurring_id")
-                return jsonify({'error': 'Parent recurring session not found'}), 404
-            
-            parent_ref = db.collection('scheduled_rooms').document(parent_recurring_id)
+                return jsonify({"error": "Parent recurring session not found"}), 404
+
+            parent_ref = db.collection("scheduled_rooms").document(parent_recurring_id)
             parent_doc = parent_ref.get()
-            
+
             if not parent_doc.exists:
                 logging.error(f"Parent recurring session {parent_recurring_id} not found in database")
-                return jsonify({'error': 'Parent recurring session not found'}), 404
-            
+                return jsonify({"error": "Parent recurring session not found"}), 404
+
             parent_data = parent_doc.to_dict()
-            
+
             # Verify user owns the parent
-            if parent_data.get('host_id') != user['user_id']:
-                return jsonify({'error': 'Only the host can cancel the entire series'}), 403
-            
+            if parent_data.get("host_id") != user["user_id"]:
+                return jsonify({"error": "Only the host can cancel the entire series"}), 403
+
             # Cancel all future instances (including the current one if it's in the future)
             now = datetime.now(timezone.utc)
             try:
                 # Get current instance's scheduled time to check if it's in the future
-                current_instance_time = scheduled_room_data.get('scheduled_time')
+                current_instance_time = scheduled_room_data.get("scheduled_time")
                 # Handle both timezone-aware and naive datetimes
                 if current_instance_time:
                     # If current_instance_time is naive, make it timezone-aware
@@ -2451,28 +2478,28 @@ def cancel_scheduled_room(scheduled_room_id):
                     current_is_future = current_instance_time > now
                 else:
                     current_is_future = False
-                
+
                 # Query for all instances by parent_recurring_id only, then filter by status and scheduled_time in Python
                 # This avoids needing any composite index
-                all_instances_query = db.collection('scheduled_rooms')\
-                    .where('parent_recurring_id', '==', parent_recurring_id)\
-                    .stream()
-                
+                all_instances_query = (
+                    db.collection("scheduled_rooms").where("parent_recurring_id", "==", parent_recurring_id).stream()
+                )
+
                 instances_canceled = 0
                 instance_ids_to_delete = []
                 for instance_doc in all_instances_query:
                     instance_data = instance_doc.to_dict()
-                    
+
                     # Filter by status in Python
-                    if instance_data.get('status') != 'scheduled':
+                    if instance_data.get("status") != "scheduled":
                         continue
-                    
-                    instance_time = instance_data.get('scheduled_time')
-                    
+
+                    instance_time = instance_data.get("scheduled_time")
+
                     # Handle Firestore timestamp conversion
                     if instance_time:
                         # Convert Firestore Timestamp to datetime if needed
-                        if hasattr(instance_time, 'timestamp') and callable(getattr(instance_time, 'timestamp', None)):
+                        if hasattr(instance_time, "timestamp") and callable(getattr(instance_time, "timestamp", None)):
                             # Firestore Timestamp object
                             instance_time = datetime.fromtimestamp(instance_time.timestamp(), tz=timezone.utc)
                         elif isinstance(instance_time, datetime):
@@ -2481,91 +2508,94 @@ def cancel_scheduled_room(scheduled_room_id):
                                 instance_time = instance_time.replace(tzinfo=timezone.utc)
                         else:
                             # Skip if we can't convert
-                            logging.warning(f"Could not convert scheduled_time for instance {instance_doc.id}: {type(instance_time)}")
+                            logging.warning(
+                                f"Could not convert scheduled_time for instance {instance_doc.id}: {type(instance_time)}"
+                            )
                             continue
-                        
+
                         # Only include future instances
                         if instance_time > now:
                             instance_ids_to_delete.append(instance_doc.id)
                             instances_canceled += 1
-                
+
                 # Delete all future instances
                 for instance_id in instance_ids_to_delete:
-                    db.collection('scheduled_rooms').document(instance_id).delete()
-                
+                    db.collection("scheduled_rooms").document(instance_id).delete()
+
                 # Delete the current instance if it's not already included in future instances
                 # (i.e., if it's in the past or present)
                 if scheduled_room_id not in instance_ids_to_delete:
                     scheduled_room_ref.delete()
                     # Current instance was separate, so we count it separately
                     # (it's not a "future" instance, but we still canceled it)
-                
+
                 # Mark the parent as cancelled
-                parent_ref.update({
-                    'status': 'cancelled',
-                    'cancelled_at': datetime.now(timezone.utc)
-                })
-                
-                logging.info(f"Cancelled entire recurring series {parent_recurring_id} and {instances_canceled} future instances (current instance {'included' if current_is_future else 'separate'})")
-                return jsonify({
-                    'success': True,
-                    'recurring_series_canceled': True,
-                    'instances_canceled': instances_canceled
-                })
+                parent_ref.update({"status": "cancelled", "cancelled_at": datetime.now(timezone.utc)})
+
+                logging.info(
+                    f"Cancelled entire recurring series {parent_recurring_id} and {instances_canceled} future instances (current instance {'included' if current_is_future else 'separate'})"
+                )
+                return jsonify(
+                    {"success": True, "recurring_series_canceled": True, "instances_canceled": instances_canceled}
+                )
             except Exception as query_error:
                 logging.error(f"Error querying/deleting future instances: {str(query_error)}", exc_info=True)
                 raise
-        
+
         else:
             # Regular scheduled room or single recurring instance
             scheduled_room_ref.delete()
-            return jsonify({'success': True})
-        
+            return jsonify({"success": True})
+
     except Exception as e:
         import traceback
+
         error_trace = traceback.format_exc()
         logging.error(f"Error canceling scheduled room {scheduled_room_id}: {str(e)}\n{error_trace}")
         # Include error details in development for debugging
-        error_message = 'Failed to cancel scheduled room'
-        if os.getenv('FLASK_ENV') != 'production':
-            error_message = f'Failed to cancel scheduled room: {str(e)}'
-        return jsonify({'error': error_message}), 500
+        error_message = "Failed to cancel scheduled room"
+        if os.getenv("FLASK_ENV") != "production":
+            error_message = f"Failed to cancel scheduled room: {str(e)}"
+        return jsonify({"error": error_message}), 500
+
 
 def notify_subscribers_about_reopened_room(original_room_id, new_room_id, room_name, room_code, host_name):
     """Send email notifications to room subscribers when room is reopened"""
     try:
         db = get_firestore_client()
-        
+
         # Get all active subscribers for this room
-        subscriptions = db.collection('room_subscriptions')\
-            .where('original_room_id', '==', original_room_id)\
-            .where('is_active', '==', True)\
-            .where('notification_preferences.email', '==', True)\
+        subscriptions = (
+            db.collection("room_subscriptions")
+            .where("original_room_id", "==", original_room_id)
+            .where("is_active", "==", True)
+            .where("notification_preferences.email", "==", True)
             .stream()
-        
+        )
+
         subscriber_count = 0
-        base_url = request.url_root.rstrip('/')
-        
+        base_url = request.url_root.rstrip("/")
+
         for sub_doc in subscriptions:
             try:
                 sub_data = sub_doc.to_dict()
-                user_email = sub_data.get('user_email')
-                user_name = sub_data.get('user_name', 'Friend')
-                
+                user_email = sub_data.get("user_email")
+                user_name = sub_data.get("user_name", "Friend")
+
                 if not user_email:
                     continue
-                
+
                 # Build join URL
                 join_url = f"{base_url}/prayer-room/join?room={new_room_id}"
                 if room_code:
                     join_url += f"&code={room_code}"
-                
+
                 # Build unsubscribe URL (using subscription document ID)
                 unsubscribe_url = f"{base_url}/prayer-room/unsubscribe-link?sub_id={sub_doc.id}"
-                
+
                 # Email subject
                 subject = f"🙏 {room_name} is Live! Join the Prayer Session"
-                
+
                 # Email body
                 body = f"""
                 <html>
@@ -2662,314 +2692,313 @@ def notify_subscribers_about_reopened_room(original_room_id, new_room_id, room_n
                 </body>
                 </html>
                 """
-                
+
                 # Send email (non-blocking, log errors but don't fail)
                 send_email(user_email, subject, body)
                 subscriber_count += 1
-                
+
             except Exception as e:
                 logging.error(f"Error sending notification to subscriber: {str(e)}")
                 continue
-        
+
         logging.info(f"Sent {subscriber_count} email notifications for reopened room {new_room_id}")
-        
+
     except Exception as e:
         logging.error(f"Error in notify_subscribers_about_reopened_room: {str(e)}")
         # Don't raise - this is a non-critical background task
 
-@prayer_room_bp.route('/reopen-room', methods=['POST'])
+
+@prayer_room_bp.route("/reopen-room", methods=["POST"])
 def reopen_room():
     """Reopen a previous room as a live session"""
     try:
         user = get_user_from_session()
-        
+
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
+            return jsonify({"error": "Authentication required"}), 401
+
         data = request.get_json()
-        original_room_id = data.get('original_room_id')
-        
+        original_room_id = data.get("original_room_id")
+
         if not original_room_id:
-            return jsonify({'error': 'Original room ID is required'}), 400
-        
+            return jsonify({"error": "Original room ID is required"}), 400
+
         db = get_firestore_client()
-        
+
         # Get the original room data
-        original_room_ref = db.collection('prayer_rooms').document(original_room_id)
+        original_room_ref = db.collection("prayer_rooms").document(original_room_id)
         original_room_doc = original_room_ref.get()
-        
+
         if not original_room_doc.exists:
-            return jsonify({'error': 'Original room not found'}), 404
-        
+            return jsonify({"error": "Original room not found"}), 404
+
         original_room_data = original_room_doc.to_dict()
-        
+
         # Check if user is the original host
-        if original_room_data.get('host_id') != user['user_id']:
-            return jsonify({'error': 'Only the original host can reopen rooms'}), 403
-        
+        if original_room_data.get("host_id") != user["user_id"]:
+            return jsonify({"error": "Only the original host can reopen rooms"}), 403
+
         # Generate new room ID
-        new_room_id = ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
-        
+        new_room_id = "".join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
+
         # Create new room with same settings
         new_room_data = {
-            'room_id': new_room_id,
-            'room_name': original_room_data.get('room_name', 'Prayer Room'),
-            'room_description': original_room_data.get('room_description', ''),
-            'room_privacy': original_room_data.get('room_privacy', 'public'),
-            'host_id': user['user_id'],
-            'host_name': user['user_name'],
-            'created_at': datetime.utcnow(),
-            'last_activity': datetime.utcnow(),
-            'participants': [{
-                'user_id': user['user_id'],
-                'user_name': user['user_name'],
-                'joined_at': datetime.utcnow(),
-                'is_muted': False,
-                'is_host': True
-            }],
-            'is_active': True,
-            'is_locked': False,
-            'settings': {
-                'allow_anonymous': original_room_data.get('room_privacy', 'public') == 'public',
-                'max_participants': 50,
-                'auto_mute_new_participants': False
+            "room_id": new_room_id,
+            "room_name": original_room_data.get("room_name", "Prayer Room"),
+            "room_description": original_room_data.get("room_description", ""),
+            "room_privacy": original_room_data.get("room_privacy", "public"),
+            "host_id": user["user_id"],
+            "host_name": user["user_name"],
+            "created_at": datetime.utcnow(),
+            "last_activity": datetime.utcnow(),
+            "participants": [
+                {
+                    "user_id": user["user_id"],
+                    "user_name": user["user_name"],
+                    "joined_at": datetime.utcnow(),
+                    "is_muted": False,
+                    "is_host": True,
+                }
+            ],
+            "is_active": True,
+            "is_locked": False,
+            "settings": {
+                "allow_anonymous": original_room_data.get("room_privacy", "public") == "public",
+                "max_participants": 50,
+                "auto_mute_new_participants": False,
             },
-            'original_room_id': original_room_id  # Track the original room
+            "original_room_id": original_room_id,  # Track the original room
         }
-        
+
         # Generate room code for private rooms
-        if new_room_data['room_privacy'] == 'private':
-            new_room_data['room_code'] = ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:8]])
+        if new_room_data["room_privacy"] == "private":
+            new_room_data["room_code"] = "".join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:8]])
         else:
-            new_room_data['room_code'] = None
-        
+            new_room_data["room_code"] = None
+
         # Deactivate any existing device sessions for this user across ALL rooms
         # This ensures users can only have one active session at a time
         # OPTIMIZED: Use collection group query for better performance
         try:
-            sessions_query = db.collection_group('device_sessions')\
-                .where('user_id', '==', user['user_id'])\
-                .where('is_active', '==', True)\
+            sessions_query = (
+                db.collection_group("device_sessions")
+                .where("user_id", "==", user["user_id"])
+                .where("is_active", "==", True)
                 .limit(10)
-            
+            )
+
             batch = db.batch()
             session_count = 0
             for session_doc in sessions_query.stream():
-                batch.update(session_doc.reference, {
-                    'is_active': False,
-                    'ended_at': datetime.utcnow()
-                })
+                batch.update(session_doc.reference, {"is_active": False, "ended_at": datetime.utcnow()})
                 session_count += 1
-            
+
             if session_count > 0:
                 batch.commit()
                 logging.info(f"Deactivated {session_count} existing session(s) for user {user['user_id']}")
         except Exception as e:
             logging.warning(f"Collection group query failed, using fallback: {e}")
             # Fallback: skip session deactivation if query fails
-        
+
         # Save the new room
-        db.collection('prayer_rooms').document(new_room_id).set(new_room_data)
-        
+        db.collection("prayer_rooms").document(new_room_id).set(new_room_data)
+
         # Notify subscribers asynchronously (don't block room creation)
         try:
             notify_subscribers_about_reopened_room(
                 original_room_id=original_room_id,
                 new_room_id=new_room_id,
-                room_name=new_room_data['room_name'],
-                room_code=new_room_data.get('room_code'),
-                host_name=user['user_name']
+                room_name=new_room_data["room_name"],
+                room_code=new_room_data.get("room_code"),
+                host_name=user["user_name"],
             )
         except Exception as notify_error:
             logging.error(f"Error sending notifications (non-blocking): {str(notify_error)}")
-        
-        return jsonify({
-            'success': True,
-            'room_id': new_room_id,
-            'room_code': new_room_data.get('room_code'),
-            'room_name': new_room_data['room_name']
-        })
-        
+
+        return jsonify(
+            {
+                "success": True,
+                "room_id": new_room_id,
+                "room_code": new_room_data.get("room_code"),
+                "room_name": new_room_data["room_name"],
+            }
+        )
+
     except Exception as e:
         logging.error(f"Error reopening room: {str(e)}")
-        return jsonify({'error': 'Failed to reopen room'}), 500
+        return jsonify({"error": "Failed to reopen room"}), 500
 
-@prayer_room_bp.route('/<room_id>/subscribe', methods=['POST'])
+
+@prayer_room_bp.route("/<room_id>/subscribe", methods=["POST"])
 def subscribe_to_room(room_id):
     """Subscribe to room notifications"""
     try:
         user = get_user_from_session()
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
+            return jsonify({"error": "Authentication required"}), 401
+
         db = get_firestore_client()
-        
+
         # Get room info
-        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_ref = db.collection("prayer_rooms").document(room_id)
         room_doc = room_ref.get()
-        
+
         if not room_doc.exists:
-            return jsonify({'error': 'Room not found'}), 404
-        
+            return jsonify({"error": "Room not found"}), 404
+
         room_data = room_doc.to_dict()
-        original_room_id = room_data.get('original_room_id', room_id)
-        
+        original_room_id = room_data.get("original_room_id", room_id)
+
         # Check if already subscribed
-        existing_subs = db.collection('room_subscriptions')\
-            .where('original_room_id', '==', original_room_id)\
-            .where('user_id', '==', user['user_id'])\
-            .where('is_active', '==', True)\
-            .limit(1)\
+        existing_subs = (
+            db.collection("room_subscriptions")
+            .where("original_room_id", "==", original_room_id)
+            .where("user_id", "==", user["user_id"])
+            .where("is_active", "==", True)
+            .limit(1)
             .stream()
-        
+        )
+
         if list(existing_subs):
-            return jsonify({'message': 'Already subscribed', 'subscribed': True}), 200
-        
+            return jsonify({"message": "Already subscribed", "subscribed": True}), 200
+
         # Create subscription
         subscription_data = {
-            'room_id': room_id,
-            'original_room_id': original_room_id,
-            'user_id': user['user_id'],
-            'user_email': user.get('email', ''),
-            'user_name': user['user_name'],
-            'room_name': room_data.get('room_name', 'Prayer Room'),
-            'host_id': room_data.get('host_id'),
-            'host_name': room_data.get('host_name'),
-            'subscribed_at': datetime.utcnow(),
-            'is_active': True,
-            'notification_preferences': {
-                'email': True,
-                'push': False
-            }
+            "room_id": room_id,
+            "original_room_id": original_room_id,
+            "user_id": user["user_id"],
+            "user_email": user.get("email", ""),
+            "user_name": user["user_name"],
+            "room_name": room_data.get("room_name", "Prayer Room"),
+            "host_id": room_data.get("host_id"),
+            "host_name": room_data.get("host_name"),
+            "subscribed_at": datetime.utcnow(),
+            "is_active": True,
+            "notification_preferences": {"email": True, "push": False},
         }
-        
-        db.collection('room_subscriptions').add(subscription_data)
-        
+
+        db.collection("room_subscriptions").add(subscription_data)
+
         logging.info(f"User {user['user_id']} subscribed to room {room_id}")
-        
-        return jsonify({
-            'success': True,
-            'message': 'Successfully subscribed to room notifications',
-            'subscribed': True
-        })
-        
+
+        return jsonify(
+            {"success": True, "message": "Successfully subscribed to room notifications", "subscribed": True}
+        )
+
     except Exception as e:
         logging.error(f"Error subscribing to room: {str(e)}")
-        return jsonify({'error': 'Failed to subscribe'}), 500
+        return jsonify({"error": "Failed to subscribe"}), 500
 
-@prayer_room_bp.route('/<room_id>/unsubscribe', methods=['POST'])
+
+@prayer_room_bp.route("/<room_id>/unsubscribe", methods=["POST"])
 def unsubscribe_from_room(room_id):
     """Unsubscribe from room notifications"""
     try:
         user = get_user_from_session()
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
+            return jsonify({"error": "Authentication required"}), 401
+
         db = get_firestore_client()
-        
+
         # Get room's original_room_id
-        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_ref = db.collection("prayer_rooms").document(room_id)
         room_doc = room_ref.get()
-        
+
         if room_doc.exists:
-            original_room_id = room_doc.to_dict().get('original_room_id', room_id)
+            original_room_id = room_doc.to_dict().get("original_room_id", room_id)
         else:
             original_room_id = room_id
-        
+
         # Find and deactivate subscriptions
-        subscriptions = db.collection('room_subscriptions')\
-            .where('original_room_id', '==', original_room_id)\
-            .where('user_id', '==', user['user_id'])\
-            .where('is_active', '==', True)\
+        subscriptions = (
+            db.collection("room_subscriptions")
+            .where("original_room_id", "==", original_room_id)
+            .where("user_id", "==", user["user_id"])
+            .where("is_active", "==", True)
             .stream()
-        
+        )
+
         unsubscribed_count = 0
         for sub_doc in subscriptions:
-            sub_doc.reference.update({
-                'is_active': False,
-                'unsubscribed_at': datetime.utcnow()
-            })
+            sub_doc.reference.update({"is_active": False, "unsubscribed_at": datetime.utcnow()})
             unsubscribed_count += 1
-        
+
         logging.info(f"User {user['user_id']} unsubscribed from room {room_id}")
-        
-        return jsonify({
-            'success': True,
-            'message': 'Successfully unsubscribed from room notifications',
-            'subscribed': False
-        })
-        
+
+        return jsonify(
+            {"success": True, "message": "Successfully unsubscribed from room notifications", "subscribed": False}
+        )
+
     except Exception as e:
         logging.error(f"Error unsubscribing from room: {str(e)}")
-        return jsonify({'error': 'Failed to unsubscribe'}), 500
+        return jsonify({"error": "Failed to unsubscribe"}), 500
 
-@prayer_room_bp.route('/<room_id>/subscription-status', methods=['GET'])
+
+@prayer_room_bp.route("/<room_id>/subscription-status", methods=["GET"])
 def get_subscription_status(room_id):
     """Check if user is subscribed to room"""
     try:
         user = get_user_from_session()
         if not user:
-            return jsonify({'subscribed': False})
-        
+            return jsonify({"subscribed": False})
+
         db = get_firestore_client()
-        
+
         # Get room's original_room_id
-        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_ref = db.collection("prayer_rooms").document(room_id)
         room_doc = room_ref.get()
-        
+
         if room_doc.exists:
-            original_room_id = room_doc.to_dict().get('original_room_id', room_id)
+            original_room_id = room_doc.to_dict().get("original_room_id", room_id)
         else:
             original_room_id = room_id
-        
+
         # Check if subscribed
-        subscriptions = db.collection('room_subscriptions')\
-            .where('original_room_id', '==', original_room_id)\
-            .where('user_id', '==', user['user_id'])\
-            .where('is_active', '==', True)\
-            .limit(1)\
+        subscriptions = (
+            db.collection("room_subscriptions")
+            .where("original_room_id", "==", original_room_id)
+            .where("user_id", "==", user["user_id"])
+            .where("is_active", "==", True)
+            .limit(1)
             .stream()
-        
+        )
+
         subscribed = len(list(subscriptions)) > 0
-        
-        return jsonify({
-            'subscribed': subscribed,
-            'user_id': user['user_id']
-        })
-        
+
+        return jsonify({"subscribed": subscribed, "user_id": user["user_id"]})
+
     except Exception as e:
         logging.error(f"Error checking subscription status: {str(e)}")
-        return jsonify({'subscribed': False}), 500
+        return jsonify({"subscribed": False}), 500
 
-@prayer_room_bp.route('/unsubscribe-link', methods=['GET'])
+
+@prayer_room_bp.route("/unsubscribe-link", methods=["GET"])
 def unsubscribe_via_email_link():
     """Unsubscribe from room via email link (no auth required)"""
     try:
-        sub_id = request.args.get('sub_id')
-        
+        sub_id = request.args.get("sub_id")
+
         if not sub_id:
             return "Invalid unsubscribe link", 400
-        
+
         db = get_firestore_client()
-        sub_ref = db.collection('room_subscriptions').document(sub_id)
+        sub_ref = db.collection("room_subscriptions").document(sub_id)
         sub_doc = sub_ref.get()
-        
+
         if not sub_doc.exists:
             return "Subscription not found", 404
-        
+
         sub_data = sub_doc.to_dict()
-        room_name = sub_data.get('room_name', 'Prayer Room')
-        
+        room_name = sub_data.get("room_name", "Prayer Room")
+
         # Deactivate subscription
-        sub_ref.update({
-            'is_active': False,
-            'unsubscribed_at': datetime.utcnow()
-        })
-        
+        sub_ref.update({"is_active": False, "unsubscribed_at": datetime.utcnow()})
+
         logging.info(f"User unsubscribed via email link: {sub_id}")
-        
+
         # Return a simple HTML page
-        return f"""
+        return (
+            f"""
         <!DOCTYPE html>
         <html>
         <head>
@@ -3028,11 +3057,14 @@ def unsubscribe_via_email_link():
             </div>
         </body>
         </html>
-        """, 200
-        
+        """,
+            200,
+        )
+
     except Exception as e:
         logging.error(f"Error unsubscribing via link: {str(e)}")
         return "An error occurred", 500
+
 
 def create_active_room_from_scheduled(scheduled_data, scheduled_room_id):
     """
@@ -3041,73 +3073,77 @@ def create_active_room_from_scheduled(scheduled_data, scheduled_room_id):
     """
     try:
         db = get_firestore_client()
-        
+
         # Generate new room ID
-        room_id = ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
-        
+        room_id = "".join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
+
         # Create active room data
         room_data = {
-            'room_id': room_id,
-            'room_name': scheduled_data.get('room_name', 'Prayer Room'),
-            'room_description': scheduled_data.get('room_description', ''),
-            'room_privacy': scheduled_data.get('room_privacy', 'public'),
-            'room_code': scheduled_data.get('room_code'),
-            'host_id': scheduled_data['host_id'],
-            'host_name': scheduled_data['host_name'],
-            'created_at': datetime.utcnow(),
-            'last_activity': datetime.utcnow(),
-            'participants': [{
-                'user_id': scheduled_data['host_id'],
-                'user_name': scheduled_data['host_name'],
-                'joined_at': datetime.utcnow(),
-                'is_muted': False,
-                'is_host': True
-            }],
-            'is_active': True,
-            'is_locked': False,
-            'scheduled_room_id': scheduled_room_id,  # Link back to scheduled room
-            'settings': {
-                'allow_anonymous': scheduled_data.get('room_privacy', 'public') == 'public',
-                'max_participants': 50,
-                'auto_mute_new_participants': False
-            }
+            "room_id": room_id,
+            "room_name": scheduled_data.get("room_name", "Prayer Room"),
+            "room_description": scheduled_data.get("room_description", ""),
+            "room_privacy": scheduled_data.get("room_privacy", "public"),
+            "room_code": scheduled_data.get("room_code"),
+            "host_id": scheduled_data["host_id"],
+            "host_name": scheduled_data["host_name"],
+            "created_at": datetime.utcnow(),
+            "last_activity": datetime.utcnow(),
+            "participants": [
+                {
+                    "user_id": scheduled_data["host_id"],
+                    "user_name": scheduled_data["host_name"],
+                    "joined_at": datetime.utcnow(),
+                    "is_muted": False,
+                    "is_host": True,
+                }
+            ],
+            "is_active": True,
+            "is_locked": False,
+            "scheduled_room_id": scheduled_room_id,  # Link back to scheduled room
+            "settings": {
+                "allow_anonymous": scheduled_data.get("room_privacy", "public") == "public",
+                "max_participants": 50,
+                "auto_mute_new_participants": False,
+            },
         }
-        
+
         # Save the active room
-        db.collection('prayer_rooms').document(room_id).set(room_data)
-        
+        db.collection("prayer_rooms").document(room_id).set(room_data)
+
         logging.info(f"Created active room {room_id} from scheduled room {scheduled_room_id}")
-        
+
         return room_id
-        
+
     except Exception as e:
         logging.error(f"Error creating active room from scheduled: {str(e)}")
         raise
+
 
 def send_session_live_notifications(scheduled_data, room_id, scheduled_room_id):
     """
     Send email notifications that scheduled session is now live
     """
     try:
-        room_name = scheduled_data.get('room_name', 'Prayer Room')
-        host_name = scheduled_data.get('host_name', 'Host')
-        room_code = scheduled_data.get('room_code')
-        base_url = request.url_root.rstrip('/')
-        
+        room_name = scheduled_data.get("room_name", "Prayer Room")
+        host_name = scheduled_data.get("host_name", "Host")
+        room_code = scheduled_data.get("room_code")
+        base_url = request.url_root.rstrip("/")
+
         # Build join URL
         join_url = f"{base_url}/prayer-room/join?room={room_id}"
         if room_code:
             join_url += f"&code={room_code}"
-        
+
         # Send notification to host
-        host_id = scheduled_data.get('host_id')
+        host_id = scheduled_data.get("host_id")
         if host_id:
             # Get host email from Firebase Auth
             try:
                 import firebase_admin.auth
+
                 host_user = firebase_admin.auth.get_user(host_id)
                 host_email = host_user.email
-                
+
                 if host_email:
                     subject = f"🙏 {room_name} is Now Live!"
                     body = f"""
@@ -3200,32 +3236,34 @@ def send_session_live_notifications(scheduled_data, room_id, scheduled_room_id):
                     </body>
                     </html>
                     """
-                    
+
                     send_email(host_email, subject, body)
                     logging.info(f"Sent session live notification to host {host_email}")
-                    
+
             except Exception as e:
                 logging.error(f"Error sending notification to host: {str(e)}")
-        
+
         # Notify RSVPed participants
         try:
             db = get_firestore_client()
-            rsvps = db.collection('scheduled_room_rsvps')\
-                .where('scheduled_room_id', '==', scheduled_room_id)\
-                .where('is_active', '==', True)\
+            rsvps = (
+                db.collection("scheduled_room_rsvps")
+                .where("scheduled_room_id", "==", scheduled_room_id)
+                .where("is_active", "==", True)
                 .stream()
-            
+            )
+
             for rsvp_doc in rsvps:
                 rsvp_data = rsvp_doc.to_dict()
-                
+
                 # Skip if user doesn't want live notifications
-                if not rsvp_data.get('reminder_preferences', {}).get('email_live', True):
+                if not rsvp_data.get("reminder_preferences", {}).get("email_live", True):
                     continue
-                
-                user_email = rsvp_data.get('user_email')
-                user_name = rsvp_data.get('user_name', 'Prayer Partner')
-                rsvp_status = rsvp_data.get('rsvp_status', 'interested')
-                
+
+                user_email = rsvp_data.get("user_email")
+                user_name = rsvp_data.get("user_name", "Prayer Partner")
+                rsvp_status = rsvp_data.get("rsvp_status", "interested")
+
                 if user_email:
                     subject = f"🙏 {room_name} is Live Now!"
                     body = f"""
@@ -3330,18 +3368,19 @@ def send_session_live_notifications(scheduled_data, room_id, scheduled_room_id):
                     </body>
                     </html>
                     """
-                    
+
                     send_email(user_email, subject, body)
                     logging.info(f"Sent session live notification to RSVPed user {user_email}")
-                    
+
         except Exception as rsvp_notify_error:
             logging.error(f"Error notifying RSVPed participants (non-blocking): {str(rsvp_notify_error)}")
-        
+
     except Exception as e:
         logging.error(f"Error in send_session_live_notifications: {str(e)}")
         # Don't raise - this is a non-critical background task
 
-@prayer_room_bp.route('/send-session-reminders', methods=['POST'])
+
+@prayer_room_bp.route("/send-session-reminders", methods=["POST"])
 @verify_cloud_scheduler()
 def send_session_reminders():
     """
@@ -3350,68 +3389,72 @@ def send_session_reminders():
     Protected by Cloud Scheduler verification
     """
     try:
-        import firebase_admin.auth
-        
         db = get_firestore_client()
         now = datetime.utcnow()
-        
+
         # Find sessions starting in approximately 1 hour (55-65 minutes from now)
         one_hour_from_now = now + timedelta(hours=1)
         window_start = one_hour_from_now - timedelta(minutes=5)
         window_end = one_hour_from_now + timedelta(minutes=5)
-        
+
         logging.info(f"Checking for sessions starting between {window_start} and {window_end}")
-        
-        scheduled_rooms = db.collection('scheduled_rooms')\
-            .where('status', '==', 'scheduled')\
-            .where('scheduled_time', '>=', window_start)\
-            .where('scheduled_time', '<=', window_end)\
+
+        scheduled_rooms = (
+            db.collection("scheduled_rooms")
+            .where("status", "==", "scheduled")
+            .where("scheduled_time", ">=", window_start)
+            .where("scheduled_time", "<=", window_end)
             .stream()
-        
+        )
+
         reminded_count = 0
         errors = []
-        
+
         for scheduled_doc in scheduled_rooms:
             try:
                 scheduled_data = scheduled_doc.to_dict()
                 scheduled_room_id = scheduled_doc.id
-                room_name = scheduled_data.get('room_name', 'Prayer Room')
-                host_name = scheduled_data.get('host_name', 'Host')
-                scheduled_time = scheduled_data.get('scheduled_time')
-                room_code = scheduled_data.get('room_code')
-                base_url = request.url_root.rstrip('/')
-                
+                room_name = scheduled_data.get("room_name", "Prayer Room")
+                host_name = scheduled_data.get("host_name", "Host")
+                scheduled_time = scheduled_data.get("scheduled_time")
+                scheduled_data.get("room_code")
+                base_url = request.url_root.rstrip("/")
+
                 # Check if we already sent reminders for this session
-                if scheduled_data.get('reminders_sent'):
+                if scheduled_data.get("reminders_sent"):
                     logging.info(f"Reminders already sent for {scheduled_room_id}")
                     continue
-                
+
                 # Build join URL (will work when room activates)
                 join_url = f"{base_url}/prayer-room"
-                
+
                 # Get all RSVPs
-                rsvps = db.collection('scheduled_room_rsvps')\
-                    .where('scheduled_room_id', '==', scheduled_room_id)\
-                    .where('is_active', '==', True)\
+                rsvps = (
+                    db.collection("scheduled_room_rsvps")
+                    .where("scheduled_room_id", "==", scheduled_room_id)
+                    .where("is_active", "==", True)
                     .stream()
-                
+                )
+
                 email_count = 0
                 for rsvp_doc in rsvps:
                     rsvp_data = rsvp_doc.to_dict()
-                    
+
                     # Skip if user doesn't want 1-hour reminders
-                    if not rsvp_data.get('reminder_preferences', {}).get('email_1hour', True):
+                    if not rsvp_data.get("reminder_preferences", {}).get("email_1hour", True):
                         continue
-                    
-                    user_email = rsvp_data.get('user_email')
-                    user_name = rsvp_data.get('user_name', 'Prayer Partner')
-                    rsvp_status = rsvp_data.get('rsvp_status', 'interested')
-                    
+
+                    user_email = rsvp_data.get("user_email")
+                    user_name = rsvp_data.get("user_name", "Prayer Partner")
+                    rsvp_status = rsvp_data.get("rsvp_status", "interested")
+
                     if user_email:
                         subject = f"⏰ Reminder: {room_name} starts in 1 hour"
-                        
-                        time_display = scheduled_time.strftime('%I:%M %p') if hasattr(scheduled_time, 'strftime') else 'soon'
-                        
+
+                        time_display = (
+                            scheduled_time.strftime("%I:%M %p") if hasattr(scheduled_time, "strftime") else "soon"
+                        )
+
                         body = f"""
                         <html>
                         <head>
@@ -3520,49 +3563,39 @@ def send_session_reminders():
                         </body>
                         </html>
                         """
-                        
+
                         send_email(user_email, subject, body)
                         email_count += 1
                         logging.info(f"Sent 1-hour reminder to {user_email} for session {scheduled_room_id}")
-                
+
                 # Mark this session as having reminders sent
-                scheduled_doc.reference.update({
-                    'reminders_sent': True,
-                    'reminders_sent_at': now
-                })
-                
+                scheduled_doc.reference.update({"reminders_sent": True, "reminders_sent_at": now})
+
                 if email_count > 0:
                     reminded_count += 1
                     logging.info(f"Sent {email_count} reminder emails for session {scheduled_room_id}")
-                
+
             except Exception as session_error:
                 error_msg = f"Error sending reminders for session {scheduled_doc.id}: {str(session_error)}"
                 logging.error(error_msg)
                 errors.append(error_msg)
                 continue
-        
-        result = {
-            'success': True,
-            'timestamp': now.isoformat(),
-            'sessions_reminded': reminded_count
-        }
-        
+
+        result = {"success": True, "timestamp": now.isoformat(), "sessions_reminded": reminded_count}
+
         if errors:
-            result['errors'] = errors
-        
+            result["errors"] = errors
+
         logging.info(f"Reminder check complete: {reminded_count} sessions processed")
-        
+
         return jsonify(result), 200
-        
+
     except Exception as e:
         logging.error(f"Error in send_session_reminders: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'timestamp': datetime.utcnow().isoformat()
-        }), 500
+        return jsonify({"success": False, "error": str(e), "timestamp": datetime.utcnow().isoformat()}), 500
 
-@prayer_room_bp.route('/activate-scheduled-rooms', methods=['POST'])
+
+@prayer_room_bp.route("/activate-scheduled-rooms", methods=["POST"])
 @verify_cloud_scheduler()
 def activate_scheduled_rooms():
     """
@@ -3575,79 +3608,74 @@ def activate_scheduled_rooms():
         now = datetime.utcnow()
 
         expired_voice_links = _expire_stale_voice_links(db, now)
-        
+
         logging.info(f"Checking for scheduled rooms to activate at {now}")
-        
+
         # Find scheduled rooms whose time has arrived (within last 10 minutes)
         # We check a 10-minute window to catch any that might have been missed
         ten_minutes_ago = now - timedelta(minutes=10)
-        
-        scheduled_rooms = db.collection('scheduled_rooms')\
-            .where('status', '==', 'scheduled')\
-            .where('scheduled_time', '<=', now)\
-            .where('scheduled_time', '>=', ten_minutes_ago)\
+
+        scheduled_rooms = (
+            db.collection("scheduled_rooms")
+            .where("status", "==", "scheduled")
+            .where("scheduled_time", "<=", now)
+            .where("scheduled_time", ">=", ten_minutes_ago)
             .stream()
-        
+        )
+
         activated_count = 0
         errors = []
-        
+
         for scheduled_doc in scheduled_rooms:
             try:
                 scheduled_data = scheduled_doc.to_dict()
                 scheduled_room_id = scheduled_doc.id
-                room_name = scheduled_data.get('room_name', 'Prayer Room')
-                
+                room_name = scheduled_data.get("room_name", "Prayer Room")
+
                 logging.info(f"Activating scheduled room: {scheduled_room_id} - {room_name}")
-                
+
                 # Create active room
                 room_id = create_active_room_from_scheduled(scheduled_data, scheduled_room_id)
-                
+
                 # Update scheduled room status
-                scheduled_doc.reference.update({
-                    'status': 'active',
-                    'activated_at': now,
-                    'active_room_id': room_id
-                })
-                
+                scheduled_doc.reference.update({"status": "active", "activated_at": now, "active_room_id": room_id})
+
                 # Send notifications (non-blocking)
                 try:
                     send_session_live_notifications(scheduled_data, room_id, scheduled_room_id)
                 except Exception as notify_error:
                     logging.error(f"Error sending notifications (non-blocking): {str(notify_error)}")
-                
+
                 activated_count += 1
                 logging.info(f"Successfully activated {room_name} as room {room_id}")
-                
+
             except Exception as room_error:
                 error_msg = f"Error activating room {scheduled_doc.id}: {str(room_error)}"
                 logging.error(error_msg)
                 errors.append(error_msg)
                 continue
-        
+
         result = {
-            'success': True,
-            'timestamp': now.isoformat(),
-            'activated_count': activated_count,
-            'checked_rooms': activated_count + len(errors),
-            'expired_voice_links': expired_voice_links,
+            "success": True,
+            "timestamp": now.isoformat(),
+            "activated_count": activated_count,
+            "checked_rooms": activated_count + len(errors),
+            "expired_voice_links": expired_voice_links,
         }
-        
+
         if errors:
-            result['errors'] = errors
-        
+            result["errors"] = errors
+
         logging.info(f"Activation check complete: {activated_count} rooms activated")
-        
+
         return jsonify(result), 200
-        
+
     except Exception as e:
         logging.error(f"Error in activate_scheduled_rooms: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'timestamp': datetime.utcnow().isoformat()
-        }), 500
+        return jsonify({"success": False, "error": str(e), "timestamp": datetime.utcnow().isoformat()}), 500
 
-@prayer_room_bp.route('/generate-recurring-instances', methods=['POST'])
+
+@prayer_room_bp.route("/generate-recurring-instances", methods=["POST"])
 @verify_cloud_scheduler()
 def generate_recurring_instances():
     """
@@ -3658,111 +3686,130 @@ def generate_recurring_instances():
     try:
         db = get_firestore_client()
         now = datetime.utcnow()
-        
+
         # Look ahead 7 days
         look_ahead_days = 7
         check_until = now + timedelta(days=look_ahead_days)
-        
+
         logging.info(f"Generating recurring instances up to {check_until}")
-        
+
         # Find all recurring sessions (both scheduled and active)
         # We need to check both statuses because:
         # - "scheduled" = not yet activated
         # - "active" = currently live (but still need to generate future instances)
         all_recurring = []
-        
+
         # Get scheduled recurring sessions (exclude cancelled)
-        scheduled_recurring = db.collection('scheduled_rooms')\
-            .where('is_recurring', '==', True)\
-            .where('status', '==', 'scheduled')\
+        scheduled_recurring = (
+            db.collection("scheduled_rooms")
+            .where("is_recurring", "==", True)
+            .where("status", "==", "scheduled")
             .stream()
+        )
         all_recurring.extend(list(scheduled_recurring))
-        
+
         # Get active recurring sessions (parent sessions that are currently live)
-        active_recurring = db.collection('scheduled_rooms')\
-            .where('is_recurring', '==', True)\
-            .where('status', '==', 'active')\
-            .stream()
+        active_recurring = (
+            db.collection("scheduled_rooms").where("is_recurring", "==", True).where("status", "==", "active").stream()
+        )
         all_recurring.extend(list(active_recurring))
-        
+
         # Filter out cancelled recurring sessions
-        all_recurring = [doc for doc in all_recurring if doc.to_dict().get('status') != 'cancelled']
-        
+        all_recurring = [doc for doc in all_recurring if doc.to_dict().get("status") != "cancelled"]
+
         logging.info(f"Found {len(all_recurring)} recurring sessions (scheduled + active)")
-        
+
         recurring_sessions = all_recurring
-        
+
         generated_count = 0
         errors = []
-        
+
         for rec_doc in recurring_sessions:
             try:
                 rec_data = rec_doc.to_dict()
                 rec_id = rec_doc.id
-                
-                recurrence_pattern = rec_data.get('recurrence_pattern')
-                recurrence_end_date = rec_data.get('recurrence_end_date')
-                last_generated_time = rec_data.get('last_generated_time', rec_data.get('scheduled_time'))
-                recurrence_days = rec_data.get('recurrence_days', [])
-                
+
+                recurrence_pattern = rec_data.get("recurrence_pattern")
+                recurrence_end_date = rec_data.get("recurrence_end_date")
+                last_generated_time = rec_data.get("last_generated_time", rec_data.get("scheduled_time"))
+                recurrence_days = rec_data.get("recurrence_days", [])
+
                 # Normalize datetimes (remove timezone info for comparison)
-                if hasattr(recurrence_end_date, 'replace') and recurrence_end_date.tzinfo:
+                if hasattr(recurrence_end_date, "replace") and recurrence_end_date.tzinfo:
                     recurrence_end_date = recurrence_end_date.replace(tzinfo=None)
-                
+
                 # Stop if we've passed the end date
                 if recurrence_end_date and now > recurrence_end_date:
                     logging.info(f"Recurring session {rec_id} has ended, skipping")
                     continue
-                
+
                 # Calculate next instance times
                 next_times = []
-                
+
                 # Ensure current_check is a naive datetime for comparison
                 if isinstance(last_generated_time, datetime):
-                    current_check = last_generated_time.replace(tzinfo=None) if last_generated_time.tzinfo else last_generated_time
-                elif hasattr(last_generated_time, 'replace'):
+                    current_check = (
+                        last_generated_time.replace(tzinfo=None) if last_generated_time.tzinfo else last_generated_time
+                    )
+                elif hasattr(last_generated_time, "replace"):
                     # Firestore timestamp
-                    current_check = last_generated_time.replace(tzinfo=None) if hasattr(last_generated_time, 'tzinfo') and last_generated_time.tzinfo else last_generated_time
+                    current_check = (
+                        last_generated_time.replace(tzinfo=None)
+                        if hasattr(last_generated_time, "tzinfo") and last_generated_time.tzinfo
+                        else last_generated_time
+                    )
                 else:
                     current_check = last_generated_time
-                
-                if recurrence_pattern == 'weekly':
+
+                if recurrence_pattern == "weekly":
                     # Generate instances for next 7 days
                     for day in range(1, look_ahead_days + 1):
                         next_time = current_check + timedelta(days=day)
-                        
+
                         # Check if this day of week matches recurrence_days
                         if not recurrence_days or next_time.weekday() in recurrence_days:
                             # Ensure check_until is naive for comparison
                             check_until_naive = check_until.replace(tzinfo=None) if check_until.tzinfo else check_until
-                            recurrence_end_naive = recurrence_end_date.replace(tzinfo=None) if recurrence_end_date and hasattr(recurrence_end_date, 'tzinfo') and recurrence_end_date.tzinfo else recurrence_end_date
-                            
-                            if next_time <= check_until_naive and (not recurrence_end_naive or next_time <= recurrence_end_naive):
+                            recurrence_end_naive = (
+                                recurrence_end_date.replace(tzinfo=None)
+                                if recurrence_end_date
+                                and hasattr(recurrence_end_date, "tzinfo")
+                                and recurrence_end_date.tzinfo
+                                else recurrence_end_date
+                            )
+
+                            if next_time <= check_until_naive and (
+                                not recurrence_end_naive or next_time <= recurrence_end_naive
+                            ):
                                 # Check if instance doesn't already exist
-                                existing = db.collection('scheduled_rooms')\
-                                    .where('parent_recurring_id', '==', rec_id)\
-                                    .where('scheduled_time', '==', next_time)\
-                                    .limit(1)\
+                                existing = (
+                                    db.collection("scheduled_rooms")
+                                    .where("parent_recurring_id", "==", rec_id)
+                                    .where("scheduled_time", "==", next_time)
+                                    .limit(1)
                                     .stream()
-                                
+                                )
+
                                 if not list(existing):
                                     next_times.append(next_time)
-                
-                elif recurrence_pattern == 'biweekly':
+
+                elif recurrence_pattern == "biweekly":
                     # Every 2 weeks
                     next_time = current_check + timedelta(weeks=2)
                     while next_time <= check_until and (not recurrence_end_date or next_time <= recurrence_end_date):
-                        existing = db.collection('scheduled_rooms')\
-                            .where('parent_recurring_id', '==', rec_id)\
-                            .where('scheduled_time', '==', next_time)\
-                            .limit(1)\
+                        existing = (
+                            db.collection("scheduled_rooms")
+                            .where("parent_recurring_id", "==", rec_id)
+                            .where("scheduled_time", "==", next_time)
+                            .limit(1)
                             .stream()
-                        
+                        )
+
                         if not list(existing):
                             next_times.append(next_time)
                         next_time += timedelta(weeks=2)
-                
-                elif recurrence_pattern == 'monthly':
+
+                elif recurrence_pattern == "monthly":
                     # Same day each month
                     next_time = current_check
                     for month in range(1, 4):  # Look ahead 3 months
@@ -3780,72 +3827,65 @@ def generate_recurring_instances():
                                     next_time = next_time.replace(month=2, day=28)
                                 else:
                                     next_time = next_time.replace(month=next_month, day=30)
-                        
+
                         if next_time <= check_until and (not recurrence_end_date or next_time <= recurrence_end_date):
-                            existing = db.collection('scheduled_rooms')\
-                                .where('parent_recurring_id', '==', rec_id)\
-                                .where('scheduled_time', '==', next_time)\
-                                .limit(1)\
+                            existing = (
+                                db.collection("scheduled_rooms")
+                                .where("parent_recurring_id", "==", rec_id)
+                                .where("scheduled_time", "==", next_time)
+                                .limit(1)
                                 .stream()
-                            
+                            )
+
                             if not list(existing):
                                 next_times.append(next_time)
-                
+
                 # Create instances
                 for next_time in next_times:
                     instance_data = {
-                        'room_name': rec_data['room_name'],
-                        'room_description': rec_data.get('room_description', ''),
-                        'room_privacy': rec_data.get('room_privacy', 'public'),
-                        'room_code': rec_data.get('room_code'),
-                        'host_id': rec_data['host_id'],
-                        'host_name': rec_data['host_name'],
-                        'scheduled_time': next_time,
-                        'created_at': now,
-                        'status': 'scheduled',
-                        'is_recurring': False,  # This is an instance, not the template
-                        'parent_recurring_id': rec_id,  # Link back to recurring template
-                        'is_recurring_instance': True
+                        "room_name": rec_data["room_name"],
+                        "room_description": rec_data.get("room_description", ""),
+                        "room_privacy": rec_data.get("room_privacy", "public"),
+                        "room_code": rec_data.get("room_code"),
+                        "host_id": rec_data["host_id"],
+                        "host_name": rec_data["host_name"],
+                        "scheduled_time": next_time,
+                        "created_at": now,
+                        "status": "scheduled",
+                        "is_recurring": False,  # This is an instance, not the template
+                        "parent_recurring_id": rec_id,  # Link back to recurring template
+                        "is_recurring_instance": True,
                     }
-                    
-                    db.collection('scheduled_rooms').add(instance_data)
+
+                    db.collection("scheduled_rooms").add(instance_data)
                     generated_count += 1
                     logging.info(f"Generated instance for {rec_data['room_name']} at {next_time}")
-                
+
                 # Update last_generated_time
                 if next_times:
-                    rec_doc.reference.update({
-                        'last_generated_time': max(next_times)
-                    })
-                
+                    rec_doc.reference.update({"last_generated_time": max(next_times)})
+
             except Exception as session_error:
                 error_msg = f"Error generating instances for session {rec_doc.id}: {str(session_error)}"
                 logging.error(error_msg)
                 errors.append(error_msg)
                 continue
-        
-        result = {
-            'success': True,
-            'timestamp': now.isoformat(),
-            'instances_generated': generated_count
-        }
-        
+
+        result = {"success": True, "timestamp": now.isoformat(), "instances_generated": generated_count}
+
         if errors:
-            result['errors'] = errors
-        
+            result["errors"] = errors
+
         logging.info(f"Recurring instance generation complete: {generated_count} instances created")
-        
+
         return jsonify(result), 200
-        
+
     except Exception as e:
         logging.error(f"Error in generate_recurring_instances: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e),
-            'timestamp': datetime.utcnow().isoformat()
-        }), 500
+        return jsonify({"success": False, "error": str(e), "timestamp": datetime.utcnow().isoformat()}), 500
 
-@prayer_room_bp.route('/public-scheduled-sessions', methods=['GET'])
+
+@prayer_room_bp.route("/public-scheduled-sessions", methods=["GET"])
 def get_public_scheduled_sessions():
     """
     Get all upcoming public scheduled sessions
@@ -3854,45 +3894,49 @@ def get_public_scheduled_sessions():
     try:
         db = get_firestore_client()
         now = datetime.utcnow()
-        
+
         # Get query parameters
-        time_filter = request.args.get('time', 'all')  # today, tomorrow, week, all
-        limit = int(request.args.get('limit', 20))
-        sort_by = request.args.get('sort', 'soonest')  # soonest, popular
-        
+        time_filter = request.args.get("time", "all")  # today, tomorrow, week, all
+        limit = int(request.args.get("limit", 20))
+        sort_by = request.args.get("sort", "soonest")  # soonest, popular
+
         logging.info(f"Fetching public scheduled sessions - filter: {time_filter}, sort: {sort_by}, limit: {limit}")
-        
+
         # Base query - only scheduled (not active/completed), only public
         # Note: This requires a composite index: status, room_privacy, scheduled_time
         try:
-            query = db.collection('scheduled_rooms')\
-                .where('status', '==', 'scheduled')\
-                .where('room_privacy', '==', 'public')\
-                .where('scheduled_time', '>=', now)
+            query = (
+                db.collection("scheduled_rooms")
+                .where("status", "==", "scheduled")
+                .where("room_privacy", "==", "public")
+                .where("scheduled_time", ">=", now)
+            )
         except Exception as query_error:
             logging.error(f"Firestore query error (may need composite index): {str(query_error)}")
             # Fallback: Query without scheduled_time filter, filter in Python
-            query = db.collection('scheduled_rooms')\
-                .where('status', '==', 'scheduled')\
-                .where('room_privacy', '==', 'public')
-        
+            query = (
+                db.collection("scheduled_rooms")
+                .where("status", "==", "scheduled")
+                .where("room_privacy", "==", "public")
+            )
+
         # Get all matching sessions
         sessions = []
         recurring_parents = {}  # Track recurring parent sessions
-        
+
         for doc in query.stream():
             session_data = doc.to_dict()
-            session_data['scheduled_room_id'] = doc.id
-            
+            session_data["scheduled_room_id"] = doc.id
+
             # Check if this is a child instance of a recurring session
-            parent_recurring_id = session_data.get('parent_recurring_id')
+            parent_recurring_id = session_data.get("parent_recurring_id")
             if parent_recurring_id:
                 # This is a child instance - convert timestamp before storing
-                scheduled_time_obj = session_data.get('scheduled_time')
+                scheduled_time_obj = session_data.get("scheduled_time")
                 scheduled_timestamp = None
-                
+
                 if scheduled_time_obj:
-                    if hasattr(scheduled_time_obj, 'timestamp'):
+                    if hasattr(scheduled_time_obj, "timestamp"):
                         # Firestore timestamp
                         scheduled_timestamp = scheduled_time_obj.timestamp()
                     elif isinstance(scheduled_time_obj, datetime):
@@ -3905,38 +3949,35 @@ def get_public_scheduled_sessions():
                     elif isinstance(scheduled_time_obj, (int, float)):
                         # Already a number
                         scheduled_timestamp = scheduled_time_obj
-                
-                session_data['scheduled_time'] = scheduled_timestamp
-                session_data['scheduled_room_id'] = doc.id
-                
+
+                session_data["scheduled_time"] = scheduled_timestamp
+                session_data["scheduled_room_id"] = doc.id
+
                 # This is a child instance - skip it, we'll show the parent instead
                 if parent_recurring_id not in recurring_parents:
                     # Fetch the parent recurring session
-                    parent_doc = db.collection('scheduled_rooms').document(parent_recurring_id).get()
+                    parent_doc = db.collection("scheduled_rooms").document(parent_recurring_id).get()
                     if parent_doc.exists:
-                        recurring_parents[parent_recurring_id] = {
-                            'doc': parent_doc,
-                            'instances': []
-                        }
-                
+                        recurring_parents[parent_recurring_id] = {"doc": parent_doc, "instances": []}
+
                 # Add this instance to the parent's instances list
                 if parent_recurring_id in recurring_parents:
-                    recurring_parents[parent_recurring_id]['instances'].append(session_data)
+                    recurring_parents[parent_recurring_id]["instances"].append(session_data)
                 continue  # Skip adding this instance to sessions
-            
-            session_data['scheduled_room_id'] = doc.id
-            
+
+            session_data["scheduled_room_id"] = doc.id
+
             # Convert timestamp to seconds (Unix timestamp) for JSON
-            scheduled_time_obj = session_data.get('scheduled_time')
+            scheduled_time_obj = session_data.get("scheduled_time")
             scheduled_timestamp = None
-            
+
             if scheduled_time_obj:
-                if hasattr(scheduled_time_obj, 'timestamp'):
+                if hasattr(scheduled_time_obj, "timestamp"):
                     # Firestore timestamp
                     scheduled_timestamp = scheduled_time_obj.timestamp()
                 elif isinstance(scheduled_time_obj, datetime):
                     # Python datetime
-                    from datetime import timezone
+
                     if scheduled_time_obj.tzinfo is None:
                         # Naive datetime - assume UTC
                         scheduled_timestamp = (scheduled_time_obj - datetime(1970, 1, 1)).total_seconds()
@@ -3945,555 +3986,582 @@ def get_public_scheduled_sessions():
                 elif isinstance(scheduled_time_obj, (int, float)):
                     # Already a number (timestamp)
                     scheduled_timestamp = scheduled_time_obj
-                
+
                 # Filter out past sessions if query didn't filter by time
                 if scheduled_timestamp and scheduled_timestamp < now.timestamp():
                     continue
-                
-                session_data['scheduled_time'] = scheduled_timestamp
-            
-            if hasattr(session_data.get('created_at'), 'timestamp'):
-                session_data['created_at'] = session_data['created_at'].timestamp()
-            
+
+                session_data["scheduled_time"] = scheduled_timestamp
+
+            if hasattr(session_data.get("created_at"), "timestamp"):
+                session_data["created_at"] = session_data["created_at"].timestamp()
+
             # Get RSVP count for this session
-            rsvp_count = db.collection('scheduled_room_rsvps')\
-                .where('scheduled_room_id', '==', doc.id)\
-                .where('is_active', '==', True)\
+            rsvp_count = (
+                db.collection("scheduled_room_rsvps")
+                .where("scheduled_room_id", "==", doc.id)
+                .where("is_active", "==", True)
                 .stream()
-            
-            rsvp_stats = {'going': 0, 'maybe': 0, 'interested': 0}
+            )
+
+            rsvp_stats = {"going": 0, "maybe": 0, "interested": 0}
             for rsvp_doc in rsvp_count:
                 rsvp_data = rsvp_doc.to_dict()
-                status = rsvp_data.get('rsvp_status', 'interested')
+                status = rsvp_data.get("rsvp_status", "interested")
                 rsvp_stats[status] = rsvp_stats.get(status, 0) + 1
-            
-            session_data['rsvp_count'] = rsvp_stats
-            session_data['total_rsvps'] = sum(rsvp_stats.values())
-            
+
+            session_data["rsvp_count"] = rsvp_stats
+            session_data["total_rsvps"] = sum(rsvp_stats.values())
+
             # Check if current user has RSVPed
             user = get_user_from_session()
             if user:
-                user_rsvp = db.collection('scheduled_room_rsvps')\
-                    .where('scheduled_room_id', '==', doc.id)\
-                    .where('user_id', '==', user['user_id'])\
-                    .where('is_active', '==', True)\
-                    .limit(1)\
+                user_rsvp = (
+                    db.collection("scheduled_room_rsvps")
+                    .where("scheduled_room_id", "==", doc.id)
+                    .where("user_id", "==", user["user_id"])
+                    .where("is_active", "==", True)
+                    .limit(1)
                     .stream()
-                
+                )
+
                 user_rsvp_list = list(user_rsvp)
                 if user_rsvp_list:
-                    session_data['user_rsvp_status'] = user_rsvp_list[0].to_dict().get('rsvp_status')
+                    session_data["user_rsvp_status"] = user_rsvp_list[0].to_dict().get("rsvp_status")
                 else:
-                    session_data['user_rsvp_status'] = None
+                    session_data["user_rsvp_status"] = None
             else:
-                session_data['user_rsvp_status'] = None
-            
+                session_data["user_rsvp_status"] = None
+
             sessions.append(session_data)
-        
+
         # Add recurring parent sessions with their instances
         for parent_id, parent_info in recurring_parents.items():
-            parent_doc = parent_info['doc']
+            parent_doc = parent_info["doc"]
             parent_data = parent_doc.to_dict()
-            instances = parent_info['instances']
-            
+            instances = parent_info["instances"]
+
             if not instances:
                 continue  # No instances, skip
-            
+
             # Sort instances by time
-            instances.sort(key=lambda x: x.get('scheduled_time', 0))
-            
+            instances.sort(key=lambda x: x.get("scheduled_time", 0))
+
             # Get the next (soonest) instance time
             next_instance = instances[0]
-            next_instance_time = next_instance.get('scheduled_time')
-            
+            next_instance_time = next_instance.get("scheduled_time")
+
             # Convert parent session data
             parent_session = {
-                'scheduled_room_id': parent_id,
-                'room_name': parent_data.get('room_name'),
-                'room_description': parent_data.get('room_description'),
-                'host_name': parent_data.get('host_name'),
-                'host_id': parent_data.get('host_id'),
-                'room_privacy': parent_data.get('room_privacy'),
-                'is_recurring': True,
-                'recurrence_pattern': parent_data.get('recurrence_pattern'),
-                'recurrence_days': parent_data.get('recurrence_days', []),
-                'scheduled_time': next_instance_time,  # Use next instance time for sorting
-                'instance_count': len(instances),
-                'instances': [{'scheduled_time': inst.get('scheduled_time'), 'scheduled_room_id': inst.get('scheduled_room_id')} for inst in instances]
+                "scheduled_room_id": parent_id,
+                "room_name": parent_data.get("room_name"),
+                "room_description": parent_data.get("room_description"),
+                "host_name": parent_data.get("host_name"),
+                "host_id": parent_data.get("host_id"),
+                "room_privacy": parent_data.get("room_privacy"),
+                "is_recurring": True,
+                "recurrence_pattern": parent_data.get("recurrence_pattern"),
+                "recurrence_days": parent_data.get("recurrence_days", []),
+                "scheduled_time": next_instance_time,  # Use next instance time for sorting
+                "instance_count": len(instances),
+                "instances": [
+                    {"scheduled_time": inst.get("scheduled_time"), "scheduled_room_id": inst.get("scheduled_room_id")}
+                    for inst in instances
+                ],
             }
-            
+
             # Get RSVP count across all instances
             total_rsvps = 0
             for instance in instances:
-                instance_id = instance.get('scheduled_room_id')
+                instance_id = instance.get("scheduled_room_id")
                 if instance_id:
-                    rsvp_count = db.collection('scheduled_room_rsvps')\
-                        .where('scheduled_room_id', '==', instance_id)\
-                        .where('is_active', '==', True)\
+                    rsvp_count = (
+                        db.collection("scheduled_room_rsvps")
+                        .where("scheduled_room_id", "==", instance_id)
+                        .where("is_active", "==", True)
                         .stream()
+                    )
                     total_rsvps += len(list(rsvp_count))
-            
-            parent_session['total_rsvps'] = total_rsvps
-            parent_session['rsvp_count'] = {'going': 0, 'maybe': 0, 'interested': total_rsvps}
-            
+
+            parent_session["total_rsvps"] = total_rsvps
+            parent_session["rsvp_count"] = {"going": 0, "maybe": 0, "interested": total_rsvps}
+
             # Check if current user has RSVPed to any instance
             user = get_user_from_session()
             if user:
                 user_rsvp_status = None
                 for instance in instances:
-                    instance_id = instance.get('scheduled_room_id')
+                    instance_id = instance.get("scheduled_room_id")
                     if instance_id:
-                        user_rsvp = db.collection('scheduled_room_rsvps')\
-                            .where('scheduled_room_id', '==', instance_id)\
-                            .where('user_id', '==', user['user_id'])\
-                            .where('is_active', '==', True)\
-                            .limit(1)\
+                        user_rsvp = (
+                            db.collection("scheduled_room_rsvps")
+                            .where("scheduled_room_id", "==", instance_id)
+                            .where("user_id", "==", user["user_id"])
+                            .where("is_active", "==", True)
+                            .limit(1)
                             .stream()
-                        
+                        )
+
                         user_rsvp_list = list(user_rsvp)
                         if user_rsvp_list:
-                            user_rsvp_status = user_rsvp_list[0].to_dict().get('rsvp_status')
+                            user_rsvp_status = user_rsvp_list[0].to_dict().get("rsvp_status")
                             break
-                
-                parent_session['user_rsvp_status'] = user_rsvp_status
+
+                parent_session["user_rsvp_status"] = user_rsvp_status
             else:
-                parent_session['user_rsvp_status'] = None
-            
+                parent_session["user_rsvp_status"] = None
+
             sessions.append(parent_session)
-        
+
         # Apply time filter
-        if time_filter == 'today':
+        if time_filter == "today":
             end_of_today = datetime.utcnow().replace(hour=23, minute=59, second=59)
-            sessions = [s for s in sessions if s['scheduled_time'] <= end_of_today.timestamp()]
-        elif time_filter == 'tomorrow':
+            sessions = [s for s in sessions if s["scheduled_time"] <= end_of_today.timestamp()]
+        elif time_filter == "tomorrow":
             start_of_tomorrow = (datetime.utcnow() + timedelta(days=1)).replace(hour=0, minute=0, second=0)
             end_of_tomorrow = start_of_tomorrow.replace(hour=23, minute=59, second=59)
-            sessions = [s for s in sessions if start_of_tomorrow.timestamp() <= s['scheduled_time'] <= end_of_tomorrow.timestamp()]
-        elif time_filter == 'week':
+            sessions = [
+                s
+                for s in sessions
+                if start_of_tomorrow.timestamp() <= s["scheduled_time"] <= end_of_tomorrow.timestamp()
+            ]
+        elif time_filter == "week":
             end_of_week = datetime.utcnow() + timedelta(days=7)
-            sessions = [s for s in sessions if s['scheduled_time'] <= end_of_week.timestamp()]
-        
+            sessions = [s for s in sessions if s["scheduled_time"] <= end_of_week.timestamp()]
+
         # Sort
-        if sort_by == 'popular':
-            sessions.sort(key=lambda x: x['total_rsvps'], reverse=True)
+        if sort_by == "popular":
+            sessions.sort(key=lambda x: x["total_rsvps"], reverse=True)
         else:  # soonest
-            sessions.sort(key=lambda x: x['scheduled_time'])
-        
+            sessions.sort(key=lambda x: x["scheduled_time"])
+
         # Apply limit
         sessions = sessions[:limit]
-        
-        return jsonify({
-            'success': True,
-            'sessions': sessions,
-            'total': len(sessions),
-            'filters': {
-                'time': time_filter,
-                'sort': sort_by
+
+        return jsonify(
+            {
+                "success": True,
+                "sessions": sessions,
+                "total": len(sessions),
+                "filters": {"time": time_filter, "sort": sort_by},
             }
-        })
-        
+        )
+
     except Exception as e:
         logging.error(f"Error getting public scheduled sessions: {str(e)}")
-        return jsonify({'error': 'Failed to get sessions'}), 500
+        return jsonify({"error": "Failed to get sessions"}), 500
 
-@prayer_room_bp.route('/scheduled-session/<scheduled_room_id>/rsvp', methods=['POST'])
+
+@prayer_room_bp.route("/scheduled-session/<scheduled_room_id>/rsvp", methods=["POST"])
 def rsvp_to_scheduled_session(scheduled_room_id):
     """RSVP to a scheduled session"""
     try:
         user = get_user_from_session()
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
+            return jsonify({"error": "Authentication required"}), 401
+
         data = request.get_json() or {}
-        rsvp_status = data.get('rsvp_status', 'interested')  # going, maybe, interested
-        
+        rsvp_status = data.get("rsvp_status", "interested")  # going, maybe, interested
+
         # Validate RSVP status
-        if rsvp_status not in ['going', 'maybe', 'interested']:
-            return jsonify({'error': 'Invalid RSVP status'}), 400
-        
+        if rsvp_status not in ["going", "maybe", "interested"]:
+            return jsonify({"error": "Invalid RSVP status"}), 400
+
         db = get_firestore_client()
-        
+
         # Get the scheduled room
-        scheduled_room_ref = db.collection('scheduled_rooms').document(scheduled_room_id)
+        scheduled_room_ref = db.collection("scheduled_rooms").document(scheduled_room_id)
         scheduled_room_doc = scheduled_room_ref.get()
-        
+
         if not scheduled_room_doc.exists:
-            return jsonify({'error': 'Scheduled session not found'}), 404
-        
+            return jsonify({"error": "Scheduled session not found"}), 404
+
         scheduled_data = scheduled_room_doc.to_dict()
-        
+
         # Check if already RSVPed
-        existing_rsvp = db.collection('scheduled_room_rsvps')\
-            .where('scheduled_room_id', '==', scheduled_room_id)\
-            .where('user_id', '==', user['user_id'])\
-            .limit(1)\
+        existing_rsvp = (
+            db.collection("scheduled_room_rsvps")
+            .where("scheduled_room_id", "==", scheduled_room_id)
+            .where("user_id", "==", user["user_id"])
+            .limit(1)
             .stream()
-        
+        )
+
         existing_rsvp_list = list(existing_rsvp)
-        
+
         if existing_rsvp_list:
             # Update existing RSVP
-            existing_rsvp_list[0].reference.update({
-                'rsvp_status': rsvp_status,
-                'updated_at': datetime.utcnow(),
-                'is_active': True
-            })
+            existing_rsvp_list[0].reference.update(
+                {"rsvp_status": rsvp_status, "updated_at": datetime.utcnow(), "is_active": True}
+            )
             logging.info(f"Updated RSVP for user {user['user_id']} to session {scheduled_room_id}")
         else:
             # Create new RSVP
             rsvp_data = {
-                'scheduled_room_id': scheduled_room_id,
-                'user_id': user['user_id'],
-                'user_email': user.get('email', ''),
-                'user_name': user['user_name'],
-                'room_name': scheduled_data.get('room_name'),
-                'rsvp_status': rsvp_status,
-                'rsvp_at': datetime.utcnow(),
-                'is_active': True,
-                'reminder_preferences': {
-                    'email_1hour': data.get('reminder_1hour', True),
-                    'email_live': data.get('reminder_live', True)
-                }
+                "scheduled_room_id": scheduled_room_id,
+                "user_id": user["user_id"],
+                "user_email": user.get("email", ""),
+                "user_name": user["user_name"],
+                "room_name": scheduled_data.get("room_name"),
+                "rsvp_status": rsvp_status,
+                "rsvp_at": datetime.utcnow(),
+                "is_active": True,
+                "reminder_preferences": {
+                    "email_1hour": data.get("reminder_1hour", True),
+                    "email_live": data.get("reminder_live", True),
+                },
             }
-            
-            db.collection('scheduled_room_rsvps').add(rsvp_data)
+
+            db.collection("scheduled_room_rsvps").add(rsvp_data)
             logging.info(f"Created RSVP for user {user['user_id']} to session {scheduled_room_id}")
-        
+
         # Get updated RSVP counts
-        rsvp_count = db.collection('scheduled_room_rsvps')\
-            .where('scheduled_room_id', '==', scheduled_room_id)\
-            .where('is_active', '==', True)\
+        rsvp_count = (
+            db.collection("scheduled_room_rsvps")
+            .where("scheduled_room_id", "==", scheduled_room_id)
+            .where("is_active", "==", True)
             .stream()
-        
-        rsvp_stats = {'going': 0, 'maybe': 0, 'interested': 0}
+        )
+
+        rsvp_stats = {"going": 0, "maybe": 0, "interested": 0}
         for rsvp_doc in rsvp_count:
             rsvp_data = rsvp_doc.to_dict()
-            status = rsvp_data.get('rsvp_status', 'interested')
+            status = rsvp_data.get("rsvp_status", "interested")
             rsvp_stats[status] = rsvp_stats.get(status, 0) + 1
-        
-        return jsonify({
-            'success': True,
-            'message': 'RSVP confirmed',
-            'rsvp_status': rsvp_status,
-            'rsvp_count': rsvp_stats,
-            'total_rsvps': sum(rsvp_stats.values())
-        })
-        
+
+        return jsonify(
+            {
+                "success": True,
+                "message": "RSVP confirmed",
+                "rsvp_status": rsvp_status,
+                "rsvp_count": rsvp_stats,
+                "total_rsvps": sum(rsvp_stats.values()),
+            }
+        )
+
     except Exception as e:
         logging.error(f"Error creating RSVP: {str(e)}")
-        return jsonify({'error': 'Failed to RSVP'}), 500
+        return jsonify({"error": "Failed to RSVP"}), 500
 
-@prayer_room_bp.route('/scheduled-session/<scheduled_room_id>/rsvp', methods=['DELETE'])
+
+@prayer_room_bp.route("/scheduled-session/<scheduled_room_id>/rsvp", methods=["DELETE"])
 def remove_rsvp_from_scheduled_session(scheduled_room_id):
     """Remove RSVP from a scheduled session"""
     try:
         user = get_user_from_session()
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
+            return jsonify({"error": "Authentication required"}), 401
+
         db = get_firestore_client()
-        
+
         # Find and deactivate RSVP
-        rsvps = db.collection('scheduled_room_rsvps')\
-            .where('scheduled_room_id', '==', scheduled_room_id)\
-            .where('user_id', '==', user['user_id'])\
-            .where('is_active', '==', True)\
+        rsvps = (
+            db.collection("scheduled_room_rsvps")
+            .where("scheduled_room_id", "==", scheduled_room_id)
+            .where("user_id", "==", user["user_id"])
+            .where("is_active", "==", True)
             .stream()
-        
+        )
+
         removed_count = 0
         for rsvp_doc in rsvps:
-            rsvp_doc.reference.update({
-                'is_active': False,
-                'removed_at': datetime.utcnow()
-            })
+            rsvp_doc.reference.update({"is_active": False, "removed_at": datetime.utcnow()})
             removed_count += 1
-        
+
         logging.info(f"Removed RSVP for user {user['user_id']} from session {scheduled_room_id}")
-        
-        return jsonify({
-            'success': True,
-            'message': 'RSVP removed',
-            'removed': removed_count > 0
-        })
-        
+
+        return jsonify({"success": True, "message": "RSVP removed", "removed": removed_count > 0})
+
     except Exception as e:
         logging.error(f"Error removing RSVP: {str(e)}")
-        return jsonify({'error': 'Failed to remove RSVP'}), 500
+        return jsonify({"error": "Failed to remove RSVP"}), 500
 
-@prayer_room_bp.route('/delete-room/<room_id>', methods=['DELETE'])
+
+@prayer_room_bp.route("/delete-room/<room_id>", methods=["DELETE"])
 def delete_room(room_id):
     """Delete a room created by the current user"""
     try:
         user = get_user_from_session()
-        
+
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
+            return jsonify({"error": "Authentication required"}), 401
+
         db = get_firestore_client()
-        
+
         # Get the room to verify ownership
-        room_ref = db.collection('prayer_rooms').document(room_id)
+        room_ref = db.collection("prayer_rooms").document(room_id)
         room_doc = room_ref.get()
-        
+
         if not room_doc.exists:
-            return jsonify({'error': 'Room not found'}), 404
-        
+            return jsonify({"error": "Room not found"}), 404
+
         room_data = room_doc.to_dict()
-        
+
         # Check if user is the host
-        if room_data.get('host_id') != user['user_id']:
-            return jsonify({'error': 'Only the room creator can delete rooms'}), 403
-        
+        if room_data.get("host_id") != user["user_id"]:
+            return jsonify({"error": "Only the room creator can delete rooms"}), 403
+
         # Delete the room
         room_ref.delete()
-        
-        return jsonify({'success': True})
-        
+
+        return jsonify({"success": True})
+
     except Exception as e:
         logging.error(f"Error deleting room: {str(e)}")
-        return jsonify({'error': 'Failed to delete room'}), 500
+        return jsonify({"error": "Failed to delete room"}), 500
 
-@prayer_room_bp.route('/update-scheduled-room/<scheduled_room_id>', methods=['PUT'])
+
+@prayer_room_bp.route("/update-scheduled-room/<scheduled_room_id>", methods=["PUT"])
 def update_scheduled_room(scheduled_room_id):
     """Update a scheduled room"""
     try:
         user = get_user_from_session()
-        
+
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
+            return jsonify({"error": "Authentication required"}), 401
+
         data = request.get_json()
-        room_name = data.get('room_name')
-        room_description = data.get('room_description', '')
-        scheduled_time = data.get('scheduled_time')
-        room_privacy = data.get('room_privacy', 'public')
-        
+        room_name = data.get("room_name")
+        room_description = data.get("room_description", "")
+        scheduled_time = data.get("scheduled_time")
+        room_privacy = data.get("room_privacy", "public")
+
         if not room_name:
-            return jsonify({'error': 'Room name is required'}), 400
-        
+            return jsonify({"error": "Room name is required"}), 400
+
         if not scheduled_time:
-            return jsonify({'error': 'Scheduled time is required'}), 400
-        
+            return jsonify({"error": "Scheduled time is required"}), 400
+
         # Validate room name length
         if len(room_name) > 50:
-            return jsonify({'error': 'Room name must be 50 characters or less'}), 400
-        
+            return jsonify({"error": "Room name must be 50 characters or less"}), 400
+
         # Parse scheduled time - handle local timezone (same logic as schedule_room)
         try:
             # Get timezone offset from request (in minutes)
-            timezone_offset_minutes = data.get('timezone_offset', 0)
-            
-            if 'T' in scheduled_time and '+' not in scheduled_time and 'Z' not in scheduled_time:
+            timezone_offset_minutes = data.get("timezone_offset", 0)
+
+            if "T" in scheduled_time and "+" not in scheduled_time and "Z" not in scheduled_time:
                 # Parse as local datetime and convert to UTC
                 # getTimezoneOffset() returns minutes to ADD to local time to get UTC
                 local_datetime = datetime.fromisoformat(scheduled_time)
-                from datetime import timezone, timedelta
+                from datetime import timedelta
+
                 offset_timedelta = timedelta(minutes=timezone_offset_minutes)
                 scheduled_datetime = local_datetime + offset_timedelta
-                logging.info(f"Updated scheduled time - converted to UTC: {scheduled_datetime} (local: {local_datetime}, offset: {timezone_offset_minutes} minutes)")
+                logging.info(
+                    f"Updated scheduled time - converted to UTC: {scheduled_datetime} (local: {local_datetime}, offset: {timezone_offset_minutes} minutes)"
+                )
             else:
                 # This has timezone info, parse normally
-                scheduled_datetime = datetime.fromisoformat(scheduled_time.replace('Z', '+00:00'))
+                scheduled_datetime = datetime.fromisoformat(scheduled_time.replace("Z", "+00:00"))
         except ValueError as e:
             logging.error(f"Invalid scheduled time format: {scheduled_time}, error: {e}")
-            return jsonify({'error': 'Invalid scheduled time format'}), 400
-        
+            return jsonify({"error": "Invalid scheduled time format"}), 400
+
         # Check if scheduled time is in the future (using UTC)
         now_utc = datetime.utcnow()
         if scheduled_datetime <= now_utc:
-            return jsonify({'error': 'Scheduled time must be in the future'}), 400
-        
+            return jsonify({"error": "Scheduled time must be in the future"}), 400
+
         db = get_firestore_client()
-        
+
         # Get the scheduled room to verify ownership
-        scheduled_room_ref = db.collection('scheduled_rooms').document(scheduled_room_id)
+        scheduled_room_ref = db.collection("scheduled_rooms").document(scheduled_room_id)
         scheduled_room_doc = scheduled_room_ref.get()
-        
+
         if not scheduled_room_doc.exists:
-            return jsonify({'error': 'Scheduled room not found'}), 404
-        
+            return jsonify({"error": "Scheduled room not found"}), 404
+
         scheduled_room_data = scheduled_room_doc.to_dict()
-        
+
         # Check if user is the host
-        if scheduled_room_data.get('host_id') != user['user_id']:
-            return jsonify({'error': 'Only the room creator can update scheduled rooms'}), 403
-        
+        if scheduled_room_data.get("host_id") != user["user_id"]:
+            return jsonify({"error": "Only the room creator can update scheduled rooms"}), 403
+
         # Update the scheduled room
         update_data = {
-            'room_name': room_name,
-            'room_description': room_description,
-            'room_privacy': room_privacy,
-            'scheduled_time': scheduled_datetime,
-            'updated_at': datetime.utcnow()
+            "room_name": room_name,
+            "room_description": room_description,
+            "room_privacy": room_privacy,
+            "scheduled_time": scheduled_datetime,
+            "updated_at": datetime.utcnow(),
         }
-        
+
         # Generate new room code for private rooms if privacy changed
-        if room_privacy == 'private' and scheduled_room_data.get('room_privacy') != 'private':
-            update_data['room_code'] = ''.join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
-        
+        if room_privacy == "private" and scheduled_room_data.get("room_privacy") != "private":
+            update_data["room_code"] = "".join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
+
         scheduled_room_ref.update(update_data)
-        
-        return jsonify({
-            'success': True,
-            'room_code': update_data.get('room_code', scheduled_room_data.get('room_code')),
-            'message': 'Scheduled room updated successfully'
-        })
-        
+
+        return jsonify(
+            {
+                "success": True,
+                "room_code": update_data.get("room_code", scheduled_room_data.get("room_code")),
+                "message": "Scheduled room updated successfully",
+            }
+        )
+
     except Exception as e:
         logging.error(f"Error updating scheduled room: {str(e)}")
-        return jsonify({'error': 'Failed to update scheduled room'}), 500
+        return jsonify({"error": "Failed to update scheduled room"}), 500
 
-@prayer_room_bp.route('/join-scheduled/<scheduled_room_id>', methods=['GET'])
+
+@prayer_room_bp.route("/join-scheduled/<scheduled_room_id>", methods=["GET"])
 def join_scheduled_room(scheduled_room_id):
     """Join a scheduled room by its scheduled room ID"""
     try:
         user = get_user_from_session()
-        
+
         if not user:
-            return jsonify({'error': 'Authentication required'}), 401
-        
+            return jsonify({"error": "Authentication required"}), 401
+
         db = get_firestore_client()
-        
+
         # Get the scheduled room
-        scheduled_room_ref = db.collection('scheduled_rooms').document(scheduled_room_id)
+        scheduled_room_ref = db.collection("scheduled_rooms").document(scheduled_room_id)
         scheduled_room_doc = scheduled_room_ref.get()
-        
+
         if not scheduled_room_doc.exists:
-            return jsonify({'error': 'Scheduled room not found'}), 404
-        
+            return jsonify({"error": "Scheduled room not found"}), 404
+
         scheduled_room_data = scheduled_room_doc.to_dict()
-        
+
         # Check if the scheduled time has passed
-        scheduled_time = scheduled_room_data.get('scheduled_time')
+        scheduled_time = scheduled_room_data.get("scheduled_time")
         if scheduled_time:
             # Convert Firestore timestamp to datetime if needed
-            if hasattr(scheduled_time, 'timestamp'):
+            if hasattr(scheduled_time, "timestamp"):
                 scheduled_datetime = datetime.fromtimestamp(scheduled_time.timestamp())
-            elif isinstance(scheduled_time, dict) and '_seconds' in scheduled_time:
-                scheduled_datetime = datetime.fromtimestamp(scheduled_time['_seconds'])
+            elif isinstance(scheduled_time, dict) and "_seconds" in scheduled_time:
+                scheduled_datetime = datetime.fromtimestamp(scheduled_time["_seconds"])
             else:
                 scheduled_datetime = scheduled_time
-            
+
             if scheduled_datetime <= datetime.now():
-                return jsonify({'error': 'This scheduled session has already passed'}), 400
-        
+                return jsonify({"error": "This scheduled session has already passed"}), 400
+
         # Redirect to the prayer room join page with the scheduled room info
-        room_name = scheduled_room_data.get('room_name', 'Scheduled Prayer Room')
-        room_privacy = scheduled_room_data.get('room_privacy', 'public')
-        room_code = scheduled_room_data.get('room_code', '')
-        
+        room_name = scheduled_room_data.get("room_name", "Scheduled Prayer Room")
+        room_privacy = scheduled_room_data.get("room_privacy", "public")
+        room_code = scheduled_room_data.get("room_code", "")
+
         # Create a redirect URL with the scheduled room information
         redirect_url = f"/prayer-room/join?room={scheduled_room_id}&name={room_name}&privacy={room_privacy}"
         if room_code:
             redirect_url += f"&code={room_code}"
-        
-        return jsonify({
-            'success': True,
-            'redirect_url': redirect_url,
-            'room_name': room_name,
-            'scheduled_time': scheduled_room_data.get('scheduled_time'),
-            'room_privacy': room_privacy,
-            'room_code': room_code
-        })
-        
+
+        return jsonify(
+            {
+                "success": True,
+                "redirect_url": redirect_url,
+                "room_name": room_name,
+                "scheduled_time": scheduled_room_data.get("scheduled_time"),
+                "room_privacy": room_privacy,
+                "room_code": room_code,
+            }
+        )
+
     except Exception as e:
         logging.error(f"Error joining scheduled room: {str(e)}")
-        return jsonify({'error': 'Failed to join scheduled room'}), 500
+        return jsonify({"error": "Failed to join scheduled room"}), 500
 
-@prayer_room_bp.route('/cleanup', methods=['POST'])
+
+@prayer_room_bp.route("/cleanup", methods=["POST"])
 @verify_cloud_scheduler()
 def run_cleanup():
     """Run bounded cleanup for rooms that have been ended for at least an hour."""
     try:
         db = get_firestore_client()
         if not _acquire_cleanup_lease(db):
-            return jsonify({'success': True, 'skipped': 'cleanup already running'}), 200
+            return jsonify({"success": True, "skipped": "cleanup already running"}), 200
         # Run all cleanup functions
         sessions_cleaned = cleanup_inactive_sessions()
         signaling_cleaned = cleanup_signaling_artifacts()
         chat_cleaned = cleanup_old_chat_messages()
-        
+
         total_cleaned = sessions_cleaned + signaling_cleaned + chat_cleaned
-        
-        return jsonify({
-            'success': True,
-            'sessions_cleaned': sessions_cleaned,
-            'signaling_cleaned': signaling_cleaned,
-            'chat_cleaned': chat_cleaned,
-            'total_cleaned': total_cleaned
-        })
-        
+
+        return jsonify(
+            {
+                "success": True,
+                "sessions_cleaned": sessions_cleaned,
+                "signaling_cleaned": signaling_cleaned,
+                "chat_cleaned": chat_cleaned,
+                "total_cleaned": total_cleaned,
+            }
+        )
+
     except Exception as e:
         logging.error(f"Error running cleanup: {str(e)}")
-        return jsonify({'error': 'Failed to run cleanup'}), 500
+        return jsonify({"error": "Failed to run cleanup"}), 500
 
 
 def _acquire_cleanup_lease(db):
-    lock_ref = db.collection('_locks').document('prayer-room-cleanup')
+    lock_ref = db.collection("_locks").document("prayer-room-cleanup")
 
     @firestore.transactional
     def acquire(transaction):
         now = datetime.utcnow()
         snapshot = lock_ref.get(transaction=transaction)
         data = snapshot.to_dict() if snapshot.exists else {}
-        held_until = data.get('held_until') if data else None
-        if held_until and getattr(held_until, 'tzinfo', None):
+        held_until = data.get("held_until") if data else None
+        if held_until and getattr(held_until, "tzinfo", None):
             held_until = held_until.replace(tzinfo=None)
         if held_until and held_until > now:
             return False
-        transaction.set(lock_ref, {'held_until': now + timedelta(minutes=14), 'acquired_at': now})
+        transaction.set(lock_ref, {"held_until": now + timedelta(minutes=14), "acquired_at": now})
         return True
 
     return acquire(db.transaction())
 
-@prayer_room_bp.route('/metrics', methods=['GET'])
+
+@prayer_room_bp.route("/metrics", methods=["GET"])
 def get_metrics():
     """Get basic metrics for monitoring"""
     try:
         db = get_firestore_client()
-        
+
         # Count active rooms
-        active_rooms = db.collection('prayer_rooms')\
-            .where('is_active', '==', True)\
-            .limit(1000)\
-            .stream()
+        active_rooms = db.collection("prayer_rooms").where("is_active", "==", True).limit(1000).stream()
         active_room_count = len(list(active_rooms))
-        
+
         # Count total participants across all active rooms
         total_participants = 0
-        for room_doc in db.collection('prayer_rooms').where('is_active', '==', True).stream():
+        for room_doc in db.collection("prayer_rooms").where("is_active", "==", True).stream():
             room_data = room_doc.to_dict()
-            participants = room_data.get('participants', [])
+            participants = room_data.get("participants", [])
             total_participants += len(participants)
-        
+
         # Count recent chat messages (last hour)
         from datetime import datetime, timedelta
+
         recent_cutoff = datetime.utcnow() - timedelta(hours=1)
-        recent_messages = db.collection('chat_messages')\
-            .where('timestamp', '>', recent_cutoff)\
-            .limit(1000)\
-            .stream()
+        recent_messages = db.collection("chat_messages").where("timestamp", ">", recent_cutoff).limit(1000).stream()
         recent_message_count = len(list(recent_messages))
-        
-        return jsonify({
-            'active_rooms': active_room_count,
-            'total_participants': total_participants,
-            'recent_messages': recent_message_count,
-            'timestamp': datetime.utcnow().isoformat()
-        })
-        
+
+        return jsonify(
+            {
+                "active_rooms": active_room_count,
+                "total_participants": total_participants,
+                "recent_messages": recent_message_count,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+        )
+
     except Exception as e:
         logging.error(f"Error getting metrics: {str(e)}")
-        return jsonify({'error': 'Failed to get metrics'}), 500
+        return jsonify({"error": "Failed to get metrics"}), 500
+
 
 def _ended_rooms_for_cleanup(db, limit=100):
     """Never sweep active calls; keep each maintenance invocation bounded."""
     cutoff = datetime.utcnow() - timedelta(hours=1)
     return list(
-        db.collection('prayer_rooms')
-        .where('is_active', '==', False)
-        .where('ended_at', '<', cutoff)
-        .order_by('ended_at')
+        db.collection("prayer_rooms")
+        .where("is_active", "==", False)
+        .where("ended_at", "<", cutoff)
+        .order_by("ended_at")
         .limit(limit)
         .stream(retry=Retry())
     )
@@ -4511,26 +4579,27 @@ def cleanup_inactive_sessions():
         for room_doc in all_rooms:
             try:
                 stale = []
-                inactive_docs = room_doc.reference \
-                    .collection('device_sessions') \
-                    .where('is_active', '==', False) \
+                inactive_docs = (
+                    room_doc.reference.collection("device_sessions")
+                    .where("is_active", "==", False)
                     .stream(retry=Retry())
+                )
 
                 for session_doc in inactive_docs:
-                    ended_at = session_doc.to_dict().get('ended_at')
+                    ended_at = session_doc.to_dict().get("ended_at")
                     if not ended_at:
                         continue
-                    if hasattr(ended_at, 'tzinfo') and ended_at.tzinfo is not None:
+                    if hasattr(ended_at, "tzinfo") and ended_at.tzinfo is not None:
                         ended_at = ended_at.replace(tzinfo=None)
                     if ended_at < cutoff_time:
                         stale.append(session_doc.reference)
 
                 for i in range(0, len(stale), 500):
                     batch = db.batch()
-                    for ref in stale[i:i + 500]:
+                    for ref in stale[i : i + 500]:
                         batch.delete(ref)
                     batch.commit()
-                    cleaned_count += len(stale[i:i + 500])
+                    cleaned_count += len(stale[i : i + 500])
             except Exception as room_err:
                 logging.warning(f"Session cleanup skipped room {room_doc.id}: {room_err}")
 
@@ -4541,6 +4610,7 @@ def cleanup_inactive_sessions():
     except Exception as e:
         logging.error(f"Error cleaning up inactive sessions: {str(e)}")
         return 0
+
 
 def cleanup_signaling_artifacts():
     """Clean up old WebRTC signaling artifacts (offers, answers, candidates).
@@ -4553,14 +4623,14 @@ def cleanup_signaling_artifacts():
         all_rooms = _ended_rooms_for_cleanup(db)
 
         cleaned_count = 0
-        subcollections = ('webrtc_offers', 'webrtc_answers', 'webrtc_candidates')
+        subcollections = ("webrtc_offers", "webrtc_answers", "webrtc_candidates")
 
         for room_doc in all_rooms:
             for sub in subcollections:
                 try:
                     stale_docs = list(
                         room_doc.reference.collection(sub)
-                        .where('timestamp', '<', cutoff_time)
+                        .where("timestamp", "<", cutoff_time)
                         .limit(500)
                         .stream(retry=Retry())
                     )
@@ -4568,10 +4638,10 @@ def cleanup_signaling_artifacts():
                         continue
                     for i in range(0, len(stale_docs), 500):
                         batch = db.batch()
-                        for doc in stale_docs[i:i + 500]:
+                        for doc in stale_docs[i : i + 500]:
                             batch.delete(doc.reference)
                         batch.commit()
-                        cleaned_count += len(stale_docs[i:i + 500])
+                        cleaned_count += len(stale_docs[i : i + 500])
                 except Exception as sub_err:
                     logging.warning(f"Signaling cleanup skipped {sub} in room {room_doc.id}: {sub_err}")
 
@@ -4582,6 +4652,7 @@ def cleanup_signaling_artifacts():
     except Exception as e:
         logging.error(f"Error cleaning up signaling artifacts: {str(e)}")
         return 0
+
 
 def cleanup_old_chat_messages():
     """Clean up old chat messages (keep last 1000 per room).
@@ -4595,9 +4666,9 @@ def cleanup_old_chat_messages():
         for room_doc in all_rooms:
             try:
                 messages = list(
-                    db.collection('chat_messages')
-                    .where('room_id', '==', room_doc.id)
-                    .order_by('timestamp', direction='DESCENDING')
+                    db.collection("chat_messages")
+                    .where("room_id", "==", room_doc.id)
+                    .order_by("timestamp", direction="DESCENDING")
                     .stream(retry=Retry())
                 )
                 if len(messages) <= 1000:
@@ -4606,10 +4677,10 @@ def cleanup_old_chat_messages():
                 to_delete = messages[1000:]
                 for i in range(0, len(to_delete), 500):
                     batch = db.batch()
-                    for msg_doc in to_delete[i:i + 500]:
+                    for msg_doc in to_delete[i : i + 500]:
                         batch.delete(msg_doc.reference)
                     batch.commit()
-                    cleaned_count += len(to_delete[i:i + 500])
+                    cleaned_count += len(to_delete[i : i + 500])
             except Exception as room_err:
                 logging.warning(f"Chat cleanup skipped room {room_doc.id}: {room_err}")
 

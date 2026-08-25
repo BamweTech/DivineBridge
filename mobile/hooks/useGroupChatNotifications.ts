@@ -43,7 +43,7 @@ export function useGroupChatNotifications(): void {
       return;
     }
 
-    const unsubs: Array<() => void> = [];
+    const unsubs: (() => void)[] = [];
 
     for (const gid of groupIds) {
       const q = query(

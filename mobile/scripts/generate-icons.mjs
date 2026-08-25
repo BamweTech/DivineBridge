@@ -6,6 +6,7 @@
 import sharp from 'sharp';
 import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
+import { Buffer } from 'node:buffer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 

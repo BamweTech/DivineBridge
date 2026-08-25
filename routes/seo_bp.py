@@ -1,14 +1,14 @@
 """
 SEO Blueprint - Sitemap, structured data, and SEO optimization
 """
-from flask import Blueprint, request, make_response, jsonify, render_template_string, Response, redirect
+from flask import Blueprint, request, make_response, jsonify, render_template_string, Response
 from datetime import datetime, timedelta
 import logging
 import requests
 import re
 from auth_decorators import verify_cloud_scheduler
 
-seo_bp = Blueprint('seo', __name__)
+seo_bp = Blueprint("seo", __name__)
 logger = logging.getLogger(__name__)
 
 
@@ -17,9 +17,9 @@ def _clean_citation_markers(text: str) -> str:
     if not text:
         return text
     # Remove citation markers [1], [2], etc.
-    cleaned = re.sub(r'\[\d+\]', '', text)
+    cleaned = re.sub(r"\[\d+\]", "", text)
     # Clean up multiple spaces
-    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned
 
 
@@ -29,207 +29,207 @@ def get_country_flag_code(country_name: str) -> str:
     Common country name mappings
     """
     country_mapping = {
-        'united states': 'us',
-        'united states of america': 'us',
-        'usa': 'us',
-        'united kingdom': 'gb',
-        'uk': 'gb',
-        'south korea': 'kr',
-        'north korea': 'kp',
-        'russia': 'ru',
-        'russian federation': 'ru',
-        'philippines': 'ph',
-        'japan': 'jp',
-        'china': 'cn',
-        'india': 'in',
-        'brazil': 'br',
-        'mexico': 'mx',
-        'canada': 'ca',
-        'australia': 'au',
-        'germany': 'de',
-        'france': 'fr',
-        'italy': 'it',
-        'spain': 'es',
-        'netherlands': 'nl',
-        'belgium': 'be',
-        'switzerland': 'ch',
-        'austria': 'at',
-        'sweden': 'se',
-        'norway': 'no',
-        'denmark': 'dk',
-        'finland': 'fi',
-        'poland': 'pl',
-        'czech republic': 'cz',
-        'greece': 'gr',
-        'portugal': 'pt',
-        'ireland': 'ie',
-        'new zealand': 'nz',
-        'south africa': 'za',
-        'egypt': 'eg',
-        'nigeria': 'ng',
-        'kenya': 'ke',
-        'ethiopia': 'et',
-        'tanzania': 'tz',
-        'uganda': 'ug',
-        'ghana': 'gh',
-        'morocco': 'ma',
-        'algeria': 'dz',
-        'tunisia': 'tn',
-        'libya': 'ly',
-        'sudan': 'sd',
-        'angola': 'ao',
-        'mozambique': 'mz',
-        'madagascar': 'mg',
-        'cameroon': 'cm',
-        'ivory coast': 'ci',
-        'niger': 'ne',
-        'burkina faso': 'bf',
-        'mali': 'ml',
-        'malawi': 'mw',
-        'zambia': 'zm',
-        'zimbabwe': 'zw',
-        'senegal': 'sn',
-        'chad': 'td',
-        'somalia': 'so',
-        'guinea': 'gn',
-        'rwanda': 'rw',
-        'benin': 'bj',
-        'burundi': 'bi',
-        'togo': 'tg',
-        'sierra leone': 'sl',
-        'liberia': 'lr',
-        'central african republic': 'cf',
-        'mauritania': 'mr',
-        'eritrea': 'er',
-        'gambia': 'gm',
-        'botswana': 'bw',
-        'namibia': 'na',
-        'gabon': 'ga',
-        'lesotho': 'ls',
-        'guinea-bissau': 'gw',
-        'equatorial guinea': 'gq',
-        'mauritius': 'mu',
-        'eswatini': 'sz',
-        'djibouti': 'dj',
-        'comoros': 'km',
-        'cape verde': 'cv',
-        'sao tome and principe': 'st',
-        'seychelles': 'sc',
-        'indonesia': 'id',
-        'thailand': 'th',
-        'vietnam': 'vn',
-        'malaysia': 'my',
-        'singapore': 'sg',
-        'myanmar': 'mm',
-        'cambodia': 'kh',
-        'laos': 'la',
-        'bangladesh': 'bd',
-        'pakistan': 'pk',
-        'sri lanka': 'lk',
-        'nepal': 'np',
-        'bhutan': 'bt',
-        'maldives': 'mv',
-        'afghanistan': 'af',
-        'iran': 'ir',
-        'iraq': 'iq',
-        'israel': 'il',
-        'palestine': 'ps',
-        'jordan': 'jo',
-        'lebanon': 'lb',
-        'syria': 'sy',
-        'saudi arabia': 'sa',
-        'united arab emirates': 'ae',
-        'uae': 'ae',
-        'qatar': 'qa',
-        'kuwait': 'kw',
-        'bahrain': 'bh',
-        'oman': 'om',
-        'yemen': 'ye',
-        'turkey': 'tr',
-        'azerbaijan': 'az',
-        'armenia': 'am',
-        'georgia': 'ge',
-        'kazakhstan': 'kz',
-        'uzbekistan': 'uz',
-        'turkmenistan': 'tm',
-        'kyrgyzstan': 'kg',
-        'tajikistan': 'tj',
-        'mongolia': 'mn',
-        'taiwan': 'tw',
-        'hong kong': 'hk',
-        'macau': 'mo',
-        'north macedonia': 'mk',
-        'bosnia and herzegovina': 'ba',
-        'croatia': 'hr',
-        'serbia': 'rs',
-        'montenegro': 'me',
-        'albania': 'al',
-        'kosovo': 'xk',
-        'moldova': 'md',
-        'belarus': 'by',
-        'ukraine': 'ua',
-        'estonia': 'ee',
-        'latvia': 'lv',
-        'lithuania': 'lt',
-        'slovenia': 'si',
-        'slovakia': 'sk',
-        'hungary': 'hu',
-        'romania': 'ro',
-        'bulgaria': 'bg',
-        'cuba': 'cu',
-        'jamaica': 'jm',
-        'haiti': 'ht',
-        'dominican republic': 'do',
-        'puerto rico': 'pr',
-        'trinidad and tobago': 'tt',
-        'barbados': 'bb',
-        'bahamas': 'bs',
-        'belize': 'bz',
-        'costa rica': 'cr',
-        'panama': 'pa',
-        'nicaragua': 'ni',
-        'honduras': 'hn',
-        'el salvador': 'sv',
-        'guatemala': 'gt',
-        'colombia': 'co',
-        'venezuela': 've',
-        'ecuador': 'ec',
-        'peru': 'pe',
-        'bolivia': 'bo',
-        'paraguay': 'py',
-        'uruguay': 'uy',
-        'chile': 'cl',
-        'argentina': 'ar',
-        'guyana': 'gy',
-        'suriname': 'sr',
-        'french guiana': 'gf',
-        'fiji': 'fj',
-        'papua new guinea': 'pg',
-        'new caledonia': 'nc',
-        'french polynesia': 'pf',
-        'samoa': 'ws',
-        'tonga': 'to',
-        'vanuatu': 'vu',
-        'solomon islands': 'sb',
-        'micronesia': 'fm',
-        'palau': 'pw',
-        'marshall islands': 'mh',
-        'kiribati': 'ki',
-        'nauru': 'nr',
-        'tuvalu': 'tv'
+        "united states": "us",
+        "united states of america": "us",
+        "usa": "us",
+        "united kingdom": "gb",
+        "uk": "gb",
+        "south korea": "kr",
+        "north korea": "kp",
+        "russia": "ru",
+        "russian federation": "ru",
+        "philippines": "ph",
+        "japan": "jp",
+        "china": "cn",
+        "india": "in",
+        "brazil": "br",
+        "mexico": "mx",
+        "canada": "ca",
+        "australia": "au",
+        "germany": "de",
+        "france": "fr",
+        "italy": "it",
+        "spain": "es",
+        "netherlands": "nl",
+        "belgium": "be",
+        "switzerland": "ch",
+        "austria": "at",
+        "sweden": "se",
+        "norway": "no",
+        "denmark": "dk",
+        "finland": "fi",
+        "poland": "pl",
+        "czech republic": "cz",
+        "greece": "gr",
+        "portugal": "pt",
+        "ireland": "ie",
+        "new zealand": "nz",
+        "south africa": "za",
+        "egypt": "eg",
+        "nigeria": "ng",
+        "kenya": "ke",
+        "ethiopia": "et",
+        "tanzania": "tz",
+        "uganda": "ug",
+        "ghana": "gh",
+        "morocco": "ma",
+        "algeria": "dz",
+        "tunisia": "tn",
+        "libya": "ly",
+        "sudan": "sd",
+        "angola": "ao",
+        "mozambique": "mz",
+        "madagascar": "mg",
+        "cameroon": "cm",
+        "ivory coast": "ci",
+        "niger": "ne",
+        "burkina faso": "bf",
+        "mali": "ml",
+        "malawi": "mw",
+        "zambia": "zm",
+        "zimbabwe": "zw",
+        "senegal": "sn",
+        "chad": "td",
+        "somalia": "so",
+        "guinea": "gn",
+        "rwanda": "rw",
+        "benin": "bj",
+        "burundi": "bi",
+        "togo": "tg",
+        "sierra leone": "sl",
+        "liberia": "lr",
+        "central african republic": "cf",
+        "mauritania": "mr",
+        "eritrea": "er",
+        "gambia": "gm",
+        "botswana": "bw",
+        "namibia": "na",
+        "gabon": "ga",
+        "lesotho": "ls",
+        "guinea-bissau": "gw",
+        "equatorial guinea": "gq",
+        "mauritius": "mu",
+        "eswatini": "sz",
+        "djibouti": "dj",
+        "comoros": "km",
+        "cape verde": "cv",
+        "sao tome and principe": "st",
+        "seychelles": "sc",
+        "indonesia": "id",
+        "thailand": "th",
+        "vietnam": "vn",
+        "malaysia": "my",
+        "singapore": "sg",
+        "myanmar": "mm",
+        "cambodia": "kh",
+        "laos": "la",
+        "bangladesh": "bd",
+        "pakistan": "pk",
+        "sri lanka": "lk",
+        "nepal": "np",
+        "bhutan": "bt",
+        "maldives": "mv",
+        "afghanistan": "af",
+        "iran": "ir",
+        "iraq": "iq",
+        "israel": "il",
+        "palestine": "ps",
+        "jordan": "jo",
+        "lebanon": "lb",
+        "syria": "sy",
+        "saudi arabia": "sa",
+        "united arab emirates": "ae",
+        "uae": "ae",
+        "qatar": "qa",
+        "kuwait": "kw",
+        "bahrain": "bh",
+        "oman": "om",
+        "yemen": "ye",
+        "turkey": "tr",
+        "azerbaijan": "az",
+        "armenia": "am",
+        "georgia": "ge",
+        "kazakhstan": "kz",
+        "uzbekistan": "uz",
+        "turkmenistan": "tm",
+        "kyrgyzstan": "kg",
+        "tajikistan": "tj",
+        "mongolia": "mn",
+        "taiwan": "tw",
+        "hong kong": "hk",
+        "macau": "mo",
+        "north macedonia": "mk",
+        "bosnia and herzegovina": "ba",
+        "croatia": "hr",
+        "serbia": "rs",
+        "montenegro": "me",
+        "albania": "al",
+        "kosovo": "xk",
+        "moldova": "md",
+        "belarus": "by",
+        "ukraine": "ua",
+        "estonia": "ee",
+        "latvia": "lv",
+        "lithuania": "lt",
+        "slovenia": "si",
+        "slovakia": "sk",
+        "hungary": "hu",
+        "romania": "ro",
+        "bulgaria": "bg",
+        "cuba": "cu",
+        "jamaica": "jm",
+        "haiti": "ht",
+        "dominican republic": "do",
+        "puerto rico": "pr",
+        "trinidad and tobago": "tt",
+        "barbados": "bb",
+        "bahamas": "bs",
+        "belize": "bz",
+        "costa rica": "cr",
+        "panama": "pa",
+        "nicaragua": "ni",
+        "honduras": "hn",
+        "el salvador": "sv",
+        "guatemala": "gt",
+        "colombia": "co",
+        "venezuela": "ve",
+        "ecuador": "ec",
+        "peru": "pe",
+        "bolivia": "bo",
+        "paraguay": "py",
+        "uruguay": "uy",
+        "chile": "cl",
+        "argentina": "ar",
+        "guyana": "gy",
+        "suriname": "sr",
+        "french guiana": "gf",
+        "fiji": "fj",
+        "papua new guinea": "pg",
+        "new caledonia": "nc",
+        "french polynesia": "pf",
+        "samoa": "ws",
+        "tonga": "to",
+        "vanuatu": "vu",
+        "solomon islands": "sb",
+        "micronesia": "fm",
+        "palau": "pw",
+        "marshall islands": "mh",
+        "kiribati": "ki",
+        "nauru": "nr",
+        "tuvalu": "tv",
     }
-    
+
     # Normalize country name
     country_lower = country_name.lower().strip()
-    
+
     # Check mapping first
     if country_lower in country_mapping:
         return country_mapping[country_lower]
-    
+
     # If it's already a 2-letter code, return as-is
     if len(country_lower) == 2:
         return country_lower
-    
+
     # Try to extract from common patterns
     # For multi-word countries, try first word or common abbreviation
     words = country_lower.split()
@@ -237,19 +237,19 @@ def get_country_flag_code(country_name: str) -> str:
         # Try first word
         if words[0] in country_mapping:
             return country_mapping[words[0]]
-    
+
     # Default: return lowercase first two letters (not ideal but better than nothing)
-    return country_lower[:2] if len(country_lower) >= 2 else 'xx'
+    return country_lower[:2] if len(country_lower) >= 2 else "xx"
 
 
 def _generate_disaster_prayer(disaster_type, location):
     """Generate a short, specific prayer for a disaster and location (50-100 words)"""
     try:
         from perplexity_client import get_perplexity_client, set_client_model
-        
+
         client = get_perplexity_client()
-        set_client_model('sonar')  # Fast model for short prayers
-        
+        set_client_model("sonar")  # Fast model for short prayers
+
         prompt = f"""Write a heartfelt Christian prayer for those affected by {disaster_type} in {location}.
 
 REQUIREMENTS:
@@ -273,29 +273,30 @@ REQUIREMENTS:
 Return ONLY the prayer text, nothing else."""
 
         response = client.query(prompt)
-        
+
         # Clean the response - remove any <think> tags
         import re
-        prayer = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL).strip()
-        
+
+        prayer = re.sub(r"<think>.*?</think>", "", response, flags=re.DOTALL).strip()
+
         # Ensure it starts correctly
         if not prayer.startswith("Heavenly Father"):
             prayer = "Heavenly Father, " + prayer
-        
+
         # Ensure it ends correctly
         if not prayer.endswith("Amen.") and not prayer.endswith("Amen"):
             if "In Jesus' name" not in prayer:
-                prayer = prayer.rstrip('.') + ". In Jesus' name, Amen."
-        
+                prayer = prayer.rstrip(".") + ". In Jesus' name, Amen."
+
         # Validate length (60-150 words)
         word_count = len(prayer.split())
         if word_count < 60 or word_count > 160:
             logger.warning(f"Disaster prayer word count out of range: {word_count} words")
             raise ValueError("Prayer length invalid")
-        
+
         logger.info(f"Generated disaster prayer for {disaster_type}/{location}: {word_count} words")
         return prayer
-        
+
     except Exception as e:
         logger.warning(f"Using fallback prayer for {disaster_type}/{location}: {e}")
         # Return a more detailed compassionate fallback prayer
@@ -305,153 +306,150 @@ We ask for Your divine protection over rescue workers and first responders as th
 
 Lord, we trust in Your promise to never leave nor forsake us. Bring healing, hope, and restoration to {location}. In Jesus' name, Amen."""
 
-@seo_bp.route('/sitemap.xml')
+
+@seo_bp.route("/sitemap.xml")
 def sitemap():
     """Generate dynamic sitemap with all pages, prayers, and disaster-specific pages"""
     try:
         from flask import current_app
-        
+
         # Get base URL (force HTTPS for production)
-        base_url = request.url_root.rstrip('/')
+        base_url = request.url_root.rstrip("/")
         # Cloud Run is behind load balancer, always use HTTPS for production
-        if 'divinebridge.io' in base_url or 'run.app' in base_url:
-            base_url = base_url.replace('http://', 'https://')
-        
+        if "divinebridge.io" in base_url or "run.app" in base_url:
+            base_url = base_url.replace("http://", "https://")
+
         # Build sitemap XML
         xml_content = ['<?xml version="1.0" encoding="UTF-8"?>']
         xml_content.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
-        
+
         # Static pages - Public pages only (exclude auth/profile pages)
         static_pages = [
-            ('/', '1.0', 'daily'),  # Home page
-            ('/home', '0.9', 'daily'),  # Main home page with daily content
-            ('/prayers', '1.0', 'daily'),  # Prayer Room - main feature
-            ('/prayer-room', '0.9', 'daily'),  # Live Prayer Room directory
-            ('/daily-prayer', '0.95', 'daily'),  # Daily prayer dedicated page
-            ('/globalprayerwatch', '0.9', 'daily'),  # Global Prayer Watch hub (SEO discovery page)
-            ('/about', '0.7', 'monthly'),  # About page
-            ('/contact', '0.6', 'monthly'),  # Contact page
-            ('/faq', '0.6', 'monthly'),  # FAQ page
-            ('/privacy-policy', '0.3', 'yearly'),  # Privacy policy
-            ('/terms-of-service', '0.3', 'yearly'),  # Terms of service
+            ("/", "1.0", "daily"),  # Home page
+            ("/home", "0.9", "daily"),  # Main home page with daily content
+            ("/prayers", "1.0", "daily"),  # Prayer Room - main feature
+            ("/prayer-room", "0.9", "daily"),  # Live Prayer Room directory
+            ("/daily-prayer", "0.95", "daily"),  # Daily prayer dedicated page
+            ("/globalprayerwatch", "0.9", "daily"),  # Global Prayer Watch hub (SEO discovery page)
+            ("/about", "0.7", "monthly"),  # About page
+            ("/contact", "0.6", "monthly"),  # Contact page
+            ("/faq", "0.6", "monthly"),  # FAQ page
+            ("/privacy-policy", "0.3", "yearly"),  # Privacy policy
+            ("/terms-of-service", "0.3", "yearly"),  # Terms of service
         ]
-        
+
         for path, priority, changefreq in static_pages:
-            xml_content.append('  <url>')
-            xml_content.append(f'    <loc>{base_url}{path}</loc>')
-            xml_content.append(f'    <changefreq>{changefreq}</changefreq>')
-            xml_content.append(f'    <priority>{priority}</priority>')
+            xml_content.append("  <url>")
+            xml_content.append(f"    <loc>{base_url}{path}</loc>")
+            xml_content.append(f"    <changefreq>{changefreq}</changefreq>")
+            xml_content.append(f"    <priority>{priority}</priority>")
             xml_content.append(f'    <lastmod>{datetime.now().strftime("%Y-%m-%d")}</lastmod>')
-            xml_content.append('  </url>')
-        
+            xml_content.append("  </url>")
+
         # Daily prayers (last 30 days)
         storage_handler = current_app.storage_handler
         today = datetime.now()
-        
+
         for i in range(30):
             date = today - timedelta(days=i)
-            date_str = date.strftime('%Y-%m-%d')
-            
+            date_str = date.strftime("%Y-%m-%d")
+
             try:
                 prayer = storage_handler.get_prayer(date_str)
                 if prayer:
-                    xml_content.append('  <url>')
-                    xml_content.append(f'    <loc>{base_url}/prayers/daily/{date_str}</loc>')
-                    xml_content.append('    <changefreq>weekly</changefreq>')
-                    xml_content.append('    <priority>0.9</priority>')
-                    xml_content.append(f'    <lastmod>{date_str}</lastmod>')
-                    xml_content.append('  </url>')
-                    
+                    xml_content.append("  <url>")
+                    xml_content.append(f"    <loc>{base_url}/prayers/daily/{date_str}</loc>")
+                    xml_content.append("    <changefreq>weekly</changefreq>")
+                    xml_content.append("    <priority>0.9</priority>")
+                    xml_content.append(f"    <lastmod>{date_str}</lastmod>")
+                    xml_content.append("  </url>")
+
                     # If prayer has disaster metadata, create disaster-specific URLs
                     # Note: Using /globalprayerwatch/{type} format (no location) to match actual route
-                    if isinstance(prayer, dict) and 'metadata' in prayer:
-                        metadata = prayer['metadata']
-                        disasters = metadata.get('disasters', [])
-                        
+                    if isinstance(prayer, dict) and "metadata" in prayer:
+                        metadata = prayer["metadata"]
+                        disasters = metadata.get("disasters", [])
+
                         # Track disaster types we've already added (deduplicate by type)
                         added_disaster_types = set()
-                        
+
                         for disaster in disasters:
-                            if disaster.get('type'):
-                                disaster_type = disaster['type'].lower().replace(' ', '-').replace('_', '-')
-                                
+                            if disaster.get("type"):
+                                disaster_type = disaster["type"].lower().replace(" ", "-").replace("_", "-")
+
                                 # Only add each disaster type once (deduplicate)
                                 if disaster_type not in added_disaster_types:
                                     added_disaster_types.add(disaster_type)
-                                    
-                                    xml_content.append('  <url>')
-                                    xml_content.append(f'    <loc>{base_url}/globalprayerwatch/{disaster_type}</loc>')
-                                    xml_content.append('    <changefreq>weekly</changefreq>')
-                                    xml_content.append('    <priority>0.95</priority>')  # High priority for current events
-                                    xml_content.append(f'    <lastmod>{date_str}</lastmod>')
-                                    xml_content.append('  </url>')
+
+                                    xml_content.append("  <url>")
+                                    xml_content.append(f"    <loc>{base_url}/globalprayerwatch/{disaster_type}</loc>")
+                                    xml_content.append("    <changefreq>weekly</changefreq>")
+                                    xml_content.append(
+                                        "    <priority>0.95</priority>"
+                                    )  # High priority for current events
+                                    xml_content.append(f"    <lastmod>{date_str}</lastmod>")
+                                    xml_content.append("  </url>")
             except Exception as e:
                 logger.warning(f"Error adding prayer {date_str} to sitemap: {e}")
                 continue
-        
-        xml_content.append('</urlset>')
-        
+
+        xml_content.append("</urlset>")
+
         # Create response
-        response = make_response('\n'.join(xml_content))
-        response.headers['Content-Type'] = 'application/xml; charset=utf-8'
+        response = make_response("\n".join(xml_content))
+        response.headers["Content-Type"] = "application/xml; charset=utf-8"
         return response
-        
+
     except Exception as e:
         logger.error(f"Error generating sitemap: {e}")
-        return jsonify({'error': 'Failed to generate sitemap'}), 500
+        return jsonify({"error": "Failed to generate sitemap"}), 500
 
 
-@seo_bp.route('/api/disasters/organizations', methods=['GET'])
+@seo_bp.route("/api/disasters/organizations", methods=["GET"])
 def get_disaster_organizations():
     """API endpoint to fetch organizations for a disaster type and affected countries"""
     try:
-        from flask import current_app
         from nonprofit_service import get_nonprofit_service
-        
-        disaster_type = request.args.get('type', '')
-        countries = request.args.get('countries', '')
-        
+
+        disaster_type = request.args.get("type", "")
+        countries = request.args.get("countries", "")
+
         if not disaster_type or not countries:
-            return jsonify({'error': 'Missing required parameters: type and countries'}), 400
-        
+            return jsonify({"error": "Missing required parameters: type and countries"}), 400
+
         # Parse countries (comma-separated)
-        affected_countries = [c.strip() for c in countries.split(',') if c.strip()]
-        
+        affected_countries = [c.strip() for c in countries.split(",") if c.strip()]
+
         if not affected_countries:
-            return jsonify({'error': 'No valid countries provided'}), 400
-        
+            return jsonify({"error": "No valid countries provided"}), 400
+
         # Get nonprofit service
         nonprofit_service = get_nonprofit_service()
-        
+
         # Create disaster dict for organization lookup
-        disaster_dict = {
-            'type': disaster_type.lower(),
-            'locations': affected_countries,
-            'details': ''
-        }
-        
+        disaster_dict = {"type": disaster_type.lower(), "locations": affected_countries, "details": ""}
+
         # Use first country as primary location for organization search
         primary_location = affected_countries[0]
         logger.info(f"Fetching organizations for {disaster_type} in {primary_location}")
-        
+
         disaster_orgs = nonprofit_service._get_disaster_organizations(disaster_dict)
         # Limit to 3 organizations
         organizations = disaster_orgs[:3] if disaster_orgs else []
-        
+
         logger.info(f"Found {len(organizations)} organizations for {disaster_type}")
-        
-        return jsonify({
-            'organizations': organizations,
-            'disaster_type': disaster_type,
-            'countries': affected_countries
-        }), 200
-        
+
+        return (
+            jsonify({"organizations": organizations, "disaster_type": disaster_type, "countries": affected_countries}),
+            200,
+        )
+
     except Exception as e:
         logger.error(f"Error fetching organizations for disaster: {e}", exc_info=True)
-        return jsonify({'error': 'Failed to fetch organizations'}), 500
+        return jsonify({"error": "Failed to fetch organizations"}), 500
 
 
-@seo_bp.route('/api/disasters/generate-hourly', methods=['POST'])
+@seo_bp.route("/api/disasters/generate-hourly", methods=["POST"])
 @verify_cloud_scheduler()
 def generate_hourly_disaster_prayers():
     """
@@ -461,89 +459,90 @@ def generate_hourly_disaster_prayers():
     try:
         from flask import current_app
         from disaster_prayer_service import get_disaster_prayer_service
-        
+
         logger.info("Cloud Scheduler triggered hourly disaster prayer generation")
-        
+
         # Get disaster prayer service
         service = get_disaster_prayer_service(current_app.storage_handler)
-        
+
         # Process breaking disasters
         result = service.process_hourly_disasters()
-        
-        if result.get('success'):
+
+        if result.get("success"):
             logger.info(f"Hourly processing complete: {result.get('prayers_generated', 0)} prayers generated")
-            return jsonify({
-                'success': True,
-                'disasters_found': result.get('disasters_found', 0),
-                'prayers_generated': result.get('prayers_generated', 0)
-            }), 200
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "disasters_found": result.get("disasters_found", 0),
+                        "prayers_generated": result.get("prayers_generated", 0),
+                    }
+                ),
+                200,
+            )
         else:
             logger.error(f"Hourly processing failed: {result.get('error')}")
-            return jsonify({
-                'success': False,
-                'error': result.get('error', 'Unknown error')
-            }), 500
-            
+            return jsonify({"success": False, "error": result.get("error", "Unknown error")}), 500
+
     except Exception as e:
         logger.error(f"Error in hourly disaster prayer generation: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
-@seo_bp.route('/globalprayerwatch')
+@seo_bp.route("/globalprayerwatch")
 def disasters_hub():
     """Hub page showing all current disasters grouped by type from hourly breaking news monitoring"""
     try:
         from flask import current_app
         from disaster_prayer_service import get_disaster_prayer_service
-        
+
         # Get disaster prayer service
         service = get_disaster_prayer_service(current_app.storage_handler)
-        
+
         # Get active disaster prayers (prioritizes grouped prayers)
         disaster_prayers = service.get_active_disaster_prayers()
-        
+
         # Normalize disaster types function (matches disaster_prayer_service normalization)
         def normalize_disaster_type_for_display(disaster_type: str) -> str:
             """Normalize disaster type to standard format for grouping"""
             disaster_type = disaster_type.lower().strip()
             type_mapping = {
-                'hurricane': 'typhoon',
-                'cyclone': 'typhoon',
-                'storm': 'typhoon',  # Normalize storm to typhoon (same weather system type)
-                'flooding': 'flood',
-                'wildfire': 'fire',
-                'volcanic_eruption': 'volcano',
-                'pandemic': 'epidemic',
-                'war': 'conflict',
-                'refugee_crisis': 'conflict',
-                'mass shooting': 'mass_shooting',
-                'gun violence': 'mass_shooting',
-                'plane crash': 'major_accident',
-                'plane_crash': 'major_accident',
-                'aviation accident': 'major_accident',
-                'airport incident': 'major_accident',
-                'train derailment': 'major_accident',
-                'building collapse': 'major_accident',
-                'explosion': 'major_accident',
+                "hurricane": "typhoon",
+                "cyclone": "typhoon",
+                "storm": "typhoon",  # Normalize storm to typhoon (same weather system type)
+                "flooding": "flood",
+                "wildfire": "fire",
+                "volcanic_eruption": "volcano",
+                "pandemic": "epidemic",
+                "war": "conflict",
+                "refugee_crisis": "conflict",
+                "mass shooting": "mass_shooting",
+                "gun violence": "mass_shooting",
+                "plane crash": "major_accident",
+                "plane_crash": "major_accident",
+                "aviation accident": "major_accident",
+                "airport incident": "major_accident",
+                "train derailment": "major_accident",
+                "building collapse": "major_accident",
+                "explosion": "major_accident",
             }
             return type_mapping.get(disaster_type, disaster_type)
-        
+
         # First pass: Collect all entries by normalized type
         entries_by_normalized_type = {}
         for prayer_data in disaster_prayers:
             # Check if it's a grouped prayer
-            if prayer_data.get('is_grouped') or prayer_data.get('affected_countries'):
-                disaster_type = prayer_data.get('disaster_type', '')
+            if prayer_data.get("is_grouped") or prayer_data.get("affected_countries"):
+                disaster_type = prayer_data.get("disaster_type", "")
                 # Normalize the type for grouping (storm -> typhoon, etc.)
-                disaster_type_normalized = normalize_disaster_type_for_display(disaster_type).replace(' ', '_').replace('-', '_')
-                
+                disaster_type_normalized = (
+                    normalize_disaster_type_for_display(disaster_type).replace(" ", "_").replace("-", "_")
+                )
+
                 if disaster_type_normalized not in entries_by_normalized_type:
                     entries_by_normalized_type[disaster_type_normalized] = []
                 entries_by_normalized_type[disaster_type_normalized].append(prayer_data)
-        
+
         # Second pass: Merge countries from all entries of the same normalized type, keep most recent
         disasters_by_type = {}
         for disaster_type_normalized, entries in entries_by_normalized_type.items():
@@ -553,262 +552,282 @@ def disasters_hub():
             else:
                 # Multiple entries - merge countries and keep most recent
                 logger.info(f"Merging {len(entries)} entries for normalized type {disaster_type_normalized}")
-                
+
                 # Find the most recent entry
-                most_recent_entry = max(entries, key=lambda x: datetime.fromisoformat(x.get('created_at', '2000-01-01')))
-                
+                most_recent_entry = max(
+                    entries, key=lambda x: datetime.fromisoformat(x.get("created_at", "2000-01-01"))
+                )
+
                 # Merge all countries from all entries
                 all_countries = set()
                 for entry in entries:
-                    all_countries.update(entry.get('affected_countries', []))
-                
+                    all_countries.update(entry.get("affected_countries", []))
+
                 # Update the most recent entry with merged countries
-                most_recent_entry['affected_countries'] = list(all_countries)
+                most_recent_entry["affected_countries"] = list(all_countries)
                 disasters_by_type[disaster_type_normalized] = most_recent_entry
-                
-                logger.info(f"Merged {len(entries)} entries for {disaster_type_normalized}: {len(all_countries)} total countries")
-        
+
+                logger.info(
+                    f"Merged {len(entries)} entries for {disaster_type_normalized}: {len(all_countries)} total countries"
+                )
+
         # Transform to display format
         grouped_disasters = []
         for disaster_type, prayer_data in disasters_by_type.items():
-            affected_countries = prayer_data.get('affected_countries', [])
-            
+            affected_countries = prayer_data.get("affected_countries", [])
+
             # Get flag codes for all affected countries
             country_flags = []
             for country in affected_countries:
                 flag_code = get_country_flag_code(country)
                 if flag_code:
-                    country_flags.append({
-                        'country': country,
-                        'flag_code': flag_code
-                    })
-            
+                    country_flags.append({"country": country, "flag_code": flag_code})
+
             # Create URL slug
-            disaster_slug = disaster_type.lower().replace('_', '-').replace(' ', '-')
+            disaster_slug = disaster_type.lower().replace("_", "-").replace(" ", "-")
             url_slug = disaster_slug
-            
-            grouped_disasters.append({
-                'type': disaster_type,
-                'type_display': prayer_data.get('disaster_type_display', disaster_type.replace('_', ' ').replace('-', ' ').title()),
-                'affected_countries': affected_countries,
-                'country_flags': country_flags,
-                'summary': _clean_citation_markers(prayer_data.get('summary', '')),
-                'severity': prayer_data.get('overall_severity', 'moderate'),
-                'created_at': prayer_data.get('created_at', ''),
-                'url_slug': url_slug,
-                'prayer_id': prayer_data.get('id', '')
-            })
-        
+
+            grouped_disasters.append(
+                {
+                    "type": disaster_type,
+                    "type_display": prayer_data.get(
+                        "disaster_type_display", disaster_type.replace("_", " ").replace("-", " ").title()
+                    ),
+                    "affected_countries": affected_countries,
+                    "country_flags": country_flags,
+                    "summary": _clean_citation_markers(prayer_data.get("summary", "")),
+                    "severity": prayer_data.get("overall_severity", "moderate"),
+                    "created_at": prayer_data.get("created_at", ""),
+                    "url_slug": url_slug,
+                    "prayer_id": prayer_data.get("id", ""),
+                }
+            )
+
         # Sort by created_at (most recent first) and severity
-        severity_order = {'catastrophic': 0, 'severe': 1, 'moderate': 2, 'minor': 3}
-        grouped_disasters.sort(key=lambda x: (
-            severity_order.get(x.get('severity', 'moderate'), 3),
-            x.get('created_at', '')
-        ), reverse=True)
-        
+        severity_order = {"catastrophic": 0, "severe": 1, "moderate": 2, "minor": 3}
+        grouped_disasters.sort(
+            key=lambda x: (severity_order.get(x.get("severity", "moderate"), 3), x.get("created_at", "")), reverse=True
+        )
+
         today = datetime.now()
-        
-        return render_template_string(DISASTERS_HUB_TEMPLATE, 
-                                    disasters=grouped_disasters,
-                                    disasters_by_country={},  # Keep for backward compatibility
-                                    today=today.strftime('%B %d, %Y'))
-        
+
+        return render_template_string(
+            DISASTERS_HUB_TEMPLATE,
+            disasters=grouped_disasters,
+            disasters_by_country={},  # Keep for backward compatibility
+            today=today.strftime("%B %d, %Y"),
+        )
+
     except Exception as e:
         logger.error(f"Error rendering disasters hub: {e}")
-        return jsonify({'error': 'Failed to load disasters'}), 500
+        return jsonify({"error": "Failed to load disasters"}), 500
 
 
-@seo_bp.route('/api/flags/<country_code>')
+@seo_bp.route("/api/flags/<country_code>")
 def proxy_flag(country_code):
     """Proxy flag images to avoid CORB issues"""
     try:
         # Use correct flagcdn.com format: 60x45 (width x height) instead of w60
         flag_url = f"https://flagcdn.com/60x45/{country_code.lower()}.png"
         logger.info(f"Fetching flag from {flag_url} for country code {country_code}")
-        response = requests.get(flag_url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
-        
-        logger.info(f"Flag response status: {response.status_code}, content length: {len(response.content)}, content-type: {response.headers.get('Content-Type', 'unknown')}")
-        
+        response = requests.get(flag_url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+
+        logger.info(
+            f"Flag response status: {response.status_code}, content length: {len(response.content)}, content-type: {response.headers.get('Content-Type', 'unknown')}"
+        )
+
         if response.status_code == 200 and len(response.content) > 100:
             return Response(
                 response.content,
-                mimetype='image/png',
+                mimetype="image/png",
                 headers={
-                    'Cache-Control': 'public, max-age=86400',
-                    'Access-Control-Allow-Origin': '*',
-                    'Content-Length': str(len(response.content))
-                }
+                    "Cache-Control": "public, max-age=86400",
+                    "Access-Control-Allow-Origin": "*",
+                    "Content-Length": str(len(response.content)),
+                },
             )
         else:
-            logger.warning(f"Flag request failed for {country_code}: status={response.status_code}, size={len(response.content)}")
+            logger.warning(
+                f"Flag request failed for {country_code}: status={response.status_code}, size={len(response.content)}"
+            )
             # Fallback to default flag
             fallback_url = "https://flagcdn.com/60x45/xx.png"
-            fallback_response = requests.get(fallback_url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+            fallback_response = requests.get(fallback_url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
             if fallback_response.status_code == 200 and len(fallback_response.content) > 100:
                 return Response(
                     fallback_response.content,
-                    mimetype='image/png',
+                    mimetype="image/png",
                     headers={
-                        'Cache-Control': 'public, max-age=86400',
-                        'Access-Control-Allow-Origin': '*',
-                        'Content-Length': str(len(fallback_response.content))
-                    }
+                        "Cache-Control": "public, max-age=86400",
+                        "Access-Control-Allow-Origin": "*",
+                        "Content-Length": str(len(fallback_response.content)),
+                    },
                 )
     except Exception as e:
         logger.error(f"Error proxying flag {country_code}: {e}", exc_info=True)
-    
+
     # Return empty 1x1 transparent PNG if all else fails
     logger.warning(f"Returning transparent PNG fallback for {country_code}")
-    transparent_png = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xdb\x00\x00\x00\x00IEND\xaeB`\x82'
-    return Response(transparent_png, mimetype='image/png', headers={'Cache-Control': 'no-cache'})
+    transparent_png = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xdb\x00\x00\x00\x00IEND\xaeB`\x82"
+    return Response(transparent_png, mimetype="image/png", headers={"Cache-Control": "no-cache"})
 
 
-@seo_bp.route('/globalprayerwatch/<disaster_type>')
+@seo_bp.route("/globalprayerwatch/<disaster_type>")
 def disaster_prayer_page(disaster_type):
     """SEO-optimized landing page for grouped disaster prayers by type"""
     try:
         from flask import current_app
         from disaster_prayer_service import get_disaster_prayer_service
-        
+
         # Format for display
-        disaster_display = disaster_type.replace('-', ' ').replace('_', ' ').title()
-        disaster_type_normalized = disaster_type.lower().replace('-', '_').replace(' ', '_')
-        
+        disaster_display = disaster_type.replace("-", " ").replace("_", " ").title()
+        disaster_type_normalized = disaster_type.lower().replace("-", "_").replace(" ", "_")
+
         storage_handler = current_app.storage_handler
         service = get_disaster_prayer_service(storage_handler)
-        
+
         # Get active disaster prayers and find matching grouped prayer
         disaster_prayer = None
         disaster_data = None
-        
+
         # Normalize disaster type function (matches disaster_prayer_service normalization)
         def normalize_disaster_type_for_display(disaster_type: str) -> str:
             """Normalize disaster type to standard format for matching"""
             disaster_type = disaster_type.lower().strip()
             type_mapping = {
-                'hurricane': 'typhoon',
-                'cyclone': 'typhoon',
-                'storm': 'typhoon',  # Normalize storm to typhoon (same weather system type)
-                'flooding': 'flood',
-                'wildfire': 'fire',
-                'volcanic_eruption': 'volcano',
-                'pandemic': 'epidemic',
-                'war': 'conflict',
-                'refugee_crisis': 'conflict',
-                'mass shooting': 'mass_shooting',
-                'gun violence': 'mass_shooting',
-                'plane crash': 'major_accident',
-                'plane_crash': 'major_accident',
-                'aviation accident': 'major_accident',
-                'airport incident': 'major_accident',
-                'train derailment': 'major_accident',
-                'building collapse': 'major_accident',
-                'explosion': 'major_accident',
+                "hurricane": "typhoon",
+                "cyclone": "typhoon",
+                "storm": "typhoon",  # Normalize storm to typhoon (same weather system type)
+                "flooding": "flood",
+                "wildfire": "fire",
+                "volcanic_eruption": "volcano",
+                "pandemic": "epidemic",
+                "war": "conflict",
+                "refugee_crisis": "conflict",
+                "mass shooting": "mass_shooting",
+                "gun violence": "mass_shooting",
+                "plane crash": "major_accident",
+                "plane_crash": "major_accident",
+                "aviation accident": "major_accident",
+                "airport incident": "major_accident",
+                "train derailment": "major_accident",
+                "building collapse": "major_accident",
+                "explosion": "major_accident",
             }
             return type_mapping.get(disaster_type, disaster_type)
-        
+
         active_prayers = service.get_active_disaster_prayers()
-        
+
         # Collect all matching entries for this disaster type (same logic as hub page)
         matching_entries = []
         for prayer_data in active_prayers:
             # Check if it's a grouped prayer for this type
-            if prayer_data.get('is_grouped') or prayer_data.get('affected_countries'):
-                prayer_disaster_type = normalize_disaster_type_for_display(prayer_data.get('disaster_type', '')).replace(' ', '_').replace('-', '_')
-                
+            if prayer_data.get("is_grouped") or prayer_data.get("affected_countries"):
+                prayer_disaster_type = (
+                    normalize_disaster_type_for_display(prayer_data.get("disaster_type", ""))
+                    .replace(" ", "_")
+                    .replace("-", "_")
+                )
+
                 if prayer_disaster_type == disaster_type_normalized:
                     matching_entries.append(prayer_data)
-        
+
         # Merge countries from all matching entries (same logic as hub page)
         if matching_entries:
             if len(matching_entries) == 1:
                 # Only one entry, use it as-is
                 disaster_data = matching_entries[0]
-                disaster_prayer = _clean_citation_markers(disaster_data.get('prayer', ''))
+                disaster_prayer = _clean_citation_markers(disaster_data.get("prayer", ""))
                 logger.info(f"Found single grouped disaster prayer for {disaster_type}")
             else:
                 # Multiple entries - merge countries and keep most recent
                 logger.info(f"Merging {len(matching_entries)} entries for {disaster_type}")
-                
+
                 # Find the most recent entry
-                most_recent_entry = max(matching_entries, key=lambda x: datetime.fromisoformat(x.get('created_at', '2000-01-01')))
-                
+                most_recent_entry = max(
+                    matching_entries, key=lambda x: datetime.fromisoformat(x.get("created_at", "2000-01-01"))
+                )
+
                 # Merge all countries from all entries
                 all_countries = set()
                 for entry in matching_entries:
-                    all_countries.update(entry.get('affected_countries', []))
-                
+                    all_countries.update(entry.get("affected_countries", []))
+
                 # Update the most recent entry with merged countries
-                most_recent_entry['affected_countries'] = list(all_countries)
+                most_recent_entry["affected_countries"] = list(all_countries)
                 disaster_data = most_recent_entry
-                disaster_prayer = _clean_citation_markers(disaster_data.get('prayer', ''))
-                
-                logger.info(f"Merged {len(matching_entries)} entries for {disaster_type}: {len(all_countries)} total countries")
+                disaster_prayer = _clean_citation_markers(disaster_data.get("prayer", ""))
+
+                logger.info(
+                    f"Merged {len(matching_entries)} entries for {disaster_type}: {len(all_countries)} total countries"
+                )
         else:
             disaster_data = None
             disaster_prayer = None
-        
+
         # If not found, try old cache system (backward compatibility)
         if not disaster_prayer:
             cache_key = f"disaster_prayer_{disaster_type}"
             try:
-                cached = storage_handler.bucket.blob(f'cache/{cache_key}.json').download_as_text()
+                cached = storage_handler.bucket.blob(f"cache/{cache_key}.json").download_as_text()
                 import json
                 from datetime import datetime as dt
+
                 cached_data = json.loads(cached)
-                cache_time = dt.fromisoformat(cached_data.get('timestamp', '2020-01-01'))
-                
+                cache_time = dt.fromisoformat(cached_data.get("timestamp", "2020-01-01"))
+
                 if (datetime.now() - cache_time).total_seconds() < 86400:
-                    disaster_prayer = _clean_citation_markers(cached_data.get('prayer', ''))
+                    disaster_prayer = _clean_citation_markers(cached_data.get("prayer", ""))
                     logger.info(f"Using cached disaster prayer for {disaster_type}")
-            except:
+            except Exception:
                 pass
-        
+
         # If still no prayer, generate fallback
         if not disaster_prayer:
             disaster_prayer = _generate_disaster_prayer(disaster_display, "affected regions")
             disaster_prayer = _clean_citation_markers(disaster_prayer)
-        
+
         # Get country flags for all affected countries
         country_flags = []
         affected_countries = []
-        summary = ''
+        summary = ""
         if disaster_data:
-            affected_countries = disaster_data.get('affected_countries', [])
-            summary = _clean_citation_markers(disaster_data.get('summary', ''))
+            affected_countries = disaster_data.get("affected_countries", [])
+            summary = _clean_citation_markers(disaster_data.get("summary", ""))
             for country in affected_countries:
                 flag_code = get_country_flag_code(country)
                 if flag_code:
-                    country_flags.append({
-                        'country': country,
-                        'flag_code': flag_code
-                    })
-        
+                    country_flags.append({"country": country, "flag_code": flag_code})
+
         # Organizations will be loaded asynchronously via JavaScript to avoid blocking page load
         # Pass disaster info for async loading
-        disaster_type_for_orgs = disaster_data.get('disaster_type', disaster_display.lower()) if disaster_data else disaster_display.lower()
-        
+        disaster_type_for_orgs = (
+            disaster_data.get("disaster_type", disaster_display.lower()) if disaster_data else disaster_display.lower()
+        )
+
         today = datetime.now()
-        
-        return render_template_string(DISASTER_PAGE_TEMPLATE,
-                                    disaster_type=disaster_display,
-                                    location=None,
-                                    disaster_prayer=disaster_prayer,
-                                    prayer=disaster_prayer,
-                                    country_flag_code=None,
-                                    country_flags=country_flags,
-                                    affected_countries=affected_countries,
-                                    summary=summary,
-                                    disaster_type_for_orgs=disaster_type_for_orgs,
-                                    today=today.strftime('%B %d, %Y'))
-        
+
+        return render_template_string(
+            DISASTER_PAGE_TEMPLATE,
+            disaster_type=disaster_display,
+            location=None,
+            disaster_prayer=disaster_prayer,
+            prayer=disaster_prayer,
+            country_flag_code=None,
+            country_flags=country_flags,
+            affected_countries=affected_countries,
+            summary=summary,
+            disaster_type_for_orgs=disaster_type_for_orgs,
+            today=today.strftime("%B %d, %Y"),
+        )
+
     except Exception as e:
         logger.error(f"Error rendering disaster page: {e}")
-        return jsonify({'error': 'Page not found'}), 404
+        return jsonify({"error": "Page not found"}), 404
 
 
 # Disaster page template - Prayer-first, participation-focused
-DISASTER_PAGE_TEMPLATE = '''
+DISASTER_PAGE_TEMPLATE = """
 {% extends "base.html" %}
 
 {% block title %}Prayer for {{ disaster_type }} - Join in Prayer for Affected Communities{% if affected_countries %} in {{ affected_countries|join(', ') }}{% endif %} | Global Prayer Watch{% endblock %}
@@ -2236,10 +2255,10 @@ DISASTER_PAGE_TEMPLATE = '''
 })();
 </script>
 {% endblock %}
-'''
+"""
 
 # Disasters hub template - Ultra-modern, beautiful design
-DISASTERS_HUB_TEMPLATE = '''
+DISASTERS_HUB_TEMPLATE = """
 {% extends "base.html" %}
 
 {% block title %}Global Prayer Watch - Join in Prayer for Affected Communities Worldwide | Divine Bridge{% endblock %}
@@ -3529,10 +3548,10 @@ DISASTERS_HUB_TEMPLATE = '''
     </div>
 </main>
 {% endblock %}
-'''
+"""
 
 
-@seo_bp.route('/join/<group_id>')
+@seo_bp.route("/join/<group_id>")
 def group_invite_landing(group_id: str):
     """Smart deep-link landing page.
 
@@ -3542,18 +3561,18 @@ def group_invite_landing(group_id: str):
     """
     from urllib.parse import urlencode, quote
 
-    code = (request.args.get('code') or '').strip()
+    code = (request.args.get("code") or "").strip()
 
     # Build the custom-scheme deep link the native app understands
-    app_url = f'io.divinebridge.app://join/{quote(group_id)}'
+    app_url = f"io.divinebridge.app://join/{quote(group_id)}"
     if code:
-        app_url += f'?code={quote(code)}'
+        app_url += f"?code={quote(code)}"
 
     # Web fallback URL (existing behaviour)
-    q = {'join_group': group_id}
+    q = {"join_group": group_id}
     if code:
-        q['invite_code'] = code
-    web_fallback = '/prayers?' + urlencode(q)
+        q["invite_code"] = code
+    web_fallback = "/prayers?" + urlencode(q)
 
     return render_template_string(
         _GROUP_INVITE_LANDING_HTML,
@@ -3563,7 +3582,7 @@ def group_invite_landing(group_id: str):
     )
 
 
-_GROUP_INVITE_LANDING_HTML = r'''<!DOCTYPE html>
+_GROUP_INVITE_LANDING_HTML = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
@@ -3645,4 +3664,4 @@ _GROUP_INVITE_LANDING_HTML = r'''<!DOCTYPE html>
 </script>
 </body>
 </html>
-'''
+"""

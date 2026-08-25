@@ -6,13 +6,14 @@ from firebase_auth import initialize_firebase
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+
 def test_firebase_init():
     """Test Firebase initialization"""
     try:
         # Get configuration
-        config = get_config()
+        get_config()
         logger.info("Successfully loaded configuration")
-        
+
         # Initialize Firebase
         if initialize_firebase():
             logger.info("Firebase initialization successful")
@@ -24,5 +25,6 @@ def test_firebase_init():
         logger.error(f"Error during Firebase initialization test: {e}")
         return False
 
+
 if __name__ == "__main__":
-    test_firebase_init() 
+    test_firebase_init()

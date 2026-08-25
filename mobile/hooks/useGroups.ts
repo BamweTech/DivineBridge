@@ -621,7 +621,7 @@ export function useGroupUnreadCounts(groupIds: string[], reads: Record<string, n
     for (const gid of groupIds) nextBase[gid] = 0;
     setCounts(nextBase);
 
-    const unsubs: Array<() => void> = [];
+    const unsubs: (() => void)[] = [];
 
     for (const gid of groupIds) {
       const lastRead = reads[gid] ?? 0;

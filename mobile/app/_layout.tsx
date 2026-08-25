@@ -1,5 +1,4 @@
 import '../global.css';
-console.log('[DivineBridge] _layout.tsx: JS runtime started');
 import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
@@ -60,6 +59,7 @@ import { THEME_COLORS } from '@/lib/constants';
 import { iosFontStyle } from '@/lib/typography';
 import Icon from '@/components/ui/Icon';
 import BrandedSplashOverlay from '@/components/BrandedSplashOverlay';
+console.log('[DivineBridge] _layout.tsx: JS runtime started');
 
 // Sentry crash reporting and performance monitoring
 Sentry.init({
