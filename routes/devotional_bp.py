@@ -265,6 +265,7 @@ def generate_devotional():
                 'theme': theme,
                 'duration': duration,
                 'days': cached['days'],
+                'status': 'active',
                 'current_day': 1,
                 'streak': 0,
                 'last_completed_at': None,
@@ -328,6 +329,7 @@ def generate_devotional():
         'theme': theme,
         'duration': duration,
         'days': plan_data['days'],
+        'status': 'active',
         'current_day': 1,
         'streak': 0,
         'last_completed_at': None,
@@ -390,10 +392,35 @@ def check_in(plan_id: str):
         update['streak'] = 1 if gap_too_large else plan.get('streak', 0) + 1
 
     if day >= plan.get('duration', 0):
-        update['completed_at'] = firestore.SERVER_TIMESTAMP
+        update.update({
+            'status': 'completed',
+            'completed_at': firestore.SERVER_TIMESTAMP,
+        })
 
     ref.update(update)
     return jsonify({'success': True, 'plan_completed': day >= plan.get('duration', 0)}), 200
+
+
+@devotional_bp.route('/<plan_id>/restart', methods=['POST'])
+@require_auth
+def restart_plan(plan_id: str):
+    """Reactivate a devotional plan and begin its calendar schedule again today."""
+    uid = g.user_id
+    db = get_firestore_client()
+    ref = db.collection('devotional_plans').document(plan_id)
+    snap = ref.get()
+    if not snap.exists:
+        return jsonify({'success': False, 'error': 'Plan not found'}), 404
+
+    plan = snap.to_dict()
+    if plan.get('uid') != uid:
+        return jsonify({'success': False, 'error': 'Forbidden'}), 403
+
+    ref.update({
+        'status': 'active',
+        'created_at': firestore.SERVER_TIMESTAMP,
+    })
+    return jsonify({'success': True, 'data': {'plan_id': plan_id}}), 200
 
 
 @devotional_bp.route('/<plan_id>/journal', methods=['POST'])

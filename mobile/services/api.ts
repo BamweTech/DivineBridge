@@ -297,6 +297,10 @@ export const devotionalApi = {
       method: 'POST',
       body: JSON.stringify({ day }),
     }),
+  restart: (planId: string) =>
+    request<{ success: boolean; data: { plan_id: string } }>(`/api/devotional/${planId}/restart`, {
+      method: 'POST',
+    }),
   saveJournal: (planId: string, day: number, text: string) =>
     request<any>(`/api/devotional/${planId}/journal`, {
       method: 'POST',

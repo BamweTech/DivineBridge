@@ -251,6 +251,7 @@ export interface DevotionalPlan {
   days: DevotionalDay[];
   current_day: number;
   streak: number;
+  status?: 'active' | 'completed';
   last_completed_at?: number;
   completed_at?: number;
 }

@@ -417,11 +417,11 @@ function PlansHub({ plans, onSelect, onCreateNew, reminderOn, onToggleReminder }
   const sorted = useMemo(() => {
     const incomplete = plans.filter((p) => {
       const done = p.days.filter((d) => d.completed).length;
-      return !p.completed_at && done < p.duration;
+      return p.status === 'active' || (!p.completed_at && done < p.duration);
     });
     const completed = plans.filter((p) => {
       const done = p.days.filter((d) => d.completed).length;
-      return !!p.completed_at || done >= p.duration;
+      return p.status !== 'active' && (!!p.completed_at || done >= p.duration);
     });
     return [...incomplete, ...completed];
   }, [plans]);
@@ -481,7 +481,7 @@ function PlansHub({ plans, onSelect, onCreateNew, reminderOn, onToggleReminder }
 
         {sorted.map((p) => {
           const doneCount = p.days.filter((d) => d.completed).length;
-          const isComplete = !!p.completed_at || doneCount >= p.duration;
+          const isComplete = p.status !== 'active' && (!!p.completed_at || doneCount >= p.duration);
           const progressPct = Math.round((doneCount / p.duration) * 100);
           return (
             <Pressable
@@ -706,6 +706,30 @@ export default function DevotionalScreen() {
     }
   }
 
+  function handleRestartPlan() {
+    if (!plan) return;
+    Alert.alert(
+      'Restart this plan?',
+      'This will reactivate the plan and begin its calendar schedule again today. Your completed days, reflections, and streak will stay unchanged.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Restart Plan',
+          onPress: async () => {
+            try {
+              await devotionalApi.restart(plan.plan_id);
+              setSelectedDay(1);
+              setShowCelebration(false);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (err: any) {
+              Alert.alert('Could not restart plan', err.message ?? 'Please try again');
+            }
+          },
+        },
+      ],
+    );
+  }
+
   async function toggleReminder() {
     const newVal = !reminderOn;
     setReminderOn(newVal);
@@ -850,6 +874,12 @@ export default function DevotionalScreen() {
         <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12 }}>
           Day {plan.current_day} of {plan.duration} · {completedDayCount}/{plan.duration} done ({progressPct}%)
         </Text>
+        <Pressable
+          onPress={handleRestartPlan}
+          style={{ alignSelf: 'flex-start', marginTop: 12, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: THEME_COLORS.border, backgroundColor: THEME_COLORS.bg3 }}
+        >
+          <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('600'), fontSize: 12 }}>Restart Plan</Text>
+        </Pressable>
       </View>
 
       {/* Day selector strip */}
