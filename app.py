@@ -1,17 +1,14 @@
-from flask import Flask, render_template, request, jsonify, redirect, session, send_file, Response
-import io
-import json as _json
-import qrcode
+from flask import Flask, request, session, redirect
 import logging
 from datetime import datetime, timedelta
 import os
-from prayer_generator import PrayerGenerator
-from config import get_config
-from verse_cache import verse_cache
+from backend.services.prayer.prayer_generator import PrayerGenerator
+from backend.core.config import get_config
+from backend.services.verse.verse_cache import verse_cache
 from flask_session import Session
 from flask_cors import CORS
 from flask_wtf.csrf import CSRFProtect
-from extensions import limiter
+from backend.core.extensions import limiter
 from flask_limiter.util import get_remote_address
 import redis
 
@@ -24,8 +21,8 @@ except ImportError:
     join_room = None
     leave_room = None
 from functools import wraps
-from firebase_auth import initialize_firebase
-from verse_generator import verse_generator
+from backend.integrations.firebase_auth import initialize_firebase
+from backend.services.verse.verse_generator import verse_generator
 
 # Initialize Sentry for error tracking and performance monitoring (Phase 3)
 try:
@@ -62,16 +59,16 @@ def get_user_based_key():
 # Import appropriate storage handler based on environment
 USE_LOCAL_STORAGE = os.getenv("USE_LOCAL_STORAGE", "false").lower() == "true"
 if USE_LOCAL_STORAGE:
-    from local_storage import LocalStorageHandler as StorageHandler
+    from backend.integrations.local_storage import LocalStorageHandler as StorageHandler
 
     print("🔧 Using LocalStorageHandler for development")
 else:
-    from storage_handler import StorageHandler
+    from backend.integrations.storage_handler import StorageHandler
 
     print("☁️  Using CloudStorageHandler for production")
 
 # Configure structured logging (JSON in production for Cloud Run, text locally)
-from logging_config import setup_logging
+from backend.core.logging import setup_logging
 
 _loggers = setup_logging()
 logger = logging.getLogger(__name__)
@@ -95,13 +92,19 @@ config = get_config()
 
 def create_app():
     """Create and configure the Flask application"""
-    app = Flask(__name__)
+    _repo_root = os.path.dirname(os.path.abspath(__file__))
+    app = Flask(
+        __name__,
+        template_folder=os.path.join(_repo_root, "web", "templates"),
+        static_folder=os.path.join(_repo_root, "web", "static"),
+        static_url_path="/static",
+    )
 
     # Set the static folder path for the verse generator
     verse_generator.set_static_folder(app.static_folder)
 
     # Load configuration
-    app.config.from_object("config.Config")
+    app.config.from_object("backend.core.config.Config")
 
     # Set request size limits to prevent memory exhaustion attacks
     app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB limit
@@ -307,10 +310,10 @@ def create_app():
 
         # Initialize nonprofit services at startup to avoid lazy loading during requests
         logger.info("Pre-initializing nonprofit services...")
-        from location_service import get_location_service
-        from nonprofit_service import get_nonprofit_service
-        from disaster_extractor import get_disaster_extractor
-        from prayer_summary_generator import get_summary_generator
+        from backend.services.community.location_service import get_location_service
+        from backend.services.community.nonprofit_service import get_nonprofit_service
+        from backend.services.disaster.disaster_extractor import get_disaster_extractor
+        from backend.services.prayer.prayer_summary_generator import get_summary_generator
 
         app.location_service = get_location_service()
         app.nonprofit_service = get_nonprofit_service()
@@ -318,16 +321,21 @@ def create_app():
         app.summary_generator = get_summary_generator()
         logger.info("Nonprofit and prayer services initialized at startup")
 
-        # Register blueprints
-        from routes import auth_bp, prayer_bp, verse_bp
-        from routes.nonprofit_bp import nonprofit_bp
-        from routes.seo_bp import seo_bp
-        from routes.email_bp import email_bp
-        from routes.testimony_bp import testimony_bp
-        from routes.prayer_room_bp import prayer_room_bp
-        from routes.admin_bp import admin_bp
-        from routes.devotional_bp import devotional_bp
-        from routes.groups_bp import groups_bp
+        # Register blueprints through the canonical backend API boundary.
+        # The routes package remains a compatibility layer during migration.
+        from backend.api import (
+            admin_bp,
+            auth_bp,
+            devotional_bp,
+            email_bp,
+            groups_bp,
+            nonprofit_bp,
+            prayer_bp,
+            prayer_room_bp,
+            seo_bp,
+            testimony_bp,
+            verse_bp,
+        )
 
         # Exempt auth, prayer, verse, email, testimony, prayer room, nonprofit, seo, admin,
         # devotional, and groups blueprints from CSRF protection (all use Firebase token auth)
@@ -354,6 +362,12 @@ def create_app():
         app.register_blueprint(seo_bp)  # SEO routes at root level
         app.register_blueprint(devotional_bp)  # /api/devotional
         app.register_blueprint(groups_bp)  # /api/groups
+
+        from backend.web import card_bp, health_bp, pages_bp
+
+        app.register_blueprint(pages_bp)
+        app.register_blueprint(card_bp)
+        app.register_blueprint(health_bp)
 
         # Exempt prayer room polling endpoints from rate limiting
         # These endpoints need high frequency access for WebRTC signaling and chat
@@ -545,739 +559,11 @@ def create_app():
     logger.info(f"Environment: {app.config['ENV']}")
     logger.info(f"Debug mode: {app.debug}")
 
-    # Add main routes
-    @app.route("/login")
-    def login():
-        """Serve the login page"""
-        return render_template("login.html")
-
-    @app.route("/signup")
-    def signup():
-        """Serve the signup page"""
-        return render_template("register.html")
-
-    @app.route("/prayers")
-    def prayers():
-        """Serve the prayers page"""
-        return render_template("prayers.html")
-
-    @app.route("/prayer-room")
-    def prayer_room():
-        """Serve the Live Prayer Room directory page"""
-        logger.info("🔍 DEBUG: Rendering prayer_rooms_standalone.html template")
-
-        # Get Firebase configuration for authentication
-        firebase_config = config.FIREBASE_CLIENT_CONFIG
-        if isinstance(firebase_config, str):
-            import json
-
-            firebase_config = json.loads(firebase_config)
-
-        return render_template("prayer_rooms_standalone.html", firebase_config=firebase_config)
-
-    @app.route("/prayer-room/join")
-    def join_prayer_room():
-        """Serve the individual prayer room page"""
-        room_id = request.args.get("room")
-        room_code = request.args.get("code")  # Room code for private rooms
-
-        if not room_id:
-            return redirect("/prayer-room")
-
-        # Fetch the actual room name from the database
-        room_name = "Prayer Room"  # Default fallback
-        room_privacy = "public"  # Default fallback
-        try:
-            from firebase_auth import get_firestore_client
-
-            db = get_firestore_client()
-            room_doc = db.collection("prayer_rooms").document(room_id).get()
-
-            if room_doc.exists:
-                room_data = room_doc.to_dict()
-                room_name = room_data.get("room_name", f"Prayer Room {room_id[:6]}")
-                room_privacy = room_data.get("room_privacy", "public")
-                logger.info(f"Found room name in database: {room_name}, privacy: {room_privacy}")
-            else:
-                logger.warning(f"Room {room_id} not found in database, using fallback name")
-                room_name = f"Prayer Room {room_id[:6]}"
-        except Exception as e:
-            logger.error(f"Error fetching room name from database: {e}")
-            room_name = f"Prayer Room {room_id[:6]}"
-
-        # Get Firebase configuration
-        firebase_config = config.FIREBASE_CLIENT_CONFIG
-        if isinstance(firebase_config, str):
-            import json
-
-            firebase_config = json.loads(firebase_config)
-
-        logger.info("🔍 DEBUG: Rendering prayer_room_standalone.html template")
-        from flask import make_response
-
-        response = make_response(
-            render_template(
-                "prayer_room_standalone.html",
-                room_id=room_id,
-                room_name=room_name,
-                room_code=room_code,
-                room_privacy=room_privacy,
-                firebase_config=firebase_config,
-            )
-        )
-
-        # Add permissions policy header to allow microphone access
-        response.headers["Permissions-Policy"] = "microphone=*"
-        return response
-
-    @app.route("/call/<room_id>")
-    def voice_call_page(room_id):
-        """Minimal 1:1 voice call page for shared web links."""
-        room_code = request.args.get("code", "")
-        host_name = "Host"
-        is_active = False
-        is_expired = False
-        is_full = False
-        link_invalid = True
-        expires_at = None
-
-        try:
-            from firebase_auth import get_firestore_client
-            from routes.prayer_room_bp import (
-                _voice_link_code_matches,
-                _is_voice_link_expired,
-                _format_expires_at_iso,
-            )
-
-            db = get_firestore_client()
-            room_doc = db.collection("prayer_rooms").document(room_id).get()
-            if room_doc.exists:
-                room_data = room_doc.to_dict() or {}
-                if room_data.get("room_type") == "voice_link":
-                    if _voice_link_code_matches(room_data, room_code):
-                        link_invalid = False
-                        host_name = room_data.get("host_name") or host_name
-                        is_active = bool(room_data.get("is_active", False))
-                        expires_raw = room_data.get("expires_at")
-                        if expires_raw:
-                            expires_at = _format_expires_at_iso(expires_raw)
-                            is_expired = _is_voice_link_expired(room_data)
-                        participants = room_data.get("participants") or []
-                        active_count = sum(1 for p in participants if p.get("is_active", True) is not False)
-                        is_full = active_count >= 2
-        except Exception as e:
-            logger.error(f"Error loading voice call room {room_id}: {e}")
-
-        firebase_config = config.FIREBASE_CLIENT_CONFIG
-        if isinstance(firebase_config, str):
-            import json
-
-            firebase_config = json.loads(firebase_config)
-
-        from flask import make_response
-
-        response = make_response(
-            render_template(
-                "voice_call.html",
-                room_id=room_id,
-                room_code=room_code if not link_invalid else "",
-                host_name=host_name if not link_invalid else "",
-                is_active=is_active,
-                is_expired=is_expired,
-                is_full=is_full,
-                link_invalid=link_invalid,
-                expires_at=expires_at,
-                firebase_config=firebase_config,
-            )
-        )
-        response.headers["Permissions-Policy"] = "microphone=*"
-        response.headers["Cache-Control"] = "no-store"
-        return response
-
-    @app.route("/daily-prayer")
-    def daily_prayer():
-        """Serve the daily prayer page"""
-        return render_template("daily_prayer.html")
-
-    @app.route("/about")
-    def about():
-        """Serve the about page"""
-        return render_template("about.html")
-
-    @app.route("/contact")
-    def contact():
-        """Serve the contact page"""
-        return render_template("contact.html")
-
-    @app.route("/faq")
-    def faq():
-        """Serve the FAQ page"""
-        return render_template("faq.html")
-
-    @app.route("/privacy-policy")
-    def privacy_policy():
-        """Serve the privacy policy page"""
-        return render_template("privacy_policy.html")
-
-    @app.route("/terms-of-service")
-    def terms_of_service():
-        """Serve the terms of service page"""
-        return render_template("terms_of_service.html")
-
-    @app.route("/robots.txt")
-    def robots_txt():
-        """Serve robots.txt for SEO"""
-        from flask import send_from_directory
-
-        return send_from_directory(app.static_folder, "robots.txt")
-
-    @app.route("/google<path:filename>")
-    def google_verification(filename):
-        """Serve Google Search Console verification file"""
-        from flask import send_from_directory
-
-        return send_from_directory(app.static_folder, f"google{filename}")
-
-    @app.route("/profile")
-    def profile():
-        """Serve the profile page"""
-        return render_template("profile.html")
-
-    @app.route("/edit-profile")
-    def edit_profile():
-        """Serve the edit profile page"""
-        return render_template("edit_profile.html")
-
-    @app.route("/change-password")
-    def change_password():
-        """Serve the change password page"""
-        return render_template("change_password.html")
-
-    @app.route("/card/<user_id>")
-    def public_card(user_id):
-        """Serve the public business card page"""
-        try:
-            from firebase_admin import firestore
-
-            db = firestore.client()
-            user_ref = db.collection("users").document(user_id)
-            user_doc = user_ref.get()
-
-            # Get user data for OG meta tags
-            user_name = "Business Card"
-            if user_doc.exists:
-                user_data = user_doc.to_dict()
-                first_name = user_data.get("firstName", "")
-                last_name = user_data.get("lastName", "")
-                if first_name or last_name:
-                    user_name = f"{first_name} {last_name}".strip()
-
-            return render_template("public_card.html", user_id=user_id, user_name=user_name)
-        except Exception as e:
-            logger.error(f"Error loading user data for card page: {e}")
-            # Fallback to default if error
-            return render_template("public_card.html", user_id=user_id, user_name="Business Card")
-
     return app
 
 
 # Create the Flask application
 app = create_app()
-
-# Daily prayer cache: Redis-backed with in-process fallback.
-# Ensures all Cloud Run instances serve the same cached prayer.
-_daily_prayer_local_cache = {}
-_daily_prayer_local_date = None
-
-
-def _get_prayer_redis():
-    """Return a Redis client for prayer caching, or None."""
-    try:
-        host = os.getenv("REDIS_HOST")
-        if not host:
-            return None
-        client = redis.Redis(
-            host=host,
-            port=int(os.getenv("REDIS_PORT", 6379)),
-            password=os.getenv("REDIS_PASSWORD"),
-            decode_responses=True,
-            socket_connect_timeout=2,
-        )
-        client.ping()
-        return client
-    except Exception:
-        return None
-
-
-_prayer_redis = _get_prayer_redis()
-
-
-def get_daily_prayer_for_date(date_str):
-    """Get daily prayer for a specific date with caching.
-    If prayer doesn't exist and it's today's date, attempt to generate it."""
-    global _daily_prayer_local_cache, _daily_prayer_local_date
-
-    # Reset local cache on date change
-    if _daily_prayer_local_date != date_str:
-        _daily_prayer_local_cache = {}
-        _daily_prayer_local_date = date_str
-
-    # Fast path: in-process cache
-    if date_str in _daily_prayer_local_cache:
-        return _daily_prayer_local_cache[date_str]
-
-    # Shared path: Redis cache (available to all instances)
-    redis_key = f"divinebridge:prayer:{date_str}"
-    if _prayer_redis:
-        try:
-            raw = _prayer_redis.get(redis_key)
-            if raw:
-                cached = _json.loads(raw)
-                _daily_prayer_local_cache[date_str] = cached
-                return cached
-        except Exception:
-            pass
-
-    try:
-        daily_prayer = app.storage_handler.get_prayer(date_str)
-
-        if not daily_prayer:
-            today = datetime.now().strftime("%Y-%m-%d")
-            if date_str == today:
-                logger.info(f"No prayer found for today ({date_str}), attempting to generate one...")
-                try:
-                    new_prayer = app.prayer_generator.generate_prayer()
-                    if new_prayer:
-                        logger.info(f"Successfully generated prayer for {date_str}")
-                        daily_prayer = new_prayer
-                    else:
-                        logger.error(f"Failed to generate prayer for {date_str}")
-                except Exception as gen_error:
-                    logger.error(f"Error generating prayer for {date_str}: {gen_error}", exc_info=True)
-            else:
-                logger.info(f"No prayer found in storage for date: {date_str} (not today, won't auto-generate)")
-
-        if daily_prayer:
-            is_daily_prayer = daily_prayer.get("source") == "generated" and not daily_prayer.get("title")
-
-            if is_daily_prayer:
-                if "content" in daily_prayer and daily_prayer["content"]:
-                    import re
-
-                    daily_prayer["content"] = re.sub(r"\[\d+\]", "", daily_prayer["content"])
-                    daily_prayer["content"] = re.sub(r"[ \t]+", " ", daily_prayer["content"])
-                    daily_prayer["content"] = daily_prayer["content"].strip()
-            else:
-                logger.warning(
-                    f"Prayer found for {date_str} but it's not a daily prayer (source={daily_prayer.get('source')}, title={daily_prayer.get('title')})"
-                )
-                daily_prayer = None
-
-        _daily_prayer_local_cache[date_str] = daily_prayer
-
-        # Store in Redis for other instances (TTL: 24 hours)
-        if _prayer_redis and daily_prayer:
-            try:
-                _prayer_redis.setex(redis_key, 86400, _json.dumps(daily_prayer))
-            except Exception:
-                pass
-
-        return daily_prayer
-    except Exception as e:
-        logger.error(f"Error fetching daily prayer for {date_str}: {e}", exc_info=True)
-        return None
-
-
-@app.route("/")
-def index():
-    """Serve the home page as main landing page with server-side rendered verse and prayer"""
-    try:
-        # Get client's local date from query parameter if provided (for timezone accuracy)
-        # Otherwise use server date as fallback
-        client_date = request.args.get("client_date")
-        if client_date:
-            try:
-                # Validate date format
-                datetime.strptime(client_date, "%Y-%m-%d")
-                today = client_date
-                # Calculate day of year from client date
-                client_datetime = datetime.strptime(client_date, "%Y-%m-%d")
-                day_of_year = client_datetime.timetuple().tm_yday
-                logger.info(f"Using client's local date: {today} (day of year: {day_of_year})")
-            except ValueError:
-                # Invalid date format, fall back to server date
-                today = datetime.now().strftime("%Y-%m-%d")
-                day_of_year = datetime.now().timetuple().tm_yday
-                logger.warning(f"Invalid client_date format: {client_date}, using server date: {today}")
-        else:
-            # No client date provided, use server date (will be corrected client-side)
-            today = datetime.now().strftime("%Y-%m-%d")
-            day_of_year = datetime.now().timetuple().tm_yday
-            logger.info(f"No client_date provided, using server date: {today}")
-
-        # Get verse (cached) - use client's day of year if provided
-        verse = app.verse_cache.get_today_verse(day_of_year=day_of_year)
-
-        # Get daily prayer (cached) - use client's local date if provided
-        daily_prayer = get_daily_prayer_for_date(today)
-
-        # Format verse for template
-        verse_data = (
-            verse
-            if verse
-            else {
-                "verse": "For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.",
-                "reference": "John 3:16",
-            }
-        )
-
-        # Format prayer for template
-        prayer_data = None
-        if daily_prayer and daily_prayer.get("content"):
-            # Format content: escape HTML, then convert newlines to <br> tags
-            import html
-
-            content = daily_prayer.get("content", "")
-            # Escape HTML entities first
-            content_escaped = html.escape(content)
-            # Convert double newlines to paragraph breaks, single newlines to line breaks
-            content_formatted = content_escaped.replace("\n\n", "<br><br>").replace("\n", "<br>")
-
-            prayer_data = {
-                "content": content_formatted,
-                "date": daily_prayer.get("date", today),  # Pass ISO date, let client format with local timezone
-                "date_iso": daily_prayer.get("date", today),
-            }
-
-        return render_template("index.html", verse=verse_data, daily_prayer=prayer_data, today_date=today)
-    except Exception as e:
-        logger.error(f"Error rendering home page: {e}")
-        # Fallback to basic render if there's an error
-        return render_template(
-            "index.html",
-            verse={
-                "verse": "For God so loved the world that he gave his one and only Son, that whoever believes in him shall not perish but have eternal life.",
-                "reference": "John 3:16",
-            },
-            daily_prayer=None,
-            today_date=datetime.now().strftime("%Y-%m-%d"),
-        )
-
-
-@app.route("/home")
-def home():
-    """Serve the home page (alias for /)"""
-    return index()
-
-
-@app.route("/api/og-image")
-def og_image():
-    """Serve today's prayer image for Open Graph / social media preview"""
-    try:
-        from flask import send_file
-        from io import BytesIO
-
-        # Get today's date
-        today = datetime.now().strftime("%Y-%m-%d")
-
-        # Try to get cached prayer image first
-        cached_image = app.storage_handler.get_prayer_image(today)
-        if cached_image:
-            logger.info(f"Serving cached prayer image for OG preview: {today}")
-            return send_file(
-                BytesIO(cached_image),
-                mimetype="image/jpeg",
-                as_attachment=False,
-                download_name=f"divine_bridge_og_{today}.jpg",
-            )
-
-        # If no cached image, generate it
-        prayer = app.storage_handler.get_prayer(today)
-        if not prayer:
-            logger.warning(f"No prayer found for OG image: {today}")
-            # Return a default OG image or 404
-            return jsonify({"error": "No prayer available"}), 404
-
-        # Extract prayer content
-        if isinstance(prayer, dict):
-            prayer_content = prayer.get("content", "")
-        else:
-            prayer_content = prayer
-
-        if not prayer_content:
-            return jsonify({"error": "Prayer content is empty"}), 404
-
-        # Generate and cache image
-        from image_generator import get_image_generator
-
-        generator = get_image_generator()
-        date_str = datetime.now().strftime("%B %d, %Y")
-
-        image_data = generator.generate_prayer_image(prayer_text=prayer_content, date=date_str)
-
-        # Save to cache
-        image_bytes = image_data.getvalue()
-        app.storage_handler.save_prayer_image(today, image_bytes)
-        logger.info(f"Generated and cached prayer image for OG preview: {today}")
-
-        # Reset and send
-        image_data.seek(0)
-        return send_file(
-            image_data, mimetype="image/jpeg", as_attachment=False, download_name=f"divine_bridge_og_{today}.jpg"
-        )
-
-    except Exception as e:
-        logger.error(f"Error serving OG image: {e}")
-        return jsonify({"error": "Failed to generate OG image"}), 500
-
-
-@app.route("/forgot-password")
-def forgot_password():
-    """Serve the forgot password page"""
-    return render_template("forgot_password.html")
-
-
-@app.route("/reset-password")
-def reset_password():
-    """Serve the reset password page"""
-    return render_template("reset_password.html")
-
-
-@app.route("/verify-email")
-def verify_email():
-    """Serve the verify email page"""
-    return render_template("verify_email.html")
-
-
-@app.route("/unsubscribe", methods=["GET", "POST"])
-def unsubscribe():
-    """
-    Unsubscribe from Divine Bridge daily prayer emails.
-
-    Supports:
-    - GET /unsubscribe?email=... (prefill form)
-    - POST /unsubscribe (form submit)
-
-    Note: This endpoint is used by email unsubscribe links, so it must work without auth.
-    """
-    from config import get_config
-
-    cfg = get_config()
-    sender_email = getattr(cfg, "SENDER_EMAIL", None) or app.config.get("SENDER_EMAIL", "blessings@divinebridge.io")
-
-    if request.method == "GET":
-        email = request.args.get("email", "").strip()
-        return render_template("unsubscribe.html", email=email, sender_email=sender_email)
-
-    # POST: process unsubscribe
-    email = (request.form.get("email") or "").strip()
-    if not email or "@" not in email:
-        return render_template(
-            "unsubscribe.html", email=email, sender_email=sender_email, error="Please enter a valid email address."
-        )
-
-    try:
-        # Update Firestore subscription flag (best-effort)
-        from firebase_admin import firestore
-
-        db = firestore.client()
-
-        users_ref = db.collection("users")
-        matches = users_ref.where("email", "==", email).stream()
-        updated = 0
-        for doc in matches:
-            doc.reference.set(
-                {"email_subscribed": False, "email_unsubscribed_at": datetime.utcnow().isoformat()}, merge=True
-            )
-            updated += 1
-
-        logger.info(f"Unsubscribe request processed for {email}. Updated users: {updated}")
-    except Exception as e:
-        # Do not leak errors to user; unsubscribe should appear successful
-        logger.error(f"Error processing unsubscribe for {email}: {e}")
-
-    return render_template("unsubscribe_confirmation.html", sender_email=sender_email)
-
-
-@app.route("/_ah/health")
-def health_check():
-    """Health check endpoint for Cloud Run"""
-    try:
-        status = {
-            "status": "healthy",
-            "timestamp": datetime.utcnow().isoformat(),
-            "firebase_initialized": getattr(app, "firebase_initialized", False),
-        }
-        return jsonify(status), 200
-    except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
-        return jsonify({"status": "unhealthy", "error": str(e)}), 500
-
-
-@app.route("/api/card/<user_id>/vcard")
-def get_vcard(user_id):
-    """Generate and download vCard file for user's business card"""
-    try:
-        from firebase_admin import firestore
-
-        db = firestore.client()
-        user_ref = db.collection("users").document(user_id)
-        user_doc = user_ref.get()
-
-        if not user_doc.exists:
-            return jsonify({"error": "User not found"}), 404
-
-        user_data = user_doc.to_dict()
-
-        # Check if business card is enabled
-        if not user_data.get("businessCardEnabled", False):
-            return jsonify({"error": "Business card not available"}), 404
-
-        # Get user data
-        first_name = user_data.get("firstName", "")
-        last_name = user_data.get("lastName", "")
-        email = user_data.get("email", "")
-        phone = user_data.get("phoneNumber", "")
-        linkedin = user_data.get("linkedin", "")
-
-        # Generate vCard
-        vcard_lines = ["BEGIN:VCARD", "VERSION:3.0"]
-
-        # Name
-        if first_name or last_name:
-            vcard_lines.append(f"N:{last_name};{first_name};;;")
-            vcard_lines.append(f"FN:{first_name} {last_name}".strip())
-
-        # Email
-        if email:
-            vcard_lines.append(f"EMAIL;TYPE=INTERNET:{email}")
-
-        # Phone
-        if phone:
-            # Normalize phone number (remove formatting)
-            phone_clean = "".join(filter(str.isdigit, phone))
-            vcard_lines.append(f"TEL;TYPE=CELL:{phone_clean}")
-
-        # URL (LinkedIn)
-        if linkedin:
-            vcard_lines.append(f"URL:{linkedin}")
-
-        # Website
-        vcard_lines.append("URL;TYPE=WORK:https://divinebridge.io")
-
-        vcard_lines.append("END:VCARD")
-
-        vcard_content = "\n".join(vcard_lines)
-
-        # Create response
-        response = Response(
-            vcard_content,
-            mimetype="text/vcard",
-            headers={"Content-Disposition": f'attachment; filename="{first_name}_{last_name}.vcf"'.replace(" ", "_")},
-        )
-
-        return response
-
-    except Exception as e:
-        logger.error(f"Error generating vCard: {e}")
-        import traceback
-
-        logger.error(traceback.format_exc())
-        return jsonify({"error": "Failed to generate vCard"}), 500
-
-
-@app.route("/api/card/<user_id>/qr")
-def get_qr_code(user_id):
-    """Generate QR code image for user's business card"""
-    try:
-        from firebase_admin import firestore
-
-        db = firestore.client()
-        user_ref = db.collection("users").document(user_id)
-        user_doc = user_ref.get()
-
-        if not user_doc.exists:
-            logger.warning(f"QR code requested for non-existent user: {user_id}")
-            return jsonify({"error": "User not found"}), 404
-
-        user_doc.to_dict()
-
-        # Get the public card URL (generate QR even if not enabled, for preview purposes)
-        request_url = request.url_root.rstrip("/")
-        card_url = f"{request_url}/card/{user_id}"
-
-        # Generate QR code
-        try:
-            qr = qrcode.QRCode(
-                version=1,
-                error_correction=qrcode.constants.ERROR_CORRECT_L,
-                box_size=10,
-                border=4,
-            )
-            qr.add_data(card_url)
-            qr.make(fit=True)
-
-            # Create image
-            img = qr.make_image(fill_color="black", back_color="white")
-
-            # Convert to bytes
-            img_bytes = io.BytesIO()
-            img.save(img_bytes, format="PNG")
-            img_bytes.seek(0)
-
-            logger.info(f"Successfully generated QR code for user: {user_id}")
-            return send_file(img_bytes, mimetype="image/png", as_attachment=False)
-        except Exception as qr_error:
-            logger.error(f"Error in QR code generation: {qr_error}")
-            import traceback
-
-            logger.error(traceback.format_exc())
-            return jsonify({"error": "Failed to generate QR code image"}), 500
-
-    except Exception as e:
-        logger.error(f"Error generating QR code: {e}")
-        import traceback
-
-        logger.error(traceback.format_exc())
-        return jsonify({"error": "Failed to generate QR code"}), 500
-
-
-@app.route("/api/card/<user_id>")
-def get_card_data(user_id):
-    """Get public business card data (for API access)"""
-    try:
-        from firebase_admin import firestore
-
-        db = firestore.client()
-        user_ref = db.collection("users").document(user_id)
-        user_doc = user_ref.get()
-
-        if not user_doc.exists:
-            return jsonify({"error": "User not found"}), 404
-
-        user_data = user_doc.to_dict()
-
-        # Check if business card is enabled
-        if not user_data.get("businessCardEnabled", False):
-            return jsonify({"error": "Business card not available"}), 404
-
-        # Return card data
-        card_data = {
-            "firstName": user_data.get("firstName", ""),
-            "lastName": user_data.get("lastName", ""),
-            "email": user_data.get("email", ""),
-            "phoneNumber": user_data.get("phoneNumber", ""),
-            "linkedin": user_data.get("linkedin", ""),
-        }
-
-        return jsonify(card_data), 200
-
-    except Exception as e:
-        logger.error(f"Error getting card data: {e}")
-        import traceback
-
-        logger.error(traceback.format_exc())
-        return jsonify({"error": "Failed to get card data"}), 500
 
 
 if __name__ == "__main__":

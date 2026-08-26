@@ -2,6 +2,7 @@
 
 const { v4: uuidv4 } = require('uuid');
 const config = require('./config');
+const { ROOM_MODES, GROUP_CALL_MAX_PARTICIPANTS } = require('./protocol');
 
 /**
  * Room — one mediasoup Router + all peers inside a prayer room.
@@ -245,7 +246,9 @@ class Room {
   // ─── Room Mode ────────────────────────────────────────────────────────────────
 
   getMode() {
-    return this.peers.size > 8 ? 'prayer_room' : 'group_call';
+    return this.peers.size > GROUP_CALL_MAX_PARTICIPANTS
+      ? ROOM_MODES.PRAYER_ROOM
+      : ROOM_MODES.GROUP_CALL;
   }
 
   _checkModeTransition(prevMode) {

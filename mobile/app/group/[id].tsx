@@ -32,25 +32,25 @@ import {
   useGroupLiveRoom,
   useGroupChatLastReads,
   firestoreTimestampMs,
-} from '@/hooks/useGroups';
+} from '@/features/groups/hooks/useGroups';
 import { uploadGroupChatFile } from '@/lib/groupChatUpload';
-import { useGroupUnread } from '@/contexts/GroupUnreadContext';
-import { usePrayerRoom } from '@/hooks/usePrayerRoom';
+import { useGroupUnread } from '@/features/groups/contexts/GroupUnreadContext';
+import { usePrayerRoom } from '@/features/rooms/hooks/usePrayerRoom';
 import { groupApi, roomApi } from '@/services/api';
 import { isWebRTCAvailable } from '@/lib/sfu';
 import { setActiveGroup } from '@/lib/activeGroupStore';
-import { GroupLiveAvPanel } from '@/components/group/GroupLiveAvPanel';
-import { GroupMembersSheet } from '@/components/group/GroupMembersSheet';
-import { VoiceRecorder } from '@/components/group/VoiceRecorder';
-import { ReplyComposerBanner } from '@/components/group/ReplyComposerBanner';
-import { AttachmentTray } from '@/components/group/AttachmentTray';
-import { DateDivider, UnreadDivider } from '@/components/group/ChatDividers';
-import { GroupChatBubble } from '@/components/group/GroupChatBubble';
-import { PendingUploadChatBubble } from '@/components/group/PendingUploadChatBubble';
-import { MessageReactionPopover } from '@/components/group/MessageReactionPopover';
-import { InviteSheet } from '@/components/group/InviteSheet';
-import { JumpToLatestButton } from '@/components/group/JumpToLatestButton';
-import { ZoomableImage } from '@/components/group/ZoomableImage';
+import { GroupLiveAvPanel } from '@/features/groups/components/GroupLiveAvPanel';
+import { GroupMembersSheet } from '@/features/groups/components/GroupMembersSheet';
+import { VoiceRecorder } from '@/features/groups/components/VoiceRecorder';
+import { ReplyComposerBanner } from '@/features/groups/components/ReplyComposerBanner';
+import { AttachmentTray } from '@/features/groups/components/AttachmentTray';
+import { DateDivider, UnreadDivider } from '@/features/groups/components/ChatDividers';
+import { GroupChatBubble } from '@/features/groups/components/GroupChatBubble';
+import { PendingUploadChatBubble } from '@/features/groups/components/PendingUploadChatBubble';
+import { MessageReactionPopover } from '@/features/groups/components/MessageReactionPopover';
+import { InviteSheet } from '@/features/groups/components/InviteSheet';
+import { JumpToLatestButton } from '@/features/groups/components/JumpToLatestButton';
+import { ZoomableImage } from '@/features/groups/components/ZoomableImage';
 import {
   applyReactionMutation,
   buildChatImageGallery,
@@ -66,7 +66,7 @@ import {
   sameSenderCluster,
   toReplyRef,
   type ViewerMedia,
-} from '@/components/group/groupChatUtils';
+} from '@/features/groups/components/groupChatUtils';
 import { PulsingDot } from '@/components/ui/PulsingDot';
 import { useAuthStore } from '@/stores/authStore';
 import { THEME_COLORS } from '@/lib/constants';

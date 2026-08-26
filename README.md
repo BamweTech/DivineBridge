@@ -25,40 +25,26 @@
 
 ```
 divineBridge/
-├── app.py                     # Main Flask application
-├── config.py                  # Configuration & secrets management
-├── requirements.txt           # Python dependencies
-├── Dockerfile                 # Container configuration
-├── 
-├── routes/                    # API blueprints
-│   ├── auth_bp.py            # Authentication endpoints
-│   ├── prayer_bp.py          # Prayer request endpoints
-│   ├── testimony_bp.py       # Testimony endpoints
-│   ├── verse_bp.py           # Daily verse endpoints
-│   ├── email_bp.py           # Email service endpoints
-│   └── seo_bp.py             # SEO & disaster pages
-├── 
-├── Core Services              # (Root directory)
-│   ├── prayer_generator.py   # AI prayer generation
-│   ├── verse_generator.py    # Verse selection logic
-│   ├── storage_handler.py    # Cloud Storage integration
-│   ├── content_moderator.py  # AI moderation
-│   ├── image_generator.py    # Daily image creation
-│   └── ...more services
-├── 
-├── templates/                 # HTML templates
-├── static/                    # CSS, JS, images
-├── 
-├── tests/                     # Test files
-├── scripts/                   # Utility scripts
-├── 
-└── docs/                      # 📚 Documentation
-    ├── README.md             # Documentation index
-    ├── deployment/           # Deployment guides
-    ├── guides/               # Setup guides
-    ├── legal/                # Legal documents
-    └── reports/              # Technical reports
+├── backend/                   # Canonical backend package
+│   ├── api/                   # Flask blueprints
+│   ├── web/                   # Server-rendered page blueprints
+│   ├── core/                  # Config, extensions, auth helpers, logging
+│   ├── integrations/          # Firebase, storage, Perplexity, push
+│   ├── services/              # Domain services (prayer, verse, email, …)
+│   ├── jobs/                  # Schedulers and background jobs
+│   └── wsgi.py                # Canonical WSGI entry
+├── app.py                     # Flask application factory / entry
+├── web/                       # Browser UI (templates, static, client)
+├── mobile/                    # Expo / React Native UI
+├── media-server/              # mediasoup SFU runtime
+├── contracts/                 # Cross-runtime API + SFU fixtures
+├── infra/                     # Infrastructure ownership boundary
+├── scripts/                   # content / emailing / admin / maintenance / deploy / metro
+├── tests/                     # unit / contract / integration / load
+└── docs/                      # Architecture, operations, decisions
 ```
+
+Browser and mobile UI stay separate; they share API and media-protocol contracts under `contracts/`.
 
 ---
 

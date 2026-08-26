@@ -16,7 +16,7 @@ When invoked:
 4. Review each changed file against the project conventions:
 
 ## Flask backend checks
-- Blueprint pattern followed: routes in `routes/`, logic in service modules.
+- Blueprint pattern followed: routes in `backend/api/`, logic in `backend/services/`.
 - `@require_auth` on authenticated endpoints, `g.user_id` for user identity.
 - Standardized JSON response: `{'success': True/False, 'data'/'error': ...}`.
 - `get_firestore_client()` for Firestore, `get_config()` for secrets.

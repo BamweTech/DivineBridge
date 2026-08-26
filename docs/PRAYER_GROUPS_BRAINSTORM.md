@@ -602,7 +602,7 @@ POST   /api/groups/{group_id}/requests/{request_id}/prayed  # Mark as prayed
 - Current Chat System: `routes/prayer_room_bp.py` (chat endpoints)
 - User Authentication: `routes/auth_bp.py`
 - Firestore Rules: `firestore.rules`
-- Prayer Room Spec: `LIVE_PRAYER_ROOM_SPECIFICATION.md`
+- Prayer Room Spec: `archive/analyses/LIVE_PRAYER_ROOM_SPECIFICATION.md`
 
 ---
 

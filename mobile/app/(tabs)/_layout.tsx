@@ -12,7 +12,7 @@ import { iosFont } from '@/lib/typography';
 import Icon from '@/components/ui/Icon';
 import type { IconName } from '@/components/ui/Icon';
 import { GlassTabBar } from '@/components/ui/GlassTabBar';
-import { useGroupUnread } from '@/contexts/GroupUnreadContext';
+import { useGroupUnread } from '@/features/groups/contexts/GroupUnreadContext';
 
 const TABS: { name: string; label: string; icon: IconName }[] = [
   { name: 'home', label: 'Home', icon: 'home' },

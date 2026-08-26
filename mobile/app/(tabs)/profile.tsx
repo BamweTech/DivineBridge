@@ -24,7 +24,7 @@ import { COLLECTIONS, THEME_COLORS, API_BASE_URL } from '@/lib/constants';
 import { iosFontStyle, iosFontStyleItalic } from '@/lib/typography';
 import { useAuthStore } from '@/stores/authStore';
 import { getDisplayName } from '@/lib/userDisplayName';
-import { useGroupUnread } from '@/contexts/GroupUnreadContext';
+import { useGroupUnread } from '@/features/groups/contexts/GroupUnreadContext';
 import { Avatar } from '@/components/ui/Avatar';
 import Icon from '@/components/ui/Icon';
 import type { IconName } from '@/components/ui/Icon';

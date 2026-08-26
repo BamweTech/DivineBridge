@@ -7,7 +7,10 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "restart": "lsof -ti :3000 | xargs kill -9 2>/dev/null; node src/server.js"
+    "restart": "lsof -ti :3000 | xargs kill -9 2>/dev/null; node src/server.js",
+    "check": "node --check src/server.js && node --check src/Room.js && node --check src/auth.js && node --check src/config.js && node --check src/roomRegistry.js && node --check src/protocol.js && node --check src/workers.js && node --check src/roomManager.js && node --check src/signaling.js && node --check src/httpApp.js",
+    "test:smoke": "node test/smoke.js",
+    "test:protocol": "node test/protocol-contract.js"
   },
   "dependencies": {
     "@google-cloud/secret-manager": "^6.1.1",

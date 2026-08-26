@@ -15,14 +15,17 @@ Execute the full test suite matching the CI pipeline in `.github/workflows/ci.ym
 # Install dev dependencies (if not already)
 pip install -r requirements-dev.txt
 
-# Lint
-flake8 --max-line-length=120 --exclude=venv,flask_session,local_storage_data,.git app.py routes/ core/ tests/
+# Lint (config in .flake8)
+flake8 --max-line-length=120 app.py tests/ backend/
 
 # Format check
-black --check --line-length=120 app.py routes/ core/ tests/
+black --check --line-length=120 app.py tests/ backend/
 
-# Unit tests
+# Unit + contract tests
 USE_LOCAL_STORAGE=true pytest tests/ -v --tb=short
+
+# Route inventory (optional smoke)
+python -m scripts.maintenance.verify_route_map
 ```
 
 ## Mobile (Expo / React Native)
@@ -41,6 +44,14 @@ npm run lint
 
 # Expo doctor
 npx expo-doctor
+```
+
+## Media SFU
+
+```bash
+cd media-server
+npm run check
+npm run test:protocol
 ```
 
 ## Interpreting results

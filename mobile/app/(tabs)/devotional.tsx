@@ -33,7 +33,7 @@ import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/stores/authStore';
 import Icon from '@/components/ui/Icon';
 import type { DevotionalPlan, DevotionalDay } from '@/types';
-import { useSpeechPlayback } from '@/hooks/useSpeechPlayback';
+import { useSpeechPlayback } from '@/features/prayer/hooks/useSpeechPlayback';
 import { useFocusEffect } from 'expo-router';
 import { readDevotionalCache, writeDevotionalCache } from '@/lib/devotionalCache';
 import { syncDevotionalReminder } from '@/lib/devotionalReminder';

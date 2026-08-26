@@ -9,12 +9,12 @@ After completing a feature or significant change, check if the following need up
 
 ## When to update AGENTS.md
 
-- A new blueprint is added to `routes/` → update `routes/AGENTS.md` blueprint table.
+- A new blueprint is added to `backend/api/` → update `backend/api/AGENTS.md` blueprint table.
 - A new screen is added to `mobile/app/` → update `mobile/AGENTS.md` navigation section and `divinebridge-app-v4.html` (see `update-mobile-wireframe` skill).
 - Mobile UI layout, tabs, or visible design changes → update `divinebridge-app-v4.html` in the same change.
 - A new SFU message type is added → update `media-server/AGENTS.md` protocol section.
 - A new script is added to `scripts/` → update `scripts/AGENTS.md`.
-- A new template is added to `templates/` → update `templates/AGENTS.md` key templates table.
+- A new template is added to `web/templates/` → update `web/templates/AGENTS.md` key templates table.
 
 ## When to update docs/ARCHITECTURE.md
 

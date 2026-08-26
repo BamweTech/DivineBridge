@@ -14,9 +14,9 @@ Before generating or modifying any prayer content, always check if today's praye
 
 1. Identify today's date in `YYYY-MM-DD` format.
 2. Check storage for existing prayer:
-   - The `get_daily_prayer_for_date(date_str)` function in `app.py` handles the full lookup chain: in-process cache → Redis cache → `storage_handler.get_prayer(date_str)`.
-   - In `prayer_generator.py`, the `PrayerGenerator` class generates prayers via Perplexity AI.
-   - Storage is either GCS (`storage_handler.py`) or local (`local_storage.py` when `USE_LOCAL_STORAGE=true`).
+   - The `get_daily_prayer_for_date(date_str)` helper (see `backend/web/daily_prayer.py` / `app.py`) handles the full lookup chain: in-process cache → Redis cache → storage.
+   - `backend.services.prayer.prayer_generator.PrayerGenerator` generates prayers via Perplexity AI.
+   - Storage is either GCS (`backend.integrations.storage_handler`) or local (`backend.integrations.local_storage` when `USE_LOCAL_STORAGE=true`).
 
 3. If a prayer exists for today: **do not generate a new one**. Return the existing prayer.
 4. If no prayer exists and it is today's date: generate via `PrayerGenerator.generate_prayer()`.
@@ -42,7 +42,7 @@ The `source` must be `'generated'` and `title` must be absent for it to qualify 
 
 ## When modifying prayer logic
 
-- Check `prayer_generator.py` for the generation pipeline.
-- Check `app.py` `get_daily_prayer_for_date()` for the caching/retrieval flow.
-- Check `routes/prayer_bp.py` for the API endpoint.
-- Scheduled generation is configured in `deployment/CLOUD_SCHEDULER_SETUP.md`.
+- Check `backend/services/prayer/prayer_generator.py` for the generation pipeline.
+- Check `get_daily_prayer_for_date()` for the caching/retrieval flow.
+- Check `backend/api/prayer_bp.py` for the API endpoint.
+- Scheduled generation is configured in `docs/deployment/CLOUD_SCHEDULER_SETUP.md`.

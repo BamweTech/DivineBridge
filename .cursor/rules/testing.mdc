@@ -11,7 +11,7 @@ alwaysApply: false
 - Tests live in `tests/` and run with `pytest tests/ -v --tb=short`.
 - Set `USE_LOCAL_STORAGE=true` to avoid GCS dependencies in tests.
 - Dev dependencies are in `requirements-dev.txt`.
-- Lint: `flake8 --max-line-length=120` on `app.py routes/ core/ tests/`.
+- Lint: `flake8 --max-line-length=120 app.py tests/ backend/` (see `.flake8`).
 - Format: `black --line-length=120`.
 
 ## Mobile (Expo / React Native)
@@ -24,8 +24,8 @@ alwaysApply: false
 
 The CI runs on every PR and push to main/develop:
 
-1. **Python job**: Install `requirements-dev.txt`, flake8, black --check, pytest (all with `|| true` soft-fail currently).
-2. **Mobile job**: `npm ci`, tsc, eslint, expo-doctor.
+1. **Python job**: Install `requirements-dev.txt`, then require flake8, black --check, and pytest to pass.
+2. **Mobile job**: `npm ci`, then require tsc, eslint, and expo-doctor to pass.
 
 ## Writing tests
 

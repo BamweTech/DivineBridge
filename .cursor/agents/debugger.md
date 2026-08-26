@@ -26,9 +26,9 @@ When invoked:
 
 **Flask backend:**
 - Check `app.py` for initialization errors.
-- Check the relevant route in `routes/` for request handling issues.
-- Verify Firebase initialization in `firebase_auth.py`.
-- Check `config.py` for missing secrets.
+- Check the relevant route in `backend/api/` for request handling issues.
+- Verify Firebase initialization in `backend/integrations/firebase_auth.py`.
+- Check `backend/core/config.py` for missing secrets.
 - Run `USE_LOCAL_STORAGE=true pytest tests/ -v` to reproduce.
 
 **Mobile:**

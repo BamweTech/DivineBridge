@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { THEME_COLORS } from '@/lib/constants';
 import { iosFontStyle, iosFontStyleItalic } from '@/lib/typography';
 import Icon from '@/components/ui/Icon';
-import { useGroupUnread } from '@/contexts/GroupUnreadContext';
+import { useGroupUnread } from '@/features/groups/contexts/GroupUnreadContext';
 import { Avatar } from '@/components/ui/Avatar';
 
 export default function ActivityScreen() {

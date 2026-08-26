@@ -99,4 +99,4 @@ The Mediasoup SFU on GCE is **not** covered by this script. Deploy that separate
 
 ---
 
-**Related:** `docs/deployment/DEPLOYMENT_GUIDE.md`, `deploy_disaster_prayer.sh` (scheduler-focused), `cloud-run-config.yaml` (reference YAML).
+**Related:** `docs/deployment/DEPLOYMENT_GUIDE.md`, `scripts/deploy/deploy_disaster_prayer.sh` (scheduler-focused), `cloud-run-config.yaml` (reference YAML).

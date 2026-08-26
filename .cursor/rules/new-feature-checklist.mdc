@@ -15,7 +15,7 @@ When adding a feature that spans multiple parts of the stack, follow this checkl
 
 ## Implementation
 
-4. **Flask route**: Follow blueprint pattern in `routes/`. Register in `app.py` with `csrf.exempt()` and `url_prefix`.
+4. **Flask route**: Follow blueprint pattern in `backend/api/`. Register in `app.py` with `csrf.exempt()` and `url_prefix`. Update `contracts/` when the public URL surface changes.
 5. **Mobile screen**: Add file in `mobile/app/`, register in `_layout.tsx`, add API call in `mobile/services/api.ts`.
 6. **Mobile wireframe**: Update `divinebridge-app-v4.html` (see `update-mobile-wireframe` skill) when the change is user-visible.
 7. **Firestore**: If adding a new collection, update `firestore.rules` and `firestore.indexes.json`.

@@ -14,7 +14,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { THEME_COLORS } from '@/lib/constants';
 import { iosFontStyle, iosFontStyleItalic } from '@/lib/typography';
 import Icon from '@/components/ui/Icon';
-import { useLiveRooms } from '@/hooks/useGroups';
+import { useLiveRooms } from '@/features/groups/hooks/useGroups';
 import type { PrayerRoom, ScheduledSession } from '@/types';
 
 dayjs.extend(relativeTime);

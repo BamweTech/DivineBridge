@@ -3,6 +3,7 @@
 name: CI
 
 on:
+  workflow_call:
   pull_request:
     branches: [main, develop]
   push:
@@ -28,15 +29,15 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Lint (flake8)
-        run: flake8 --max-line-length=120 --exclude=venv,flask_session,local_storage_data,.git app.py routes/ core/ tests/
+        run: flake8 --max-line-length=120 app.py tests/ backend/
 
       - name: Format check (black)
-        run: black --check --line-length=120 app.py routes/ core/ tests/ || true
+        run: black --check --line-length=120 app.py tests/ backend/
 
       - name: Run tests
         env:
           USE_LOCAL_STORAGE: "true"
-        run: pytest tests/ -v --tb=short || true
+        run: pytest tests/ -v --tb=short
 
   # ─── Mobile (Expo / React Native) ───────────────────────────────────────────
   mobile:
@@ -60,7 +61,55 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Lint
-        run: npm run lint || true
+        run: npm run lint
 
       - name: Expo doctor
-        run: npx expo-doctor || true
+        run: npx expo-doctor
+
+  # ─── Browser SFU bundle ─────────────────────────────────────────────────────
+  web-client:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web/client
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build browser SFU bundle
+        run: npm run build
+
+      - name: Verify generated bundle is committed
+        run: git diff --exit-code -- web/static/js/sfu-bundle.js
+
+  # ─── Media SFU ──────────────────────────────────────────────────────────────
+  media-server:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: media-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: media-server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check source syntax
+        run: npm run check
+
+      - name: Protocol contract
+        run: npm run test:protocol

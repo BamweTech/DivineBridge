@@ -197,7 +197,7 @@ const iceServers = [
 **TURN Server Options:**
 - **Free:** OpenRelay (limited bandwidth)
 - **Paid:** Twilio, Xirsys, or self-hosted coturn
-- **Setup Guide:** Already created in `QUICK_TURN_SETUP.md`
+- **Setup Guide:** Already created in `guides/QUICK_TURN_SETUP.md`
 
 #### Fix 3: Add Audio Diagnostics UI
 Show users real-time audio status:
@@ -246,7 +246,7 @@ Show users real-time audio status:
 5. 🧪 Test with 3+ users again
 
 **Short-term (This Week):**
-1. 🚀 Set up TURN server (use guide in `QUICK_TURN_SETUP.md`)
+1. 🚀 Set up TURN server (use guide in `guides/QUICK_TURN_SETUP.md`)
 2. 🎨 Add audio diagnostic UI for users
 3. 📈 Add analytics for connection success rates
 4. 🐛 Enhance error reporting
@@ -311,7 +311,7 @@ peer.on('stream', stream => {
 - [ ] **Test 3-user audio** with detailed logging
 
 ### **High Priority (This Week):**
-- [ ] **Set up TURN server** (follow QUICK_TURN_SETUP.md)
+- [ ] **Set up TURN server** (follow `guides/QUICK_TURN_SETUP.md`)
 - [ ] **Add audio diagnostics UI** (visual feedback)
 - [ ] **Enhance error logging** (track audio issues)
 
@@ -324,9 +324,9 @@ peer.on('stream', stream => {
 
 ## 🔗 **Related Documentation**
 
-- `QUICK_TURN_SETUP.md` - Free TURN server setup
-- `AUDIO_DEBUGGING_GUIDE.md` - Comprehensive audio debugging
-- `MICROPHONE_MUTED_ISSUE.md` - Track muted diagnostics
+- `guides/QUICK_TURN_SETUP.md` - Free TURN server setup
+- `archive/incidents/AUDIO_DEBUGGING_GUIDE.md` - Comprehensive audio debugging
+- `archive/incidents/MICROPHONE_MUTED_ISSUE.md` - Track muted diagnostics
 - `routes/prayer_room_bp.py` - Scheduler endpoint implementations
 
 ---

@@ -67,12 +67,18 @@ local_storage_data/
 *.json
 !firebase.json
 !firestore.indexes.json
-!static/bible_verses.json
+!web/static/bible_verses.json
 !mobile/package.json
 !mobile/package-lock.json
 !mobile/app.json
 !mobile/tsconfig.json
-!web-client/package.json
-!web-client/package-lock.json
+!web/client/package.json
+!web/client/package-lock.json
 !media-server/package.json
 !media-server/package-lock.json
+
+# Local TURN secrets (never commit)
+turn-credentials.txt
+
+# Coverage artifact
+.coverage

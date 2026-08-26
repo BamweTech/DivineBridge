@@ -8,16 +8,18 @@ alwaysApply: false
 
 ## Blueprint structure
 
-- Each feature area lives in its own file under `routes/` as a Flask Blueprint.
-- Business logic lives in root-level service modules (e.g. `prayer_generator.py`, `storage_handler.py`), not inside route handlers.
+- Each feature area lives under `backend/api/` as a Flask Blueprint (or package for large domains like `prayer_room/` and `seo/`).
+- HTML page routes live under `backend/web/`.
+- Business logic lives in `backend/services/` and integrations in `backend/integrations/`, not inside route handlers.
 - Blueprints are registered in `app.py` inside `create_app()` with a `url_prefix` and `csrf.exempt()` for API routes.
+- Never create `backend/api/prayer_room_bp.py` beside the `prayer_room` package — it shadows the blueprint export.
 
 ## Route pattern
 
 ```python
 from flask import Blueprint, request, jsonify, g
-from auth_helpers import require_auth
-from firebase_auth import get_firestore_client
+from backend.core.auth.helpers import require_auth
+from backend.integrations.firebase_auth import get_firestore_client
 
 bp = Blueprint('feature', __name__, url_prefix='/api/feature')
 
@@ -32,11 +34,11 @@ def list_items():
 ## Key conventions
 
 - Use `@require_auth` for authenticated endpoints; the user ID is on `g.user_id`.
-- Use `get_firestore_client()` from `firebase_auth` for Firestore access.
-- Use `get_config()` singleton from `config.py` for secrets -- never read env vars directly for secrets.
-- Rate limiting uses `extensions.limiter`; prayer room endpoints are exempted in `app.py`.
-- Local dev swaps storage via `USE_LOCAL_STORAGE=true` → `local_storage.py`.
-- Logging: use `logging.getLogger(__name__)` -- structured JSON in production via `logging_config.py`.
+- Use `get_firestore_client()` from `backend.integrations.firebase_auth` for Firestore access.
+- Use `get_config()` from `backend.core.config` for secrets -- never read env vars directly for secrets.
+- Rate limiting uses `backend.core.extensions.limiter`; prayer room endpoints are exempted in `app.py`.
+- Local dev swaps storage via `USE_LOCAL_STORAGE=true` → `backend.integrations.local_storage`.
+- Logging: use `logging.getLogger(__name__)` -- structured JSON in production via `backend.core.logging`.
 
 ## Error handling
 

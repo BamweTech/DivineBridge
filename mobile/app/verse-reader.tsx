@@ -16,7 +16,7 @@ import * as Haptics from 'expo-haptics';
 import dayjs from 'dayjs';
 
 import { verseApi, type VerseContext, type VerseContextOriginalWord } from '@/services/api';
-import { useSpeechPlayback } from '@/hooks/useSpeechPlayback';
+import { useSpeechPlayback } from '@/features/prayer/hooks/useSpeechPlayback';
 import { useAuthStore } from '@/stores/authStore';
 import { shareServerImage } from '@/lib/shareServerImage';
 import { THEME_COLORS } from '@/lib/constants';

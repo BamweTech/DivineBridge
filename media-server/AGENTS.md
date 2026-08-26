@@ -40,7 +40,12 @@ JSON request/response over WebSocket. Key messages:
 
 | File | Purpose |
 |------|---------|
-| `src/server.js` | Express + WebSocket server, worker pool, room management |
+| `src/server.js` | Bootstrap: workers, HTTP, WebSocket `/ws` |
+| `src/signaling.js` | WebSocket request/response protocol handler |
+| `src/protocol.js` | Action/event/mode constants (parity with `contracts/sfu-protocol.json`) |
+| `src/workers.js` | mediasoup worker pool |
+| `src/roomManager.js` | In-memory room map + lifecycle |
+| `src/httpApp.js` | `/health` and `/room-lookup` |
 | `src/Room.js` | Room and Peer classes, mediasoup Router management |
 | `src/auth.js` | Firebase ID token verification |
 | `src/config.js` | Worker settings, codec parameters, transport options |
@@ -58,7 +63,7 @@ Defined in `mobile/lib/constants.ts`:
 - **Group call**: Small participant cap, full media exchange.
 - **Prayer room**: Larger gatherings, speaker caps, spotlight video.
 
-Web (`static/js/sfu-client.js`) and mobile (`mobile/lib/sfu.ts`) must maintain protocol parity.
+Web (`web/static/js/sfu-client.js`) and mobile (`mobile/lib/sfu.ts`) must maintain protocol parity. Shared fixture: `contracts/sfu-protocol.json` (validated by `npm run test:protocol` and `tests/contract/test_sfu_protocol.py`).
 
 ## Multi-region (Voice Link)
 

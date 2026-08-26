@@ -1,6 +1,6 @@
 # tests/ — Test Suite
 
-Python test suite for the Flask backend, run with pytest.
+Python test suite for the Flask backend and cross-runtime contracts, run with pytest.
 
 ## Running tests
 
@@ -12,9 +12,15 @@ The `USE_LOCAL_STORAGE=true` env var is required to avoid Google Cloud Storage d
 
 ## Test organization
 
+| Folder | Purpose |
+|--------|---------|
+| `tests/unit/` | Unit and focused API tests for Flask services and blueprints |
+| `tests/contract/` | Route map, API surface, and SFU protocol parity fixtures |
+| `tests/integration/` | Deployment readiness / static checks |
+| `tests/load/` | Locust load scenarios |
+
 - Test files are named `test_<module>.py` matching the module under test.
-- Tests for route blueprints test the HTTP API via Flask's test client.
-- Tests for service modules test business logic directly.
+- API/SFU fixtures live under `contracts/` (`api-*.json`, `sfu-protocol.json`).
 
 ## Dev dependencies
 
@@ -22,28 +28,6 @@ Install from `requirements-dev.txt`:
 
 ```bash
 pip install -r requirements-dev.txt
-```
-
-This includes pytest, flake8, black, and other dev tools.
-
-## Writing new tests
-
-```python
-import pytest
-from app import create_app
-
-@pytest.fixture
-def client():
-    app = create_app()
-    app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
-
-def test_endpoint(client):
-    response = client.get('/api/endpoint')
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data['success'] is True
 ```
 
 ## Conventions
@@ -55,13 +39,13 @@ def test_endpoint(client):
 
 ## Linting and formatting
 
-- `flake8 --max-line-length=120 --exclude=venv,flask_session,local_storage_data,.git app.py routes/ core/ tests/`
-- `black --check --line-length=120 app.py routes/ core/ tests/`
+- `flake8 --max-line-length=120 app.py tests/ backend/` (see `.flake8`)
+- `black --check --line-length=120 app.py tests/ backend/`
 
-## Mobile tests
-
-Mobile type checking and linting run separately in the `mobile/` directory:
+## Mobile / media / web checks
 
 ```bash
 cd mobile && npx tsc --noEmit && npm run lint && npx expo-doctor
+cd media-server && npm run check && npm run test:protocol
+cd web/client && npm run build
 ```

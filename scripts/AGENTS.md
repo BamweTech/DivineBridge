@@ -2,11 +2,25 @@
 
 Operational scripts for deploying, migrating data, and administering Divine Bridge.
 
+Prefer categorized modules (`python -m scripts.<category>.<module>`) over root-level launchers.
+
+## Layout
+
+| Folder | Purpose |
+|--------|---------|
+| `scripts/content/` | Prayer/verse/disaster content inspection and regeneration |
+| `scripts/emailing/` | Manual email sends and subscriber utilities |
+| `scripts/admin/` | Organization and admin cleanup utilities |
+| `scripts/maintenance/` | Formatting, route-map verification, diagnostics |
+| `scripts/deploy/` | Deploy, SFU region, TURN, disaster scheduler tooling |
+| `scripts/metro/` | Metro GCE VM update / tunnel / allow-IP helpers |
+| `scripts/lib/` | Shared shell helpers (`cloudsdk-python.sh`) |
+
+Stable thin wrappers remain at `scripts/deploy.sh`, `scripts/deploy-sfu-region.sh`, and `scripts/gcp-metro-*.sh` so docs and post-push hooks keep working.
+
 ## Deployment
 
-### `deploy.sh`
-
-The primary deployment script. Deploys Firestore rules and/or Cloud Run.
+### `deploy.sh` → `deploy/deploy.sh`
 
 ```bash
 ./scripts/deploy.sh                       # Full deploy (Firestore + Cloud Run)
@@ -20,13 +34,7 @@ Environment config: `scripts/deploy.env` (see `deploy.env.example`).
 
 Key variables: `GCP_PROJECT`, `GCP_REGION`, `CLOUD_RUN_SERVICE`, `FIREBASE_PROJECT`.
 
-### `lib/cloudsdk-python.sh`
-
-Helper to set `CLOUDSDK_PYTHON` for gcloud SDK compatibility.
-
 ### Metro VM (Expo bundler on GCE)
-
-After pushing **mobile** (or shared JS) changes to `main`, or when the user asks to refresh the bundler VM:
 
 ```bash
 ./scripts/gcp-metro-update.sh            # git pull main + restart metro.service
@@ -34,58 +42,29 @@ After pushing **mobile** (or shared JS) changes to `main`, or when the user asks
 ./scripts/gcp-metro-update.sh --status    # systemd + Metro health
 ```
 
-Requires `gcloud` auth and access to project `divinebridge`, VM `divinebridge-metro` (default zone `us-central1-a`). See also `gcp-metro-vm.sh`, `gcp-metro-tunnel.sh`, `gcp-metro-allow-my-ip.sh`.
-
 ### Regional SFU (Voice Link media)
 
-Voice Link rooms pin `sfu_url` at create (geo: `CF-IPCountry`, mobile `timezone`, or `sfu_region`).
+```bash
+./scripts/deploy-sfu-region.sh --bootstrap --region eu
+./scripts/deploy-sfu-region.sh --region eu
+./scripts/deploy-sfu-region.sh --region us
+```
+
+## Common Python commands
 
 ```bash
-./scripts/deploy-sfu-region.sh --bootstrap --region eu   # first-time checklist
-./scripts/deploy-sfu-region.sh --region eu               # pull main + restart PM2 on EU VM
-./scripts/deploy-sfu-region.sh --region us               # US SFU (divinebridge-sfu, us-east1-b)
+python -m scripts.content.check_today_prayer
+python -m scripts.emailing.manual_sunday_email
+python -m scripts.maintenance.verify_route_map
+python scripts/maintenance/pregen_verse_contexts.py
+./scripts/deploy/setup-turn-server.sh
 ```
-
-After EU VM is live, set Cloud Run env `SFU_URL_EU=wss://sfu-eu.divinebridge.io/ws` and redeploy Flask.
-
-## Migrations
-
-Migration scripts are one-off Python scripts for Firestore data changes. They are not part of a formal migration framework.
-
-Pattern:
-
-```python
-from config import get_config
-from firebase_auth import initialize_firebase
-from firebase_admin import firestore
-
-initialize_firebase()
-db = firestore.client()
-
-# Iterate collection, transform documents
-for doc in db.collection('users').stream():
-    data = doc.to_dict()
-    # Transform and update...
-    doc.reference.set(updates, merge=True)
-```
-
-Example: `migrate_users_to_firestore.py`.
-
-## Admin / GCS utilities
-
-| Script | Purpose |
-|--------|---------|
-| `delete_production_test_testimonies.py` | Remove QA posts from GCS: `testimonies/` **and** `prayer_requests/` (mobile Community / `/api/prayer/prayers` uses the latter). `--dry-run` to list only. |
-| `grant_existing_users_english_prayer_leader.py` | One-time migration granting every Firebase Auth user prayer-leader access for English. Preview by default; pass `--apply` to write. |
-| `reconcile_duplicate_email_subscribers.py` | Preview or suppress duplicate opted-in Firestore subscriber profiles; pass `--apply` to write. |
-| `pregen_devotional_templates.py` | Pre-generate the 24 canonical devotional plans (8 suggested themes × 3 durations) into the `devotional_templates` Firestore collection. Run once on first deploy; subsequent refreshes happen monthly via `/admin/api/refresh-devotional-templates`. Pass `--force` to regenerate all templates regardless of age. |
-| `pregen_verse_contexts.py` | Pre-generate the AI sermon + original-language words + reflection questions for every verse in `static/bible_verses.json` into the `verse_contexts` Firestore collection (keyed by verse slug, not date). Run once on first deploy so the mobile reader's "Today's Message" section is instant from day 1; nightly refresh happens via Cloud Scheduler → `POST /api/today-verse/context/generate` (7-day look-ahead). Pass `--force` to regenerate, `--limit N` for a smoke test. |
 
 ## Conventions
 
 - Always use `set -euo pipefail` in bash scripts.
 - Use `--dry-run` to preview destructive operations.
 - Migration scripts should be idempotent (safe to run multiple times).
-- Use `get_config()` and `initialize_firebase()` for Firebase access in Python scripts.
-- Log progress and errors clearly.
+- Prefer `backend.core.config` / `backend.integrations.firebase_auth` imports.
 - Do not commit `deploy.env` (contains secrets); use `deploy.env.example` as template.
+- Avoid `python scripts/*.py` wildcards — `scripts/emailing` must not be shadowed by a package named `email`.

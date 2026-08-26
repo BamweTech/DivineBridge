@@ -43,7 +43,7 @@ logs/
 # Service Account Keys
 *.json
 !divinebridge-676c7c0963dd.json
-!static/bible_verses.json
+!web/static/bible_verses.json
 
 # Docker
 Dockerfile
@@ -51,6 +51,20 @@ Dockerfile
 
 .env
 .venv
+mobile/
+media-server/
+web/client/node_modules/
+mobile/node_modules/
+media-server/node_modules/
+docs/
+.cursor/
+.github/
+tests/
+monitoring/
+flask_session/
+local_storage_data/
+.pytest_cache/
+.ruff_cache/
 __pycache__
 *.pyc
 *.pyo

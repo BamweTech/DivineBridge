@@ -30,7 +30,7 @@ alwaysApply: false
 ## Key patterns
 
 - WebSocket connection → `join` with room ID + auth token → create transports → produce/consume media.
-- Protocol parity between web (`static/js/sfu-client.js`) and mobile (`mobile/lib/sfu.ts`).
+- Protocol parity between web (`web/static/js/sfu-client.js`) and mobile (`mobile/lib/sfu.ts`); fixture in `contracts/sfu-protocol.json`.
 - Redis used for pub/sub signaling in multi-instance deployments.
 - Separate deployment from Flask container; different scaling characteristics.
 

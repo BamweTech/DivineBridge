@@ -1,6 +1,6 @@
 ---
 description: Standardize API JSON response format across all Flask routes
-globs: "routes/**/*.py"
+globs: "backend/api/**/*.py"
 alwaysApply: false
 ---
 

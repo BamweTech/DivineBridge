@@ -43,7 +43,7 @@ logs/
 # Service Account Keys
 *.json
 !divinebridge-676c7c0963dd.json
-!static/bible_verses.json
+!web/static/bible_verses.json
 
 # Docker
 # Dockerfile and .dockerignore are needed for deployment

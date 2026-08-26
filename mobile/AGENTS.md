@@ -26,10 +26,24 @@ Static HTML prototype at repo root: **`divinebridge-app-v4.html`** (not deployed
 | Concern | Tool | Location |
 |---------|------|----------|
 | REST API calls | `fetch` with auth headers | `services/api.ts` |
-| Server state caching | TanStack Query | `hooks/use*.ts` |
-| Real-time data | Firebase Firestore `onSnapshot` | `hooks/use*.ts` |
+| Server state caching | TanStack Query | `features/*/hooks`, `hooks/use*.ts` |
+| Real-time data | Firebase Firestore `onSnapshot` | feature hooks / contexts |
 | Local UI state | Zustand | `stores/*.ts` |
 | Auth state | Zustand + Firebase Auth | `stores/authStore.ts` |
+
+## Feature layout
+
+Non-route UI is organized by product area (Expo Router paths under `app/` are unchanged):
+
+| Area | Path |
+|------|------|
+| Groups / chat / group calls | `features/groups/` |
+| Live rooms / Voice Link | `features/rooms/` |
+| Home / verse / speech helpers | `features/prayer/` |
+| Shared chrome | `components/ui/` |
+| HTTP client | `services/` |
+
+Compatibility re-exports remain under `components/group/`, `components/room/`, `hooks/`, and `contexts/` for one migration cycle.
 
 ## Key files
 
@@ -37,7 +51,7 @@ Static HTML prototype at repo root: **`divinebridge-app-v4.html`** (not deployed
 - `lib/constants.ts` — `API_BASE_URL`, `SFU_WS_URL`, `THEME_COLORS`, Firestore collection names.
 - `lib/firebase.ts` — Firebase initialization and Firestore export.
 - `lib/backendAuth.ts` — Syncs Firebase auth with Flask backend session.
-- `lib/sfu.ts` — mediasoup client for WebRTC (protocol parity with `static/js/sfu-client.js`).
+- `lib/sfu.ts` — mediasoup client for WebRTC (protocol parity with `web/static/js/sfu-client.js`; fixture `contracts/sfu-protocol.json`).
 - `components/ui/Icon.tsx` — Icon component.
 
 ## Styling

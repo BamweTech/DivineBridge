@@ -10,7 +10,7 @@ import {
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { useVoiceLink } from '@/hooks/useVoiceLink';
+import { useVoiceLink } from '@/features/rooms/hooks/useVoiceLink';
 import { RTCView } from '@/lib/sfu';
 import { THEME_COLORS } from '@/lib/constants';
 import { iosFontStyle } from '@/lib/typography';

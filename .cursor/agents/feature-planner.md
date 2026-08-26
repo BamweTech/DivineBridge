@@ -27,10 +27,11 @@ Produce a checklist of all layers the feature touches:
 
 | Layer | Affected? | Files to create/modify |
 |-------|-----------|----------------------|
-| Flask routes | | `routes/` |
-| Flask services | | Root-level `*.py` modules |
-| Web templates | | `templates/` |
-| Static JS/CSS | | `static/` |
+| Flask routes | | `backend/api/` |
+| Flask services | | `backend/services/`, `backend/integrations/` |
+| API contracts | | `contracts/` |
+| Web templates | | `web/templates/` |
+| Static JS/CSS | | `web/static/` |
 | Mobile screens | | `mobile/app/` |
 | Mobile API client | | `mobile/services/api.ts` |
 | Mobile hooks | | `mobile/hooks/` |
