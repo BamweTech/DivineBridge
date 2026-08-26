@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "envelope": {
+    "request": ["action", "requestId", "data"],
+    "response": ["requestId", "ok", "data"],
+    "error": ["requestId", "ok", "error"],
+    "push": ["event", "data"]
+  },
+  "actions": [
+    "join",
+    "setRtpCapabilities",
+    "createTransport",
+    "connectTransport",
+    "produce",
+    "readyToConsume",
+    "resumeConsumer",
+    "pauseProducer",
+    "resumeProducer",
+    "closeProducer",
+    "getStats",
+    "ping"
+  ],
+  "events": [
+    "peerJoined",
+    "peerLeft",
+    "newProducer",
+    "newConsumer",
+    "consumerClosed",
+    "consumerPaused",
+    "consumerResumed",
+    "activeSpeakers",
+    "modeChanged"
+  ],
+  "roomModes": {
+    "GROUP_CALL": "group_call",
+    "PRAYER_ROOM": "prayer_room"
+  },
+  "thresholds": {
+    "groupCallMaxParticipants": 8,
+    "prayerRoomMaxSpeakers": 20,
+    "activeSpeakerMaxConnections": 5
+  }
+}

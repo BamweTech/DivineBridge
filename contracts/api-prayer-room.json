@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "prefix": "/api/prayer-room",
+  "endpoints": [
+    {"path": "/api/prayer-room/rooms", "methods": ["GET"]},
+    {"path": "/api/prayer-room/ice-config", "methods": ["GET"]},
+    {"path": "/api/prayer-room/create", "methods": ["POST"]},
+    {"path": "/api/prayer-room/join/<room_id>", "methods": ["POST"]},
+    {"path": "/api/prayer-room/leave/<room_id>", "methods": ["POST"]},
+    {"path": "/api/prayer-room/voice-link/create", "methods": ["POST"]},
+    {"path": "/api/prayer-room/sfu-token/<room_id>", "methods": ["POST"]},
+    {"path": "/api/prayer-room/<room_id>/chat", "methods": ["GET", "POST"]},
+    {"path": "/api/prayer-room/schedule", "methods": ["POST"]},
+    {"path": "/api/prayer-room/activate-scheduled-rooms", "methods": ["POST"]}
+  ]
+}

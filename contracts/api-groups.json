@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "prefix": "/api/groups",
+  "endpoints": [
+    {"path": "/api/groups", "methods": ["GET", "POST"]},
+    {"path": "/api/groups/my", "methods": ["GET"]},
+    {"path": "/api/groups/<group_id>", "methods": ["GET"]},
+    {"path": "/api/groups/<group_id>/join", "methods": ["POST"]},
+    {"path": "/api/groups/join-by-code", "methods": ["POST"]},
+    {"path": "/api/groups/<group_id>/leave", "methods": ["POST"]},
+    {"path": "/api/groups/<group_id>/members/sync", "methods": ["POST"]},
+    {"path": "/api/groups/<group_id>/notify-message", "methods": ["POST"]}
+  ]
+}

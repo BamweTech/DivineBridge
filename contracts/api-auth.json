@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "prefix": "/api/auth",
+  "endpoints": [
+    {"path": "/api/auth/login", "methods": ["POST"]},
+    {"path": "/api/auth/signup", "methods": ["POST"]},
+    {"path": "/api/auth/logout", "methods": ["POST"]},
+    {"path": "/api/auth/status", "methods": ["GET"]},
+    {"path": "/api/auth/firebase-config", "methods": ["GET"]},
+    {"path": "/api/auth/forgot-password", "methods": ["POST"]},
+    {"path": "/api/auth/reset-password", "methods": ["POST"]},
+    {"path": "/api/auth/push-token", "methods": ["POST"]},
+    {"path": "/api/auth/profile/business-card", "methods": ["GET", "POST"]}
+  ]
+}

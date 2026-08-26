@@ -76,6 +76,8 @@ local_storage_data/
 !web/client/package-lock.json
 !media-server/package.json
 !media-server/package-lock.json
+!contracts/*.json
+!contracts/**/*.json
 
 # Local TURN secrets (never commit)
 turn-credentials.txt
