@@ -98,6 +98,17 @@ def _load_template(db, key: str) -> dict | None:
     return data
 
 
+def _fresh_schedule_days(days: list) -> list:
+    """Copy plan days with completion cleared. Journals and content stay."""
+    fresh = []
+    for raw in days or []:
+        item = dict(raw)
+        item["completed"] = False
+        item.pop("completed_at", None)
+        fresh.append(item)
+    return fresh
+
+
 def _save_template(db, key: str, theme: str, duration: int, days: list) -> None:
     """Upsert a pre-generated plan into the devotional_templates collection."""
     db.collection(_TEMPLATES_COLLECTION).document(key).set(
@@ -282,12 +293,13 @@ def generate_devotional():
                 "title": plan_data["title"],
                 "theme": theme,
                 "duration": duration,
-                "days": cached["days"],
+                "days": _fresh_schedule_days(cached["days"]),
                 "status": "active",
                 "current_day": 1,
                 "streak": 0,
                 "last_completed_at": None,
                 "created_at": firestore.SERVER_TIMESTAMP,
+                "started_at": firestore.SERVER_TIMESTAMP,
             }
             db.collection("devotional_plans").document(plan_id).set(doc)
             return jsonify({"success": True, "plan_id": plan_id, "plan": plan_data}), 200
@@ -351,12 +363,13 @@ def generate_devotional():
         "title": plan_data.get("title", f"{theme} — {duration}-Day Plan"),
         "theme": theme,
         "duration": duration,
-        "days": plan_data["days"],
+        "days": _fresh_schedule_days(plan_data["days"]),
         "status": "active",
         "current_day": 1,
         "streak": 0,
         "last_completed_at": None,
         "created_at": firestore.SERVER_TIMESTAMP,
+        "started_at": firestore.SERVER_TIMESTAMP,
     }
     db.collection("devotional_plans").document(plan_id).set(doc)
 
@@ -393,10 +406,17 @@ def check_in(plan_id: str):
             d["completed_at"] = datetime.now(timezone.utc).isoformat()
             break
 
+    completed_days = [
+        d.get("day")
+        for d in days
+        if d.get("completed") and isinstance(d.get("day"), int)
+    ]
+    latest_completed = max(completed_days) if completed_days else 0
+
     now = datetime.now(timezone.utc)
     update = {
         "days": days,
-        "current_day": min(day + 1, plan["duration"]),
+        "current_day": latest_completed if latest_completed else 1,
         "last_completed_at": firestore.SERVER_TIMESTAMP,
     }
 
@@ -444,7 +464,12 @@ def restart_plan(plan_id: str):
     ref.update(
         {
             "status": "active",
-            "created_at": firestore.SERVER_TIMESTAMP,
+            "started_at": firestore.SERVER_TIMESTAMP,
+            "current_day": 1,
+            "streak": 0,
+            "last_completed_at": None,
+            "completed_at": firestore.DELETE_FIELD,
+            "days": _fresh_schedule_days(plan.get("days", [])),
         }
     )
     return jsonify({"success": True, "data": {"plan_id": plan_id}}), 200

@@ -248,7 +248,10 @@ export interface DevotionalPlan {
   theme: string;
   duration: 7 | 14 | 30;
   created_at: number;
+  /** When the current schedule began. Restart sets this without wiping created_at. */
+  started_at?: number;
   days: DevotionalDay[];
+  /** Highest completed plan day (watermark). 1 when none are done. */
   current_day: number;
   streak: number;
   status?: 'active' | 'completed';

@@ -710,6 +710,29 @@ html, body {
 .msg-send { background: var(--gold); border-color: transparent; color:#fff; }
 
 /* ===================== SCREEN 6: DEVOTIONAL ===================== */
+.devo-today-header { padding: 10px 22px 8px; }
+.devo-today-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.devo-today-plans { font-size: 15px; font-weight: 600; color: var(--gold); }
+.devo-today-plan { flex: 1; min-width: 0; }
+.devo-today-plan-name { font-size: 17px; font-weight: 600; color: var(--text); letter-spacing: -.1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.devo-today-plan-meta { font-size: 12px; color: var(--text3); margin-top: 2px; }
+.devo-today-streak { display: flex; align-items: center; gap: 4px; background: var(--gold-dim); border: 1px solid var(--border2); border-radius: 12px; padding: 6px 10px; color: var(--gold); font-size: 15px; font-weight: 600; }
+.devo-today-progress { height: 3px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
+.devo-today-progress > span { display: block; height: 100%; width: 40%; background: var(--gold); border-radius: 2px; }
+.devo-read { padding: 8px 22px 20px; }
+.devo-read-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.devo-read-date { font-size: 13px; color: var(--text3); }
+.devo-read-title { font-size: 22px; font-weight: 700; letter-spacing: -.3px; color: var(--text); line-height: 1.25; margin-bottom: 20px; }
+.devo-verse-quote { border-left: 2px solid var(--gold); padding-left: 16px; margin-bottom: 24px; }
+.devo-verse-text { font-family: Georgia, serif; font-style: italic; font-size: 22px; line-height: 1.45; color: var(--text); letter-spacing: -.3px; }
+.devo-verse-ref { font-size: 11px; color: var(--gold); letter-spacing: 1.4px; text-transform: uppercase; margin-top: 14px; font-weight: 600; }
+.devo-section-label { font-size: 11px; color: var(--text3); letter-spacing: .6px; text-transform: uppercase; font-weight: 600; margin-bottom: 10px; }
+.devo-reflection { font-size: 16px; line-height: 1.6; color: var(--text2); margin-bottom: 22px; }
+.devo-prayer-card { background: rgba(232,242,236,.55); border: 1px solid rgba(74,124,94,.18); border-radius: 18px; padding: 16px; display: flex; gap: 10px; margin-bottom: 16px; color: var(--text); font-size: 16px; line-height: 1.6; }
+.devo-read-actions { display: flex; gap: 8px; }
+.devo-read-act { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 12px 8px; border-radius: 14px; border: 1px solid var(--border); background: var(--bg2); font-size: 13px; font-weight: 600; color: var(--text2); }
+.devo-read-act.gold { background: var(--gold-dim); border-color: var(--border2); color: var(--gold); }
+.devo-read-act.icon-only { flex: 0 0 48px; }
 .devo-hero { margin: 0 22px 18px; background: linear-gradient(135deg,#f0ebf8 0%,#e8e0f4 100%); border: 1px solid rgba(112,64,184,.18); border-radius: 24px; padding: 22px; position: relative; overflow: hidden; }
 .devo-hero::before { content: ''; position: absolute; top: -50px; right: -50px; width: 160px; height: 160px; background: radial-gradient(circle,rgba(112,64,184,.12) 0%,transparent 70%); }
 .devo-ai-tag { display: inline-flex; align-items: center; gap: 6px; background: rgba(112,64,184,.1); border: 1px solid rgba(112,64,184,.2); border-radius: 50px; padding: 4px 12px; font-size: 10px; color: var(--violet); font-weight: 500; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 14px; }
@@ -722,14 +745,17 @@ html, body {
 .devo-week { padding: 0 22px; margin-bottom: 18px; }
 .devo-week-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 12px; }
 .week-days { display: flex; gap: 8px; }
-.week-day { flex: 1; background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 10px 4px; text-align: center; }
+.week-day { flex: 0 0 62px; background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 10px 6px 8px; text-align: center; position: relative; }
 .week-day.done { border-color: var(--border2); background: var(--gold-dim2); }
-.week-day.today { border-color: var(--gold); }
-.wd-name { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 5px; }
-.wd-num { font-size: 15px; font-weight: 600; color: var(--text3); }
+.week-day.today { border-color: var(--gold); background: var(--gold-dim); }
+.wd-plan { position: absolute; top: 5px; right: 6px; font-size: 9px; font-weight: 600; color: var(--text3); }
+.week-day.today .wd-plan { color: var(--gold); }
+.wd-name { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; font-weight: 600; }
+.wd-num { font-size: 18px; font-weight: 700; color: var(--text); margin-top: 2px; }
 .week-day.done .wd-num, .week-day.today .wd-num { color: var(--gold); }
-.wd-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text3); margin: 4px auto 0; }
-.week-day.done .wd-dot, .week-day.today .wd-dot { background: var(--gold); }
+.wd-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text3); margin: 5px auto 0; }
+.week-day.done .wd-dot { background: var(--sage); }
+.week-day.today .wd-dot { background: var(--gold); }
 
 .today-reading { margin: 0 22px 16px; background: var(--bg2); border: 1px solid var(--border); border-radius: 20px; overflow: hidden; cursor: pointer; }
 .tr-image { height: 72px; background: linear-gradient(135deg,#f5edd8,#e8d8b8); display: flex; align-items: center; justify-content: center; position: relative; color: var(--gold); }
@@ -1306,52 +1332,55 @@ html, body {
     <!-- DEVOTIONAL -->
     <div class="phone-screen" id="s-devo">
       <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
-      <div class="app-screen">
-        <div class="devo-hub-header">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div>
-              <div class="devo-ai-pill"><span class="icon icon-9"><svg><use href="#ic-sparkle"/></svg></span> AI-Powered</div>
-              <div class="page-title">My Devotionals</div>
+      <div class="app-screen" style="padding:0">
+        <div class="devo-today-header">
+          <div class="devo-today-top">
+            <div class="devo-today-plans">Plans</div>
+            <div class="devo-today-plan">
+              <div class="devo-today-plan-name">Trusting God Through Uncertainty</div>
+              <div class="devo-today-plan-meta">Day 12 of 30 · 2 plans</div>
             </div>
-            <div class="icon-btn" style="background:var(--gold-dim);border-color:var(--border2);color:var(--gold)"><span class="icon icon-16"><svg><use href="#ic-bell"/></svg></span></div>
+            <div class="devo-today-streak"><span class="icon icon-12"><svg><use href="#ic-flame"/></svg></span> 12</div>
+          </div>
+          <div class="devo-today-progress"><span></span></div>
+        </div>
+
+        <div class="devo-week" style="margin-bottom:8px">
+          <div class="week-days">
+            <div class="week-day done"><div class="wd-plan">10</div><div class="wd-name">Sun</div><div class="wd-num">24</div><div class="wd-dot"></div></div>
+            <div class="week-day done"><div class="wd-plan">11</div><div class="wd-name">Mon</div><div class="wd-num">25</div><div class="wd-dot"></div></div>
+            <div class="week-day today"><div class="wd-plan">12</div><div class="wd-name">Tue</div><div class="wd-num">26</div><div class="wd-dot"></div></div>
+            <div class="week-day"><div class="wd-plan">13</div><div class="wd-name">Wed</div><div class="wd-num">27</div><div class="wd-dot"></div></div>
+            <div class="week-day"><div class="wd-plan">14</div><div class="wd-name">Thu</div><div class="wd-num">28</div><div class="wd-dot"></div></div>
           </div>
         </div>
 
-        <div class="create-plan-cta">
-          <div style="width:44px;height:44px;border-radius:14px;background:var(--gold);display:flex;align-items:center;justify-content:center;color:#fff"><span class="icon icon-20"><svg><use href="#ic-plus"/></svg></span></div>
-          <div style="flex:1"><div style="font-size:16px;font-weight:700;color:var(--text)">Create New Plan</div><div style="font-size:12px;color:var(--text2);margin-top:2px">AI-generated scripture, reflection &amp; prayer</div></div>
-          <span class="icon icon-16" style="color:var(--gold)"><svg><use href="#ic-chevron-r"/></svg></span>
+        <div class="devo-read">
+          <div class="devo-read-meta">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="pill pill-gold" style="font-size:10px;padding:4px 10px">Today</div>
+              <div class="devo-read-date">Tuesday, August 27</div>
+            </div>
+          </div>
+          <div class="devo-read-title">Peace That Holds</div>
+          <div class="devo-verse-quote">
+            <div class="devo-verse-text">“Peace I leave with you; my peace I give to you. I do not give to you as the world gives.”</div>
+            <div class="devo-verse-ref">— John 14:27</div>
+          </div>
+          <div class="devo-section-label">Reflection</div>
+          <div class="devo-reflection">Jesus offers a peace that does not depend on circumstances. Today, rest in the gift already given — not the calm you have to manufacture.</div>
+          <div class="devo-section-label">Prayer</div>
+          <div class="devo-prayer-card">
+            <span class="icon icon-16" style="color:var(--sage);margin-top:2px"><svg><use href="#ic-pray"/></svg></span>
+            <div>Lord, quiet my striving. Let Your peace settle over what I cannot control, and teach me to receive rather than grasp.</div>
+          </div>
+          <div class="devo-read-actions">
+            <div class="devo-read-act gold"><span class="icon icon-14"><svg><use href="#ic-audio"/></svg></span> Listen</div>
+            <div class="devo-read-act"><span class="icon icon-14"><svg><use href="#ic-share"/></svg></span> Share</div>
+            <div class="devo-read-act icon-only"><span class="icon icon-16"><svg><use href="#ic-book"/></svg></span></div>
+          </div>
+          <div style="margin-top:16px;background:var(--gold);color:#fff;border-radius:50px;padding:14px 24px;text-align:center;font-size:14px;font-weight:600">Mark as Complete</div>
         </div>
-
-        <div class="sec-header" style="padding-top:0"><div class="sec-title">Your Plans</div></div>
-
-        <div class="plan-list-card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <div style="font-size:15px;font-weight:700;color:var(--text)">Trusting God Through Uncertainty</div>
-            <div class="pill pill-gold" style="font-size:10px;padding:2px 8px">Day 23</div>
-          </div>
-          <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Faith &amp; Trust · 30 days</div>
-          <div style="display:flex;align-items:center;gap:12px;font-size:12px;color:var(--text2)">
-            <span>23/30 days</span>
-            <div class="plan-progress" style="flex:1;margin:0"><div class="plan-progress-fill" style="width:77%"></div></div>
-            <span style="display:flex;align-items:center;gap:3px;color:var(--gold);font-weight:600"><span class="icon icon-12"><svg><use href="#ic-flame"/></svg></span> 23</span>
-          </div>
-          <div style="font-size:12px;color:var(--text2);margin-top:12px">Open the plan to restart its schedule from today.</div>
-        </div>
-
-        <div class="plan-list-card" style="border-color:var(--border);background:var(--bg3)">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <div style="font-size:15px;font-weight:700;color:var(--text)">Peace &amp; Stillness</div>
-            <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--sage)"><span class="icon icon-10"><svg><use href="#ic-cross"/></svg></span> Complete</div>
-          </div>
-          <div style="font-size:12px;color:var(--text3);margin-bottom:8px">Peace &amp; Stillness · 7 days</div>
-          <div style="display:flex;align-items:center;gap:12px;font-size:12px;color:var(--text2)">
-            <span>7/7 days</span>
-            <div class="plan-progress" style="flex:1;margin:0"><div class="plan-progress-fill" style="width:100%;background:var(--sage)"></div></div>
-          </div>
-          <div style="font-size:12px;color:var(--text2);margin-top:12px">Open the plan to restart its schedule from today.</div>
-        </div>
-        <div style="height:20px"></div>
       </div>
       <div class="bottom-nav">
         <div class="nav-item" onclick="show('s-home',document.querySelectorAll('.side-btn')[1])"><span class="icon icon-18"><svg><use href="#ic-home"/></svg></span><div class="nav-label">Home</div></div>
@@ -1502,7 +1531,7 @@ html, body {
     <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Home</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Verse hero, global prayer, stats, groups</div></div>
     <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Pray tab</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">My Groups + Prayer Wall sub-tabs</div></div>
     <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Live tab</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Prayer rooms list · live &amp; scheduled</div></div>
-    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Devotional</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">AI plans hub · create &amp; track</div></div>
+    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Devotional</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Today’s verse · newest active plan</div></div>
     <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Activity</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Bell hub · wall shortcut + group chats</div></div>
     <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Profile</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Account, prefs, sign out</div></div>
   </div>

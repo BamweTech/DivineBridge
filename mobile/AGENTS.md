@@ -8,6 +8,7 @@ File-based routing under `app/`:
 
 - `app/_layout.tsx` — Root Stack with auth guard, providers (QueryClient, GroupUnread, LiveRooms).
 - `app/(tabs)/_layout.tsx` — Tab bar: Home, Pray (`groups`), Live (`rooms`), Devotional, Profile.
+- `app/(tabs)/devotional.tsx` — Opens on today's reading for the newest active plan; Plans hub is secondary.
 - `app/(auth)/` — Login, register screens.
 - `app/room/[id].tsx` — Live prayer room (dynamic route).
 - `app/voice-call/[id].tsx` — 1:1 voice link call (share web URL; mute/speaker/end).

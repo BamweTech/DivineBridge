@@ -27,9 +27,11 @@ import {
 import dayjs from 'dayjs';
 import { db } from '@/lib/firebase';
 import { COLLECTIONS, DEVOTIONAL_DURATIONS, THEME_COLORS } from '@/lib/constants';
-import { iosFontStyle, iosFontStyleItalic } from '@/lib/typography';
+import { TYPE, iosFont, iosFontStyle, iosFontStyleItalic } from '@/lib/typography';
 import { devotionalApi } from '@/services/api';
 import { Button } from '@/components/ui/Button';
+import { GlassCard } from '@/components/ui/GlassCard';
+import { GlassPill } from '@/components/ui/GlassPill';
 import { useAuthStore } from '@/stores/authStore';
 import Icon from '@/components/ui/Icon';
 import type { DevotionalPlan, DevotionalDay } from '@/types';
@@ -45,22 +47,91 @@ const THEMES = [
 ];
 
 function tsToMs(ts: unknown): number {
-  if (typeof ts === 'number') return ts;
-  if (ts && typeof (ts as any).toMillis === 'function') return (ts as any).toMillis();
+  if (typeof ts === 'number' && Number.isFinite(ts)) {
+    return ts < 1e12 ? ts * 1000 : ts;
+  }
+  if (typeof ts === 'string') {
+    const parsed = Date.parse(ts);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+  if (ts && typeof ts === 'object') {
+    const obj = ts as { toMillis?: () => number; seconds?: number; _seconds?: number };
+    if (typeof obj.toMillis === 'function') return obj.toMillis();
+    const seconds = obj.seconds ?? obj._seconds;
+    if (typeof seconds === 'number') return seconds * 1000;
+  }
   return 0;
+}
+
+/** Current schedule start: restart uses started_at; older plans fall back to created_at. */
+function getScheduleStartMs(plan: DevotionalPlan): number {
+  return tsToMs(plan.started_at) || tsToMs(plan.created_at) || Date.now();
 }
 
 /** Plan day index (1-based) that falls on the user's local calendar date today, clamped to the plan. */
 function getCalendarTodayPlanDay(plan: DevotionalPlan): number {
-  const planStart = plan.created_at
-    ? dayjs(tsToMs(plan.created_at)).startOf('day')
-    : dayjs().startOf('day');
+  const planStart = dayjs(getScheduleStartMs(plan)).startOf('day');
   const today = dayjs().startOf('day');
   const idx = today.diff(planStart, 'day') + 1;
   return Math.min(plan.duration, Math.max(1, idx));
 }
 
+function getLatestCompletedDay(plan: DevotionalPlan): number {
+  return plan.days.reduce((latest, day) => (
+    day.completed && day.day > latest ? day.day : latest
+  ), 0);
+}
+
+/**
+ * Where the carousel should open.
+ * 1. Behind — first incomplete day (catch-up).
+ * 2. Today still open — today.
+ * 3. Finished today only — stay on today (day-by-day rest).
+ * 4. Worked ahead of the calendar — next day after the latest completion.
+ */
+function getLandingPlanDay(plan: DevotionalPlan): number {
+  const calendarToday = getCalendarTodayPlanDay(plan);
+  const latestCompleted = getLatestCompletedDay(plan);
+
+  const firstIncomplete = plan.days
+    .filter((d) => !d.completed)
+    .map((d) => d.day)
+    .sort((a, b) => a - b)[0];
+
+  if (firstIncomplete != null && firstIncomplete < calendarToday) {
+    return firstIncomplete;
+  }
+  if (latestCompleted < calendarToday) {
+    return calendarToday;
+  }
+  if (latestCompleted > calendarToday) {
+    return Math.min(latestCompleted + 1, plan.duration);
+  }
+  return calendarToday;
+}
+
+function isPlanActive(plan: DevotionalPlan): boolean {
+  const done = plan.days.filter((d) => d.completed).length;
+  return plan.status === 'active' || (!plan.completed_at && done < plan.duration);
+}
+
+/** Newest active plan by current schedule start. Restarted plans take priority. */
+function pickLatestActivePlan(plans: DevotionalPlan[]): DevotionalPlan | null {
+  const active = plans.filter(isPlanActive);
+  if (active.length === 0) return null;
+  return active.reduce((newest, plan) =>
+    getScheduleStartMs(plan) > getScheduleStartMs(newest) ? plan : newest
+  );
+}
+
+function planDayDate(plan: DevotionalPlan, dayNumber: number) {
+  return dayjs(getScheduleStartMs(plan)).add(dayNumber - 1, 'day');
+}
+
 // ─── Day selector (synced with pager) ────────────────────────────────────────
+
+const DAY_CHIP_WIDTH = 62;
+const DAY_CHIP_GAP = 8;
 
 function DaySelectorStrip({
   plan,
@@ -75,40 +146,56 @@ function DaySelectorStrip({
   onSelectDay: (dayNum: number) => void;
 }) {
   const scrollRef = useRef<ScrollView>(null);
-  const planStartDate = plan.created_at ? dayjs(tsToMs(plan.created_at)) : dayjs();
+  const planStartDate = dayjs(getScheduleStartMs(plan));
   const dayNumbers = useMemo(() => Array.from({ length: plan.duration }, (_, i) => i + 1), [plan.duration]);
 
   useEffect(() => {
     const idx = Math.max(0, selectedDay - 1);
-    scrollRef.current?.scrollTo({ x: Math.max(0, idx * 56 - 80), animated: true });
+    scrollRef.current?.scrollTo({ x: Math.max(0, idx * (DAY_CHIP_WIDTH + DAY_CHIP_GAP) - 80), animated: true });
   }, [selectedDay]);
 
   return (
-    <View style={{ marginBottom: 14 }}>
-      <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 13, marginBottom: 10, paddingHorizontal: 22 }}>
-        Plan days
-      </Text>
-      <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 22, gap: 8, paddingBottom: 4 }}>
+    <View style={{ marginBottom: 8 }}>
+      <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 22, gap: DAY_CHIP_GAP, paddingBottom: 2 }}>
         {dayNumbers.map((dayNum) => {
           const dayData = plan.days.find((d) => d.day === dayNum);
           const isCalendarToday = dayNum === calendarTodayDay;
           const isSelected = dayNum === selectedDay;
           const isDone = dayData?.completed ?? false;
           const dayDate = planStartDate.add(dayNum - 1, 'day');
-          const dayName = dayDate.format('ddd').substring(0, 3);
+          const dayName = dayDate.format('ddd').substring(0, 3).toUpperCase();
           return (
             <Pressable
               key={dayNum}
               onPress={() => { onSelectDay(dayNum); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
               style={{
-                minWidth: 52, paddingVertical: 10, paddingHorizontal: 10, borderRadius: 14, alignItems: 'center',
-                backgroundColor: isSelected ? THEME_COLORS.goldDim : THEME_COLORS.bg3,
-                borderWidth: 2,
-                borderColor: isSelected ? THEME_COLORS.gold : isCalendarToday ? THEME_COLORS.goldBorder : isDone ? THEME_COLORS.goldBorder : THEME_COLORS.border,
+                width: DAY_CHIP_WIDTH,
+                paddingTop: 10,
+                paddingBottom: 8,
+                paddingHorizontal: 6,
+                borderRadius: 14,
+                alignItems: 'center',
+                backgroundColor: isSelected ? THEME_COLORS.goldDim : THEME_COLORS.bg2,
+                borderWidth: 1,
+                borderColor: isSelected ? THEME_COLORS.gold : isCalendarToday ? THEME_COLORS.goldBorder : THEME_COLORS.border,
               }}
             >
-              <Text style={{ color: THEME_COLORS.text3, fontSize: 9, ...iosFontStyle('500'), textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>{dayName}</Text>
-              <Text style={{ color: isSelected || isCalendarToday ? THEME_COLORS.gold : THEME_COLORS.text2, ...iosFontStyle('700'), fontSize: 16 }}>{dayNum}</Text>
+              <Text
+                style={{
+                  position: 'absolute',
+                  top: 5,
+                  right: 6,
+                  ...TYPE.caption2,
+                  fontSize: 9,
+                  color: isSelected || isCalendarToday ? THEME_COLORS.gold : THEME_COLORS.text3,
+                }}
+              >
+                {dayNum}
+              </Text>
+              <Text style={{ color: THEME_COLORS.text3, fontSize: 10, ...iosFontStyle('600'), textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 }}>{dayName}</Text>
+              <Text style={{ color: isSelected || isCalendarToday ? THEME_COLORS.gold : THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 18, marginTop: 2 }}>
+                {dayDate.format('D')}
+              </Text>
               <View style={{ width: 5, height: 5, borderRadius: 2.5, marginTop: 5, backgroundColor: isDone ? THEME_COLORS.sage : isCalendarToday ? THEME_COLORS.gold : THEME_COLORS.border }} />
             </Pressable>
           );
@@ -118,13 +205,14 @@ function DaySelectorStrip({
   );
 }
 
-// ─── Day Card (enhanced with journal, share, reading mode) ───────────────────
+// ─── Today's reading (verse-first, editorial) ────────────────────────────────
 
-function DayCard({
+function TodayReading({
   day,
   isCalendarToday,
   showCheckIn,
   planId,
+  dayDateLabel,
   onCheckIn,
   listenLabel,
   onListen,
@@ -136,6 +224,7 @@ function DayCard({
   /** This day is the server's current check-in step (Mark complete). */
   showCheckIn: boolean;
   planId: string;
+  dayDateLabel: string;
   onCheckIn: () => void;
   listenLabel: string;
   onListen: () => void;
@@ -171,79 +260,66 @@ function DayCard({
   }
 
   return (
-    <View style={{
-      backgroundColor: isCalendarToday ? '#f5edd8' : THEME_COLORS.bg2,
-      borderWidth: 1, borderColor: isCalendarToday ? THEME_COLORS.goldBorder : THEME_COLORS.border,
-      borderRadius: 20, padding: 20, marginBottom: 14,
-    }}>
-      {/* Header row */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+    <Animated.View entering={FadeIn.duration(320)}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <View style={{
-            width: 28, height: 28, borderRadius: 14,
-            backgroundColor: day.completed ? THEME_COLORS.gold : THEME_COLORS.bg3,
-            alignItems: 'center', justifyContent: 'center',
-            borderWidth: 1, borderColor: day.completed ? THEME_COLORS.goldBorder : THEME_COLORS.border,
-          }}>
-            {day.completed
-              ? <Icon name="cross" size={12} color="#ffffff" />
-              : <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('700'), fontSize: 11 }}>{day.day}</Text>
-            }
-          </View>
-          {isCalendarToday && (
-            <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: THEME_COLORS.goldDim, borderWidth: 1, borderColor: THEME_COLORS.goldBorder }}>
-              <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600'), fontSize: 10 }}>Today</Text>
-            </View>
+          {isCalendarToday ? (
+            <GlassPill tone="gold" radius={999} style={{ paddingHorizontal: 10, paddingVertical: 5 }}>
+              <Text style={{ ...TYPE.capsLabel, color: THEME_COLORS.gold }}>Today</Text>
+            </GlassPill>
+          ) : (
+            <Text style={{ ...TYPE.capsLabel, color: THEME_COLORS.text3 }}>Day {day.day}</Text>
           )}
+          <Text style={{ ...TYPE.footnote, color: THEME_COLORS.text3 }}>{dayDateLabel}</Text>
         </View>
         {day.completed && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Icon name="cross" size={12} color={THEME_COLORS.sage} />
-            <Text style={{ color: THEME_COLORS.sage, ...iosFontStyle('500'), fontSize: 11 }}>Complete</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <Icon name="cross" size={11} color={THEME_COLORS.sage} />
+            <Text style={{ ...TYPE.caption1, color: THEME_COLORS.sage, fontWeight: '600', fontFamily: iosFont('600') }}>Complete</Text>
           </View>
         )}
       </View>
 
-      <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 17, marginBottom: 10 }}>{day.title}</Text>
+      <Text style={{ ...TYPE.title2, color: THEME_COLORS.text, marginBottom: 22 }}>{day.title}</Text>
 
-      {/* Scripture */}
-      <View style={{ backgroundColor: THEME_COLORS.goldDim2, borderWidth: 1, borderColor: THEME_COLORS.goldBorder, borderRadius: 14, padding: 14, marginBottom: 12 }}>
-        <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('400'), fontSize: 14, lineHeight: 22, fontStyle: 'italic', marginBottom: 6 }}>
+      <View style={{ borderLeftWidth: 2, borderLeftColor: THEME_COLORS.gold, paddingLeft: 16, marginBottom: 28 }}>
+        <Text
+          style={{
+            ...iosFontStyleItalic('400'),
+            fontSize: 24,
+            lineHeight: 34,
+            letterSpacing: -0.4,
+            color: THEME_COLORS.text,
+          }}
+        >
           &ldquo;{day.scripture}&rdquo;
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600'), fontSize: 11, letterSpacing: 0.5 }}>
-            &mdash; {day.scripture_reference}
-          </Text>
-          <Pressable
-            onPress={() => { Share.share({ message: `\u201c${day.scripture}\u201d\n\u2014 ${day.scripture_reference}\n\nDivine Bridge` }).catch(() => null); }}
-            hitSlop={8}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2, paddingHorizontal: 6, borderRadius: 8, backgroundColor: THEME_COLORS.goldDim }}
-          >
-            <Icon name="share" size={10} color={THEME_COLORS.gold} />
-            <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('500'), fontSize: 10 }}>Share verse</Text>
-          </Pressable>
+        <Text style={{ ...TYPE.capsLabel, color: THEME_COLORS.gold, marginTop: 16, letterSpacing: 1.4, fontSize: 12 }}>
+          — {day.scripture_reference}
+        </Text>
+      </View>
+
+      <Text style={{ ...TYPE.capsLabel, color: THEME_COLORS.text3, marginBottom: 10 }}>Reflection</Text>
+      <Text style={{ ...TYPE.body, color: THEME_COLORS.text2, lineHeight: 26, marginBottom: 24 }}>
+        {day.reflection}
+      </Text>
+
+      <Text style={{ ...TYPE.capsLabel, color: THEME_COLORS.text3, marginBottom: 10 }}>Prayer</Text>
+      <GlassCard tone="sage" intensity="card" radius={18} style={{ padding: 16, marginBottom: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+          <Icon name="pray" size={15} color={THEME_COLORS.sage} style={{ marginTop: 3 }} />
+          <Text style={{ flex: 1, ...TYPE.body, color: THEME_COLORS.text, lineHeight: 26 }}>{day.prayer}</Text>
         </View>
-      </View>
+      </GlassCard>
 
-      {/* Reflection */}
-      <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('400'), fontSize: 14, lineHeight: 22, marginBottom: 12 }}>{day.reflection}</Text>
-
-      {/* Prayer */}
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-        <Icon name="pray" size={14} color={THEME_COLORS.gold} style={{ marginTop: 3 }} />
-        <Text style={{ flex: 1, color: THEME_COLORS.text, ...iosFontStyle('400'), fontSize: 14, lineHeight: 22 }}>{day.prayer}</Text>
-      </View>
-
-      {/* Journal */}
       <Pressable
         onPress={() => setJournalOpen((v) => !v)}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, paddingVertical: 6 }}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingVertical: 8 }}
       >
         <Icon name="edit" size={13} color={THEME_COLORS.gold} />
-        <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600'), fontSize: 13, flex: 1 }}>My Reflections</Text>
-        {saveStatus === 'saving' && <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 11 }}>Saving...</Text>}
-        {saveStatus === 'saved' && <Text style={{ color: THEME_COLORS.sage, ...iosFontStyle('400'), fontSize: 11 }}>Saved</Text>}
+        <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600'), fontSize: 14, flex: 1 }}>My Reflections</Text>
+        {saveStatus === 'saving' && <Text style={{ ...TYPE.caption1, color: THEME_COLORS.text3 }}>Saving...</Text>}
+        {saveStatus === 'saved' && <Text style={{ ...TYPE.caption1, color: THEME_COLORS.sage }}>Saved</Text>}
         <Icon name={journalOpen ? 'chevron-d' : 'chevron-r'} size={12} color={THEME_COLORS.text3} />
       </Pressable>
       {journalOpen && (
@@ -255,50 +331,58 @@ function DayCard({
           multiline
           textAlignVertical="top"
           style={{
-            backgroundColor: THEME_COLORS.bg3, borderRadius: 12, borderWidth: 1, borderColor: THEME_COLORS.border,
-            color: THEME_COLORS.text, ...iosFontStyle('400'), fontSize: 14, lineHeight: 22,
-            paddingHorizontal: 14, paddingVertical: 12, marginTop: 8, minHeight: 100,
+            backgroundColor: THEME_COLORS.bg2,
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: THEME_COLORS.border,
+            color: THEME_COLORS.text,
+            ...TYPE.body,
+            lineHeight: 24,
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+            marginTop: 4,
+            minHeight: 110,
           }}
         />
       )}
 
-      {/* Action buttons */}
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: 18 }}>
         <Pressable
           onPress={onListen}
           style={{
             flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-            paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: THEME_COLORS.goldBorder, backgroundColor: THEME_COLORS.goldDim,
+            paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: THEME_COLORS.goldBorder, backgroundColor: THEME_COLORS.goldDim,
           }}
         >
-          <Icon name="audio" size={13} color={THEME_COLORS.gold} />
-          <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600'), fontSize: 12 }}>{listenLabel}</Text>
+          <Icon name="audio" size={14} color={THEME_COLORS.gold} />
+          <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600'), fontSize: 13 }}>{listenLabel}</Text>
         </Pressable>
         <Pressable
           onPress={handleShare}
           style={{
             flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-            paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: THEME_COLORS.border, backgroundColor: THEME_COLORS.bg3,
+            paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: THEME_COLORS.border, backgroundColor: THEME_COLORS.bg2,
           }}
         >
-          <Icon name="share" size={13} color={THEME_COLORS.text2} />
-          <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('600'), fontSize: 12 }}>Share</Text>
+          <Icon name="share" size={14} color={THEME_COLORS.text2} />
+          <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('600'), fontSize: 13 }}>Share</Text>
         </Pressable>
         <Pressable
           onPress={onOpenReading}
+          accessibilityLabel="Open reading mode"
           style={{
-            width: 44, alignItems: 'center', justifyContent: 'center',
-            paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: THEME_COLORS.border, backgroundColor: THEME_COLORS.bg3,
+            width: 48, alignItems: 'center', justifyContent: 'center',
+            paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: THEME_COLORS.border, backgroundColor: THEME_COLORS.bg2,
           }}
         >
-          <Icon name="book" size={15} color={THEME_COLORS.text2} />
+          <Icon name="book" size={16} color={THEME_COLORS.text2} />
         </Pressable>
       </View>
 
       {showCheckIn && !day.completed && (
-        <Button label="Mark as Complete" onPress={onCheckIn} style={{ marginTop: 16 }} size="sm" />
+        <Button label="Mark as Complete" onPress={onCheckIn} style={{ marginTop: 18 }} size="md" fullWidth />
       )}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -415,14 +499,8 @@ function PlansHub({ plans, onSelect, onCreateNew, reminderOn, onToggleReminder }
   const insets = useSafeAreaInsets();
 
   const sorted = useMemo(() => {
-    const incomplete = plans.filter((p) => {
-      const done = p.days.filter((d) => d.completed).length;
-      return p.status === 'active' || (!p.completed_at && done < p.duration);
-    });
-    const completed = plans.filter((p) => {
-      const done = p.days.filter((d) => d.completed).length;
-      return p.status !== 'active' && (!!p.completed_at || done >= p.duration);
-    });
+    const incomplete = plans.filter(isPlanActive);
+    const completed = plans.filter((p) => !isPlanActive(p));
     return [...incomplete, ...completed];
   }, [plans]);
 
@@ -625,9 +703,11 @@ export default function DevotionalScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refresh, setRefresh] = useState(0);
 
-  // Navigation: null = plans hub, plan = detail view, 'generate' = create flow
+  // Navigation: null = hub (or auto-open today), plan = reading view
   const [viewingPlan, setViewingPlan] = useState<DevotionalPlan | null>(null);
   const [showGenerateFlow, setShowGenerateFlow] = useState(false);
+  const [hubExplicit, setHubExplicit] = useState(false);
+  const [preferLatest, setPreferLatest] = useState(true);
 
   const [selectedDay, setSelectedDay] = useState(1);
   const [readingDay, setReadingDay] = useState<DevotionalDay | null>(null);
@@ -640,8 +720,15 @@ export default function DevotionalScreen() {
 
   const prevCompletedAtRef = useRef<number | undefined>(undefined);
   const pagerRef = useRef<FlatList>(null);
+  const latestActiveRef = useRef<DevotionalPlan | null>(null);
+  const selectedFromPagerRef = useRef(false);
+  const prevScheduleStartRef = useRef(0);
 
   const { toggle: speechToggle, stop: stopSpeech, isSpeaking, activeSource } = useSpeechPlayback();
+
+  const latestActivePlan = useMemo(() => pickLatestActivePlan(allPlans), [allPlans]);
+  const activePlanCount = useMemo(() => allPlans.filter(isPlanActive).length, [allPlans]);
+  latestActiveRef.current = latestActivePlan;
 
   // Keep viewingPlan in sync with Firestore updates
   const plan = useMemo(() => {
@@ -649,12 +736,29 @@ export default function DevotionalScreen() {
     return allPlans.find((p) => p.plan_id === viewingPlan.plan_id) ?? viewingPlan;
   }, [viewingPlan, allPlans]);
 
+  // Opening the tab lands on today's reading for the newest active plan.
+  // Staying on the hub after tapping "Plans" is allowed until the user leaves the tab.
   useFocusEffect(
     useCallback(() => {
-      if (plan) setSelectedDay(getCalendarTodayPlanDay(plan));
+      setHubExplicit(false);
+      setPreferLatest(true);
+      const active = latestActiveRef.current;
+      if (active) {
+        setViewingPlan(active);
+        setSelectedDay(getLandingPlanDay(active));
+      }
       return () => stopSpeech();
-    }, [plan?.plan_id, plan?.duration, plan?.created_at, stopSpeech])
+    }, [stopSpeech])
   );
+
+  useEffect(() => {
+    if (isLoading || hubExplicit || showGenerateFlow || !latestActivePlan) return;
+    if (!viewingPlan || (preferLatest && viewingPlan.plan_id !== latestActivePlan.plan_id)) {
+      setViewingPlan(latestActivePlan);
+      setSelectedDay(getLandingPlanDay(latestActivePlan));
+      setPreferLatest(false);
+    }
+  }, [isLoading, hubExplicit, showGenerateFlow, viewingPlan, latestActivePlan, preferLatest]);
 
   // Firestore subscription — all user plans, cached locally
   useEffect(() => {
@@ -701,6 +805,12 @@ export default function DevotionalScreen() {
     try {
       await devotionalApi.checkIn(plan.plan_id, dayNumber);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const calendarToday = getCalendarTodayPlanDay(plan);
+      // Stay on today's reading after a same-day check-in. Advance only when
+      // catching up or reading ahead so a binge can continue.
+      if (dayNumber !== calendarToday && dayNumber < plan.duration) {
+        setSelectedDay(dayNumber + 1);
+      }
     } catch (err: any) {
       Alert.alert('Check-in failed', err.message ?? 'Please try again');
     }
@@ -710,7 +820,7 @@ export default function DevotionalScreen() {
     if (!plan) return;
     Alert.alert(
       'Restart this plan?',
-      'This will reactivate the plan and begin its calendar schedule again today. Your completed days, reflections, and streak will stay unchanged.',
+      'This starts the plan again from today as Day 1. Completion checkmarks and streak reset. Your written reflections stay.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -720,6 +830,7 @@ export default function DevotionalScreen() {
               await devotionalApi.restart(plan.plan_id);
               setSelectedDay(1);
               setShowCelebration(false);
+              prevCompletedAtRef.current = undefined;
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } catch (err: any) {
               Alert.alert('Could not restart plan', err.message ?? 'Please try again');
@@ -745,30 +856,54 @@ export default function DevotionalScreen() {
   }
 
   function openPlan(p: DevotionalPlan) {
+    setHubExplicit(false);
+    setPreferLatest(false);
     setViewingPlan(p);
-    setSelectedDay(getCalendarTodayPlanDay(p));
+    setSelectedDay(getLandingPlanDay(p));
     prevCompletedAtRef.current = p.completed_at ? tsToMs(p.completed_at) : undefined;
   }
 
-  // Sync pager when selectedDay changes from strip tap
-  useEffect(() => {
-    if (plan) {
-      const idx = Math.max(0, selectedDay - 1);
-      pagerRef.current?.scrollToIndex({ index: idx, animated: true });
-    }
-  }, [selectedDay, plan?.plan_id]);
+  function openPlansHub() {
+    setHubExplicit(true);
+    setViewingPlan(null);
+    stopSpeech();
+  }
 
   const dayPagerData = useMemo(() => plan?.days.slice().sort((a, b) => a.day - b.day) ?? [], [plan?.days]);
 
   const calendarTodayPlanDay = useMemo(() => (plan ? getCalendarTodayPlanDay(plan) : 1), [plan]);
+  const scheduleStartMs = plan ? getScheduleStartMs(plan) : 0;
+
+  // Restart (or a new schedule start) should snap the carousel to the new landing day.
+  useEffect(() => {
+    if (!plan) return;
+    if (prevScheduleStartRef.current && prevScheduleStartRef.current !== scheduleStartMs) {
+      setSelectedDay(getLandingPlanDay(plan));
+    }
+    prevScheduleStartRef.current = scheduleStartMs;
+  }, [plan, scheduleStartMs]);
+
+  // Sync pager when selectedDay changes from strip / landing — not from a swipe.
+  useEffect(() => {
+    if (!plan) return;
+    if (selectedFromPagerRef.current) {
+      selectedFromPagerRef.current = false;
+      return;
+    }
+    const idx = Math.max(0, selectedDay - 1);
+    requestAnimationFrame(() => {
+      pagerRef.current?.scrollToIndex({ index: idx, animated: true });
+    });
+  }, [selectedDay, plan?.plan_id]);
 
   const renderDayPage = useCallback(({ item: day }: { item: DevotionalDay }) => (
     <ScrollView style={{ width: screenWidth }} contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: insets.bottom + 80 }} showsVerticalScrollIndicator={false}>
-      <DayCard
+      <TodayReading
         day={day}
         isCalendarToday={day.day === calendarTodayPlanDay}
-        showCheckIn={day.day === (plan?.current_day ?? 1)}
+        showCheckIn={!day.completed}
         planId={plan?.plan_id ?? ''}
+        dayDateLabel={plan ? planDayDate(plan, day.day).format('dddd, MMMM D') : ''}
         onCheckIn={() => handleCheckIn(day.day)}
         listenLabel={activeSource === `day-${day.day}` && isSpeaking ? 'Stop' : 'Listen'}
         onListen={() => handleListenDay(day)}
@@ -781,8 +916,17 @@ export default function DevotionalScreen() {
 
   const onPagerScroll = useCallback((e: { nativeEvent: { contentOffset: { x: number } } }) => {
     const page = Math.round(e.nativeEvent.contentOffset.x / screenWidth) + 1;
-    if (page >= 1 && page !== selectedDay) setSelectedDay(page);
+    if (page >= 1 && page !== selectedDay) {
+      selectedFromPagerRef.current = true;
+      setSelectedDay(page);
+    }
   }, [screenWidth, selectedDay]);
+
+  const onScrollToIndexFailed = useCallback((info: { index: number }) => {
+    setTimeout(() => {
+      pagerRef.current?.scrollToIndex({ index: info.index, animated: false });
+    }, 80);
+  }, []);
 
   // ─── Render states ─────────────────────────────────────────────────────────
 
@@ -808,14 +952,20 @@ export default function DevotionalScreen() {
           </Pressable>
         </View>
         <GeneratePlanScreen
-          onGenerated={() => { setRefresh((v) => v + 1); setShowGenerateFlow(false); }}
+          onGenerated={() => {
+            setRefresh((v) => v + 1);
+            setShowGenerateFlow(false);
+            setHubExplicit(false);
+            setPreferLatest(true);
+            setViewingPlan(null);
+          }}
           onDismiss={exitGenerate}
         />
       </View>
     );
   }
 
-  // Plans hub (default landing)
+  // Plans hub — only when there is no active plan, or the user opened it
   if (!viewingPlan) {
     // If no plans at all, show generate screen directly
     if (allPlans.length === 0) {
@@ -845,40 +995,46 @@ export default function DevotionalScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}>
-      {/* Header with back button */}
-      <View style={{ paddingTop: insets.top + 12, paddingHorizontal: 22, paddingBottom: 12 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+      <View style={{ paddingTop: insets.top + 10, paddingHorizontal: 22, paddingBottom: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
           <Pressable
-            onPress={() => { setViewingPlan(null); stopSpeech(); }}
-            style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: THEME_COLORS.bg3, borderWidth: 1, borderColor: THEME_COLORS.border, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}
+            onPress={openPlansHub}
+            accessibilityRole="button"
+            accessibilityLabel="My plans"
+            style={{ paddingVertical: 8, paddingRight: 12 }}
           >
-            <Icon name="back" size={16} color={THEME_COLORS.text2} />
+            <Text style={{ ...TYPE.headline, color: THEME_COLORS.gold, fontSize: 15 }}>Plans</Text>
           </Pressable>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 18, letterSpacing: -0.3 }} numberOfLines={1}>{plan.title || plan.theme}</Text>
-            <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 1 }}>{plan.theme}</Text>
-          </View>
-          <View style={{ alignItems: 'center', backgroundColor: THEME_COLORS.goldDim, borderWidth: 1, borderColor: THEME_COLORS.goldBorder, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-              <Icon name="flame" size={14} color={THEME_COLORS.gold} />
-              <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('700'), fontSize: 16 }}>{plan.streak}</Text>
+          <Pressable
+            onPress={activePlanCount > 1 ? openPlansHub : undefined}
+            style={{ flex: 1, paddingRight: 8 }}
+            accessibilityRole={activePlanCount > 1 ? 'button' : undefined}
+            accessibilityLabel={activePlanCount > 1 ? 'Switch plan' : undefined}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={{ ...TYPE.headline, color: THEME_COLORS.text, flexShrink: 1 }} numberOfLines={1}>
+                {plan.title || plan.theme}
+              </Text>
+              {activePlanCount > 1 && <Icon name="chevron-d" size={12} color={THEME_COLORS.text3} />}
             </View>
-            <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 9 }}>streak</Text>
-          </View>
+            <Text style={{ ...TYPE.caption1, color: THEME_COLORS.text3, marginTop: 2 }}>
+              Day {plan.current_day || calendarTodayPlanDay} of {plan.duration}
+              {activePlanCount > 1 ? ` · ${activePlanCount} plans` : ''}
+            </Text>
+          </Pressable>
+          <GlassPill tone="gold" radius={12} style={{ paddingHorizontal: 10, paddingVertical: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Icon name="flame" size={13} color={THEME_COLORS.gold} />
+              <Text style={{ ...TYPE.headline, color: THEME_COLORS.gold, fontSize: 15 }}>{plan.streak}</Text>
+            </View>
+          </GlassPill>
         </View>
 
-        {/* Progress bar */}
-        <View style={{ height: 4, backgroundColor: THEME_COLORS.bg3, borderRadius: 2, overflow: 'hidden', marginBottom: 6 }}>
-          <View style={{ height: 4, borderRadius: 2, backgroundColor: THEME_COLORS.gold, width: `${progressPct}%` }} />
+        <View style={{ height: 3, backgroundColor: THEME_COLORS.bg3, borderRadius: 2, overflow: 'hidden' }}>
+          <View style={{ height: 3, borderRadius: 2, backgroundColor: THEME_COLORS.gold, width: `${progressPct}%` }} />
         </View>
-        <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12 }}>
-          Day {plan.current_day} of {plan.duration} · {completedDayCount}/{plan.duration} done ({progressPct}%)
-        </Text>
-        <Pressable
-          onPress={handleRestartPlan}
-          style={{ alignSelf: 'flex-start', marginTop: 12, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: THEME_COLORS.border, backgroundColor: THEME_COLORS.bg3 }}
-        >
-          <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('600'), fontSize: 12 }}>Restart Plan</Text>
+        <Pressable onPress={handleRestartPlan} hitSlop={8} style={{ alignSelf: 'flex-end', marginTop: 6 }}>
+          <Text style={{ ...TYPE.caption1, color: THEME_COLORS.text3 }}>Restart schedule</Text>
         </Pressable>
       </View>
 
@@ -897,7 +1053,7 @@ export default function DevotionalScreen() {
         >
           <Icon name="book" size={14} color={THEME_COLORS.gold} />
           <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('500'), fontSize: 13 }}>
-            Viewing day {selectedDay} ·{' '}
+            {selectedDay < calendarTodayPlanDay ? 'Catching up' : `Viewing day ${selectedDay}`} ·{' '}
             <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600') }}>Go to today (day {calendarTodayPlanDay})</Text>
           </Text>
         </Pressable>
@@ -916,6 +1072,7 @@ export default function DevotionalScreen() {
         getItemLayout={getItemLayout}
         initialScrollIndex={Math.max(0, selectedDay - 1)}
         onMomentumScrollEnd={onPagerScroll}
+        onScrollToIndexFailed={onScrollToIndexFailed}
         style={{ flex: 1 }}
       />
 
@@ -924,7 +1081,7 @@ export default function DevotionalScreen() {
       {showCelebration && (
         <CompletionCelebration
           plan={plan}
-          onNewPlan={() => { setShowCelebration(false); setViewingPlan(null); setShowGenerateFlow(true); }}
+          onNewPlan={() => { setShowCelebration(false); setHubExplicit(false); setViewingPlan(null); setShowGenerateFlow(true); }}
           onDismiss={() => setShowCelebration(false)}
         />
       )}
