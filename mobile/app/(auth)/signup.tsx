@@ -67,8 +67,8 @@ export default function SignupScreen() {
           height: 300,
           borderRadius: 150,
           backgroundColor: THEME_COLORS.goldDim,
+          pointerEvents: 'none',
         }}
-        pointerEvents="none"
       />
 
       <ScrollView

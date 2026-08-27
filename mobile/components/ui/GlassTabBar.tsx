@@ -30,10 +30,10 @@ export function GlassTabBar() {
       {/* Thin cream tint over the blur — just enough to keep icons legible
           on top of scrolling content without smothering the blur. */}
       <View
-        pointerEvents="none"
         style={{
           position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
           backgroundColor: 'rgba(250,246,239,0.28)',
+          pointerEvents: 'none',
         }}
       />
     </View>

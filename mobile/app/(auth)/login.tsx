@@ -73,8 +73,8 @@ export default function LoginScreen() {
           height: 300,
           borderRadius: 150,
           backgroundColor: THEME_COLORS.goldDim,
+          pointerEvents: 'none',
         }}
-        pointerEvents="none"
       />
 
       <ScrollView

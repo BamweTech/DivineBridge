@@ -96,8 +96,7 @@ function HomeAmbience() {
 
   return (
     <View
-      pointerEvents="none"
-      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden', pointerEvents: 'none' }}
     >
       <Animated.View
         style={[
@@ -166,7 +165,7 @@ function VerseHeroBlobs({
   }));
 
   return (
-    <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none' }}>
       <Animated.View style={[{ position: 'absolute', top: -60, right: -50, width: 220, height: 220, borderRadius: 110, backgroundColor: colors[0] }, blob1]} />
       <Animated.View style={[{ position: 'absolute', bottom: -30, left: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: colors[1] }, blob2]} />
       <Animated.View style={[{ position: 'absolute', top: '40%', right: '20%', width: 90, height: 90, borderRadius: 45, backgroundColor: colors[2] }, blob3]} />

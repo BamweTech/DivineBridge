@@ -16,6 +16,14 @@ import { iosFontStyle } from '@/lib/typography';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
+function glowShadow(hex: string, opacity: number, y: number, blur: number): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `0px ${y}px ${blur}px rgba(${r},${g},${b},${opacity})`;
+}
+
 const SLIDES = [
   {
     key: 'pray',
@@ -63,7 +71,7 @@ function Slide({ item }: { item: typeof SLIDES[number] }) {
             backgroundColor: item.bgHint,
             borderWidth: 1.5, borderColor: item.iconColor + '44',
             alignItems: 'center', justifyContent: 'center',
-            shadowColor: item.iconColor, shadowOpacity: 0.2, shadowRadius: 24, shadowOffset: { width: 0, height: 8 },
+            boxShadow: glowShadow(item.iconColor, 0.2, 8, 24),
           }}>
             <Icon name={item.icon} size={44} color={item.iconColor} strokeWidth={1.5} />
           </View>
@@ -169,7 +177,7 @@ export default function OnboardingScreen() {
             alignItems: 'center', justifyContent: 'center',
             opacity: pressed ? 0.88 : 1,
             marginBottom: 12,
-            shadowColor: activeSlide.iconColor, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+            boxShadow: glowShadow(activeSlide.iconColor, 0.28, 4, 12),
           })}
         >
           <Text style={{ color: '#ffffff', ...iosFontStyle('700'), fontSize: 16, letterSpacing: 0.2 }}>

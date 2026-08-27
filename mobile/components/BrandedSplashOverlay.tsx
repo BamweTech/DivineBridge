@@ -85,7 +85,7 @@ export default function BrandedSplashOverlay({ onFinish }: Props) {
   }));
 
   return (
-    <View style={styles.root} pointerEvents="auto">
+    <View style={[styles.root, { pointerEvents: 'auto' }]}>
       <View style={styles.centerSlot}>
         <Animated.View style={rowStyle}>
           <Animated.View style={logoInnerStyle}>
