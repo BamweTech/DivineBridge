@@ -8,14 +8,11 @@ import {
   ActivityIndicator,
   Linking,
   Platform,
+  LogBox,
 } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
-
-// Persisted Expo token auto-upload warns on launch when the iOS binary
-// has no aps-environment entitlement. We register explicitly in usePushToken.
-Notifications.setAutoServerRegistrationEnabledAsync(false).catch(() => {});
 import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
@@ -63,6 +60,18 @@ import { THEME_COLORS } from '@/lib/constants';
 import { iosFontStyle } from '@/lib/typography';
 import Icon from '@/components/ui/Icon';
 import BrandedSplashOverlay from '@/components/BrandedSplashOverlay';
+
+if (__DEV__) {
+  // expo-av still powers voice notes and in-chat video; migrate to
+  // expo-audio / expo-video in a dedicated change. Until then this
+  // SDK 54 deprecation only clutters LogBox on every launch.
+  LogBox.ignoreLogs(['Expo AV has been deprecated']);
+}
+
+// Persisted Expo token auto-upload warns on launch when the iOS binary
+// has no aps-environment entitlement. We register explicitly in usePushToken.
+Notifications.setAutoServerRegistrationEnabledAsync(false).catch(() => {});
+
 console.log('[DivineBridge] _layout.tsx: JS runtime started');
 
 // Sentry crash reporting and performance monitoring

@@ -1,7 +1,9 @@
+import { Platform } from 'react-native';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { initializeAuth, getAuth, type Persistence } from 'firebase/auth';
 import {
   initializeFirestore,
+  memoryLocalCache,
   persistentLocalCache,
   persistentMultipleTabManager,
 } from 'firebase/firestore';
@@ -40,11 +42,15 @@ try {
 }
 export { auth };
 
-// Firestore with persistent local cache for offline-first reads
+// IndexedDB persistence is web-only. On native it warns and falls back to
+// memory, so request memory cache directly.
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager(),
-  }),
+  localCache:
+    Platform.OS === 'web'
+      ? persistentLocalCache({
+          tabManager: persistentMultipleTabManager(),
+        })
+      : memoryLocalCache(),
 });
 
 export const storage = getStorage(app);
