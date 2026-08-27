@@ -1,4 +1,10 @@
 const IS_EAS_BUILD = process.env.EAS_BUILD === 'true';
+// Debug / Expo run:ios uses Apple's development APNs. Store and TestFlight
+// profiles (EAS production/preview) require the production environment.
+const APS_ENVIRONMENT =
+  process.env.EAS_BUILD_PROFILE === 'development' || !IS_EAS_BUILD
+    ? 'development'
+    : 'production';
 
 export default {
   expo: {
@@ -17,12 +23,15 @@ export default {
       supportsTablet: false,
       bundleIdentifier: 'io.divinebridge.app',
       googleServicesFile: process.env.GOOGLE_SERVICE_INFO_PLIST ?? './GoogleService-Info.plist',
+      entitlements: {
+        'aps-environment': APS_ENVIRONMENT,
+      },
       infoPlist: {
         NSCameraUsageDescription: 'Divine Bridge uses your camera for video prayer sessions.',
         NSMicrophoneUsageDescription: 'Divine Bridge uses your microphone for audio prayer sessions.',
         NSPhotoLibraryUsageDescription: 'Divine Bridge needs access to your photos so you can share them in group chats.',
         NSPhotoLibraryAddUsageDescription: 'Divine Bridge needs permission to save shared photos and videos to your device.',
-        UIBackgroundModes: ['audio', 'voip', 'fetch'],
+        UIBackgroundModes: ['audio', 'voip', 'fetch', 'remote-notification'],
         NSAppTransportSecurity: {
           NSAllowsArbitraryLoads: true,
           NSAllowsLocalNetworking: true,
@@ -131,6 +140,8 @@ export default {
           icon: './assets/notification-icon.png',
           color: '#F59E0B',
           sounds: [],
+          mode: APS_ENVIRONMENT,
+          enableBackgroundRemoteNotifications: true,
         },
       ],
       './plugins/withATS.js',

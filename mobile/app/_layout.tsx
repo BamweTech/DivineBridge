@@ -12,6 +12,10 @@ import {
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
+
+// Persisted Expo token auto-upload warns on launch when the iOS binary
+// has no aps-environment entitlement. We register explicitly in usePushToken.
+Notifications.setAutoServerRegistrationEnabledAsync(false).catch(() => {});
 import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
