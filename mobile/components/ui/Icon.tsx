@@ -45,6 +45,7 @@ export type IconName =
   | 'share'
   | 'download'
   | 'calendar'
+  | 'restart'
   | 'plus'
   | 'chevron-r'
   | 'chevron-d'
@@ -224,6 +225,13 @@ const Icon: React.FC<IconProps> = ({
         <Line {...s} x1="16" y1="2" x2="16" y2="6" />
         <Line {...s} x1="8" y1="2" x2="8" y2="6" />
         <Line {...s} x1="3" y1="10" x2="21" y2="10" />
+      </G>
+    ),
+
+    restart: (
+      <G>
+        <Polyline {...s} points="23 4 23 10 17 10" />
+        <Path {...s} d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
       </G>
     ),
 

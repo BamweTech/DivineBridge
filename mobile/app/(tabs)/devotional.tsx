@@ -32,8 +32,10 @@ import { devotionalApi } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GlassPill } from '@/components/ui/GlassPill';
+import { pickVerseTheme } from '@/lib/verseThemes';
 import { useAuthStore } from '@/stores/authStore';
 import Icon from '@/components/ui/Icon';
+import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 import type { DevotionalPlan, DevotionalDay } from '@/types';
 import { useSpeechPlayback } from '@/features/prayer/hooks/useSpeechPlayback';
 import { useFocusEffect } from 'expo-router';
@@ -213,6 +215,7 @@ function TodayReading({
   showCheckIn,
   planId,
   dayDateLabel,
+  dayDateIso,
   onCheckIn,
   listenLabel,
   onListen,
@@ -225,6 +228,7 @@ function TodayReading({
   showCheckIn: boolean;
   planId: string;
   dayDateLabel: string;
+  dayDateIso: string;
   onCheckIn: () => void;
   listenLabel: string;
   onListen: () => void;
@@ -259,9 +263,16 @@ function TodayReading({
     Share.share({ message: text }).catch(() => null);
   }
 
+  function handleShareVerse() {
+    Share.share({ message: `\u201c${day.scripture}\u201d\n\u2014 ${day.scripture_reference}\n\nDivine Bridge` }).catch(() => null);
+  }
+
+  const verseTheme = pickVerseTheme(day.scripture, day.scripture_reference, dayDateIso);
+  const gradientId = `devoVerse-${day.day}-${verseTheme.id}`;
+
   return (
     <Animated.View entering={FadeIn.duration(320)}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           {isCalendarToday ? (
             <GlassPill tone="gold" radius={999} style={{ paddingHorizontal: 10, paddingVertical: 5 }}>
@@ -280,23 +291,85 @@ function TodayReading({
         )}
       </View>
 
-      <Text style={{ ...TYPE.title2, color: THEME_COLORS.text, marginBottom: 22 }}>{day.title}</Text>
+      <Text style={{ ...TYPE.title2, color: THEME_COLORS.text, marginBottom: 16 }}>{day.title}</Text>
 
-      <View style={{ borderLeftWidth: 2, borderLeftColor: THEME_COLORS.gold, paddingLeft: 16, marginBottom: 28 }}>
-        <Text
-          style={{
-            ...iosFontStyleItalic('400'),
-            fontSize: 24,
-            lineHeight: 34,
-            letterSpacing: -0.4,
-            color: THEME_COLORS.text,
-          }}
+      <View
+        style={{
+          borderRadius: 28,
+          overflow: 'hidden',
+          backgroundColor: verseTheme.baseColor,
+          marginBottom: 26,
+          minHeight: 220,
+        }}
+      >
+        <Svg
+          width="100%"
+          height="100%"
+          preserveAspectRatio="none"
+          viewBox="0 0 100 100"
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
         >
-          &ldquo;{day.scripture}&rdquo;
-        </Text>
-        <Text style={{ ...TYPE.capsLabel, color: THEME_COLORS.gold, marginTop: 16, letterSpacing: 1.4, fontSize: 12 }}>
-          — {day.scripture_reference}
-        </Text>
+          <Defs>
+            <SvgLinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0" stopColor={verseTheme.gradient[0]} stopOpacity="1" />
+              <Stop offset="0.55" stopColor={verseTheme.gradient[1]} stopOpacity="1" />
+              <Stop offset="1" stopColor={verseTheme.gradient[2]} stopOpacity="1" />
+            </SvgLinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100" height="100" fill={`url(#${gradientId})`} />
+        </Svg>
+        <View pointerEvents="none" style={{ position: 'absolute', top: -36, right: -28, width: 160, height: 160, borderRadius: 80, backgroundColor: verseTheme.blobs[0] }} />
+        <View pointerEvents="none" style={{ position: 'absolute', bottom: -24, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: verseTheme.blobs[1] }} />
+        <View pointerEvents="none" style={{ position: 'absolute', top: 72, left: 40, width: 70, height: 70, borderRadius: 35, backgroundColor: verseTheme.blobs[2] }} />
+
+        <View style={{ paddingHorizontal: 22, paddingTop: 18, paddingBottom: 22 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+            <GlassPill tone={verseTheme.pillTone} radius={999} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Icon name="cross" size={10} color={verseTheme.accent} />
+                <Text style={{ ...TYPE.capsLabel, color: verseTheme.accent }}>Scripture</Text>
+              </View>
+            </GlassPill>
+            <GlassPill
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                handleShareVerse();
+              }}
+              accessibilityLabel="Share verse"
+              radius={14}
+              style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
+              hitSlop={8}
+            >
+              <View style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="share" size={14} color={THEME_COLORS.text2} />
+              </View>
+            </GlassPill>
+          </View>
+
+          <Text
+            style={{
+              fontFamily: iosFont('600'),
+              fontWeight: '600',
+              fontSize: 26,
+              lineHeight: 34,
+              letterSpacing: -0.45,
+              color: THEME_COLORS.text,
+            }}
+          >
+            &ldquo;{day.scripture}&rdquo;
+          </Text>
+          <Text
+            style={{
+              ...TYPE.capsLabel,
+              color: verseTheme.accent,
+              marginTop: 16,
+              letterSpacing: 1.4,
+              fontSize: 12,
+            }}
+          >
+            — {day.scripture_reference}
+          </Text>
+        </View>
       </View>
 
       <Text style={{ ...TYPE.capsLabel, color: THEME_COLORS.text3, marginBottom: 10 }}>Reflection</Text>
@@ -904,6 +977,7 @@ export default function DevotionalScreen() {
         showCheckIn={!day.completed}
         planId={plan?.plan_id ?? ''}
         dayDateLabel={plan ? planDayDate(plan, day.day).format('dddd, MMMM D') : ''}
+        dayDateIso={plan ? planDayDate(plan, day.day).format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD')}
         onCheckIn={() => handleCheckIn(day.day)}
         listenLabel={activeSource === `day-${day.day}` && isSpeaking ? 'Stop' : 'Listen'}
         onListen={() => handleListenDay(day)}
@@ -1022,41 +1096,50 @@ export default function DevotionalScreen() {
               {activePlanCount > 1 ? ` · ${activePlanCount} plans` : ''}
             </Text>
           </Pressable>
-          <GlassPill tone="gold" radius={12} style={{ paddingHorizontal: 10, paddingVertical: 6 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Icon name="flame" size={13} color={THEME_COLORS.gold} />
-              <Text style={{ ...TYPE.headline, color: THEME_COLORS.gold, fontSize: 15 }}>{plan.streak}</Text>
-            </View>
-          </GlassPill>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <GlassPill
+              onPress={handleRestartPlan}
+              accessibilityLabel="Restart schedule"
+              radius={12}
+              style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
+              hitSlop={8}
+            >
+              <View style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="restart" size={15} color={THEME_COLORS.text2} />
+              </View>
+            </GlassPill>
+            <GlassPill tone="gold" radius={12} style={{ paddingHorizontal: 10, paddingVertical: 6 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Icon name="flame" size={13} color={THEME_COLORS.gold} />
+                <Text style={{ ...TYPE.headline, color: THEME_COLORS.gold, fontSize: 15 }}>{plan.streak}</Text>
+              </View>
+            </GlassPill>
+          </View>
         </View>
 
         <View style={{ height: 3, backgroundColor: THEME_COLORS.bg3, borderRadius: 2, overflow: 'hidden' }}>
           <View style={{ height: 3, borderRadius: 2, backgroundColor: THEME_COLORS.gold, width: `${progressPct}%` }} />
         </View>
-        <Pressable onPress={handleRestartPlan} hitSlop={8} style={{ alignSelf: 'flex-end', marginTop: 6 }}>
-          <Text style={{ ...TYPE.caption1, color: THEME_COLORS.text3 }}>Restart schedule</Text>
-        </Pressable>
       </View>
 
       {/* Day selector strip */}
       <DaySelectorStrip plan={plan} selectedDay={selectedDay} calendarTodayDay={calendarTodayPlanDay} onSelectDay={setSelectedDay} />
 
-      {/* "Go to today" banner — calendar date for this plan */}
       {selectedDay !== calendarTodayPlanDay && (
-        <Pressable
-          onPress={() => { setSelectedDay(calendarTodayPlanDay); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-          style={{
-            flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-            paddingVertical: 10, paddingHorizontal: 14, marginHorizontal: 22, marginBottom: 8,
-            borderRadius: 14, backgroundColor: THEME_COLORS.bg3, borderWidth: 1, borderColor: THEME_COLORS.border,
-          }}
-        >
-          <Icon name="book" size={14} color={THEME_COLORS.gold} />
-          <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('500'), fontSize: 13 }}>
-            {selectedDay < calendarTodayPlanDay ? 'Catching up' : `Viewing day ${selectedDay}`} ·{' '}
-            <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600') }}>Go to today (day {calendarTodayPlanDay})</Text>
-          </Text>
-        </Pressable>
+        <View style={{ alignItems: 'center', marginBottom: 8 }}>
+          <GlassPill
+            tone="gold"
+            onPress={() => { setSelectedDay(calendarTodayPlanDay); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+            accessibilityLabel={`Go to today, day ${calendarTodayPlanDay}`}
+            radius={999}
+            style={{ paddingHorizontal: 14, paddingVertical: 7 }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Icon name="sunrise" size={13} color={THEME_COLORS.gold} />
+              <Text style={{ ...TYPE.caption1, color: THEME_COLORS.gold, fontWeight: '600', fontFamily: iosFont('600') }}>Today</Text>
+            </View>
+          </GlassPill>
+        </View>
       )}
 
       {/* Swipeable day pager */}

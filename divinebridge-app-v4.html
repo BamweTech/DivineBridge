@@ -84,6 +84,10 @@
       <line x1="8" y1="2" x2="8" y2="6"/>
       <line x1="3" y1="10" x2="21" y2="10"/>
     </symbol>
+    <symbol id="ic-restart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="23 4 23 10 17 10"/>
+      <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
+    </symbol>
     <!-- Add / plus -->
     <symbol id="ic-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
       <line x1="12" y1="5" x2="12" y2="19"/>
@@ -717,15 +721,19 @@ html, body {
 .devo-today-plan-name { font-size: 17px; font-weight: 600; color: var(--text); letter-spacing: -.1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .devo-today-plan-meta { font-size: 12px; color: var(--text3); margin-top: 2px; }
 .devo-today-streak { display: flex; align-items: center; gap: 4px; background: var(--gold-dim); border: 1px solid var(--border2); border-radius: 12px; padding: 6px 10px; color: var(--gold); font-size: 15px; font-weight: 600; }
+.devo-today-icon { width: 36px; height: 36px; border-radius: 12px; background: rgba(255,253,247,.55); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: var(--text2); }
 .devo-today-progress { height: 3px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
 .devo-today-progress > span { display: block; height: 100%; width: 40%; background: var(--gold); border-radius: 2px; }
 .devo-read { padding: 8px 22px 20px; }
 .devo-read-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .devo-read-date { font-size: 13px; color: var(--text3); }
-.devo-read-title { font-size: 22px; font-weight: 700; letter-spacing: -.3px; color: var(--text); line-height: 1.25; margin-bottom: 20px; }
-.devo-verse-quote { border-left: 2px solid var(--gold); padding-left: 16px; margin-bottom: 24px; }
-.devo-verse-text { font-family: Georgia, serif; font-style: italic; font-size: 22px; line-height: 1.45; color: var(--text); letter-spacing: -.3px; }
-.devo-verse-ref { font-size: 11px; color: var(--gold); letter-spacing: 1.4px; text-transform: uppercase; margin-top: 14px; font-weight: 600; }
+.devo-read-title { font-size: 22px; font-weight: 700; letter-spacing: -.3px; color: var(--text); line-height: 1.25; margin-bottom: 16px; }
+.devo-verse-card { position: relative; overflow: hidden; border-radius: 28px; padding: 18px 22px 22px; margin-bottom: 24px; min-height: 200px; background: linear-gradient(135deg,#eef5f0 0%,#bbd4c7 55%,#7fa893 100%); }
+.devo-verse-card::before { content: ''; position: absolute; top: -36px; right: -28px; width: 160px; height: 160px; border-radius: 50%; background: rgba(127,168,147,.3); }
+.devo-verse-card::after { content: ''; position: absolute; bottom: -24px; left: -20px; width: 120px; height: 120px; border-radius: 50%; background: rgba(42,79,61,.16); }
+.devo-verse-top { position: relative; z-index: 1; display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+.devo-verse-text { position: relative; z-index: 1; font-size: 22px; font-weight: 600; line-height: 1.35; letter-spacing: -.4px; color: var(--text); }
+.devo-verse-ref { position: relative; z-index: 1; font-size: 11px; color: #2a4f3d; letter-spacing: 1.4px; text-transform: uppercase; margin-top: 16px; font-weight: 600; }
 .devo-section-label { font-size: 11px; color: var(--text3); letter-spacing: .6px; text-transform: uppercase; font-weight: 600; margin-bottom: 10px; }
 .devo-reflection { font-size: 16px; line-height: 1.6; color: var(--text2); margin-bottom: 22px; }
 .devo-prayer-card { background: rgba(232,242,236,.55); border: 1px solid rgba(74,124,94,.18); border-radius: 18px; padding: 16px; display: flex; gap: 10px; margin-bottom: 16px; color: var(--text); font-size: 16px; line-height: 1.6; }
@@ -1340,6 +1348,7 @@ html, body {
               <div class="devo-today-plan-name">Trusting God Through Uncertainty</div>
               <div class="devo-today-plan-meta">Day 12 of 30 · 2 plans</div>
             </div>
+            <div class="devo-today-icon"><span class="icon icon-16"><svg><use href="#ic-restart"/></svg></span></div>
             <div class="devo-today-streak"><span class="icon icon-12"><svg><use href="#ic-flame"/></svg></span> 12</div>
           </div>
           <div class="devo-today-progress"><span></span></div>
@@ -1363,7 +1372,11 @@ html, body {
             </div>
           </div>
           <div class="devo-read-title">Peace That Holds</div>
-          <div class="devo-verse-quote">
+          <div class="devo-verse-card">
+            <div class="devo-verse-top">
+              <div class="pill pill-gold" style="font-size:10px;padding:4px 12px">Scripture</div>
+              <div class="devo-today-icon" style="width:36px;height:36px"><span class="icon icon-14"><svg><use href="#ic-share"/></svg></span></div>
+            </div>
             <div class="devo-verse-text">“Peace I leave with you; my peace I give to you. I do not give to you as the world gives.”</div>
             <div class="devo-verse-ref">— John 14:27</div>
           </div>

@@ -1,4 +1,8 @@
 const IS_EAS_BUILD = process.env.EAS_BUILD === 'true';
+// Personal Apple teams cannot provision Push Notifications. Local Xcode /
+// `expo run:ios` therefore omit APNs until the organization team is ready.
+// EAS device builds, or `IOS_PUSH=1`, keep the entitlement.
+const ENABLE_IOS_PUSH = process.env.IOS_PUSH === '1' || IS_EAS_BUILD;
 // Debug / Expo run:ios uses Apple's development APNs. Store and TestFlight
 // profiles (EAS production/preview) require the production environment.
 const APS_ENVIRONMENT =
@@ -23,15 +27,17 @@ export default {
       supportsTablet: false,
       bundleIdentifier: 'io.divinebridge.app',
       googleServicesFile: process.env.GOOGLE_SERVICE_INFO_PLIST ?? './GoogleService-Info.plist',
-      entitlements: {
-        'aps-environment': APS_ENVIRONMENT,
-      },
+      entitlements: ENABLE_IOS_PUSH
+        ? { 'aps-environment': APS_ENVIRONMENT }
+        : {},
       infoPlist: {
         NSCameraUsageDescription: 'Divine Bridge uses your camera for video prayer sessions.',
         NSMicrophoneUsageDescription: 'Divine Bridge uses your microphone for audio prayer sessions.',
         NSPhotoLibraryUsageDescription: 'Divine Bridge needs access to your photos so you can share them in group chats.',
         NSPhotoLibraryAddUsageDescription: 'Divine Bridge needs permission to save shared photos and videos to your device.',
-        UIBackgroundModes: ['audio', 'voip', 'fetch', 'remote-notification'],
+        UIBackgroundModes: ENABLE_IOS_PUSH
+          ? ['audio', 'voip', 'fetch', 'remote-notification']
+          : ['audio', 'voip', 'fetch'],
         NSAppTransportSecurity: {
           NSAllowsArbitraryLoads: true,
           NSAllowsLocalNetworking: true,
@@ -140,11 +146,13 @@ export default {
           icon: './assets/notification-icon.png',
           color: '#F59E0B',
           sounds: [],
-          mode: APS_ENVIRONMENT,
-          enableBackgroundRemoteNotifications: true,
+          ...(ENABLE_IOS_PUSH
+            ? { mode: APS_ENVIRONMENT, enableBackgroundRemoteNotifications: true }
+            : { enableBackgroundRemoteNotifications: false }),
         },
       ],
       './plugins/withATS.js',
+      ['./plugins/withOptionalIosPush.js', { enabled: ENABLE_IOS_PUSH }],
       '@sentry/react-native/expo',
       'expo-web-browser',
     ],
