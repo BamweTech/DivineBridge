@@ -38,6 +38,11 @@ def test_prayer_room_api_contract_endpoints_are_registered():
     assert _fixture_pairs("api-prayer-room.json") <= _registered_pairs(app)
 
 
+def test_verse_api_contract_endpoints_are_registered():
+    app = create_app()
+    assert _fixture_pairs("api-verse.json") <= _registered_pairs(app)
+
+
 def test_canonical_blueprint_package_is_backend_api():
     """Blueprints must live under backend.api — no routes/ compatibility package."""
     import backend.api as api

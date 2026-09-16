@@ -920,6 +920,38 @@ class StorageHandler:
             logger.error(f"Error retrieving verse hero image: {e}")
             return None
 
+    def save_verse_explainer_image(self, slug: str, section: str, image_data: bytes) -> bool:
+        """Save one verse-explainer share card, keyed by verse slug + section.
+
+        Cached under a separate prefix so it never collides with the
+        date-keyed hero image. Same verse on a later calendar day reuses
+        the cached card.
+        """
+        try:
+            blob_name = f"images/verse-explainer/{slug}/{section}.jpg"
+            blob = self.bucket.blob(blob_name)
+            blob.upload_from_string(image_data, content_type="image/jpeg")
+            logger.info(f"Successfully saved verse explainer image: {blob_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Error saving verse explainer image: {e}")
+            return False
+
+    def get_verse_explainer_image(self, slug: str, section: str) -> bytes:
+        """Retrieve a cached verse-explainer share card."""
+        try:
+            blob_name = f"images/verse-explainer/{slug}/{section}.jpg"
+            blob = self.bucket.blob(blob_name)
+            if blob.exists():
+                image_data = blob.download_as_bytes()
+                logger.info(f"Retrieved cached verse explainer image: {blob_name}")
+                return image_data
+            logger.debug(f"No cached verse explainer image found: {blob_name}")
+            return None
+        except Exception as e:
+            logger.error(f"Error retrieving verse explainer image: {e}")
+            return None
+
     def save_prayer_image(self, date: str, image_data: bytes) -> bool:
         """Save prayer image to Cloud Storage
 

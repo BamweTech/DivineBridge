@@ -58,6 +58,7 @@ Update the wireframe in the **same PR / task** as the UI change when any of thes
 | Devotional | `s-devo` | `(tabs)/devotional.tsx` |
 | Activity | `s-activity` | `activity.tsx` |
 | Profile | `s-profile` | `(tabs)/profile.tsx` |
+| Verse Reader | `s-verse-reader` | `verse-reader.tsx` |
 
 When adding a screen: add side-nav button, new `.phone-screen` block, CSS if needed, and fix any `onclick` / `show(..., document.querySelectorAll('.side-btn')[n])` indices.
 

@@ -325,6 +325,22 @@ class LocalStorageHandler:
         with open(file_path, "rb") as f:
             return f.read()
 
+    def save_verse_explainer_image(self, slug, section, image_data):
+        """Save one verse-explainer share card (local-dev cache)."""
+        file_path = self.images_path / f"verse_explainer_{slug}_{section}.jpg"
+        with open(file_path, "wb") as f:
+            f.write(image_data)
+        logger.info(f"Saved verse explainer image locally: {file_path}")
+        return str(file_path)
+
+    def get_verse_explainer_image(self, slug, section):
+        """Get a cached verse-explainer share card (local-dev cache)."""
+        file_path = self.images_path / f"verse_explainer_{slug}_{section}.jpg"
+        if not file_path.exists():
+            return None
+        with open(file_path, "rb") as f:
+            return f.read()
+
     def save_prayer_image(self, date_str, image_data):
         """Save a prayer image"""
         file_path = self.images_path / f"prayer_{date_str}.png"

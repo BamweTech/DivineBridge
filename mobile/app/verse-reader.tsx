@@ -18,7 +18,7 @@ import dayjs from 'dayjs';
 import { verseApi, type VerseContext, type VerseContextOriginalWord } from '@/services/api';
 import { useSpeechPlayback } from '@/features/prayer/hooks/useSpeechPlayback';
 import { useAuthStore } from '@/stores/authStore';
-import { shareServerImage } from '@/lib/shareServerImage';
+import { VerseSharePack } from '@/features/prayer/components/VerseSharePack';
 import { THEME_COLORS } from '@/lib/constants';
 import { TYPE, iosFont } from '@/lib/typography';
 import { pickVerseTheme } from '@/lib/verseThemes';
@@ -98,6 +98,7 @@ export default function VerseReaderScreen() {
   // be collapsed by a flex quirk and let the verse text slide up underneath
   // it. We measure its real height on layout and use that to pad the
   // ScrollView so the verse always starts cleanly below it.
+  const [sharePackOpen, setSharePackOpen] = useState(false);
   const [headerHeight, setHeaderHeight] = useState<number>(
     (Platform.OS === 'ios' ? Math.max(insets.top, 18) + 14 : insets.top + 16) + 40 + 24
   );
@@ -138,16 +139,11 @@ export default function VerseReaderScreen() {
     speechToggle([`Verse. ${verseText}`, `Reference: ${verseRef || 'Scripture'}`], 'verse');
   }
 
-  async function onShare() {
-    const fallback =
-      verseText && verseRef
-        ? `Today's Verse (${verseRef}):\n\n"${verseText}"\n\nDivine Bridge — divinebridge.io`
-        : `Today's verse on Divine Bridge — divinebridge.io`;
-    await shareServerImage(
-      `/api/today-verse/hero-image?client_date=${encodeURIComponent(date)}`,
-      `divine_bridge_verse_${date}.jpg`,
-      fallback
-    );
+  function onShare() {
+    setSharePackOpen(true);
+  }
+
+  async function onShareTracked() {
     if (verseText && user) {
       await verseApi.share(date).catch(() => null);
     }
@@ -403,7 +399,7 @@ export default function VerseReaderScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             onShare();
           }}
-          accessibilityLabel="Share today's verse"
+          accessibilityLabel="Share today's message"
           radius={14}
           hitSlop={8}
           style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}
@@ -413,6 +409,16 @@ export default function VerseReaderScreen() {
           </View>
         </GlassPill>
       </View>
+
+      <VerseSharePack
+        visible={sharePackOpen}
+        date={date}
+        verseText={verseText}
+        verseRef={verseRef}
+        includeSermonCards={!!verseContext}
+        onClose={() => setSharePackOpen(false)}
+        onShared={onShareTracked}
+      />
 
       {/* Bottom glass action bar */}
       <View style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 12, zIndex: 10 }}>

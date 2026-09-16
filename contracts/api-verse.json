@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "prefix": "/api",
+  "endpoints": [
+    {"path": "/api/today-verse", "methods": ["GET"]},
+    {"path": "/api/today-verse/download", "methods": ["GET"]},
+    {"path": "/api/today-verse/hero-image", "methods": ["GET"]},
+    {"path": "/api/today-verse/explainer-image/<section>", "methods": ["GET"]},
+    {"path": "/api/today-verse/context", "methods": ["GET"]},
+    {"path": "/api/today-verse/<date>/share", "methods": ["POST"]},
+    {"path": "/api/today-verse/<date>/interactions", "methods": ["GET"]}
+  ]
+}

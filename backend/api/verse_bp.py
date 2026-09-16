@@ -226,6 +226,94 @@ def download_verse_hero_image():
         return jsonify({"success": False, "error": "Failed to generate hero image"}), 500
 
 
+_EXPLAINER_SECTIONS = frozenset({"verse", "context", "meaning", "application"})
+
+
+@verse_bp.route("/today-verse/explainer-image/<section>", methods=["GET"])
+def download_verse_explainer_image(section):
+    """Download one card of the verse-explainer share pack.
+
+    Four themed 9:16 JPEGs (verse, context, meaning, application) that
+    match the in-app reader. Cached in object storage by verse slug so
+    a later calendar day with the same verse reuses the cards.
+
+    Query params:
+      client_date: YYYY-MM-DD (optional) — the client's local date.
+      force:       'true' to bypass cache and regenerate.
+    """
+    section = (section or "").strip().lower()
+    if section not in _EXPLAINER_SECTIONS:
+        return jsonify({"success": False, "error": "Unknown explainer section"}), 400
+
+    try:
+        client_date = request.args.get("client_date")
+        force_regenerate = request.args.get("force", "false").lower() == "true"
+        day_of_year, cache_date = _resolve_client_date(client_date)
+
+        verse = current_app.verse_cache.get_today_verse(day_of_year=day_of_year)
+        if not verse:
+            return jsonify({"success": False, "error": "No verse available"}), 404
+
+        from backend.services.verse.verse_context_generator import slugify_reference
+
+        slug = slugify_reference(verse.get("reference") or "")
+        if not slug:
+            return jsonify({"success": False, "error": "Verse reference is invalid"}), 400
+
+        if not force_regenerate:
+            cached_image = current_app.storage_handler.get_verse_explainer_image(slug, section)
+            if cached_image:
+                logger.info("Serving cached verse explainer image %s/%s", slug, section)
+                from io import BytesIO
+
+                return send_file(
+                    BytesIO(cached_image),
+                    mimetype="image/jpeg",
+                    as_attachment=True,
+                    download_name=f"divine_bridge_{section}_{cache_date}.jpg",
+                )
+
+        body = verse.get("verse") or ""
+        if section != "verse":
+            generator = _get_verse_context_generator()
+            doc = generator.generate_context(
+                verse_text=verse["verse"],
+                reference=verse["reference"],
+            )
+            body = (doc.get(section) or "").strip()
+            if not body:
+                return jsonify({"success": False, "error": f"No {section} available"}), 404
+
+        from backend.services.verse.verse_themes import pick_verse_theme
+
+        theme = pick_verse_theme(verse.get("verse", ""), verse.get("reference", ""), cache_date)
+
+        from backend.services.prayer.image_generator import get_image_generator
+
+        image_data = get_image_generator().generate_verse_explainer_image(
+            section=section,
+            verse_text=verse["verse"],
+            reference=verse["reference"],
+            body=body,
+            theme=theme,
+        )
+        image_bytes = image_data.getvalue()
+        current_app.storage_handler.save_verse_explainer_image(slug, section, image_bytes)
+        logger.info("Cached verse explainer image %s/%s (theme=%s)", slug, section, theme["id"])
+
+        image_data.seek(0)
+        return send_file(
+            image_data,
+            mimetype="image/jpeg",
+            as_attachment=True,
+            download_name=f"divine_bridge_{section}_{cache_date}.jpg",
+        )
+
+    except Exception as e:
+        logger.error("Error generating verse explainer image: %s", e, exc_info=True)
+        return jsonify({"success": False, "error": "Failed to generate explainer image"}), 500
+
+
 @verse_bp.route("/today-verse/<date>/image", methods=["GET"])
 def get_daily_verse_image(date):
     """Serve daily verse image for sharing (not download)"""

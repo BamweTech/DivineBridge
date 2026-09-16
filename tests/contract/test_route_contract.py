@@ -12,6 +12,7 @@ EXPECTED_PUBLIC_RULES = {
     ("/api/auth/login", "POST"),
     ("/api/prayer/prayer/<date>", "GET"),
     ("/api/today-verse", "GET"),
+    ("/api/today-verse/explainer-image/<section>", "GET"),
     ("/api/groups", "GET"),
     ("/api/prayer-room/rooms", "GET"),
 }

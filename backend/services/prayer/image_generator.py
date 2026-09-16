@@ -1361,6 +1361,253 @@ class ImageGenerator:
             logger.error(f"Error generating verse hero image: {e}", exc_info=True)
             raise
 
+    # ── Verse explainer share pack (verse / context / meaning / application) ──
+    #
+    # Four 9:16 cards that reuse the hero canvas (mood gradient, blobs,
+    # frosted pills, wordmark, white outer frame) so the pack feels like
+    # a continuation of the in-app reader rather than a separate brand.
+    # Triggered from the verse-reader share button.
+
+    EXPLAINER_SECTIONS = ("verse", "context", "meaning", "application")
+    EXPLAINER_LABELS = {
+        "verse": "Verse",
+        "context": "Context",
+        "meaning": "Meaning",
+        "application": "Application",
+    }
+
+    def _hero_start_canvas(self, theme):
+        """Paint the shared hero backdrop (gradient + blobs) at 2x.
+
+        Returns ``(base_rgba, W, H, scale, inner_w, inner_h)``. Callers
+        draw their own type, then pass the same values to
+        ``_hero_finish_jpeg``.
+        """
+        scale = 2
+        inner_w = self.HERO_WIDTH - 2 * self.HERO_CARD_MARGIN
+        inner_h = self.HERO_HEIGHT - 2 * self.HERO_CARD_MARGIN
+        W = inner_w * scale
+        H = inner_h * scale
+        base = self._hero_diagonal_gradient(W, H, theme["gradient"]).convert("RGBA")
+        b0, b1, b2 = theme["blobs"]
+        self._hero_paint_blob(base, (int(W * 0.95), int(H * 0.05)), int(W * 0.28), b0[0], b0[1])
+        self._hero_paint_blob(base, (int(W * 0.05), int(H * 0.92)), int(W * 0.24), b1[0], b1[1])
+        self._hero_paint_blob(base, (int(W * 0.72), int(H * 0.52)), int(W * 0.14), b2[0], b2[1])
+        return base, W, H, scale, inner_w, inner_h
+
+    def _hero_draw_wordmark(self, base, W, H, scale):
+        """Paste the Divine Bridge wordmark in the bottom-right of ``base``."""
+        try:
+            wm = Image.open(self.WORDMARK_LOGO_PATH).convert("RGBA")
+            target_h = 110 * scale
+            aspect = wm.width / wm.height
+            target_w = int(target_h * aspect)
+            wm = wm.resize((target_w, target_h), Image.Resampling.LANCZOS)
+            margin = 70 * scale
+            base.alpha_composite(wm, (W - margin - target_w, H - margin - target_h))
+        except Exception as logo_err:
+            logger.warning("Explainer image: couldn't load wordmark logo: %s", logo_err)
+
+    def _hero_finish_jpeg(self, base, theme, inner_w, inner_h):
+        """Flatten, round, frame, and encode a hero-style card as JPEG."""
+        inner_flat = Image.new("RGB", base.size, self._hex_rgb(theme["base_color"]))
+        inner_flat.paste(base, mask=base.split()[-1])
+        inner_flat = inner_flat.resize((inner_w, inner_h), Image.Resampling.LANCZOS)
+        inner_flat = inner_flat.filter(ImageFilter.SHARPEN)
+
+        mask_scale = 4
+        mask_hi = Image.new("L", (inner_w * mask_scale, inner_h * mask_scale), 0)
+        ImageDraw.Draw(mask_hi).rounded_rectangle(
+            (0, 0, inner_w * mask_scale, inner_h * mask_scale),
+            radius=self.HERO_CARD_RADIUS * mask_scale,
+            fill=255,
+        )
+        mask = mask_hi.resize((inner_w, inner_h), Image.Resampling.LANCZOS)
+        inner_rgba = inner_flat.convert("RGBA")
+        inner_rgba.putalpha(mask)
+
+        outer = Image.new("RGB", (self.HERO_WIDTH, self.HERO_HEIGHT), self.HERO_OUTER_BG)
+        outer.paste(
+            inner_rgba,
+            (self.HERO_CARD_MARGIN, self.HERO_CARD_MARGIN),
+            mask=inner_rgba.split()[-1],
+        )
+        out = BytesIO()
+        outer.save(out, format="JPEG", quality=92, optimize=True)
+        out.seek(0)
+        return out
+
+    def _hero_draw_explainer_chrome(self, base, theme, section, scale):
+        """Section pill (left) + series counter (right) shared by every card."""
+        sans = self._get_sans_font()
+        label = self.EXPLAINER_LABELS.get(section, section).upper()
+        index = self.EXPLAINER_SECTIONS.index(section) + 1 if section in self.EXPLAINER_SECTIONS else 1
+        total = len(self.EXPLAINER_SECTIONS)
+        accent = (*self._hex_rgb(theme["accent"]), 255)
+
+        label_font = sans(32 * scale, bold=True)
+        lb = label_font.getbbox(label)
+        label_w = lb[2] - lb[0]
+        label_h = lb[3] - lb[1]
+        pad_x = 38 * scale
+        pad_y = 22 * scale
+        label_x0 = 70 * scale
+        label_y0 = 110 * scale
+        label_x1 = label_x0 + label_w + 2 * pad_x
+        label_y1 = label_y0 + label_h + 2 * pad_y + 6 * scale
+        self._hero_frosted_pill(
+            base,
+            (label_x0, label_y0, label_x1, label_y1),
+            radius=(label_y1 - label_y0) // 2,
+            fill_rgba=(255, 253, 247, 195),
+            border_rgba=(*self._hex_rgb(theme["accent"]), 60),
+        )
+        draw = ImageDraw.Draw(base)
+        draw.text(
+            (label_x0 + pad_x, label_y0 + pad_y - lb[1]),
+            label,
+            font=label_font,
+            fill=accent,
+        )
+
+        counter = f"{index} / {total}"
+        cb = label_font.getbbox(counter)
+        counter_w = cb[2] - cb[0]
+        W = base.width
+        counter_x1 = W - 70 * scale
+        counter_x0 = counter_x1 - counter_w - 2 * pad_x
+        self._hero_frosted_pill(
+            base,
+            (counter_x0, label_y0, counter_x1, label_y1),
+            radius=(label_y1 - label_y0) // 2,
+            fill_rgba=(255, 253, 247, 195),
+            border_rgba=(44, 36, 23, 30),
+        )
+        draw.text(
+            (counter_x0 + pad_x, label_y0 + pad_y - cb[1]),
+            counter,
+            font=label_font,
+            fill=(*self._hex_rgb(theme["accent"]), 220),
+        )
+        return label_y1
+
+    def _hero_fit_prose_font(self, sans, text, max_width, max_height):
+        """Largest readable body font that fits ``text`` in the box.
+
+        Sizes are in 2x-canvas pixels so they match ``_hero_fit_verse_font``
+        (48pt on the finished JPEG ≈ 96 here).
+        """
+        for size in (80, 72, 64, 56, 52, 48, 44, 40):
+            font = sans(size)
+            line_h = int(size * 1.42)
+            lines = self._hero_wrap_text(text, font, max_width)
+            if lines and len(lines) * line_h <= max_height:
+                return font, lines, line_h
+        font = sans(40)
+        line_h = int(40 * 1.42)
+        max_lines = max(1, max_height // line_h)
+        lines = self._hero_wrap_text(text, font, max_width)[:max_lines]
+        if lines:
+            lines[-1] = lines[-1].rstrip(".,;: ") + "…"
+        return font, lines, line_h
+
+    def generate_verse_explainer_image(self, section, verse_text, reference, body, theme):
+        """Render one card of the verse-explainer share pack.
+
+        Args:
+          section:    ``verse`` | ``context`` | ``meaning`` | ``application``
+          verse_text: the scripture body (used on the verse card)
+          reference:  e.g. ``"John 3:16"``
+          body:       section prose (ignored for ``verse``; verse_text is used)
+          theme:      dict from ``verse_themes.pick_verse_theme``
+
+        Returns: BytesIO containing JPEG bytes (1080×1580).
+        """
+        section = (section or "").strip().lower()
+        if section not in self.EXPLAINER_SECTIONS:
+            raise ValueError(f"Unknown explainer section: {section!r}")
+
+        try:
+            base, W, H, scale, inner_w, inner_h = self._hero_start_canvas(theme)
+            chrome_bottom = self._hero_draw_explainer_chrome(base, theme, section, scale)
+            sans = self._get_sans_font()
+            draw = ImageDraw.Draw(base)
+            accent = (*self._hex_rgb(theme["accent"]), 255)
+            side_pad = 70 * scale
+            body_max_w = W - 2 * side_pad
+            # Leave room for the wordmark (~110pt + margin) under the copy.
+            wordmark_reserve = 200 * scale
+            body_max_h = H - chrome_bottom - 48 * scale - wordmark_reserve
+
+            if section == "verse":
+                verse_font, verse_lines, line_h = self._hero_fit_verse_font(
+                    sans,
+                    f"\u201c{(verse_text or '').strip()}\u201d",
+                    body_max_w,
+                    body_max_h,
+                )
+                text_block_h = len(verse_lines) * line_h
+                verse_top = chrome_bottom + 56 * scale
+                # If the verse is short, drop it toward the visual center.
+                centered_top = (H - text_block_h) // 2 - int(40 * scale)
+                if centered_top > verse_top:
+                    verse_top = centered_top
+                for i, line in enumerate(verse_lines):
+                    lw = verse_font.getbbox(line)[2] - verse_font.getbbox(line)[0]
+                    draw.text(
+                        ((W - lw) // 2, verse_top + i * line_h),
+                        line,
+                        font=verse_font,
+                        fill=(28, 22, 14, 255),
+                    )
+                ref_font = sans(40 * scale, bold=True)
+                ref_text = f"\u2014 {(reference or '').upper()}" if reference else ""
+                if ref_text:
+                    rb = ref_font.getbbox(ref_text)
+                    draw.text(
+                        ((W - (rb[2] - rb[0])) // 2, verse_top + text_block_h + 36 * scale),
+                        ref_text,
+                        font=ref_font,
+                        fill=accent,
+                    )
+            else:
+                ref_font = sans(28 * scale, bold=True)
+                ref_text = (reference or "").upper()
+                copy_top = chrome_bottom + 40 * scale
+                if ref_text:
+                    rb = ref_font.getbbox(ref_text)
+                    draw.text((side_pad, copy_top), ref_text, font=ref_font, fill=accent)
+                    copy_top += (rb[3] - rb[1]) + 28 * scale
+
+                prose = (body or "").strip()
+                prose_font, prose_lines, line_h = self._hero_fit_prose_font(
+                    sans,
+                    prose,
+                    body_max_w,
+                    max(80 * scale, H - copy_top - wordmark_reserve),
+                )
+                for i, line in enumerate(prose_lines):
+                    draw.text(
+                        (side_pad, copy_top + i * line_h),
+                        line,
+                        font=prose_font,
+                        fill=(28, 22, 14, 255),
+                    )
+
+            self._hero_draw_wordmark(base, W, H, scale)
+            out = self._hero_finish_jpeg(base, theme, inner_w, inner_h)
+            logger.info(
+                "Generated verse explainer image: section=%s theme=%s ref=%r chars=%s",
+                section,
+                theme.get("id"),
+                reference,
+                len((body or verse_text or "")),
+            )
+            return out
+        except Exception as e:
+            logger.error("Error generating verse explainer image: %s", e, exc_info=True)
+            raise
+
 
 # Singleton instance
 _image_generator = None
