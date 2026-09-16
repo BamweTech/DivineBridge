@@ -1437,12 +1437,10 @@ class ImageGenerator:
         out.seek(0)
         return out
 
-    def _hero_draw_explainer_chrome(self, base, theme, section, scale):
+    def _hero_draw_explainer_chrome(self, base, theme, label, index, total, scale):
         """Section pill (left) + series counter (right) shared by every card."""
         sans = self._get_sans_font()
-        label = self.EXPLAINER_LABELS.get(section, section).upper()
-        index = self.EXPLAINER_SECTIONS.index(section) + 1 if section in self.EXPLAINER_SECTIONS else 1
-        total = len(self.EXPLAINER_SECTIONS)
+        label = (label or "").upper()
         accent = (*self._hex_rgb(theme["accent"]), 255)
 
         label_font = sans(32 * scale, bold=True)
@@ -1497,19 +1495,91 @@ class ImageGenerator:
         Sizes are in 2x-canvas pixels so they match ``_hero_fit_verse_font``
         (48pt on the finished JPEG ≈ 96 here).
         """
-        for size in (80, 72, 64, 56, 52, 48, 44, 40):
+        for size in (80, 72, 64, 56, 52, 48, 44, 40, 36, 32):
             font = sans(size)
             line_h = int(size * 1.42)
             lines = self._hero_wrap_text(text, font, max_width)
             if lines and len(lines) * line_h <= max_height:
                 return font, lines, line_h
-        font = sans(40)
-        line_h = int(40 * 1.42)
+        font = sans(32)
+        line_h = int(32 * 1.42)
         max_lines = max(1, max_height // line_h)
         lines = self._hero_wrap_text(text, font, max_width)[:max_lines]
         if lines:
             lines[-1] = lines[-1].rstrip(".,;: ") + "…"
         return font, lines, line_h
+
+    def _render_share_card(self, *, label, index, total, display, verse_text, reference, body, theme):
+        """Shared 9:16 card used by the verse explainer and devotional packs.
+
+        ``display`` is ``"quote"`` (large centered scripture) or ``"prose"``.
+        """
+        base, W, H, scale, inner_w, inner_h = self._hero_start_canvas(theme)
+        chrome_bottom = self._hero_draw_explainer_chrome(base, theme, label, index, total, scale)
+        sans = self._get_sans_font()
+        draw = ImageDraw.Draw(base)
+        accent = (*self._hex_rgb(theme["accent"]), 255)
+        side_pad = 70 * scale
+        body_max_w = W - 2 * side_pad
+        wordmark_reserve = 200 * scale
+        body_max_h = H - chrome_bottom - 48 * scale - wordmark_reserve
+
+        if display == "quote":
+            verse_font, verse_lines, line_h = self._hero_fit_verse_font(
+                sans,
+                f"\u201c{(verse_text or '').strip()}\u201d",
+                body_max_w,
+                body_max_h,
+            )
+            text_block_h = len(verse_lines) * line_h
+            verse_top = chrome_bottom + 56 * scale
+            centered_top = (H - text_block_h) // 2 - int(40 * scale)
+            if centered_top > verse_top:
+                verse_top = centered_top
+            for i, line in enumerate(verse_lines):
+                lw = verse_font.getbbox(line)[2] - verse_font.getbbox(line)[0]
+                draw.text(
+                    ((W - lw) // 2, verse_top + i * line_h),
+                    line,
+                    font=verse_font,
+                    fill=(28, 22, 14, 255),
+                )
+            ref_font = sans(40 * scale, bold=True)
+            ref_text = f"\u2014 {(reference or '').upper()}" if reference else ""
+            if ref_text:
+                rb = ref_font.getbbox(ref_text)
+                draw.text(
+                    ((W - (rb[2] - rb[0])) // 2, verse_top + text_block_h + 36 * scale),
+                    ref_text,
+                    font=ref_font,
+                    fill=accent,
+                )
+        else:
+            ref_font = sans(28 * scale, bold=True)
+            ref_text = (reference or "").upper()
+            copy_top = chrome_bottom + 40 * scale
+            if ref_text:
+                rb = ref_font.getbbox(ref_text)
+                draw.text((side_pad, copy_top), ref_text, font=ref_font, fill=accent)
+                copy_top += (rb[3] - rb[1]) + 28 * scale
+
+            prose = (body or "").strip()
+            prose_font, prose_lines, line_h = self._hero_fit_prose_font(
+                sans,
+                prose,
+                body_max_w,
+                max(80 * scale, H - copy_top - wordmark_reserve),
+            )
+            for i, line in enumerate(prose_lines):
+                draw.text(
+                    (side_pad, copy_top + i * line_h),
+                    line,
+                    font=prose_font,
+                    fill=(28, 22, 14, 255),
+                )
+
+        self._hero_draw_wordmark(base, W, H, scale)
+        return self._hero_finish_jpeg(base, theme, inner_w, inner_h)
 
     def generate_verse_explainer_image(self, section, verse_text, reference, body, theme):
         """Render one card of the verse-explainer share pack.
@@ -1528,74 +1598,16 @@ class ImageGenerator:
             raise ValueError(f"Unknown explainer section: {section!r}")
 
         try:
-            base, W, H, scale, inner_w, inner_h = self._hero_start_canvas(theme)
-            chrome_bottom = self._hero_draw_explainer_chrome(base, theme, section, scale)
-            sans = self._get_sans_font()
-            draw = ImageDraw.Draw(base)
-            accent = (*self._hex_rgb(theme["accent"]), 255)
-            side_pad = 70 * scale
-            body_max_w = W - 2 * side_pad
-            # Leave room for the wordmark (~110pt + margin) under the copy.
-            wordmark_reserve = 200 * scale
-            body_max_h = H - chrome_bottom - 48 * scale - wordmark_reserve
-
-            if section == "verse":
-                verse_font, verse_lines, line_h = self._hero_fit_verse_font(
-                    sans,
-                    f"\u201c{(verse_text or '').strip()}\u201d",
-                    body_max_w,
-                    body_max_h,
-                )
-                text_block_h = len(verse_lines) * line_h
-                verse_top = chrome_bottom + 56 * scale
-                # If the verse is short, drop it toward the visual center.
-                centered_top = (H - text_block_h) // 2 - int(40 * scale)
-                if centered_top > verse_top:
-                    verse_top = centered_top
-                for i, line in enumerate(verse_lines):
-                    lw = verse_font.getbbox(line)[2] - verse_font.getbbox(line)[0]
-                    draw.text(
-                        ((W - lw) // 2, verse_top + i * line_h),
-                        line,
-                        font=verse_font,
-                        fill=(28, 22, 14, 255),
-                    )
-                ref_font = sans(40 * scale, bold=True)
-                ref_text = f"\u2014 {(reference or '').upper()}" if reference else ""
-                if ref_text:
-                    rb = ref_font.getbbox(ref_text)
-                    draw.text(
-                        ((W - (rb[2] - rb[0])) // 2, verse_top + text_block_h + 36 * scale),
-                        ref_text,
-                        font=ref_font,
-                        fill=accent,
-                    )
-            else:
-                ref_font = sans(28 * scale, bold=True)
-                ref_text = (reference or "").upper()
-                copy_top = chrome_bottom + 40 * scale
-                if ref_text:
-                    rb = ref_font.getbbox(ref_text)
-                    draw.text((side_pad, copy_top), ref_text, font=ref_font, fill=accent)
-                    copy_top += (rb[3] - rb[1]) + 28 * scale
-
-                prose = (body or "").strip()
-                prose_font, prose_lines, line_h = self._hero_fit_prose_font(
-                    sans,
-                    prose,
-                    body_max_w,
-                    max(80 * scale, H - copy_top - wordmark_reserve),
-                )
-                for i, line in enumerate(prose_lines):
-                    draw.text(
-                        (side_pad, copy_top + i * line_h),
-                        line,
-                        font=prose_font,
-                        fill=(28, 22, 14, 255),
-                    )
-
-            self._hero_draw_wordmark(base, W, H, scale)
-            out = self._hero_finish_jpeg(base, theme, inner_w, inner_h)
+            out = self._render_share_card(
+                label=self.EXPLAINER_LABELS[section],
+                index=self.EXPLAINER_SECTIONS.index(section) + 1,
+                total=len(self.EXPLAINER_SECTIONS),
+                display="quote" if section == "verse" else "prose",
+                verse_text=verse_text,
+                reference=reference,
+                body=body,
+                theme=theme,
+            )
             logger.info(
                 "Generated verse explainer image: section=%s theme=%s ref=%r chars=%s",
                 section,
@@ -1606,6 +1618,46 @@ class ImageGenerator:
             return out
         except Exception as e:
             logger.error("Error generating verse explainer image: %s", e, exc_info=True)
+            raise
+
+    DEVOTIONAL_SHARE_SECTIONS = ("scripture", "reflection", "prayer")
+    DEVOTIONAL_SHARE_LABELS = {
+        "scripture": "Scripture",
+        "reflection": "Reflection",
+        "prayer": "Prayer",
+    }
+
+    def generate_devotional_share_image(self, section, scripture, reference, body, theme):
+        """Render one card of the devotional share pack.
+
+        Same canvas as the verse explainer: scripture is a large quote card;
+        reflection and prayer are prose cards with the verse reference.
+        """
+        section = (section or "").strip().lower()
+        if section not in self.DEVOTIONAL_SHARE_SECTIONS:
+            raise ValueError(f"Unknown devotional share section: {section!r}")
+
+        try:
+            out = self._render_share_card(
+                label=self.DEVOTIONAL_SHARE_LABELS[section],
+                index=self.DEVOTIONAL_SHARE_SECTIONS.index(section) + 1,
+                total=len(self.DEVOTIONAL_SHARE_SECTIONS),
+                display="quote" if section == "scripture" else "prose",
+                verse_text=scripture,
+                reference=reference,
+                body=body,
+                theme=theme,
+            )
+            logger.info(
+                "Generated devotional share image: section=%s theme=%s ref=%r chars=%s",
+                section,
+                theme.get("id"),
+                reference,
+                len((body or scripture or "")),
+            )
+            return out
+        except Exception as e:
+            logger.error("Error generating devotional share image: %s", e, exc_info=True)
             raise
 
 

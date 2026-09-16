@@ -24,66 +24,57 @@ import {
   VERSE_EXPLAINER_SECTIONS,
   VERSE_EXPLAINER_LABELS,
   type VerseExplainerSection,
+  devotionalShareImagePath,
+  DEVOTIONAL_SHARE_SECTIONS,
+  DEVOTIONAL_SHARE_LABELS,
+  type DevotionalShareSection,
 } from '@/lib/shareServerImage';
 
+export type SharePackSection = { id: string; label: string };
+
 type CardState = {
-  section: VerseExplainerSection;
+  id: string;
   uri: string | null;
   error: boolean;
 };
 
-type Props = {
+type SharePackProps = {
   visible: boolean;
-  date: string;
-  verseText: string;
-  verseRef: string;
-  /** When false, only the verse card is requested (context still loading / failed). */
-  includeSermonCards: boolean;
+  title: string;
+  subtitle: string;
+  sections: SharePackSection[];
+  imagePath: (sectionId: string) => string;
+  filename: (sectionId: string) => string;
+  fallback: string;
   onClose: () => void;
   onShared?: () => void;
 };
 
 /**
- * Share pack for the verse explainer: four themed cards (verse, context,
- * meaning, application) downloaded from the server and previewed in a
- * horizontal pager. The native share sheet is opened per card, or for
- * every ready card in order when the user taps Share all.
+ * Horizontal pager of server-rendered share cards. Used by the verse
+ * explainer (4 cards) and the daily devotional reading (3 cards).
  */
-export function VerseSharePack({
+export function SharePack({
   visible,
-  date,
-  verseText,
-  verseRef,
-  includeSermonCards,
+  title,
+  subtitle,
+  sections,
+  imagePath,
+  filename,
+  fallback,
   onClose,
   onShared,
-}: Props) {
+}: SharePackProps) {
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const [page, setPage] = useState(0);
   const [cards, setCards] = useState<CardState[]>([]);
   const [sharing, setSharing] = useState(false);
 
-  const sections = useMemo<VerseExplainerSection[]>(
-    () =>
-      includeSermonCards
-        ? [...VERSE_EXPLAINER_SECTIONS]
-        : (['verse'] as VerseExplainerSection[]),
-    [includeSermonCards]
-  );
-
-  const fallback = useMemo(
-    () =>
-      verseText && verseRef
-        ? `Today's Verse (${verseRef}):\n\n"${verseText}"\n\nDivine Bridge — divinebridge.io`
-        : `Today's verse on Divine Bridge — divinebridge.io`,
-    [verseText, verseRef]
-  );
-
-  // Card preview is 9:16 (1080×1580) with side gutters so the next card peeks.
   const cardWidth = Math.min(320, windowWidth - 72);
   const cardHeight = Math.round(cardWidth * (1580 / 1080));
   const pageWidth = windowWidth;
+  const sectionKey = sections.map((s) => s.id).join(',');
 
   useEffect(() => {
     if (!visible) {
@@ -94,16 +85,13 @@ export function VerseSharePack({
     }
 
     let cancelled = false;
-    setCards(sections.map((section) => ({ section, uri: null, error: false })));
+    setCards(sections.map((section) => ({ id: section.id, uri: null, error: false })));
 
     (async () => {
       const results = await Promise.all(
         sections.map(async (section) => {
-          const uri = await downloadServerImage(
-            verseExplainerImagePath(date, section),
-            `divine_bridge_${section}_${date}.jpg`
-          );
-          return { section, uri, error: !uri } satisfies CardState;
+          const uri = await downloadServerImage(imagePath(section.id), filename(section.id));
+          return { id: section.id, uri, error: !uri } satisfies CardState;
         })
       );
       if (!cancelled) setCards(results);
@@ -112,10 +100,13 @@ export function VerseSharePack({
     return () => {
       cancelled = true;
     };
-  }, [visible, date, sections]);
+    // imagePath / filename are stable closures from the wrappers below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, sectionKey]);
 
   const readyUris = cards.filter((c) => c.uri).map((c) => c.uri) as string[];
   const current = cards[page];
+  const currentLabel = sections[page]?.label ?? 'card';
   const loading = visible && cards.some((c) => !c.uri && !c.error);
 
   function onScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
@@ -190,11 +181,9 @@ export function VerseSharePack({
             }}
           >
             <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={{ ...TYPE.title3, color: THEME_COLORS.text }}>Share today&apos;s message</Text>
+              <Text style={{ ...TYPE.title3, color: THEME_COLORS.text }}>{title}</Text>
               <Text style={{ ...TYPE.footnote, color: THEME_COLORS.text3, marginTop: 4 }}>
-                {includeSermonCards
-                  ? 'Four cards — verse, context, meaning, and application.'
-                  : 'Preparing the full message. The verse card is ready now.'}
+                {subtitle}
               </Text>
             </View>
             <Pressable
@@ -226,7 +215,7 @@ export function VerseSharePack({
               const card = cards[i];
               return (
                 <View
-                  key={section}
+                  key={section.id}
                   style={{ width: pageWidth, alignItems: 'center', paddingVertical: 8 }}
                 >
                   <View
@@ -250,13 +239,13 @@ export function VerseSharePack({
                       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
                         {card?.error ? (
                           <Text style={{ ...TYPE.footnote, color: THEME_COLORS.text3, textAlign: 'center', paddingHorizontal: 24 }}>
-                            Couldn&apos;t load the {VERSE_EXPLAINER_LABELS[section].toLowerCase()} card.
+                            Couldn&apos;t load the {section.label.toLowerCase()} card.
                           </Text>
                         ) : (
                           <>
                             <ActivityIndicator color={THEME_COLORS.gold} />
                             <Text style={{ ...TYPE.capsLabel, color: THEME_COLORS.text3 }}>
-                              {VERSE_EXPLAINER_LABELS[section]}
+                              {section.label}
                             </Text>
                           </>
                         )}
@@ -272,7 +261,7 @@ export function VerseSharePack({
             <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 12 }}>
               {sections.map((section, i) => (
                 <View
-                  key={section}
+                  key={section.id}
                   style={{
                     width: i === page ? 16 : 6,
                     height: 6,
@@ -289,7 +278,7 @@ export function VerseSharePack({
               onPress={() => shareUri(current?.uri ?? null)}
               disabled={!current?.uri || sharing}
               accessibilityRole="button"
-              accessibilityLabel={`Share ${current ? VERSE_EXPLAINER_LABELS[current.section] : 'card'}`}
+              accessibilityLabel={`Share ${currentLabel}`}
               style={{
                 backgroundColor: current?.uri ? THEME_COLORS.text : 'rgba(44,36,23,0.18)',
                 borderRadius: 16,
@@ -309,7 +298,7 @@ export function VerseSharePack({
                   color: '#fff',
                 }}
               >
-                Share {current ? VERSE_EXPLAINER_LABELS[current.section] : 'card'}
+                Share {currentLabel}
               </Text>
             </Pressable>
 
@@ -337,5 +326,99 @@ export function VerseSharePack({
         </View>
       </View>
     </Modal>
+  );
+}
+
+type VerseSharePackProps = {
+  visible: boolean;
+  date: string;
+  verseText: string;
+  verseRef: string;
+  includeSermonCards: boolean;
+  onClose: () => void;
+  onShared?: () => void;
+};
+
+export function VerseSharePack({
+  visible,
+  date,
+  verseText,
+  verseRef,
+  includeSermonCards,
+  onClose,
+  onShared,
+}: VerseSharePackProps) {
+  const sections = useMemo<SharePackSection[]>(
+    () =>
+      (includeSermonCards ? [...VERSE_EXPLAINER_SECTIONS] : (['verse'] as VerseExplainerSection[])).map(
+        (id) => ({ id, label: VERSE_EXPLAINER_LABELS[id] })
+      ),
+    [includeSermonCards]
+  );
+  const fallback =
+    verseText && verseRef
+      ? `Today's Verse (${verseRef}):\n\n"${verseText}"\n\nDivine Bridge — divinebridge.io`
+      : `Today's verse on Divine Bridge — divinebridge.io`;
+
+  return (
+    <SharePack
+      visible={visible}
+      title="Share today's message"
+      subtitle={
+        includeSermonCards
+          ? 'Four cards — verse, context, meaning, and application.'
+          : 'Preparing the full message. The verse card is ready now.'
+      }
+      sections={sections}
+      imagePath={(id) => verseExplainerImagePath(date, id as VerseExplainerSection)}
+      filename={(id) => `divine_bridge_${id}_${date}.jpg`}
+      fallback={fallback}
+      onClose={onClose}
+      onShared={onShared}
+    />
+  );
+}
+
+type DevotionalSharePackProps = {
+  visible: boolean;
+  planId: string;
+  day: number;
+  scripture: string;
+  reference: string;
+  onClose: () => void;
+};
+
+export function DevotionalSharePack({
+  visible,
+  planId,
+  day,
+  scripture,
+  reference,
+  onClose,
+}: DevotionalSharePackProps) {
+  const sections = useMemo<SharePackSection[]>(
+    () =>
+      DEVOTIONAL_SHARE_SECTIONS.map((id: DevotionalShareSection) => ({
+        id,
+        label: DEVOTIONAL_SHARE_LABELS[id],
+      })),
+    []
+  );
+  const fallback =
+    scripture && reference
+      ? `Day ${day} (${reference}):\n\n"${scripture}"\n\nDivine Bridge — divinebridge.io`
+      : `Today's reading on Divine Bridge — divinebridge.io`;
+
+  return (
+    <SharePack
+      visible={visible}
+      title="Share today's reading"
+      subtitle="Three cards — scripture, reflection, and prayer."
+      sections={sections}
+      imagePath={(id) => devotionalShareImagePath(planId, day, id as DevotionalShareSection)}
+      filename={(id) => `divine_bridge_devo_${id}_${planId}_day${day}.jpg`}
+      fallback={fallback}
+      onClose={onClose}
+    />
   );
 }

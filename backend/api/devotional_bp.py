@@ -6,7 +6,7 @@ import re
 import uuid
 import logging
 from datetime import datetime, timezone
-from flask import Blueprint, request, jsonify, g
+from flask import Blueprint, request, jsonify, g, current_app, send_file
 from firebase_admin import firestore
 from backend.integrations.firebase_auth import get_firestore_client
 from backend.core.auth.helpers import require_auth
@@ -406,11 +406,7 @@ def check_in(plan_id: str):
             d["completed_at"] = datetime.now(timezone.utc).isoformat()
             break
 
-    completed_days = [
-        d.get("day")
-        for d in days
-        if d.get("completed") and isinstance(d.get("day"), int)
-    ]
+    completed_days = [d.get("day") for d in days if d.get("completed") and isinstance(d.get("day"), int)]
     latest_completed = max(completed_days) if completed_days else 0
 
     now = datetime.now(timezone.utc)
@@ -512,3 +508,95 @@ def save_journal(plan_id: str):
 
     ref.update({"days": days})
     return jsonify({"success": True}), 200
+
+
+_DEVOTIONAL_SHARE_SECTIONS = frozenset({"scripture", "reflection", "prayer"})
+_PLAN_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
+
+
+def _owned_plan_day(plan_id: str, day: int):
+    """Return ``(plan, day_doc)`` if the caller owns this plan day, else a Flask error tuple."""
+    if not _PLAN_ID_RE.match(plan_id or ""):
+        return None, (jsonify({"success": False, "error": "Invalid plan id"}), 400)
+    db = get_firestore_client()
+    snap = db.collection("devotional_plans").document(plan_id).get()
+    if not snap.exists:
+        return None, (jsonify({"success": False, "error": "Plan not found"}), 404)
+    plan = snap.to_dict() or {}
+    if plan.get("uid") != g.user_id:
+        return None, (jsonify({"success": False, "error": "Forbidden"}), 403)
+    for d in plan.get("days") or []:
+        if d.get("day") == day:
+            return (plan, d), None
+    return None, (jsonify({"success": False, "error": "Day not found in plan"}), 404)
+
+
+@devotional_bp.route("/<plan_id>/day/<int:day>/share-image/<section>", methods=["GET"])
+@require_auth
+def download_devotional_share_image(plan_id, day, section):
+    """Download one card of the devotional share pack.
+
+    Three themed 9:16 JPEGs (scripture, reflection, prayer) that match the
+    verse-explainer cards. Cached in object storage by plan + day + section.
+
+    Query params:
+      force: 'true' to bypass cache and regenerate.
+    """
+    section = (section or "").strip().lower()
+    if section not in _DEVOTIONAL_SHARE_SECTIONS:
+        return jsonify({"success": False, "error": "Unknown share section"}), 400
+    if day < 1:
+        return jsonify({"success": False, "error": "Day must be a positive integer"}), 400
+
+    loaded, err = _owned_plan_day(plan_id, day)
+    if err:
+        return err
+    _plan, day_doc = loaded
+
+    force_regenerate = request.args.get("force", "false").lower() == "true"
+    try:
+        if not force_regenerate:
+            cached = current_app.storage_handler.get_devotional_share_image(plan_id, day, section)
+            if cached:
+                from io import BytesIO
+
+                return send_file(
+                    BytesIO(cached),
+                    mimetype="image/jpeg",
+                    as_attachment=True,
+                    download_name=f"divine_bridge_devo_{section}_day{day}.jpg",
+                )
+
+        scripture = (day_doc.get("scripture") or "").strip()
+        reference = (day_doc.get("scripture_reference") or "").strip()
+        if section == "scripture":
+            body = scripture
+        else:
+            body = (day_doc.get(section) or "").strip()
+        if not body:
+            return jsonify({"success": False, "error": f"No {section} available"}), 404
+
+        from backend.services.verse.verse_themes import pick_verse_theme
+        from backend.services.prayer.image_generator import get_image_generator
+
+        theme = pick_verse_theme(scripture, reference, datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+        image_data = get_image_generator().generate_devotional_share_image(
+            section=section,
+            scripture=scripture,
+            reference=reference,
+            body=body,
+            theme=theme,
+        )
+        image_bytes = image_data.getvalue()
+        current_app.storage_handler.save_devotional_share_image(plan_id, day, section, image_bytes)
+
+        image_data.seek(0)
+        return send_file(
+            image_data,
+            mimetype="image/jpeg",
+            as_attachment=True,
+            download_name=f"divine_bridge_devo_{section}_day{day}.jpg",
+        )
+    except Exception as e:
+        logger.error("Error generating devotional share image: %s", e, exc_info=True)
+        return jsonify({"success": False, "error": "Failed to generate share image"}), 500

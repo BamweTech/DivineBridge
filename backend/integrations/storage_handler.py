@@ -952,6 +952,33 @@ class StorageHandler:
             logger.error(f"Error retrieving verse explainer image: {e}")
             return None
 
+    def save_devotional_share_image(self, plan_id: str, day: int, section: str, image_data: bytes) -> bool:
+        """Save one devotional share card, keyed by plan + day + section."""
+        try:
+            blob_name = f"images/devotional-share/{plan_id}/{day}/{section}.jpg"
+            blob = self.bucket.blob(blob_name)
+            blob.upload_from_string(image_data, content_type="image/jpeg")
+            logger.info(f"Successfully saved devotional share image: {blob_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Error saving devotional share image: {e}")
+            return False
+
+    def get_devotional_share_image(self, plan_id: str, day: int, section: str) -> bytes:
+        """Retrieve a cached devotional share card."""
+        try:
+            blob_name = f"images/devotional-share/{plan_id}/{day}/{section}.jpg"
+            blob = self.bucket.blob(blob_name)
+            if blob.exists():
+                image_data = blob.download_as_bytes()
+                logger.info(f"Retrieved cached devotional share image: {blob_name}")
+                return image_data
+            logger.debug(f"No cached devotional share image found: {blob_name}")
+            return None
+        except Exception as e:
+            logger.error(f"Error retrieving devotional share image: {e}")
+            return None
+
     def save_prayer_image(self, date: str, image_data: bytes) -> bool:
         """Save prayer image to Cloud Storage
 

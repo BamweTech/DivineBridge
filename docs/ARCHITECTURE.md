@@ -236,6 +236,7 @@ User journeys and screenshots-level detail: **[USER_FEATURES_DOCUMENTATION.md](U
 | Live room (mobile) | [mobile/app/room/[id].tsx](../mobile/app/room/[id].tsx), [mobile/lib/sfu.ts](../mobile/lib/sfu.ts), [mobile/hooks/usePrayerRoom.ts](../mobile/hooks/usePrayerRoom.ts) |
 | Groups | [backend/api/groups_bp.py](../backend/api/groups_bp.py), [mobile/app/(tabs)/groups.tsx](../mobile/app/(tabs)/groups.tsx), [mobile/app/group/[id].tsx](../mobile/app/group/[id].tsx) |
 | Devotional plans | [backend/api/devotional_bp.py](../backend/api/devotional_bp.py), [mobile/app/(tabs)/devotional.tsx](../mobile/app/(tabs)/devotional.tsx) |
+| Devotional share cards | Three themed 9:16 JPEGs (scripture, reflection, prayer) from [backend/services/prayer/image_generator.py](../backend/services/prayer/image_generator.py) via `GET /api/devotional/<plan_id>/day/<day>/share-image/<section>`. Same canvas as the verse explainer pack. |
 | Auth and profile | [backend/api/auth_bp.py](../backend/api/auth_bp.py), [backend/integrations/firebase_auth.py](../backend/integrations/firebase_auth.py), [mobile/app/(auth)/](../mobile/app/(auth)/) |
 | Email subscriptions | [backend/api/email_bp.py](../backend/api/email_bp.py), [guides/EMAIL_CONFIGURATION_GUIDE.md](guides/EMAIL_CONFIGURATION_GUIDE.md) |
 | Organizations / nonprofits | [backend/api/nonprofit_bp.py](../backend/api/nonprofit_bp.py), [backend/services/community/nonprofit_service.py](../backend/services/community/nonprofit_service.py) |

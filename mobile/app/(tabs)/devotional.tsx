@@ -41,6 +41,7 @@ import { useSpeechPlayback } from '@/features/prayer/hooks/useSpeechPlayback';
 import { useFocusEffect } from 'expo-router';
 import { readDevotionalCache, writeDevotionalCache } from '@/lib/devotionalCache';
 import { syncDevotionalReminder } from '@/lib/devotionalReminder';
+import { DevotionalSharePack } from '@/features/prayer/components/VerseSharePack';
 
 const THEMES = [
   'Faith & Trust', 'Healing & Restoration', 'Peace & Stillness',
@@ -237,6 +238,7 @@ function TodayReading({
   const [journalText, setJournalText] = useState(day.journal ?? '');
   const [journalOpen, setJournalOpen] = useState(!!(day.journal));
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [sharePackOpen, setSharePackOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { setJournalText(day.journal ?? ''); }, [day.journal]);
@@ -259,12 +261,7 @@ function TodayReading({
   useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
 
   function handleShare() {
-    const text = `Day ${day.day}: ${day.title}\n\n"${day.scripture}"\n\u2014 ${day.scripture_reference}\n\n${day.reflection.slice(0, 200)}${day.reflection.length > 200 ? '...' : ''}\n\nFrom my devotional on Divine Bridge`;
-    Share.share({ message: text }).catch(() => null);
-  }
-
-  function handleShareVerse() {
-    Share.share({ message: `\u201c${day.scripture}\u201d\n\u2014 ${day.scripture_reference}\n\nDivine Bridge` }).catch(() => null);
+    setSharePackOpen(true);
   }
 
   const verseTheme = pickVerseTheme(day.scripture, day.scripture_reference, dayDateIso);
@@ -333,9 +330,9 @@ function TodayReading({
             <GlassPill
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                handleShareVerse();
+                handleShare();
               }}
-              accessibilityLabel="Share verse"
+              accessibilityLabel="Share today's reading"
               radius={14}
               style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
               hitSlop={8}
@@ -455,14 +452,32 @@ function TodayReading({
       {showCheckIn && !day.completed && (
         <Button label="Mark as Complete" onPress={onCheckIn} style={{ marginTop: 18 }} size="md" fullWidth />
       )}
+
+      <DevotionalSharePack
+        visible={sharePackOpen}
+        planId={planId}
+        day={day.day}
+        scripture={day.scripture}
+        reference={day.scripture_reference}
+        onClose={() => setSharePackOpen(false)}
+      />
     </Animated.View>
   );
 }
 
 // ─── Reading Mode ────────────────────────────────────────────────────────────
 
-function ReadingMode({ day, onClose }: { day: DevotionalDay; onClose: () => void }) {
+function ReadingMode({
+  day,
+  planId,
+  onClose,
+}: {
+  day: DevotionalDay;
+  planId: string;
+  onClose: () => void;
+}) {
   const insets = useSafeAreaInsets();
+  const [sharePackOpen, setSharePackOpen] = useState(false);
   return (
     <Modal visible animationType="none" transparent statusBarTranslucent>
       <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={{ flex: 1, backgroundColor: '#1a1610' }}>
@@ -484,12 +499,13 @@ function ReadingMode({ day, onClose }: { day: DevotionalDay; onClose: () => void
                 &mdash; {day.scripture_reference}
               </Text>
               <Pressable
-                onPress={() => { Share.share({ message: `\u201c${day.scripture}\u201d\n\u2014 ${day.scripture_reference}\n\nDivine Bridge` }).catch(() => null); }}
+                onPress={() => setSharePackOpen(true)}
                 hitSlop={8}
+                accessibilityLabel="Share today's reading"
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, backgroundColor: 'rgba(176,125,32,0.2)' }}
               >
                 <Icon name="share" size={11} color="#b07d20" />
-                <Text style={{ color: '#b07d20', ...iosFontStyle('500'), fontSize: 11 }}>Share verse</Text>
+                <Text style={{ color: '#b07d20', ...iosFontStyle('500'), fontSize: 11 }}>Share</Text>
               </Pressable>
             </View>
           </View>
@@ -501,6 +517,14 @@ function ReadingMode({ day, onClose }: { day: DevotionalDay; onClose: () => void
             <Text style={{ flex: 1, color: '#f5edd8', ...iosFontStyle('400'), fontSize: 18, lineHeight: 32 }}>{day.prayer}</Text>
           </View>
         </ScrollView>
+        <DevotionalSharePack
+          visible={sharePackOpen}
+          planId={planId}
+          day={day.day}
+          scripture={day.scripture}
+          reference={day.scripture_reference}
+          onClose={() => setSharePackOpen(false)}
+        />
       </Animated.View>
     </Modal>
   );
@@ -1160,7 +1184,13 @@ export default function DevotionalScreen() {
       />
 
       {/* Modals */}
-      {readingDay && <ReadingMode day={readingDay} onClose={() => setReadingDay(null)} />}
+      {readingDay && (
+        <ReadingMode
+          day={readingDay}
+          planId={plan.plan_id}
+          onClose={() => setReadingDay(null)}
+        />
+      )}
       {showCelebration && (
         <CompletionCelebration
           plan={plan}

@@ -70,3 +70,56 @@ def test_verse_and_context_cards_are_hero_sized_jpegs():
         img = Image.open(BytesIO(raw))
         assert img.size == (ImageGenerator.HERO_WIDTH, ImageGenerator.HERO_HEIGHT)
         assert img.format == "JPEG"
+
+
+def test_devotional_share_sections_are_scripture_reflection_prayer():
+    assert ImageGenerator.DEVOTIONAL_SHARE_SECTIONS == ("scripture", "reflection", "prayer")
+
+
+def test_unknown_devotional_section_raises():
+    gen = ImageGenerator()
+    try:
+        gen.generate_devotional_share_image(
+            section="application",
+            scripture="Peace I leave with you.",
+            reference="John 14:27",
+            body="",
+            theme=_theme(),
+        )
+    except ValueError as exc:
+        assert "Unknown devotional share section" in str(exc)
+    else:
+        raise AssertionError("expected ValueError for an unknown section")
+
+
+def test_devotional_share_cards_are_hero_sized_jpegs():
+    gen = ImageGenerator()
+    theme = _theme()
+    scripture = "Peace I leave with you; my peace I give to you."
+    reflection = (
+        "Jesus offers a peace that does not depend on circumstances. Today, rest in "
+        "the gift already given — not the calm you have to manufacture. Let his "
+        "presence settle what you cannot control, and receive rather than grasp. "
+        "This is the same peace he spoke in the upper room, and it still holds."
+    )
+    prayer = (
+        "Lord, quiet my striving. Let Your peace settle over what I cannot control, "
+        "and teach me to receive rather than grasp. Amen."
+    )
+    for section, body in (
+        ("scripture", scripture),
+        ("reflection", reflection),
+        ("prayer", prayer),
+    ):
+        buf = gen.generate_devotional_share_image(
+            section=section,
+            scripture=scripture,
+            reference="John 14:27",
+            body=body,
+            theme=theme,
+        )
+        raw = buf.getvalue()
+        assert raw[:2] == b"\xff\xd8"
+        img = Image.open(BytesIO(raw))
+        assert img.size == (ImageGenerator.HERO_WIDTH, ImageGenerator.HERO_HEIGHT)
+        assert img.format == "JPEG"

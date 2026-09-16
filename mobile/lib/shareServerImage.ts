@@ -91,3 +91,21 @@ export async function shareServerImage(
 export function verseExplainerImagePath(date: string, section: VerseExplainerSection): string {
   return `/api/today-verse/explainer-image/${section}?client_date=${encodeURIComponent(date)}`;
 }
+
+export const DEVOTIONAL_SHARE_SECTIONS = ['scripture', 'reflection', 'prayer'] as const;
+
+export type DevotionalShareSection = (typeof DEVOTIONAL_SHARE_SECTIONS)[number];
+
+export const DEVOTIONAL_SHARE_LABELS: Record<DevotionalShareSection, string> = {
+  scripture: 'Scripture',
+  reflection: 'Reflection',
+  prayer: 'Prayer',
+};
+
+export function devotionalShareImagePath(
+  planId: string,
+  day: number,
+  section: DevotionalShareSection
+): string {
+  return `/api/devotional/${encodeURIComponent(planId)}/day/${day}/share-image/${section}`;
+}

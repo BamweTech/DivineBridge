@@ -341,6 +341,22 @@ class LocalStorageHandler:
         with open(file_path, "rb") as f:
             return f.read()
 
+    def save_devotional_share_image(self, plan_id, day, section, image_data):
+        """Save one devotional share card (local-dev cache)."""
+        file_path = self.images_path / f"devo_share_{plan_id}_{day}_{section}.jpg"
+        with open(file_path, "wb") as f:
+            f.write(image_data)
+        logger.info(f"Saved devotional share image locally: {file_path}")
+        return str(file_path)
+
+    def get_devotional_share_image(self, plan_id, day, section):
+        """Get a cached devotional share card (local-dev cache)."""
+        file_path = self.images_path / f"devo_share_{plan_id}_{day}_{section}.jpg"
+        if not file_path.exists():
+            return None
+        with open(file_path, "rb") as f:
+            return f.read()
+
     def save_prayer_image(self, date_str, image_data):
         """Save a prayer image"""
         file_path = self.images_path / f"prayer_{date_str}.png"

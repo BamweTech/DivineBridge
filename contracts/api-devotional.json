@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "prefix": "/api/devotional",
+  "endpoints": [
+    {"path": "/api/devotional/generate", "methods": ["POST"]},
+    {"path": "/api/devotional/<plan_id>/checkin", "methods": ["POST"]},
+    {"path": "/api/devotional/<plan_id>/restart", "methods": ["POST"]},
+    {"path": "/api/devotional/<plan_id>/journal", "methods": ["POST"]},
+    {"path": "/api/devotional/<plan_id>/day/<int:day>/share-image/<section>", "methods": ["GET"]}
+  ]
+}
