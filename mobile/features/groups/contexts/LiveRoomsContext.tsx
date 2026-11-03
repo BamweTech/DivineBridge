@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useMemo } from '
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { COLLECTIONS } from '@/lib/constants';
+import { isLiveFeedRoom } from '@/lib/liveFeedRoom';
 import type { PrayerRoom } from '@/types';
 
 interface LiveRoomsState {
@@ -16,10 +17,14 @@ export function LiveRoomsProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Keep the room_type inequality in the query so Firestore security rules can
+    // prove matched_prayer_call docs are never returned to non-participants.
+    // IMPORTANT: Firestore excludes documents that omit `room_type` from !=
+    // filters. Backend create/join/cleanup paths must always set room_type on
+    // standard prayer / group live rooms (see DEFAULT_ROOM_TYPE).
     const q = query(
       collection(db, COLLECTIONS.PRAYER_ROOMS),
       where('is_active', '==', true),
-      // Keep participant-scoped private prayer calls out of this public feed.
       where('room_type', '!=', 'matched_prayer_call'),
     );
     const unsub = onSnapshot(
@@ -30,12 +35,13 @@ export function LiveRoomsProvider({ children }: { children: React.ReactNode }) {
             ...d.data(),
             room_id: d.id,
           }) as PrayerRoom)
-          .filter((r) => r.room_type !== 'voice_link' && r.room_type !== 'matched_prayer_call');
+          .filter(isLiveFeedRoom);
         data.sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
         setRooms(data);
         setIsLoading(false);
       },
-      () => {
+      (error) => {
+        console.error('LiveRooms listener failed', error);
         setRooms([]);
         setIsLoading(false);
       },

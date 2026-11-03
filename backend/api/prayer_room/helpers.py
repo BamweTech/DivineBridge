@@ -30,6 +30,13 @@ VOICE_LINK_TTL_MINUTES = 10
 VOICE_LINK_WAIT_MINUTES = 30
 VALID_PARTICIPANT_ROLES = {"speaker", "listener"}
 
+# Standard prayer rooms and group live sessions must set this field.
+# Mobile LiveRooms queries `room_type != matched_prayer_call`; Firestore
+# inequality filters exclude documents that omit the field entirely, which
+# made group calls invisible to other members.
+DEFAULT_ROOM_TYPE = "prayer"
+PRIVATE_ROOM_TYPES = frozenset({"voice_link", "matched_prayer_call"})
+
 
 def _generate_room_id():
     return "".join([chr(65 + (ord(c) - 48) % 26) for c in str(uuid.uuid4().int)[:6]])
@@ -40,7 +47,21 @@ def _generate_room_code(length=8):
 
 
 def _is_voice_link_room(room_data):
-    return bool(room_data) and room_data.get("room_type") in {"voice_link", "matched_prayer_call"}
+    return bool(room_data) and room_data.get("room_type") in PRIVATE_ROOM_TYPES
+
+
+def _missing_live_feed_room_type(room_data):
+    """Rooms without room_type are excluded by Firestore != filters on live feeds."""
+    if room_data is None:
+        return False
+    return not room_data.get("room_type")
+
+
+def _live_feed_room_type_update(room_data):
+    """Return a Firestore update dict when room_type must be backfilled for live visibility."""
+    if _missing_live_feed_room_type(room_data):
+        return {"room_type": DEFAULT_ROOM_TYPE}
+    return {}
 
 
 def _normalize_utc_datetime(value):

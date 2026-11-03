@@ -8,6 +8,7 @@ from datetime import datetime
 import uuid
 from backend.services.media.sfu_regions import get_sfu_url_for_room, maybe_migrate_voice_link_sfu_at_guest_join
 from backend.api.prayer_room.helpers import (
+    DEFAULT_ROOM_TYPE,
     MAX_ACTIVE_SPEAKERS,
     VOICE_LINK_MAX_PARTICIPANTS,
     _active_participant_count,
@@ -17,6 +18,7 @@ from backend.api.prayer_room.helpers import (
     _is_room_participant,
     _is_voice_link_expired,
     _is_voice_link_room,
+    _live_feed_room_type_update,
     _mirror_chat_message_to_rtdb,
     _normalize_utc_datetime,
     _reject_anonymous_outside_voice_link,
@@ -73,6 +75,7 @@ def create_prayer_room():
             "room_name": room_name,
             "room_privacy": room_privacy,
             "room_code": room_code,  # Only set for private rooms
+            "room_type": DEFAULT_ROOM_TYPE,
             "host_id": host_id,
             "host_name": host_name,
             "created_at": datetime.utcnow(),
@@ -153,7 +156,13 @@ def ensure_group_prayer_session():
         )
         existing = list(rooms_query.stream())
         if existing:
-            rd = existing[0].to_dict()
+            existing_doc = existing[0]
+            rd = existing_doc.to_dict() or {}
+            # Self-heal rooms created before room_type was required for live feed visibility.
+            type_update = _live_feed_room_type_update(rd)
+            if type_update:
+                existing_doc.reference.update(type_update)
+                rd.update(type_update)
             return jsonify(
                 {
                     "success": True,
@@ -172,6 +181,7 @@ def ensure_group_prayer_session():
             "room_name": room_name,
             "room_privacy": "private",
             "room_code": room_code,
+            "room_type": DEFAULT_ROOM_TYPE,
             "group_id": group_id,
             "host_id": uid,
             "host_name": host_name,
@@ -390,6 +400,8 @@ def join_prayer_room(room_id):
             "last_activity": datetime.utcnow(),
             "max_speakers": max_speakers,
         }
+        # Backfill room_type so mobile live-feed listeners (room_type != ...) can see this room.
+        update_fields.update(_live_feed_room_type_update(room_data))
         started_expires_at, timer_fields = _voice_link_timer_start_if_needed(room_data, participants)
         update_fields.update(timer_fields)
 
