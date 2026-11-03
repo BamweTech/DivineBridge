@@ -37,6 +37,7 @@ import { uploadGroupChatFile } from '@/lib/groupChatUpload';
 import { useGroupUnread } from '@/features/groups/contexts/GroupUnreadContext';
 import { usePrayerRoom } from '@/features/rooms/hooks/usePrayerRoom';
 import { groupApi, roomApi } from '@/services/api';
+import { promptBlockUser, promptReportContent } from '@/lib/contentSafety';
 import { isWebRTCAvailable } from '@/lib/sfu';
 import { setActiveGroup } from '@/lib/activeGroupStore';
 import { GroupLiveAvPanel } from '@/features/groups/components/GroupLiveAvPanel';
@@ -129,7 +130,8 @@ export default function GroupScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user } = useAuthStore();
+  const { user, profile, refreshProfile } = useAuthStore();
+  const blockedUserIds = profile?.blockedUserIds;
   const scrollRef = useRef<FlatList<ChatListItem>>(null);
   const fsScrollRef = useRef<FlatList<ChatListItem>>(null);
 
@@ -251,7 +253,9 @@ export default function GroupScreen() {
     const effectiveJoinedAt =
       isReadsReady && lastReadAt === 0 && isRecentJoiner ? memberJoinedAt : 0;
 
+    const blocked = new Set(blockedUserIds ?? []);
     return messages
+      .filter((msg) => !msg.user_id || msg.user_id === user?.uid || !blocked.has(msg.user_id))
       .filter((msg) =>
         effectiveJoinedAt === 0 || firestoreTimestampMs(msg.timestamp) >= effectiveJoinedAt
       )
@@ -259,7 +263,7 @@ export default function GroupScreen() {
         const override = optimisticReactions[msg.message_id];
         return override ? { ...msg, reactions: override } : msg;
       });
-  }, [messages, optimisticReactions, lastReadAt, memberJoinedAt, isReadsReady]);
+  }, [messages, optimisticReactions, lastReadAt, memberJoinedAt, isReadsReady, blockedUserIds, user?.uid]);
 
   const viewerMediaActive = useMemo((): ViewerMedia | null => {
     if (videoViewer) return videoViewer;
@@ -553,6 +557,19 @@ export default function GroupScreen() {
     } catch {
       Alert.alert('Error', 'Could not delete message. Please try again.');
     }
+  }
+
+  function handleReportMessage(message: GroupChatMessage) {
+    promptReportContent({
+      contentType: 'group_message',
+      contentId: message.message_id,
+      targetUserId: message.user_id,
+    });
+  }
+
+  function handleBlockMessageAuthor(message: GroupChatMessage) {
+    if (!message.user_id || message.user_id === user?.uid) return;
+    promptBlockUser(message.user_id, () => refreshProfile());
   }
 
   function requestDeleteMessage(messageId: string) {
@@ -994,6 +1011,8 @@ export default function GroupScreen() {
         onOpenReactions={handleOpenReactionPopover}
         onCopyMessage={(message) => { void handleCopyMessage(message); }}
         onDeleteMessage={requestDeleteMessage}
+        onReportMessage={handleReportMessage}
+        onBlockUser={handleBlockMessageAuthor}
         onJumpToReply={jumpToMessage}
         onLayoutMessage={registerMessageLayout}
       />

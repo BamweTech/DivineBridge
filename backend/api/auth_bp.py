@@ -1,5 +1,13 @@
-from flask import Blueprint, request, jsonify, session, current_app
-from backend.integrations.firebase_auth import initialize_firebase, verify_token, create_user, send_verification_email
+from flask import Blueprint, request, jsonify, session, current_app, g
+from backend.integrations.firebase_auth import (
+    initialize_firebase,
+    verify_token,
+    create_user,
+    send_verification_email,
+    delete_user,
+    get_firestore_client,
+)
+from backend.core.auth.helpers import require_auth
 from backend.services.email.email_service import EmailService
 from backend.core.config import get_config
 from backend.core.extensions import limiter
@@ -691,3 +699,168 @@ def register_push_token():
     except Exception as e:
         logger.error(f"Error registering push token: {e}")
         return jsonify({"error": "Failed to register push token"}), 500
+
+
+_ALLOWED_REPORT_TYPES = {"group_message", "prayer_request", "testimony"}
+
+
+def _authenticated_uid():
+    uid = getattr(g, "user_id", None)
+    if not isinstance(uid, str) or not uid.strip():
+        return None
+    return uid.strip()
+
+
+def _json_body():
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else {}
+
+
+def _bounded_text(value, max_length):
+    if not isinstance(value, str):
+        return ""
+    cleaned = sanitize_string(value, max_length=max_length)
+    return cleaned if isinstance(cleaned, str) else ""
+
+
+def _delete_profile_photos(uid):
+    """Delete Firebase Storage objects under profile_photos/{uid}/. Missing objects are ignored."""
+    try:
+        from firebase_admin import storage as fb_storage
+        from google.api_core.exceptions import NotFound
+    except Exception:
+        logger.warning("Profile photo cleanup unavailable for %s", uid, exc_info=True)
+        return
+
+    try:
+        bucket = fb_storage.bucket()
+        blobs = bucket.list_blobs(prefix=f"profile_photos/{uid}/")
+    except NotFound:
+        return
+    except Exception:
+        logger.warning("Profile photo list failed for %s", uid, exc_info=True)
+        return
+
+    for blob in blobs:
+        try:
+            blob.delete()
+        except NotFound:
+            continue
+        except Exception:
+            logger.warning("Profile photo delete failed for %s", uid, exc_info=True)
+
+
+def _delete_firestore_user(uid):
+    """Delete users/{uid}. A missing document is treated as already removed."""
+    try:
+        from google.api_core.exceptions import NotFound
+
+        db = get_firestore_client()
+        if db is None:
+            logger.warning("Firestore unavailable while deleting user %s", uid)
+            return
+        ref = db.collection("users").document(uid)
+        try:
+            snapshot = ref.get()
+        except NotFound:
+            return
+        if getattr(snapshot, "exists", False):
+            ref.delete()
+    except Exception:
+        logger.warning("Firestore profile cleanup failed for %s", uid, exc_info=True)
+
+
+@auth_bp.route("/delete-account", methods=["POST"])
+@limiter.limit("5 per hour")
+@require_auth
+def delete_account():
+    """Delete the signed-in Firebase user, Firestore profile, and profile photos."""
+    uid = _authenticated_uid()
+    if not uid:
+        return jsonify({"success": False, "error": "Authentication required"}), 401
+
+    body = _json_body()
+    requested = _bounded_text(body.get("uid") or body.get("user_id") or "", 128)
+    if requested and requested != uid:
+        return jsonify({"success": False, "error": "You can only delete your own account"}), 403
+
+    _delete_firestore_user(uid)
+    _delete_profile_photos(uid)
+    if not delete_user(uid):
+        logger.error("Firebase Auth delete failed for %s", uid)
+        return jsonify({"success": False, "error": "Could not delete account"}), 500
+
+    session.clear()
+    return jsonify({"success": True, "data": {"deleted": True}}), 200
+
+
+@auth_bp.route("/content-reports", methods=["POST"])
+@limiter.limit("30 per hour")
+@require_auth
+def create_content_report():
+    """Store a report from the signed-in user. The reporter id comes from the token."""
+    uid = _authenticated_uid()
+    if not uid:
+        return jsonify({"success": False, "error": "Authentication required"}), 401
+
+    body = _json_body()
+    content_type = _bounded_text(body.get("content_type") or body.get("contentType") or "", 40)
+    content_id = _bounded_text(body.get("content_id") or body.get("contentId") or "", 200)
+    reason = _bounded_text(body.get("reason") or "", 500)
+    target_user_id = _bounded_text(body.get("target_user_id") or body.get("targetUserId") or "", 128)
+
+    if content_type not in _ALLOWED_REPORT_TYPES:
+        return jsonify({"success": False, "error": "Unsupported content type"}), 400
+    if not content_id or not reason:
+        return jsonify({"success": False, "error": "Content and a reason are required"}), 400
+    if target_user_id == uid:
+        return jsonify({"success": False, "error": "You cannot report your own account"}), 400
+
+    db = get_firestore_client()
+    if db is None:
+        return jsonify({"success": False, "error": "Could not save report"}), 503
+
+    from firebase_admin import firestore as fb_fs
+
+    added = db.collection("content_reports").add(
+        {
+            "reporter_uid": uid,
+            "target_user_id": target_user_id,
+            "content_type": content_type,
+            "content_id": content_id,
+            "reason": reason,
+            "created_at": fb_fs.SERVER_TIMESTAMP,
+        }
+    )
+    report_ref = added[1] if isinstance(added, tuple) and len(added) > 1 else added
+    report_id = getattr(report_ref, "id", "")
+    return jsonify({"success": True, "data": {"id": report_id}}), 201
+
+
+@auth_bp.route("/block-user", methods=["POST"])
+@limiter.limit("30 per hour")
+@require_auth
+def block_user():
+    """Add a user id to the signed-in user's blocked_user_ids list."""
+    uid = _authenticated_uid()
+    if not uid:
+        return jsonify({"success": False, "error": "Authentication required"}), 401
+
+    body = _json_body()
+    target_user_id = _bounded_text(body.get("target_user_id") or body.get("targetUserId") or "", 128)
+    if not target_user_id:
+        return jsonify({"success": False, "error": "A user to block is required"}), 400
+    if target_user_id == uid:
+        return jsonify({"success": False, "error": "You cannot block your own account"}), 400
+
+    db = get_firestore_client()
+    if db is None:
+        return jsonify({"success": False, "error": "Could not update blocks"}), 503
+
+    from firebase_admin import firestore as fb_fs
+
+    db.collection("users").document(uid).set(
+        {"blocked_user_ids": fb_fs.ArrayUnion([target_user_id])},
+        merge=True,
+    )
+    return jsonify({"success": True, "data": {"blocked_user_id": target_user_id}}), 200

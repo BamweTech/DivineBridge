@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Linking,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { collection, query, where, getDocs, limit, doc, updateDoc } from 'firebase/firestore';
@@ -117,6 +118,7 @@ function SectionTitle({ children }: { children: string }) {
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { user, profile, logout, refreshProfile, resetPassword } = useAuthStore();
   const { groups: myGroups } = useGroupUnread();
 
@@ -125,6 +127,7 @@ export default function ProfileScreen() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
@@ -312,6 +315,36 @@ export default function ProfileScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign out', style: 'destructive', onPress: logout },
     ]);
+  }
+
+  function handleDeleteAccount() {
+    if (deletingAccount) return;
+    Alert.alert(
+      'Delete account',
+      'This removes your Divine Bridge account and its data, including your profile. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete account',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              setDeletingAccount(true);
+              try {
+                await profileApi.deleteAccount();
+                await logout();
+                router.replace('/(auth)/login');
+              } catch (error: unknown) {
+                const message = error instanceof Error ? error.message : 'Could not delete your account.';
+                Alert.alert('Could not delete account', message);
+              } finally {
+                setDeletingAccount(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
   }
 
   const openUrl = (path: string) => {
@@ -582,6 +615,12 @@ export default function ProfileScreen() {
         <SettingRow iconName="scroll" label="Privacy Policy" onPress={() => openUrl('/privacy-policy')} />
         <SettingRow iconName="scroll" label="Terms of Service" onPress={() => openUrl('/terms-of-service')} />
         <SettingRow iconName="chat" label="Help & FAQ" onPress={() => openUrl('/faq')} />
+        <SettingRow
+          iconName="trash"
+          label={deletingAccount ? 'Deleting account…' : 'Delete account'}
+          onPress={deletingAccount ? undefined : handleDeleteAccount}
+          danger
+        />
         <SettingRow iconName="logout" label="Sign Out" onPress={handleLogout} danger />
       </Animated.View>
 

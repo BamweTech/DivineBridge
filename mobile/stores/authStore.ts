@@ -61,6 +61,9 @@ function normalizeProfile(uid: string, data: Record<string, unknown>): UserProfi
     preferredPrayerLanguage: data.preferred_prayer_language as string | undefined,
     createdAt: createdNum,
     groups: (data.groups as string[] | undefined) ?? [],
+    blockedUserIds: Array.isArray(data.blocked_user_ids)
+      ? data.blocked_user_ids.filter((id): id is string => typeof id === 'string' && id.length > 0)
+      : [],
   };
 }
 

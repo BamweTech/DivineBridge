@@ -10,6 +10,9 @@
     {"path": "/api/auth/forgot-password", "methods": ["POST"]},
     {"path": "/api/auth/reset-password", "methods": ["POST"]},
     {"path": "/api/auth/push-token", "methods": ["POST"]},
-    {"path": "/api/auth/profile/business-card", "methods": ["GET", "POST"]}
+    {"path": "/api/auth/profile/business-card", "methods": ["GET", "POST"]},
+    {"path": "/api/auth/delete-account", "methods": ["POST"]},
+    {"path": "/api/auth/content-reports", "methods": ["POST"]},
+    {"path": "/api/auth/block-user", "methods": ["POST"]}
   ]
 }

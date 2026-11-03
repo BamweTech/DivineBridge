@@ -57,6 +57,7 @@ import { OfflineBanner } from '@/components/OfflineBanner';
 import { usePushToken } from '@/hooks/usePushToken';
 import { groupApi } from '@/services/api';
 import { THEME_COLORS } from '@/lib/constants';
+import { parseInviteUrl } from '@/lib/parseGroupInvite';
 import { iosFontStyle } from '@/lib/typography';
 import Icon from '@/components/ui/Icon';
 import BrandedSplashOverlay from '@/components/BrandedSplashOverlay';
@@ -99,37 +100,6 @@ const asyncStoragePersister = createAsyncStoragePersister({
   storage: AsyncStorage,
   key: 'DIVINEBRIDGE_QUERY_CACHE',
 });
-
-// Parse a deep link URL and extract groupId + code.
-// Handles:
-//   io.divinebridge.app://join/<groupId>?code=<code>  (custom scheme)
-//   https://divinebridge.io/join/<groupId>?code=<code> (universal link)
-function parseInviteUrl(url: string | null): { groupId: string; code: string } | null {
-  if (!url) return null;
-  try {
-    let normalized = url;
-    // Normalize custom scheme so URL can be parsed uniformly
-    if (url.startsWith('io.divinebridge.app://')) {
-      normalized = url.replace('io.divinebridge.app://', 'https://placeholder/');
-    }
-    const u = new URL(normalized);
-    const joinGroup = u.searchParams.get('join_group');
-    if (joinGroup) {
-      return {
-        groupId: joinGroup,
-        code:
-          u.searchParams.get('invite_code') ||
-          u.searchParams.get('code') ||
-          '',
-      };
-    }
-    const match = u.pathname.match(/\/join\/([^?/#]+)/);
-    if (!match) return null;
-    return { groupId: match[1], code: u.searchParams.get('code') || '' };
-  } catch {
-    return null;
-  }
-}
 
 // ─── JoinGroupModal ───────────────────────────────────────────────────────────
 

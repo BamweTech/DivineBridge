@@ -8,7 +8,8 @@ alwaysApply: false
 
 ## Firestore collections (from firestore.rules)
 
-- `users` — profiles, preferences, admin flags
+- `users` — profiles, preferences, admin flags, `blocked_user_ids`
+- `content_reports` — moderation reports written by the API (clients cannot read or write)
 - `prayer_rooms`, `scheduled_rooms`, `scheduled_room_rsvps` — live room metadata
 - `chat_messages`, `group_chat_messages/{id}/messages` — room and group chat
 - `prayer_groups`, `group_members` — small group communities

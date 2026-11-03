@@ -25,6 +25,8 @@ export interface UserProfile {
   notifyDevotional?: boolean;
   createdAt?: number;
   groups?: string[];
+  /** User ids this account has blocked. Mirrors Firestore `blocked_user_ids`. */
+  blockedUserIds?: string[];
 }
 
 // ─── Private Prayer Matching ──────────────────────────────────────────────────

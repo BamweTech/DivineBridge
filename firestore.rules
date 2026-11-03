@@ -208,15 +208,23 @@ service cloud.firestore {
                           resource.data.user_id == request.auth.uid;
     }
     
-    // Testimonies collection - public read, authenticated write
+    // Testimonies collection - public read. Clients may create pending items only.
     match /testimonies/{testimonyId} {
       allow read: if true;
-      allow write: if request.auth != null &&
+      allow create: if request.auth != null &&
                   request.resource.data.keys().hasAll(['user_id', 'testimony', 'timestamp', 'status']) &&
                   request.resource.data.user_id == request.auth.uid &&
                   request.resource.data.testimony is string &&
                   request.resource.data.testimony.size() <= 2000 &&
-                  request.resource.data.status in ['pending', 'approved', 'rejected'];
+                  request.resource.data.status == 'pending';
+      allow update: if request.auth != null &&
+                  resource.data.user_id == request.auth.uid &&
+                  request.resource.data.user_id == request.auth.uid &&
+                  request.resource.data.status == resource.data.status &&
+                  request.resource.data.testimony is string &&
+                  request.resource.data.testimony.size() <= 2000;
+      allow delete: if request.auth != null &&
+                  resource.data.user_id == request.auth.uid;
     }
     
     // Prayers collection - public read, authenticated write
@@ -452,6 +460,11 @@ service cloud.firestore {
 
     // Devotional templates — backend-only; no direct client access
     match /devotional_templates/{docId} {
+      allow read, write: if false;
+    }
+
+    // Moderation reports are written by the API with the Admin SDK.
+    match /content_reports/{reportId} {
       allow read, write: if false;
     }
 

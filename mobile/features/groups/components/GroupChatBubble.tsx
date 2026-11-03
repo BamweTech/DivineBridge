@@ -37,6 +37,8 @@ export function GroupChatBubble({
   onOpenReactions,
   onCopyMessage,
   onDeleteMessage,
+  onReportMessage,
+  onBlockUser,
   onJumpToReply,
   onLayoutMessage,
 }: {
@@ -53,6 +55,8 @@ export function GroupChatBubble({
   onOpenReactions: (message: GroupChatMessage, anchor: { x: number; y: number; align: 'left' | 'right' }) => void;
   onCopyMessage: (message: GroupChatMessage) => void;
   onDeleteMessage: (messageId: string) => void;
+  onReportMessage: (message: GroupChatMessage) => void;
+  onBlockUser: (message: GroupChatMessage) => void;
   onJumpToReply: (messageId: string, surface: ChatSurface) => void;
   onLayoutMessage: (messageId: string, y: number, surface: ChatSurface) => void;
 }) {
@@ -217,7 +221,46 @@ export function GroupChatBubble({
                 Delete
               </Text>
             </Pressable>
-          ) : null}
+          ) : (
+            <>
+              <Pressable
+                onPress={() => {
+                  swipeRef.current?.close();
+                  onReportMessage(msg);
+                }}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  borderRadius: 14,
+                  backgroundColor: THEME_COLORS.bg3,
+                  borderWidth: 1,
+                  borderColor: THEME_COLORS.border,
+                }}
+              >
+                <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('600'), fontSize: 12 }}>
+                  Report
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  swipeRef.current?.close();
+                  onBlockUser(msg);
+                }}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  borderRadius: 14,
+                  backgroundColor: 'rgba(176,90,80,0.08)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(176,90,80,0.16)',
+                }}
+              >
+                <Text style={{ color: THEME_COLORS.rose, ...iosFontStyle('600'), fontSize: 12 }}>
+                  Block
+                </Text>
+              </Pressable>
+            </>
+          )}
         </View>
       )}
       onSwipeableOpen={(direction) => {

@@ -12,6 +12,7 @@ import Icon from '@/components/ui/Icon';
 import { THEME_COLORS } from '@/lib/constants';
 import { iosFontStyle } from '@/lib/typography';
 import { privatePrayerRequestApi } from '@/services/api';
+import { promptReportContent } from '@/lib/contentSafety';
 import { useAuthStore } from '@/stores/authStore';
 import type { PrivatePrayerRequest } from '@/types';
 
@@ -243,6 +244,7 @@ export default function PrayerRequestsScreen() {
               onPray={() => pray.mutate(item.id)}
               joining={openCall.isPending}
               praying={pray.isPending}
+              canReport
             />
           ))}
         </>
@@ -251,7 +253,7 @@ export default function PrayerRequestsScreen() {
   );
 }
 
-function RequestCard({ request, onClaim, onJoin, onResubmit, onCancel, onPray, claiming, joining, cancelling, praying, leader }: {
+function RequestCard({ request, onClaim, onJoin, onResubmit, onCancel, onPray, claiming, joining, cancelling, praying, leader, canReport }: {
   request: PrivatePrayerRequest;
   onClaim?: (slotStart?: string) => void;
   onJoin?: () => void;
@@ -263,6 +265,7 @@ function RequestCard({ request, onClaim, onJoin, onResubmit, onCancel, onPray, c
   cancelling?: boolean;
   praying?: boolean;
   leader?: boolean;
+  canReport?: boolean;
 }) {
   const firstSlot = request.availability[0]?.start_at;
   return (
@@ -275,6 +278,20 @@ function RequestCard({ request, onClaim, onJoin, onResubmit, onCancel, onPray, c
       {(request.prayer_count ?? 0) > 0 && <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 8 }}>{request.prayer_count} prayer{request.prayer_count === 1 ? '' : 's'} recorded</Text>}
       {request.scheduled_at && <Text style={{ color: THEME_COLORS.sage, ...iosFontStyle('500'), fontSize: 12, marginTop: 10 }}>Call scheduled · {formatSlot(request.scheduled_at)}</Text>}
       {leader && request.wants_live_call && firstSlot && <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 10 }}>Available: {formatSlot(firstSlot)}</Text>}
+      {leader || canReport ? (
+        <Pressable
+          onPress={() =>
+            promptReportContent({
+              contentType: 'prayer_request',
+              contentId: request.id,
+            })
+          }
+          hitSlop={8}
+          style={{ marginTop: 12, alignSelf: 'flex-start' }}
+        >
+          <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('500'), fontSize: 12 }}>Report</Text>
+        </Pressable>
+      ) : null}
       {leader && onClaim && <Button label={claiming ? 'Accepting…' : request.wants_live_call ? 'Accept & schedule call' : 'Accept request'} onPress={() => onClaim(firstSlot)} isLoading={claiming} fullWidth style={{ marginTop: 14 }} />}
       {request.status === 'scheduled' && onJoin && <Button label={joining ? 'Opening…' : 'Join prayer call'} onPress={onJoin} isLoading={joining} fullWidth style={{ marginTop: 14 }} />}
       {onPray && !['cancelled', 'expired'].includes(request.status) && <Button label={praying ? 'Saving…' : `I prayed for you${request.prayer_count ? ` · ${request.prayer_count}` : ''}`} onPress={onPray} isLoading={praying} variant="secondary" fullWidth style={{ marginTop: 10 }} />}

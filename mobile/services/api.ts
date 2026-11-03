@@ -269,10 +269,13 @@ export const groupApi = {
     request<any>(`/api/groups/${groupId}/leave`, { method: 'POST' }),
   myGroups: () => request<any>('/api/groups/my'),
   joinByCode: (code: string) =>
-    request<any>('/api/groups/join-by-code', {
-      method: 'POST',
-      body: JSON.stringify({ code }),
-    }),
+    request<{ success: boolean; message: string; group_id: string; group_name: string }>(
+      '/api/groups/join-by-code',
+      {
+        method: 'POST',
+        body: JSON.stringify({ code }),
+      },
+    ),
   syncMembers: (groupId: string) =>
     request<any>(`/api/groups/${groupId}/members/sync`, {
       method: 'POST',
@@ -405,6 +408,36 @@ export const profileApi = {
     request<{ message: string }>('/api/auth/profile/business-card', {
       method: 'POST',
       body: JSON.stringify(body),
+    }),
+  deleteAccount: () =>
+    request<{ success: boolean; data: { deleted: boolean } }>('/api/auth/delete-account', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+};
+
+export type SafetyContentType = 'group_message' | 'prayer_request' | 'testimony';
+
+export const safetyApi = {
+  report: (body: {
+    contentType: SafetyContentType;
+    contentId: string;
+    targetUserId?: string;
+    reason: string;
+  }) =>
+    request<{ success: boolean; data: { id: string } }>('/api/auth/content-reports', {
+      method: 'POST',
+      body: JSON.stringify({
+        content_type: body.contentType,
+        content_id: body.contentId,
+        target_user_id: body.targetUserId ?? '',
+        reason: body.reason,
+      }),
+    }),
+  blockUser: (targetUserId: string) =>
+    request<{ success: boolean; data: { blocked_user_id: string } }>('/api/auth/block-user', {
+      method: 'POST',
+      body: JSON.stringify({ target_user_id: targetUserId }),
     }),
 };
 

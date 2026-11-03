@@ -12,6 +12,7 @@ import {
   RefreshControl,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,10 +23,12 @@ import dayjs from 'dayjs';
 import { useGroupUnread } from '@/features/groups/contexts/GroupUnreadContext';
 import { useGroupLiveRooms } from '@/features/groups/hooks/useGroups';
 import { groupApi, scheduledApi, prayerRequestApi, globalWatchApi } from '@/services/api';
+import { promptBlockUser, promptReportContent } from '@/lib/contentSafety';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { PulsingDot } from '@/components/ui/PulsingDot';
 import { THEME_COLORS } from '@/lib/constants';
+import { parseGroupInviteInput } from '@/lib/parseGroupInvite';
 import { iosFontStyle, iosFontStyleItalic } from '@/lib/typography';
 import { filterGlobalWatchForFeed } from '@/lib/globalWatchFeed';
 import { isHiddenProductionTestWallItem } from '@/lib/qaWallFilters';
@@ -412,10 +415,14 @@ const PrayerCard = memo(function PrayerCard({
   post,
   currentUserId,
   onPray,
+  onReport,
+  onBlock,
 }: {
   post: PrayerPost;
   currentUserId?: string;
   onPray: () => void;
+  onReport: (post: PrayerPost) => void;
+  onBlock: (post: PrayerPost) => void;
 }) {
   const isAnon = Boolean(post.is_anonymous) || !post.user_id;
   const isMe =
@@ -483,6 +490,16 @@ const PrayerCard = memo(function PrayerCard({
               I Prayed{prayCount > 0 ? ` · ${prayCount}` : ''}
             </Text>
           </Pressable>
+          {!isMe ? (
+            <Pressable onPress={() => onReport(post)} hitSlop={8}>
+              <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('500'), fontSize: 12 }}>Report</Text>
+            </Pressable>
+          ) : null}
+          {!isMe && !isAnon && post.user_id ? (
+            <Pressable onPress={() => onBlock(post)} hitSlop={8}>
+              <Text style={{ color: THEME_COLORS.rose, ...iosFontStyle('500'), fontSize: 12 }}>Block</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </Animated.View>
@@ -617,6 +634,8 @@ function PrayerWallFeed({
   onPrivateRequest: () => void;
 }) {
   const queryClient = useQueryClient();
+  const blockedUserIds = useAuthStore((state) => state.profile?.blockedUserIds);
+  const refreshProfile = useAuthStore((state) => state.refreshProfile);
 
   const { data: communityData, isLoading: communityLoading, refetch: refetchCommunity, isFetching: communityFetching } = useQuery({
     queryKey: ['prayer-wall'],
@@ -673,9 +692,12 @@ function PrayerWallFeed({
   });
 
   // Community posts — exclude AI daily prayers (source === 'generated'); hide QA fingerprints
+  const blockedIds = new Set(blockedUserIds ?? []);
   const communityPosts: PrayerPost[] = (communityData?.prayers ?? []).filter(
     (p: any) =>
-      !(p.source === 'generated' && !p.user_id) && !isHiddenProductionTestWallItem(p as Record<string, unknown>)
+      !(p.source === 'generated' && !p.user_id) &&
+      !isHiddenProductionTestWallItem(p as Record<string, unknown>) &&
+      !(typeof p.user_id === 'string' && p.user_id && blockedIds.has(p.user_id))
   );
 
   // Global watch: max 10, drop AI/meta junk, one card per event (dedupe)
@@ -731,9 +753,20 @@ function PrayerWallFeed({
           post={item.data as PrayerPost}
           currentUserId={currentUserId}
           onPray={() => prayMutation.mutate((item.data as PrayerPost).id)}
+          onReport={(post) =>
+            promptReportContent({
+              contentType: 'prayer_request',
+              contentId: post.id,
+              targetUserId: post.user_id,
+            })
+          }
+          onBlock={(post) => {
+            if (!post.user_id) return;
+            promptBlockUser(post.user_id, () => refreshProfile());
+          }}
         />
       ),
-    [currentUserId, prayMutation, globalWatchPrayMutation]
+    [currentUserId, prayMutation, globalWatchPrayMutation, refreshProfile]
   );
 
   if (isLoading) {
@@ -812,6 +845,154 @@ function PrayerWallFeed({
   );
 }
 
+// ─── Join by invite code ──────────────────────────────────────────────────────
+
+function HeaderPill({
+  label,
+  icon,
+  onPress,
+}: {
+  label: string;
+  icon?: 'user-plus' | 'plus';
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        borderRadius: 50,
+        backgroundColor: THEME_COLORS.bg3,
+        borderWidth: 1,
+        borderColor: THEME_COLORS.border,
+      }}
+    >
+      {icon ? <Icon name={icon} size={14} color={THEME_COLORS.text2} /> : null}
+      <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('500'), fontSize: 12 }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function JoinGroupByCodeModal({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
+  const [codeInput, setCodeInput] = useState('');
+  const [isJoining, setIsJoining] = useState(false);
+
+  async function handleJoin() {
+    const parsed = parseGroupInviteInput(codeInput);
+    if (!parsed || (!parsed.groupId && !parsed.code)) {
+      Alert.alert(
+        'Enter an invite code',
+        'Type the 8-character code from the invite, or paste the invite link.',
+      );
+      return;
+    }
+
+    setIsJoining(true);
+    try {
+      let groupId = parsed.groupId;
+      if (parsed.groupId) {
+        await groupApi.join(parsed.groupId, parsed.code || undefined);
+      } else {
+        const result = await groupApi.joinByCode(parsed.code);
+        groupId = result.group_id;
+      }
+      if (!groupId) {
+        setIsJoining(false);
+        Alert.alert('Could not join group', 'That invite code did not match a group.');
+        return;
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      onClose();
+      router.push(`/group/${groupId}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error && err.message ? err.message : 'Please try again.';
+      if (/already a member/i.test(msg) && parsed.groupId) {
+        onClose();
+        router.push(`/group/${parsed.groupId}`);
+        return;
+      }
+      setIsJoining(false);
+      Alert.alert('Could not join group', msg);
+    }
+  }
+
+  return (
+    <Modal transparent animationType="slide" visible onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(44,36,22,0.55)', justifyContent: 'flex-end' }}
+          onPress={onClose}
+        >
+          <Pressable
+            onPress={() => {}}
+            style={{
+              backgroundColor: THEME_COLORS.bg,
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              paddingHorizontal: 24,
+              paddingTop: 16,
+              paddingBottom: 48,
+            }}
+          >
+            <View style={{ width: 36, height: 4, backgroundColor: THEME_COLORS.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 }} />
+            <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 20, textAlign: 'center', marginBottom: 4, letterSpacing: -0.3 }}>
+              Join group
+            </Text>
+            <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 13, textAlign: 'center', marginBottom: 20, lineHeight: 18 }}>
+              Enter the 8-character code, or paste the invite link.
+            </Text>
+            <TextInput
+              value={codeInput}
+              onChangeText={setCodeInput}
+              placeholder="A1B2C3D4"
+              placeholderTextColor={THEME_COLORS.text3}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={500}
+              onSubmitEditing={handleJoin}
+              returnKeyType="go"
+              style={{
+                backgroundColor: THEME_COLORS.bg2,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: THEME_COLORS.border,
+                color: THEME_COLORS.text,
+                ...iosFontStyle(/[:/]/.test(codeInput) ? '400' : '600'),
+                fontSize: /[:/]/.test(codeInput) ? 14 : 18,
+                letterSpacing: /[:/]/.test(codeInput) ? 0 : 2,
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+                marginBottom: 20,
+                textAlign: /[:/]/.test(codeInput) ? 'left' : 'center',
+              }}
+            />
+            <Button
+              label="Join"
+              onPress={handleJoin}
+              isLoading={isJoining}
+              disabled={!codeInput.trim()}
+              fullWidth
+            />
+            <Button label="Cancel" onPress={onClose} variant="ghost" fullWidth style={{ marginTop: 8 }} />
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function GroupsScreen() {
@@ -833,6 +1014,7 @@ export default function GroupsScreen() {
     router.setParams({ tab: next });
   }
   const [showCreate, setShowCreate] = useState(false);
+  const [showJoin, setShowJoin] = useState(false);
   const [showCompose, setShowCompose] = useState(false);
   const { groups: myGroups, isLoadingGroups: myLoading, unreadByGroup, unreadCountByGroup, totalUnread } = useGroupUnread();
   const liveByGroup = useGroupLiveRooms(myGroups.map((g) => g.group_id));
@@ -867,27 +1049,36 @@ export default function GroupsScreen() {
         entering={FadeInDown.duration(400)}
         style={{ paddingTop: insets.top + 16, paddingHorizontal: 22, paddingBottom: 16 }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-          <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 26, letterSpacing: -0.5 }}>
-            {tab === 'prayer-wall' ? 'Prayer Wall' : 'Prayer Groups'}
-          </Text>
-          {/* The + button opens CreateGroup on "mine" tab and Compose on "prayer-wall" tab */}
-          <Pressable
-            onPress={() => tab === 'prayer-wall' ? setShowCompose(true) : setShowCreate(true)}
-            style={{
-              flexDirection: 'row', alignItems: 'center', gap: 6,
-              paddingHorizontal: 12, paddingVertical: 7,
-              borderRadius: 50,
-              backgroundColor: tab === 'prayer-wall' ? THEME_COLORS.goldDim : THEME_COLORS.bg3,
-              borderWidth: 1,
-              borderColor: tab === 'prayer-wall' ? THEME_COLORS.goldBorder : THEME_COLORS.border,
-            }}
-          >
-            <Icon name="plus" size={14} color={tab === 'prayer-wall' ? THEME_COLORS.gold : THEME_COLORS.text2} />
-            <Text style={{ color: tab === 'prayer-wall' ? THEME_COLORS.gold : THEME_COLORS.text2, ...iosFontStyle('500'), fontSize: 12 }}>
-              {tab === 'prayer-wall' ? 'Pray' : 'New Group'}
+        <View style={{ marginBottom: 16, gap: tab === 'prayer-wall' ? 0 : 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 26, letterSpacing: -0.5, flex: 1 }}>
+              {tab === 'prayer-wall' ? 'Prayer Wall' : 'Prayer Groups'}
             </Text>
-          </Pressable>
+            {tab === 'prayer-wall' ? (
+              <Pressable
+                onPress={() => setShowCompose(true)}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 6,
+                  paddingHorizontal: 12, paddingVertical: 7,
+                  borderRadius: 50,
+                  backgroundColor: THEME_COLORS.goldDim,
+                  borderWidth: 1,
+                  borderColor: THEME_COLORS.goldBorder,
+                }}
+              >
+                <Icon name="plus" size={14} color={THEME_COLORS.gold} />
+                <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('500'), fontSize: 12 }}>
+                  Pray
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+          {tab !== 'prayer-wall' ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <HeaderPill label="Join group" icon="user-plus" onPress={() => setShowJoin(true)} />
+              <HeaderPill label="New Group" icon="plus" onPress={() => setShowCreate(true)} />
+            </View>
+          ) : null}
         </View>
 
         {/* Tab pills */}
@@ -963,9 +1154,10 @@ export default function GroupsScreen() {
                 You're not in any group yet
               </Text>
               <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 14, textAlign: 'center', maxWidth: 260, lineHeight: 22, marginBottom: 24 }}>
-                Prayer is better together. Create your own group or visit the Prayer Wall to connect with the community.
+                Prayer is better together. Join with an invite code, or create your own group.
               </Text>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
+                <Button label="Join group" onPress={() => setShowJoin(true)} />
                 <Button label="Create Group" onPress={() => setShowCreate(true)} />
                 <Button label="Prayer Wall" onPress={() => selectTab('prayer-wall')} variant="secondary" />
               </View>
@@ -988,6 +1180,7 @@ export default function GroupsScreen() {
           )}
         </ScrollView>
       )}
+      {showJoin ? <JoinGroupByCodeModal onClose={() => setShowJoin(false)} /> : null}
     </View>
   );
 }

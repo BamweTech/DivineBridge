@@ -19,8 +19,10 @@ export default {
     icon: './assets/icon.png',
     scheme: 'io.divinebridge.app',
     userInterfaceStyle: 'dark',
-    newArchEnabled: false,
+    newArchEnabled: true,
     splash: {
+      image: './assets/splash-icon.png',
+      resizeMode: 'contain',
       backgroundColor: '#faf6ef',
     },
     ios: {
@@ -72,6 +74,9 @@ export default {
         'android.permission.VIBRATE',
         'android.permission.RECEIVE_BOOT_COMPLETED',
         'android.permission.WAKE_LOCK',
+        'android.permission.POST_NOTIFICATIONS',
+      ],
+      blockedPermissions: [
         'android.permission.READ_EXTERNAL_STORAGE',
         'android.permission.WRITE_EXTERNAL_STORAGE',
         'android.permission.READ_MEDIA_VISUAL_USER_SELECTED',
@@ -104,7 +109,10 @@ export default {
       [
         'expo-splash-screen',
         {
+          image: './assets/splash-icon.png',
+          resizeMode: 'contain',
           backgroundColor: '#faf6ef',
+          imageWidth: 200,
         },
       ],
       'expo-font',
@@ -115,8 +123,8 @@ export default {
             deploymentTarget: '17.0',
           },
           android: {
-            compileSdkVersion: 35,
-            targetSdkVersion: 35,
+            compileSdkVersion: 36,
+            targetSdkVersion: 36,
             minSdkVersion: 24,
           },
         },
@@ -138,6 +146,7 @@ export default {
         {
           photosPermission: "Divine Bridge needs access to your library so you can choose media to share in group chats.",
           savePhotosPermission: 'Divine Bridge needs permission to save shared photos and videos to your device.',
+          granularPermissions: [],
         },
       ],
       [
@@ -162,9 +171,9 @@ export default {
     extra: {
       router: {},
       eas: {
-        projectId: 'e1dd06ba-dda2-4c47-ba99-13f9c8443005',
+        projectId: '05419864-1508-4ff8-b2de-4cc674ee5cb2',
       },
     },
-    owner: 'kubwayo',
+    owner: 'bamwetech',
   },
 };
