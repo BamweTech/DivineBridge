@@ -8,7 +8,9 @@ from datetime import datetime, timedelta
 import uuid
 from google.cloud import firestore
 from backend.api.prayer_room.helpers import (
+    DEFAULT_ROOM_TYPE,
     _expire_stale_voice_links,
+    _missing_live_feed_room_type,
     get_firestore_client,
     get_user_from_session,
     send_email,
@@ -54,6 +56,7 @@ def reopen_room():
             "room_name": original_room_data.get("room_name", "Prayer Room"),
             "room_description": original_room_data.get("room_description", ""),
             "room_privacy": original_room_data.get("room_privacy", "public"),
+            "room_type": original_room_data.get("room_type") or DEFAULT_ROOM_TYPE,
             "host_id": user["user_id"],
             "host_name": user["user_name"],
             "created_at": datetime.utcnow(),
@@ -1788,6 +1791,7 @@ def run_cleanup():
         sessions_cleaned = cleanup_inactive_sessions()
         signaling_cleaned = cleanup_signaling_artifacts()
         chat_cleaned = cleanup_old_chat_messages()
+        room_types_backfilled = backfill_missing_live_feed_room_types()
 
         total_cleaned = sessions_cleaned + signaling_cleaned + chat_cleaned
 
@@ -1797,6 +1801,7 @@ def run_cleanup():
                 "sessions_cleaned": sessions_cleaned,
                 "signaling_cleaned": signaling_cleaned,
                 "chat_cleaned": chat_cleaned,
+                "room_types_backfilled": room_types_backfilled,
                 "total_cleaned": total_cleaned,
             }
         )
@@ -1804,6 +1809,32 @@ def run_cleanup():
     except Exception as e:
         logging.error(f"Error running cleanup: {str(e)}")
         return jsonify({"error": "Failed to run cleanup"}), 500
+
+
+def backfill_missing_live_feed_room_types(limit=100):
+    """Set room_type on active rooms that omit it so mobile live feeds can see them.
+
+    Firestore `where('room_type', '!=', ...)` excludes documents missing the field,
+    which hid group/public prayer rooms from other members after private-call filtering.
+    """
+    try:
+        db = get_firestore_client()
+        active_rooms = list(
+            db.collection("prayer_rooms").where("is_active", "==", True).limit(limit).stream(retry=Retry())
+        )
+        fixed = 0
+        for room_doc in active_rooms:
+            room_data = room_doc.to_dict() or {}
+            if not _missing_live_feed_room_type(room_data):
+                continue
+            room_doc.reference.update({"room_type": DEFAULT_ROOM_TYPE})
+            fixed += 1
+        if fixed:
+            logging.info(f"Backfilled room_type on {fixed} active prayer room(s)")
+        return fixed
+    except Exception as e:
+        logging.error(f"Error backfilling live-feed room_type: {e}", exc_info=True)
+        return 0
 
 
 def _acquire_cleanup_lease(db):
