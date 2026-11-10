@@ -78,16 +78,18 @@ import type { PrayerGroup, GroupChatAttachment, GroupChatMessage, GroupChatReply
 function LiveSessionBanner({
   participantCount,
   onJoin,
+  onEnd,
   loading,
+  isHost,
 }: {
   participantCount: number;
   onJoin: () => void;
+  onEnd?: () => void;
   loading: boolean;
+  isHost?: boolean;
 }) {
   return (
-    <Pressable
-      onPress={onJoin}
-      disabled={loading}
+    <View
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -99,30 +101,47 @@ function LiveSessionBanner({
         gap: 10,
       }}
     >
-      <PulsingDot size={8} />
-      <View style={{ flex: 1 }}>
-        <Text style={{ color: '#34d399', ...iosFontStyle('700'), fontSize: 13 }}>
-          Live prayer session
-        </Text>
-        <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 11, marginTop: 1 }}>
-          {participantCount > 0
-            ? `${participantCount} ${participantCount === 1 ? 'person' : 'people'} praying now`
-            : 'Tap to join'}
-        </Text>
-      </View>
+      <Pressable
+        onPress={onJoin}
+        disabled={loading}
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+      >
+        <PulsingDot size={8} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: '#34d399', ...iosFontStyle('700'), fontSize: 13 }}>
+            Live prayer session
+          </Text>
+          <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 11, marginTop: 1 }}>
+            {participantCount > 0
+              ? `${participantCount} ${participantCount === 1 ? 'person' : 'people'} praying now`
+              : 'Tap to join'}
+          </Text>
+        </View>
+      </Pressable>
       {loading ? (
         <ActivityIndicator size="small" color="#34d399" />
       ) : (
-        <View style={{
-          paddingHorizontal: 14,
-          paddingVertical: 6,
-          borderRadius: 10,
-          backgroundColor: '#34d399',
-        }}>
-          <Text style={{ color: '#fff', ...iosFontStyle('600'), fontSize: 12 }}>Join</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {isHost && onEnd ? (
+            <Pressable onPress={onEnd} hitSlop={8}>
+              <Text style={{ color: THEME_COLORS.rose, ...iosFontStyle('600'), fontSize: 12 }}>End</Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            onPress={onJoin}
+            disabled={loading}
+            style={{
+              paddingHorizontal: 14,
+              paddingVertical: 6,
+              borderRadius: 10,
+              backgroundColor: '#34d399',
+            }}
+          >
+            <Text style={{ color: '#fff', ...iosFontStyle('600'), fontSize: 12 }}>Join</Text>
+          </Pressable>
         </View>
       )}
-    </Pressable>
+    </View>
   );
 }
 
@@ -898,6 +917,31 @@ export default function GroupScreen() {
     setAvFullscreen(false);
   }
 
+  function handleEndGroupLive() {
+    const roomId = groupLiveRoom?.room_id;
+    if (!roomId) return;
+    Alert.alert(
+      'End session for everyone?',
+      'This will close the live prayer session for all members.',
+      [
+        { text: 'Keep live', style: 'cancel' },
+        {
+          text: 'End session',
+          style: 'destructive',
+          onPress: async () => {
+            await roomApi.end(roomId).catch(() => null);
+            if (prayer.isJoined) {
+              await prayer.leave();
+            }
+            setLiveRoomId(null);
+            setLiveRoomCode(undefined);
+            setAvFullscreen(false);
+          },
+        },
+      ]
+    );
+  }
+
   const chatItems = useMemo<ChatListItem[]>(() => {
     const items: ChatListItem[] = [];
     let lastDateKey = '';
@@ -1084,7 +1128,9 @@ export default function GroupScreen() {
         <LiveSessionBanner
           participantCount={groupLiveRoom.participants?.length ?? 0}
           onJoin={onLiveHeaderPress}
+          onEnd={handleEndGroupLive}
           loading={startingLive}
+          isHost={Boolean(user?.uid && groupLiveRoom.host_id === user.uid)}
         />
       ) : null}
 

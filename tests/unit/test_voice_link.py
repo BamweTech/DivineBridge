@@ -288,6 +288,46 @@ class TestGuestJoinSfuMigration:
         assert update_args["sfu_selected_by"] == "pair_optimal"
 
 
+class TestPrivateRoomHostJoin:
+    def _private_room_ref(self, mock_db):
+        room_ref = MagicMock()
+        room_snap = MagicMock()
+        room_snap.exists = True
+        room_snap.to_dict.return_value = {
+            "room_type": "prayer",
+            "room_privacy": "private",
+            "room_code": "SECRET12",
+            "host_id": "host1",
+            "is_active": True,
+            "participants": [{"user_id": "host1", "is_host": True, "role": "speaker"}],
+            "max_speakers": 20,
+        }
+        room_ref.get.return_value = room_snap
+        mock_db.return_value.collection.return_value.document.return_value = room_ref
+        return room_ref
+
+    @patch("backend.api.prayer_room.lifecycle.get_firestore_client")
+    @patch("backend.api.prayer_room.lifecycle.get_user_from_session")
+    def test_host_joins_private_room_without_code(self, mock_user, mock_db, app):
+        mock_user.return_value = {"user_id": "host1", "user_name": "Bamwe Dev"}
+        room_ref = self._private_room_ref(mock_db)
+        with app.test_request_context(json={}):
+            result = pr.join_prayer_room("DDJFJJ")
+        status = result[1] if isinstance(result, tuple) else result.status_code
+        assert status == 200
+        room_ref.update.assert_called()
+
+    @patch("backend.api.prayer_room.lifecycle.get_firestore_client")
+    @patch("backend.api.prayer_room.lifecycle.get_user_from_session")
+    def test_guest_still_needs_private_room_code(self, mock_user, mock_db, app):
+        mock_user.return_value = {"user_id": "guest1", "user_name": "Guest"}
+        room_ref = self._private_room_ref(mock_db)
+        with app.test_request_context(json={}):
+            result = pr.join_prayer_room("DDJFJJ")
+        assert result[1] == 400
+        room_ref.update.assert_not_called()
+
+
 class TestVoiceLinkParticipantDisconnected:
     @patch("backend.api.prayer_room.voice_link.get_firestore_client")
     @patch("backend.api.prayer_room.voice_link.get_user_from_session")

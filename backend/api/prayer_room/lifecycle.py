@@ -166,7 +166,7 @@ def ensure_group_prayer_session():
             return jsonify(
                 {
                     "success": True,
-                    "room_id": rd.get("room_id"),
+                    "room_id": rd.get("room_id") or existing_doc.id,
                     "room_name": rd.get("room_name"),
                     "room_code": rd.get("room_code"),
                     "reused": True,
@@ -316,11 +316,14 @@ def join_prayer_room(room_id):
             elif user_name in ("Anonymous", "") or not str(user_name).strip():
                 user_name = "Guest"
 
-        # Check room privacy and validate room code for private rooms
+        # Check room privacy and validate room code for private rooms.
+        # The host can always re-enter without the code so a stuck private
+        # session is not locked out of its own room.
+        host_id = room_data.get("host_id")
         room_privacy = room_data.get("room_privacy", "public")
         bonded_group_id = room_data.get("group_id")
-        skip_private_code = (
-            room_privacy == "private" and bonded_group_id and _is_group_member(db, bonded_group_id, user_id)
+        skip_private_code = room_privacy == "private" and (
+            user_id == host_id or (bonded_group_id and _is_group_member(db, bonded_group_id, user_id))
         )
 
         if room_privacy == "private" and not skip_private_code:
@@ -353,7 +356,6 @@ def join_prayer_room(room_id):
 
         # Normalize participant metadata and check if user is already in the room
         participants = room_data.get("participants", [])
-        host_id = room_data.get("host_id")
         max_speakers = get_max_speakers(room_data)
 
         participants, speaker_count, participants_changed = normalize_participants(participants, host_id)

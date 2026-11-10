@@ -19,7 +19,17 @@ import type { PrayerRoom, ScheduledSession } from '@/types';
 
 dayjs.extend(relativeTime);
 
-function LiveRoomCard({ room, onJoin }: { room: PrayerRoom; onJoin: () => void }) {
+function LiveRoomCard({
+  room,
+  isHost,
+  onJoin,
+  onEnd,
+}: {
+  room: PrayerRoom;
+  isHost: boolean;
+  onJoin: () => void;
+  onEnd: () => void;
+}) {
   const speakerCount = room.participants?.filter((p) => p.role === 'speaker').length ?? 0;
   const listenerCount = room.participants?.filter((p) => p.role === 'listener').length ?? 0;
 
@@ -47,12 +57,19 @@ function LiveRoomCard({ room, onJoin }: { room: PrayerRoom; onJoin: () => void }
             Hosted by {room.host_name}
           </Text>
         </View>
-        <Pressable
-          onPress={onJoin}
-          style={{ backgroundColor: THEME_COLORS.sage, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 8 }}
-        >
-          <Text style={{ color: '#ffffff', ...iosFontStyle('700'), fontSize: 13 }}>Join</Text>
-        </Pressable>
+        <View style={{ alignItems: 'flex-end', gap: 8 }}>
+          <Pressable
+            onPress={onJoin}
+            style={{ backgroundColor: THEME_COLORS.sage, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 8 }}
+          >
+            <Text style={{ color: '#ffffff', ...iosFontStyle('700'), fontSize: 13 }}>Join</Text>
+          </Pressable>
+          {isHost ? (
+            <Pressable onPress={onEnd} hitSlop={8}>
+              <Text style={{ color: THEME_COLORS.rose, ...iosFontStyle('600'), fontSize: 12 }}>End</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
 
       <View style={{ flexDirection: 'row', gap: 14 }}>
@@ -257,8 +274,29 @@ export default function RoomsScreen() {
     }, []),
   );
 
-  async function handleJoinRoom(roomId: string) {
-    router.push(`/room/${roomId}`);
+  async function handleJoinRoom(room: PrayerRoom) {
+    router.push(`/room/${room.room_id}` as Href);
+  }
+
+  function handleEndRoom(room: PrayerRoom) {
+    Alert.alert(
+      'End session for everyone?',
+      `Close “${room.room_name}”? This will take the room off the live list.`,
+      [
+        { text: 'Keep live', style: 'cancel' },
+        {
+          text: 'End session',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await roomApi.end(room.room_id);
+            } catch (err: any) {
+              Alert.alert('Could not end session', err?.message || 'Try again.');
+            }
+          },
+        },
+      ]
+    );
   }
 
   async function handleRsvp(session: ScheduledSession) {
@@ -384,7 +422,12 @@ export default function RoomsScreen() {
           ) : (
             liveRooms.map((room, i) => (
               <Animated.View key={room.room_id} entering={FadeInDown.delay(i * 50).duration(400)}>
-                <LiveRoomCard room={room} onJoin={() => handleJoinRoom(room.room_id)} />
+                <LiveRoomCard
+                  room={room}
+                  isHost={Boolean(user?.uid && room.host_id === user.uid)}
+                  onJoin={() => handleJoinRoom(room)}
+                  onEnd={() => handleEndRoom(room)}
+                />
               </Animated.View>
             ))
           )

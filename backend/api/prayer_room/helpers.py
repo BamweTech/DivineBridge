@@ -28,6 +28,10 @@ MAX_ACTIVE_SPEAKERS = 20
 VOICE_LINK_MAX_PARTICIPANTS = 2
 VOICE_LINK_TTL_MINUTES = 10
 VOICE_LINK_WAIT_MINUTES = 30
+# Ghost live rooms (host never re-joined, or everyone left) stay is_active forever
+# unless we expire them. Five minutes of no join/leave/mute activity drops the
+# Live card without waiting for the host to cancel.
+STALE_PRAYER_ROOM_IDLE_MINUTES = 5
 VALID_PARTICIPANT_ROLES = {"speaker", "listener"}
 
 # Standard prayer rooms and group live sessions must set this field.
@@ -152,34 +156,49 @@ def _voice_link_timer_start_if_needed(room_data, participants, now=None):
     return expires_at, {"expires_at": expires_at, "call_started_at": now}
 
 
+def _should_expire_active_room(data, now=None):
+    """True if an is_active room should be closed by the idle/TTL sweeper."""
+    if not data:
+        return False
+    now = now or datetime.utcnow()
+    if _is_voice_link_room(data):
+        expires_at = _normalize_utc_datetime(data.get("expires_at"))
+        if expires_at and expires_at < now:
+            return True
+        if not expires_at:
+            created_at = _normalize_utc_datetime(data.get("created_at"))
+            if created_at and created_at + timedelta(minutes=VOICE_LINK_WAIT_MINUTES) < now:
+                return True
+        return False
+    idle_from = _normalize_utc_datetime(data.get("last_activity")) or _normalize_utc_datetime(data.get("created_at"))
+    return bool(idle_from and idle_from + timedelta(minutes=STALE_PRAYER_ROOM_IDLE_MINUTES) < now)
+
+
 def _expire_stale_voice_links(db, now=None):
-    """Mark active voice_link rooms past expires_at or idle wait limit as ended."""
+    """End timed-out voice links and idle standard prayer rooms.
+
+    Voice links use their TTL / wait window. Other live rooms (group and
+    public/private prayer) have no in-call timer, so a host who never
+    re-joins leaves a permanent Live card. Expire those after
+    STALE_PRAYER_ROOM_IDLE_MINUTES of no activity.
+    """
     now = now or datetime.utcnow()
     expired_count = 0
     try:
         rooms = db.collection("prayer_rooms").where("is_active", "==", True).stream()
         for doc in rooms:
             data = doc.to_dict() or {}
-            if not _is_voice_link_room(data):
+            if not _should_expire_active_room(data, now):
                 continue
-            expires_at = _normalize_utc_datetime(data.get("expires_at"))
-            should_expire = False
-            if expires_at and expires_at < now:
-                should_expire = True
-            elif not expires_at:
-                created_at = _normalize_utc_datetime(data.get("created_at"))
-                if created_at and created_at + timedelta(minutes=VOICE_LINK_WAIT_MINUTES) < now:
-                    should_expire = True
-            if should_expire:
-                doc.reference.update(
-                    {
-                        "is_active": False,
-                        "ended_at": now,
-                        "ended_by": "system",
-                        "ended_reason": "timeout",
-                    }
-                )
-                expired_count += 1
+            doc.reference.update(
+                {
+                    "is_active": False,
+                    "ended_at": now,
+                    "ended_by": "system",
+                    "ended_reason": "timeout",
+                }
+            )
+            expired_count += 1
     except Exception as e:
         logging.warning("expire_stale_voice_links failed: %s", e)
     return expired_count

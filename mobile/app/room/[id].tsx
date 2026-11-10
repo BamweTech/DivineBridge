@@ -18,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 import { RTCView, isWebRTCAvailable } from '@/lib/sfu';
 import { VideoStreamView } from '@/features/rooms/components/VideoStreamView';
 import { usePrayerRoom } from '@/features/rooms/hooks/usePrayerRoom';
+import { roomApi } from '@/services/api';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuthStore } from '@/stores/authStore';
 import { THEME_COLORS, ROOM_MODES, MESSAGE_TYPES } from '@/lib/constants';
@@ -207,7 +208,7 @@ function RoomMessageToast({
 }
 
 export default function RoomScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, code } = useLocalSearchParams<{ id: string; code?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
@@ -312,12 +313,33 @@ export default function RoomScreen() {
   async function handleJoin() {
     setIsJoining(true);
     try {
-      await join();
-    } catch {
-      Alert.alert('Failed to join room');
+      const joinCode = Array.isArray(code) ? code[0] : code;
+      await join(joinCode);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to join room';
+      Alert.alert('Could not join room', msg);
     } finally {
       setIsJoining(false);
     }
+  }
+
+  async function handleEndFromLobby() {
+    if (!id) return;
+    Alert.alert(
+      'End session for everyone?',
+      'This will close the live room for all participants.',
+      [
+        { text: 'Keep live', style: 'cancel' },
+        {
+          text: 'End session',
+          style: 'destructive',
+          onPress: async () => {
+            await roomApi.end(id).catch(() => null);
+            router.back();
+          },
+        },
+      ]
+    );
   }
 
   async function handleLeave() {
@@ -442,6 +464,11 @@ export default function RoomScreen() {
             <Text style={{ color: '#ffffff', ...iosFontStyle('700'), fontSize: 16 }}>Join Room</Text>
           )}
         </Pressable>
+        {user?.uid && room?.host_id === user.uid ? (
+          <Pressable onPress={() => void handleEndFromLobby()} style={{ marginBottom: 16 }}>
+            <Text style={{ color: THEME_COLORS.rose, ...iosFontStyle('600'), fontSize: 14 }}>End session</Text>
+          </Pressable>
+        ) : null}
         <Pressable onPress={() => router.back()}>
           <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('500'), fontSize: 14 }}>Cancel</Text>
         </Pressable>

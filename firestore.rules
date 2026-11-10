@@ -24,8 +24,20 @@ service cloud.firestore {
     // Prayer rooms collection - enhanced security with room membership validation
     match /prayer_rooms/{roomId} {
       // Matched prayer calls are private to the two server-selected people.
-      // All other room behavior remains unchanged.
-      allow read: if request.auth != null &&
+      // Group and prayer rooms often omit room_type. Reading that missing
+      // property is a rules error, which denies the document listener used
+      // when a member starts a call. Check the key before reading it.
+      // Queries stay on the stricter list rule: a missing-field exception
+      // there lets an unfiltered is_active query return matched calls.
+      allow get: if request.auth != null && (
+                    !resource.data.keys().hasAny(['room_type'])
+                    || resource.data.room_type != 'matched_prayer_call'
+                    || (
+                      resource.data.keys().hasAny(['participant_ids'])
+                      && request.auth.uid in resource.data.participant_ids
+                    )
+                  );
+      allow list: if request.auth != null &&
                   (resource.data.room_type != 'matched_prayer_call' ||
                    request.auth.uid in resource.data.participant_ids);
       

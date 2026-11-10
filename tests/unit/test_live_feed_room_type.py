@@ -1,5 +1,6 @@
 """Regression: group/public rooms need room_type for mobile live-feed queries."""
 
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -139,3 +140,63 @@ class TestBackfillMissingLiveFeedRoomTypes:
         missing.reference.update.assert_called_once_with({"room_type": pr.DEFAULT_ROOM_TYPE})
         typed.reference.update.assert_not_called()
         private.reference.update.assert_not_called()
+
+    def test_reused_room_uses_document_id_when_room_id_field_missing(self, app):
+        existing_doc = MagicMock()
+        existing_doc.id = "DOCID1"
+        existing_doc.to_dict.return_value = {
+            "room_name": "Morning Prayer — Live",
+            "room_code": "ABCDEFGH",
+            "group_id": "group-1",
+            "is_active": True,
+            "room_type": "prayer",
+        }
+        existing_query = MagicMock()
+        existing_query.stream.return_value = [existing_doc]
+
+        db = MagicMock()
+        db.collection.return_value.where.return_value.where.return_value.limit.return_value = existing_query
+
+        with app.test_request_context(
+            "/api/prayer-room/group-session",
+            method="POST",
+            json={"group_id": "group-1"},
+        ):
+            with (
+                patch("backend.api.prayer_room.lifecycle.get_user_from_session") as get_user,
+                patch("backend.api.prayer_room.lifecycle.get_firestore_client", return_value=db),
+                patch("backend.api.prayer_room.lifecycle._is_group_member", return_value=True),
+            ):
+                get_user.return_value = {"user_id": "host-1", "user_name": "Host"}
+                response = ensure_group_prayer_session()
+
+        assert response.get_json()["room_id"] == "DOCID1"
+
+
+class TestStaleLiveRoomExpiry:
+    def test_idle_prayer_room_expires_after_idle_minutes(self):
+        now = datetime.utcnow()
+        stale = {
+            "room_type": "prayer",
+            "created_at": now - timedelta(minutes=pr.STALE_PRAYER_ROOM_IDLE_MINUTES + 1),
+        }
+        fresh = {"room_type": "prayer", "created_at": now - timedelta(minutes=1)}
+        assert pr._should_expire_active_room(stale, now) is True
+        assert pr._should_expire_active_room(fresh, now) is False
+
+    def test_last_activity_keeps_busy_room_alive(self):
+        now = datetime.utcnow()
+        room = {
+            "room_type": "prayer",
+            "created_at": now - timedelta(hours=48),
+            "last_activity": now - timedelta(minutes=1),
+        }
+        assert pr._should_expire_active_room(room, now) is False
+
+    def test_voice_link_still_uses_wait_window(self):
+        now = datetime.utcnow()
+        waiting = {
+            "room_type": "voice_link",
+            "created_at": now - timedelta(minutes=pr.VOICE_LINK_WAIT_MINUTES + 1),
+        }
+        assert pr._should_expire_active_room(waiting, now) is True

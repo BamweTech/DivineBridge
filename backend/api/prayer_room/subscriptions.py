@@ -395,6 +395,7 @@ def create_active_room_from_scheduled(scheduled_data, scheduled_room_id):
             "room_name": scheduled_data.get("room_name", "Prayer Room"),
             "room_description": scheduled_data.get("room_description", ""),
             "room_privacy": scheduled_data.get("room_privacy", "public"),
+            "room_type": scheduled_data.get("room_type") or DEFAULT_ROOM_TYPE,
             "room_code": scheduled_data.get("room_code"),
             "host_id": scheduled_data["host_id"],
             "host_name": scheduled_data["host_name"],
