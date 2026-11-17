@@ -267,3 +267,18 @@ def test_private_prayer_count_requires_authorized_participant():
         assert private_requests.record_prayer(db, "request-1", "leader") == 3
         with pytest.raises(PermissionError):
             private_requests.record_prayer(db, "request-1", "outsider")
+
+
+def test_preferred_at_accepts_a_time_in_the_next_week():
+    when = datetime.utcnow() + timedelta(hours=3)
+
+    parsed = private_requests._parse_preferred_at(when.replace(tzinfo=timezone.utc).isoformat())
+
+    assert parsed.hour == when.hour
+
+
+def test_preferred_at_rejects_a_past_time():
+    when = datetime.utcnow() - timedelta(hours=1)
+
+    with pytest.raises(ValueError):
+        private_requests._parse_preferred_at(when.isoformat())

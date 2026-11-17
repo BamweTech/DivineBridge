@@ -357,6 +357,21 @@ class LocalStorageHandler:
         with open(file_path, "rb") as f:
             return f.read()
 
+    def save_devotional_art(self, plan_id, image_data):
+        """Save the minimal theme artwork for one plan."""
+        file_path = self.images_path / f"devo_art_{plan_id}.jpg"
+        with open(file_path, "wb") as f:
+            f.write(image_data)
+        return str(file_path)
+
+    def get_devotional_art(self, plan_id):
+        """Get cached plan artwork."""
+        file_path = self.images_path / f"devo_art_{plan_id}.jpg"
+        if not file_path.exists():
+            return None
+        with open(file_path, "rb") as f:
+            return f.read()
+
     def save_prayer_image(self, date_str, image_data):
         """Save a prayer image"""
         file_path = self.images_path / f"prayer_{date_str}.png"

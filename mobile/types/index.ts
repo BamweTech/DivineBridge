@@ -51,6 +51,7 @@ export interface PrivatePrayerRequest {
   description: string;
   preferred_language: string;
   wants_live_call: boolean;
+  preferred_at?: string;
   availability: PrayerAvailabilityWindow[];
   created_at: string;
   expires_at: string;

@@ -54,6 +54,8 @@ Key variables: `GCP_PROJECT`, `GCP_REGION`, `CLOUD_RUN_SERVICE`, `FIREBASE_PROJE
 
 ```bash
 python -m scripts.content.check_today_prayer
+python -m scripts.content.generate_devotional_art --dry-run
+python -m scripts.content.generate_devotional_art
 python -m scripts.emailing.manual_sunday_email
 python -m scripts.maintenance.verify_route_map
 python scripts/maintenance/pregen_verse_contexts.py

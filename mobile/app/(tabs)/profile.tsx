@@ -522,6 +522,16 @@ export default function ProfileScreen() {
         </View>
       </Animated.View>
 
+      <Animated.View entering={FadeInDown.delay(100).duration(400)} style={{ marginBottom: 20 }}>
+        <SectionTitle>Activity</SectionTitle>
+        <SettingRow
+          iconName="bell"
+          label="Activity"
+          value="Prayer wall and group chats"
+          onPress={() => router.push('/activity')}
+        />
+      </Animated.View>
+
       <Animated.View entering={FadeInDown.delay(120).duration(400)} style={{ marginBottom: 20 }}>
         <SectionTitle>Account</SectionTitle>
         <SettingRow iconName="profile" label="Display Name" value={getDisplayName(profile, user)} onPress={openEdit} />

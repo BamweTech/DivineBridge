@@ -76,7 +76,7 @@ export default function VoiceCallScreen() {
   useEffect(() => {
     if (!room || room.is_active !== false || !wasInCall.current) return;
     const timer = setTimeout(() => {
-      router.replace('/(tabs)/rooms' as Href);
+      router.replace('/(tabs)/pray' as Href);
     }, 600);
     return () => clearTimeout(timer);
   }, [room?.is_active, room, router]);
@@ -106,7 +106,7 @@ export default function VoiceCallScreen() {
           text: 'End call',
           style: 'destructive',
           onPress: () => {
-            void endCall('user').then(() => router.replace('/(tabs)/rooms' as Href));
+            void endCall('user').then(() => router.replace('/(tabs)/pray' as Href));
           },
         },
       ],

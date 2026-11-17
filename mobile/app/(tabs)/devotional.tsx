@@ -10,6 +10,7 @@ import {
   TextInput,
   Share,
   Modal,
+  InteractionManager,
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,10 +39,13 @@ import Icon from '@/components/ui/Icon';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Stop, Rect } from 'react-native-svg';
 import type { DevotionalPlan, DevotionalDay } from '@/types';
 import { useSpeechPlayback } from '@/features/prayer/hooks/useSpeechPlayback';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useNavigation } from 'expo-router';
+import { Image } from 'expo-image';
+import { downloadServerImage } from '@/lib/shareServerImage';
 import { readDevotionalCache, writeDevotionalCache } from '@/lib/devotionalCache';
 import { syncDevotionalReminder } from '@/lib/devotionalReminder';
 import { DevotionalSharePack } from '@/features/prayer/components/VerseSharePack';
+import { TodaysVerseCard } from '@/features/prayer/components/TodaysVerseCard';
 
 const THEMES = [
   'Faith & Trust', 'Healing & Restoration', 'Peace & Stillness',
@@ -113,18 +117,14 @@ function getLandingPlanDay(plan: DevotionalPlan): number {
   return calendarToday;
 }
 
+function planDisplayTitle(plan: { title?: string; theme?: string }): string {
+  const raw = (plan.title || plan.theme || '').trim();
+  return raw.replace(/\s+[—–-]\s+\d+-Day Plan$/i, '').trim() || raw;
+}
+
 function isPlanActive(plan: DevotionalPlan): boolean {
   const done = plan.days.filter((d) => d.completed).length;
   return plan.status === 'active' || (!plan.completed_at && done < plan.duration);
-}
-
-/** Newest active plan by current schedule start. Restarted plans take priority. */
-function pickLatestActivePlan(plans: DevotionalPlan[]): DevotionalPlan | null {
-  const active = plans.filter(isPlanActive);
-  if (active.length === 0) return null;
-  return active.reduce((newest, plan) =>
-    getScheduleStartMs(plan) > getScheduleStartMs(newest) ? plan : newest
-  );
 }
 
 function planDayDate(plan: DevotionalPlan, dayNumber: number) {
@@ -266,9 +266,10 @@ function TodayReading({
 
   const verseTheme = pickVerseTheme(day.scripture, day.scripture_reference, dayDateIso);
   const gradientId = `devoVerse-${day.day}-${verseTheme.id}`;
+  const [verseCard, setVerseCard] = useState({ width: 0, height: 0 });
 
   return (
-    <Animated.View entering={FadeIn.duration(320)}>
+    <View collapsable={false}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           {isCalendarToday ? (
@@ -291,6 +292,10 @@ function TodayReading({
       <Text style={{ ...TYPE.title2, color: THEME_COLORS.text, marginBottom: 16 }}>{day.title}</Text>
 
       <View
+        onLayout={(event) => {
+          const { width, height } = event.nativeEvent.layout;
+          setVerseCard((size) => (size.width === width && size.height === height ? size : { width, height }));
+        }}
         style={{
           borderRadius: 28,
           overflow: 'hidden',
@@ -299,12 +304,13 @@ function TodayReading({
           minHeight: 220,
         }}
       >
+        {verseCard.width > 0 && verseCard.height > 0 ? (
         <Svg
-          width="100%"
-          height="100%"
+          width={verseCard.width}
+          height={verseCard.height}
           preserveAspectRatio="none"
           viewBox="0 0 100 100"
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          style={{ position: 'absolute', top: 0, left: 0 }}
         >
           <Defs>
             <SvgLinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
@@ -315,6 +321,7 @@ function TodayReading({
           </Defs>
           <Rect x="0" y="0" width="100" height="100" fill={`url(#${gradientId})`} />
         </Svg>
+        ) : null}
         <View pointerEvents="none" style={{ position: 'absolute', top: -36, right: -28, width: 160, height: 160, borderRadius: 80, backgroundColor: verseTheme.blobs[0] }} />
         <View pointerEvents="none" style={{ position: 'absolute', bottom: -24, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: verseTheme.blobs[1] }} />
         <View pointerEvents="none" style={{ position: 'absolute', top: 72, left: 40, width: 70, height: 70, borderRadius: 35, backgroundColor: verseTheme.blobs[2] }} />
@@ -461,7 +468,7 @@ function TodayReading({
         reference={day.scripture_reference}
         onClose={() => setSharePackOpen(false)}
       />
-    </Animated.View>
+    </View>
   );
 }
 
@@ -584,6 +591,45 @@ function CompletionCelebration({ plan, onNewPlan, onDismiss }: { plan: Devotiona
   );
 }
 
+function PlanArt({ planId }: { planId: string }) {
+  const [uri, setUri] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    setUri(null);
+    setFailed(false);
+    downloadServerImage(`/api/devotional/${planId}/art`, `devo_art_${planId}.jpg`).then((next) => {
+      if (!alive) return;
+      if (!next) setFailed(true);
+      else setUri(next);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [planId]);
+
+  return (
+    <View
+      style={{
+        width: 76,
+        height: 76,
+        borderRadius: 14,
+        backgroundColor: '#faf6ef',
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {uri ? (
+        <Image source={{ uri }} style={{ width: '100%', height: '100%' }} contentFit="contain" accessibilityLabel="Plan artwork" />
+      ) : failed ? null : (
+        <ActivityIndicator color={THEME_COLORS.gold} />
+      )}
+    </View>
+  );
+}
+
 // ─── Plans Hub (default landing — list of all plans) ─────────────────────────
 
 function PlansHub({ plans, onSelect, onCreateNew, reminderOn, onToggleReminder }: {
@@ -620,6 +666,7 @@ function PlansHub({ plans, onSelect, onCreateNew, reminderOn, onToggleReminder }
       </View>
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: insets.bottom + 96 }} showsVerticalScrollIndicator={false}>
+        <TodaysVerseCard />
         {/* Create new plan CTA */}
         <Pressable
           onPress={onCreateNew}
@@ -663,33 +710,39 @@ function PlansHub({ plans, onSelect, onCreateNew, reminderOn, onToggleReminder }
               key={p.plan_id}
               onPress={() => onSelect(p)}
               style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
                 backgroundColor: !isComplete ? THEME_COLORS.bg2 : THEME_COLORS.bg3,
                 borderWidth: 1, borderColor: !isComplete ? THEME_COLORS.goldBorder : THEME_COLORS.border,
-                borderRadius: 16, padding: 16, marginBottom: 10,
+                borderRadius: 16, padding: 12, marginBottom: 10,
               }}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 15, flex: 1 }} numberOfLines={1}>{p.title || p.theme}</Text>
-                {isComplete ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 8 }}>
-                    <Icon name="cross" size={10} color={THEME_COLORS.sage} />
-                    <Text style={{ color: THEME_COLORS.sage, ...iosFontStyle('500'), fontSize: 11 }}>Complete</Text>
-                  </View>
-                ) : (
-                  <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: THEME_COLORS.goldDim, marginLeft: 8 }}>
-                    <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600'), fontSize: 10 }}>Day {p.current_day}</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginBottom: 10 }}>{p.theme}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('500'), fontSize: 12 }}>{doneCount}/{p.duration} days</Text>
-                <View style={{ flex: 1, height: 4, backgroundColor: THEME_COLORS.bg3, borderRadius: 2, overflow: 'hidden' }}>
-                  <View style={{ height: 4, borderRadius: 2, backgroundColor: isComplete ? THEME_COLORS.sage : THEME_COLORS.gold, width: `${progressPct}%` }} />
+              <PlanArt planId={p.plan_id} />
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 15, flex: 1 }} numberOfLines={1}>{planDisplayTitle(p)}</Text>
+                  {isComplete ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 8 }}>
+                      <Icon name="cross" size={10} color={THEME_COLORS.sage} />
+                      <Text style={{ color: THEME_COLORS.sage, ...iosFontStyle('500'), fontSize: 11 }}>Complete</Text>
+                    </View>
+                  ) : (
+                    <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: THEME_COLORS.goldDim, marginLeft: 8 }}>
+                      <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600'), fontSize: 10 }}>Day {p.current_day}</Text>
+                    </View>
+                  )}
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                  <Icon name="flame" size={12} color={THEME_COLORS.gold} />
-                  <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600'), fontSize: 12 }}>{p.streak}</Text>
+                <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginBottom: 8 }} numberOfLines={1}>{p.theme}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('500'), fontSize: 12 }}>{doneCount}/{p.duration}</Text>
+                  <View style={{ flex: 1, height: 4, backgroundColor: THEME_COLORS.bg3, borderRadius: 2, overflow: 'hidden' }}>
+                    <View style={{ height: 4, borderRadius: 2, backgroundColor: isComplete ? THEME_COLORS.sage : THEME_COLORS.gold, width: `${progressPct}%` }} />
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <Icon name="calendar" size={12} color={THEME_COLORS.gold} />
+                    <Text style={{ color: THEME_COLORS.gold, ...iosFontStyle('600'), fontSize: 12 }}>{p.streak}</Text>
+                  </View>
                 </View>
               </View>
             </Pressable>
@@ -782,7 +835,7 @@ function GeneratePlanScreen({ onGenerated, onDismiss }: { onGenerated: () => voi
       <Button label={isGenerating ? 'Generating your plan\u2026' : 'Generate My Plan'} onPress={handleGenerate} isLoading={isGenerating} fullWidth size="lg" />
       {onDismiss && (
         <Pressable onPress={() => { if (!isGenerating) onDismiss(); }} disabled={isGenerating} style={{ marginTop: 20, alignItems: 'center', paddingVertical: 12 }}>
-          <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('500'), fontSize: 14 }}>Cancel — back to my current plan</Text>
+          <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('500'), fontSize: 14 }}>Cancel — back to plans</Text>
         </Pressable>
       )}
     </ScrollView>
@@ -793,6 +846,7 @@ function GeneratePlanScreen({ onGenerated, onDismiss }: { onGenerated: () => voi
 
 export default function DevotionalScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const { width: screenWidth } = useWindowDimensions();
   const { user, profile } = useAuthStore();
 
@@ -800,13 +854,12 @@ export default function DevotionalScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refresh, setRefresh] = useState(0);
 
-  // Navigation: null = hub (or auto-open today), plan = reading view
+  // null = scripture and plan cards. A plan opens only when the user taps one.
   const [viewingPlan, setViewingPlan] = useState<DevotionalPlan | null>(null);
   const [showGenerateFlow, setShowGenerateFlow] = useState(false);
-  const [hubExplicit, setHubExplicit] = useState(false);
-  const [preferLatest, setPreferLatest] = useState(true);
 
   const [selectedDay, setSelectedDay] = useState(1);
+  const [pagerEpoch, setPagerEpoch] = useState(0);
   const [readingDay, setReadingDay] = useState<DevotionalDay | null>(null);
   const [showCelebration, setShowCelebration] = useState(false);
   const [reminderOn, setReminderOn] = useState(profile?.notifyDevotional ?? false);
@@ -817,15 +870,13 @@ export default function DevotionalScreen() {
 
   const prevCompletedAtRef = useRef<number | undefined>(undefined);
   const pagerRef = useRef<FlatList>(null);
-  const latestActiveRef = useRef<DevotionalPlan | null>(null);
   const selectedFromPagerRef = useRef(false);
   const prevScheduleStartRef = useRef(0);
+  /** True when a screen such as the verse reader is covering the tabs. */
+  const coveredByStackRef = useRef(false);
 
   const { toggle: speechToggle, stop: stopSpeech, isSpeaking, activeSource } = useSpeechPlayback();
 
-  const latestActivePlan = useMemo(() => pickLatestActivePlan(allPlans), [allPlans]);
-  const activePlanCount = useMemo(() => allPlans.filter(isPlanActive).length, [allPlans]);
-  latestActiveRef.current = latestActivePlan;
 
   // Keep viewingPlan in sync with Firestore updates
   const plan = useMemo(() => {
@@ -833,29 +884,28 @@ export default function DevotionalScreen() {
     return allPlans.find((p) => p.plan_id === viewingPlan.plan_id) ?? viewingPlan;
   }, [viewingPlan, allPlans]);
 
-  // Opening the tab lands on today's reading for the newest active plan.
-  // Staying on the hub after tapping "Plans" is allowed until the user leaves the tab.
+  // Stay on the scripture landing. A covering sheet, such as the verse reader,
+  // must not rebuild the day pager while it is dismissing.
   useFocusEffect(
     useCallback(() => {
-      setHubExplicit(false);
-      setPreferLatest(true);
-      const active = latestActiveRef.current;
-      if (active) {
-        setViewingPlan(active);
-        setSelectedDay(getLandingPlanDay(active));
-      }
-      return () => stopSpeech();
-    }, [stopSpeech])
-  );
+      const returnedFromCover = coveredByStackRef.current;
+      coveredByStackRef.current = false;
 
-  useEffect(() => {
-    if (isLoading || hubExplicit || showGenerateFlow || !latestActivePlan) return;
-    if (!viewingPlan || (preferLatest && viewingPlan.plan_id !== latestActivePlan.plan_id)) {
-      setViewingPlan(latestActivePlan);
-      setSelectedDay(getLandingPlanDay(latestActivePlan));
-      setPreferLatest(false);
-    }
-  }, [isLoading, hubExplicit, showGenerateFlow, viewingPlan, latestActivePlan, preferLatest]);
+      let relayout: { cancel: () => void } | undefined;
+      if (returnedFromCover) {
+        relayout = InteractionManager.runAfterInteractions(() => {
+          setPagerEpoch((epoch) => epoch + 1);
+        });
+      }
+
+      return () => {
+        relayout?.cancel();
+        stopSpeech();
+        const parent = navigation.getParent();
+        coveredByStackRef.current = !!parent && !parent.isFocused();
+      };
+    }, [navigation, stopSpeech])
+  );
 
   // Firestore subscription — all user plans, cached locally
   useEffect(() => {
@@ -953,15 +1003,12 @@ export default function DevotionalScreen() {
   }
 
   function openPlan(p: DevotionalPlan) {
-    setHubExplicit(false);
-    setPreferLatest(false);
     setViewingPlan(p);
     setSelectedDay(getLandingPlanDay(p));
     prevCompletedAtRef.current = p.completed_at ? tsToMs(p.completed_at) : undefined;
   }
 
   function openPlansHub() {
-    setHubExplicit(true);
     setViewingPlan(null);
     stopSpeech();
   }
@@ -1053,8 +1100,6 @@ export default function DevotionalScreen() {
           onGenerated={() => {
             setRefresh((v) => v + 1);
             setShowGenerateFlow(false);
-            setHubExplicit(false);
-            setPreferLatest(true);
             setViewingPlan(null);
           }}
           onDismiss={exitGenerate}
@@ -1063,16 +1108,7 @@ export default function DevotionalScreen() {
     );
   }
 
-  // Plans hub — only when there is no active plan, or the user opened it
   if (!viewingPlan) {
-    // If no plans at all, show generate screen directly
-    if (allPlans.length === 0) {
-      return (
-        <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg, paddingTop: insets.top + 16 }}>
-          <GeneratePlanScreen onGenerated={() => setRefresh((v) => v + 1)} />
-        </View>
-      );
-    }
     return (
       <PlansHub
         plans={allPlans}
@@ -1093,56 +1129,55 @@ export default function DevotionalScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}>
-      <View style={{ paddingTop: insets.top + 10, paddingHorizontal: 22, paddingBottom: 8 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+      <View style={{ paddingTop: insets.top + 6, paddingHorizontal: 22, paddingBottom: 14 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Pressable
             onPress={openPlansHub}
             accessibilityRole="button"
             accessibilityLabel="My plans"
-            style={{ paddingVertical: 8, paddingRight: 12 }}
+            hitSlop={8}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8, paddingRight: 12 }}
           >
-            <Text style={{ ...TYPE.headline, color: THEME_COLORS.gold, fontSize: 15 }}>Plans</Text>
+            <Icon name="back" size={16} color={THEME_COLORS.gold} />
+            <Text style={{ ...TYPE.headline, color: THEME_COLORS.gold }}>Plans</Text>
           </Pressable>
-          <Pressable
-            onPress={activePlanCount > 1 ? openPlansHub : undefined}
-            style={{ flex: 1, paddingRight: 8 }}
-            accessibilityRole={activePlanCount > 1 ? 'button' : undefined}
-            accessibilityLabel={activePlanCount > 1 ? 'Switch plan' : undefined}
+          <GlassPill
+            tone="gold"
+            radius={999}
+            accessibilityLabel={`${plan.streak} day streak`}
+            style={{ paddingHorizontal: 12, paddingVertical: 6 }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={{ ...TYPE.headline, color: THEME_COLORS.text, flexShrink: 1 }} numberOfLines={1}>
-                {plan.title || plan.theme}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <Icon name="calendar" size={14} color={THEME_COLORS.gold} />
+              <Text style={{ ...TYPE.subheadline, color: THEME_COLORS.gold, fontWeight: '600', fontFamily: iosFont('600') }}>
+                {plan.streak} {plan.streak === 1 ? 'day' : 'days'}
               </Text>
-              {activePlanCount > 1 && <Icon name="chevron-d" size={12} color={THEME_COLORS.text3} />}
             </View>
-            <Text style={{ ...TYPE.caption1, color: THEME_COLORS.text3, marginTop: 2 }}>
-              Day {plan.current_day || calendarTodayPlanDay} of {plan.duration}
-              {activePlanCount > 1 ? ` · ${activePlanCount} plans` : ''}
-            </Text>
-          </Pressable>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <GlassPill
-              onPress={handleRestartPlan}
-              accessibilityLabel="Restart schedule"
-              radius={12}
-              style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
-              hitSlop={8}
-            >
-              <View style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="restart" size={15} color={THEME_COLORS.text2} />
-              </View>
-            </GlassPill>
-            <GlassPill tone="gold" radius={12} style={{ paddingHorizontal: 10, paddingVertical: 6 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Icon name="flame" size={13} color={THEME_COLORS.gold} />
-                <Text style={{ ...TYPE.headline, color: THEME_COLORS.gold, fontSize: 15 }}>{plan.streak}</Text>
-              </View>
-            </GlassPill>
-          </View>
+          </GlassPill>
         </View>
 
-        <View style={{ height: 3, backgroundColor: THEME_COLORS.bg3, borderRadius: 2, overflow: 'hidden' }}>
-          <View style={{ height: 3, borderRadius: 2, backgroundColor: THEME_COLORS.gold, width: `${progressPct}%` }} />
+        <Text style={{ ...TYPE.title2, color: THEME_COLORS.text, marginTop: 12 }} numberOfLines={2}>
+          {planDisplayTitle(plan)}
+        </Text>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginBottom: 16 }}>
+          <Text style={{ ...TYPE.subheadline, color: THEME_COLORS.text2 }}>
+            Day {plan.current_day || calendarTodayPlanDay} of {plan.duration}
+          </Text>
+          <Pressable
+            onPress={handleRestartPlan}
+            accessibilityRole="button"
+            accessibilityLabel="Restart schedule"
+            hitSlop={8}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4, paddingLeft: 12 }}
+          >
+            <Icon name="restart" size={14} color={THEME_COLORS.text3} />
+            <Text style={{ ...TYPE.subheadline, color: THEME_COLORS.text3 }}>Restart</Text>
+          </Pressable>
+        </View>
+
+        <View style={{ height: 5, backgroundColor: THEME_COLORS.bg3, borderRadius: 3, overflow: 'hidden' }}>
+          <View style={{ height: 5, borderRadius: 3, backgroundColor: THEME_COLORS.gold, width: `${progressPct}%` }} />
         </View>
       </View>
 
@@ -1168,7 +1203,7 @@ export default function DevotionalScreen() {
 
       {/* Swipeable day pager */}
       <FlatList
-        key={plan.plan_id}
+        key={`${plan.plan_id}-${pagerEpoch}`}
         ref={pagerRef}
         data={dayPagerData}
         keyExtractor={(item) => `day-${item.day}`}
@@ -1180,7 +1215,7 @@ export default function DevotionalScreen() {
         initialScrollIndex={Math.max(0, selectedDay - 1)}
         onMomentumScrollEnd={onPagerScroll}
         onScrollToIndexFailed={onScrollToIndexFailed}
-        style={{ flex: 1 }}
+        style={{ flex: 1, overflow: 'hidden' }}
       />
 
       {/* Modals */}
@@ -1194,7 +1229,7 @@ export default function DevotionalScreen() {
       {showCelebration && (
         <CompletionCelebration
           plan={plan}
-          onNewPlan={() => { setShowCelebration(false); setHubExplicit(false); setViewingPlan(null); setShowGenerateFlow(true); }}
+          onNewPlan={() => { setShowCelebration(false); setViewingPlan(null); setShowGenerateFlow(true); }}
           onDismiss={() => setShowCelebration(false)}
         />
       )}

@@ -15,12 +15,14 @@ import { GlassTabBar } from '@/components/ui/GlassTabBar';
 import { useGroupUnread } from '@/features/groups/contexts/GroupUnreadContext';
 
 const TABS: { name: string; label: string; icon: IconName }[] = [
-  { name: 'home', label: 'Home', icon: 'home' },
-  { name: 'groups', label: 'Pray', icon: 'prayBridge' },
-  { name: 'rooms', label: 'Live', icon: 'live' },
+  { name: 'pray', label: 'Pray', icon: 'prayBridge' },
+  { name: 'groups', label: 'Groups', icon: 'gathering' },
   { name: 'devotional', label: 'Devotional', icon: 'book' },
   { name: 'profile', label: 'Profile', icon: 'profile' },
 ] as const;
+
+/** Kept as routes. Home and Live are no longer tabs. */
+const HIDDEN_TABS = ['home', 'rooms'] as const;
 
 /** Base icon size (dp); spring scale differentiates focused vs idle. */
 const ICON_BASE = 27;
@@ -118,6 +120,7 @@ export default function TabsLayout() {
 
   return (
     <Tabs
+      initialRouteName="pray"
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
@@ -154,6 +157,9 @@ export default function TabsLayout() {
             ),
           }}
         />
+      ))}
+      {HIDDEN_TABS.map((name) => (
+        <Tabs.Screen key={name} name={name} options={{ href: null }} />
       ))}
     </Tabs>
   );

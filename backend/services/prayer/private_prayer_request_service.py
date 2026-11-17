@@ -49,6 +49,21 @@ def _first_name(profile, fallback_name):
     return (profile.get("firstName") or fallback_name or "Member").strip().split()[0][:50]
 
 
+def _parse_preferred_at(value):
+    """A time the requester wants to be prayed for. A live call is separate."""
+    if not value:
+        raise ValueError("Choose a time when you would like to be prayed for")
+    try:
+        start = datetime.fromisoformat(str(value).replace("Z", "+00:00")).replace(tzinfo=None)
+    except ValueError as exc:
+        raise ValueError("Preferred time must be a valid date") from exc
+    now = _now()
+    latest = now + timedelta(days=7)
+    if start < now or start > latest:
+        raise ValueError("Choose a time within the next seven days")
+    return start
+
+
 def _parse_availability(availability):
     if not isinstance(availability, list) or not availability:
         raise ValueError("Select at least one availability window for a live call")
@@ -91,6 +106,7 @@ def _request_payload(doc_id, request_data, viewer_id, leader_view=False):
             "description": data.get("description"),
             "preferred_language": data.get("preferred_language"),
             "wants_live_call": data.get("wants_live_call"),
+            "preferred_at": _serialize(data.get("preferred_at")),
             "availability": _serialize(data.get("availability", [])),
             "expires_at": _serialize(data.get("expires_at")),
             "created_at": _serialize(data.get("created_at")),
@@ -138,7 +154,7 @@ def _notify_eligible_leaders(db, request_id, request_data, title, body, event, e
             )
 
 
-def create_request(db, user, description, preferred_language, wants_live_call, availability):
+def create_request(db, user, description, preferred_language, wants_live_call, availability, preferred_at):
     if user.get("is_anonymous"):
         raise PermissionError("Sign in is required to request private prayer")
     description = (description or "").strip()
@@ -148,6 +164,7 @@ def create_request(db, user, description, preferred_language, wants_live_call, a
     if not language or len(language) > 35:
         raise ValueError("Choose a preferred language")
 
+    parsed_preferred = _parse_preferred_at(preferred_at)
     parsed_availability = _parse_availability(availability) if wants_live_call else []
     requester_id = user["user_id"]
     profile = _get_profile(db, requester_id)
@@ -159,6 +176,7 @@ def create_request(db, user, description, preferred_language, wants_live_call, a
         "description": description,
         "preferred_language": language,
         "wants_live_call": bool(wants_live_call),
+        "preferred_at": parsed_preferred,
         "availability": parsed_availability,
         "status": "active",
         "created_at": now,

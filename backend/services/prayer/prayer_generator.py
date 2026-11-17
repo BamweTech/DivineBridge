@@ -348,6 +348,34 @@ Fix this and output ONLY the corrected paragraph."""
             logger.error("Could not save prayer with email_intro: %s", e)
         return updated
 
+    def generate_personal_prayer(self, topic, scripture=""):
+        """Write a one-off prayer. This never reads or writes today's stored prayer."""
+        import re
+
+        topic = (topic or "").strip()
+        scripture = (scripture or "").strip()
+        if len(topic) < 3:
+            raise ValueError("Tell us what you want to pray about")
+        scripture_line = f"\nWeave in this scripture if it fits: {scripture}" if scripture else ""
+        prompt = f"""You are writing a personal Christian prayer for one person. This is not a global news prayer and must not mention current events.
+
+Topic: {topic}{scripture_line}
+
+Rules:
+- 80 to 140 words
+- Begin with "Heavenly Father"
+- End with "Amen."
+- Write words the person can pray aloud
+- No citations, no <think> tags, no commentary
+- Return only the prayer
+"""
+        response = self.client.query(prompt) or ""
+        text = re.sub(r"<think>.*?</think>", "", response, flags=re.DOTALL | re.IGNORECASE)
+        text = self._remove_citations(text)
+        if len(text) < 20:
+            raise ValueError("Could not write a prayer")
+        return text
+
     def generate_prayer(self, max_retries=5):
         """Generate a new prayer and save it to storage with retry logic.
 

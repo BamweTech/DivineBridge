@@ -7,8 +7,18 @@ The Divine Bridge mobile app built with Expo ~54, React Native, and TypeScript.
 File-based routing under `app/`:
 
 - `app/_layout.tsx` — Root Stack with auth guard, providers (QueryClient, GroupUnread, LiveRooms).
-- `app/(tabs)/_layout.tsx` — Tab bar: Home, Pray (`groups`), Live (`rooms`), Devotional, Profile.
-- `app/(tabs)/devotional.tsx` — Opens on today's reading for the newest active plan; Plans hub is secondary.
+- `app/(tabs)/_layout.tsx` — Tab bar: Pray (landing), Groups, Devotional, Profile. Home and Live stay as hidden routes.
+- `app/(tabs)/pray.tsx` — Burning-bush halo. Drag down to open prayer tools (requests, timer, reminder, today's prayer, scheduled private matches, wall, personal generator, Voice Link).
+- `app/(tabs)/devotional.tsx` — Landing is today's scripture and the plan cards. A plan opens on its own reading, without the daily verse.
+- `app/(tabs)/groups.tsx` — Prayer Groups tab: your groups, create, and join. Unread badge lives here.
+- `app/prayer-wall.tsx` — Public Prayer Wall, opened from the Pray menu.
+- `app/request-prayer.tsx` — Chooses a public wall post or a private warrior request.
+- `app/prayer-requests.tsx` — Private request form (`mode=compose`) and the requester plus warrior inbox (`mode=inbox`).
+- `app/scheduled-prayer.tsx` — Upcoming private matches. Requesters see their times; warriors see assigned calls.
+- `app/todays-prayer.tsx` — The global daily prayer.
+- `app/prayer-timer.tsx` — Personal quiet-time timer.
+- `app/prayer-reminder.tsx` — Daily local prayer reminder.
+- `app/personal-prayer.tsx` — One-off AI prayer. It is not saved.
 - `app/(auth)/` — Login, register screens.
 - `app/room/[id].tsx` — Live prayer room (dynamic route).
 - `app/voice-call/[id].tsx` — 1:1 voice link call (share web URL; mute/speaker/end).

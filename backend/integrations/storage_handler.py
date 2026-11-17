@@ -979,6 +979,30 @@ class StorageHandler:
             logger.error(f"Error retrieving devotional share image: {e}")
             return None
 
+    def save_devotional_art(self, plan_id: str, image_data: bytes) -> bool:
+        """Save the minimal theme artwork for one plan."""
+        try:
+            blob_name = f"images/devotional-art/{plan_id}.jpg"
+            blob = self.bucket.blob(blob_name)
+            blob.upload_from_string(image_data, content_type="image/jpeg")
+            logger.info(f"Successfully saved devotional art: {blob_name}")
+            return True
+        except Exception as e:
+            logger.error(f"Error saving devotional art: {e}")
+            return False
+
+    def get_devotional_art(self, plan_id: str) -> bytes:
+        """Retrieve cached plan artwork."""
+        try:
+            blob_name = f"images/devotional-art/{plan_id}.jpg"
+            blob = self.bucket.blob(blob_name)
+            if blob.exists():
+                return blob.download_as_bytes()
+            return None
+        except Exception as e:
+            logger.error(f"Error retrieving devotional art: {e}")
+            return None
+
     def save_prayer_image(self, date: str, image_data: bytes) -> bool:
         """Save prayer image to Cloud Storage
 

@@ -20,6 +20,17 @@
       <path d="M9 21V12h6v9"/>
     </symbol>
     <!-- Groups / people -->
+    <symbol id="ic-gathering" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+      <circle cx="12" cy="4" r="1.6"/>
+      <circle cx="17.66" cy="5.66" r="1.6"/>
+      <circle cx="20" cy="12" r="1.6"/>
+      <circle cx="17.66" cy="18.34" r="1.6"/>
+      <circle cx="12" cy="20" r="1.6"/>
+      <circle cx="6.34" cy="18.34" r="1.6"/>
+      <circle cx="4" cy="12" r="1.6"/>
+      <circle cx="6.34" cy="5.66" r="1.6"/>
+      <circle cx="12" cy="12" r="2.4"/>
+    </symbol>
     <symbol id="ic-groups" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="9" cy="7" r="3"/>
       <path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/>
@@ -853,7 +864,7 @@ html, body {
     <div style="color:rgba(80,60,30,.4);font-family:inherit;font-size:10px;letter-spacing:.15em;text-transform:uppercase;margin-bottom:16px;padding-left:4px">Screens</div>
     <div class="side-nav">
       <button class="side-btn" onclick="show('s-login',this)">Login</button>
-      <button class="side-btn active" onclick="show('s-home',this)">Home</button>
+      <button class="side-btn" onclick="show('s-home',this)">Home</button>
       <button class="side-btn" onclick="show('s-pray',this)">Pray · Groups</button>
       <button class="side-btn" onclick="show('s-wall',this)">Prayer Wall</button>
       <button class="side-btn" onclick="show('s-rooms',this)">Prayer Rooms</button>
@@ -865,6 +876,8 @@ html, body {
       <button class="side-btn" onclick="show('s-voice-call',this)">Voice Call</button>
       <button class="side-btn" onclick="show('s-private-prayer',this)">Private Prayer</button>
       <button class="side-btn" onclick="show('s-verse-reader',this)">Verse Reader</button>
+      <button class="side-btn active" onclick="show('s-pray-hub',this)">Pray</button>
+      <button class="side-btn" onclick="show('s-devo-plan',this)">Plan reading</button>
     </div>
     <div style="margin-top:24px;padding:14px;background:rgba(176,125,32,.07);border:1px solid rgba(176,125,32,.18);border-radius:12px;max-width:160px">
       <div style="font-size:10px;color:#9a6d18;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Divine Bridge</div>
@@ -900,7 +913,7 @@ html, body {
     </div>
 
     <!-- HOME -->
-    <div class="phone-screen active" id="s-home">
+    <div class="phone-screen" id="s-home">
       <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
       <div class="app-screen">
         <div class="home-greeting">
@@ -986,11 +999,10 @@ html, body {
         <div style="height:16px"></div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item active"><span class="icon icon-18"><svg><use href="#ic-home"/></svg></span><div class="nav-label">Home</div></div>
-        <div class="nav-item" onclick="show('s-pray',document.querySelectorAll('.side-btn')[2])"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item" onclick="show('s-rooms',document.querySelectorAll('.side-btn')[4])"><span class="icon icon-18"><svg><use href="#ic-live"/></svg></span><div class="nav-label">Live</div></div>
-        <div class="nav-item" onclick="show('s-devo',document.querySelectorAll('.side-btn')[7])"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile',document.querySelectorAll('.side-btn')[9])"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item active" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
       </div>
     </div>
 
@@ -1041,11 +1053,10 @@ html, body {
         <div style="height:16px"></div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item" onclick="show('s-home',document.querySelectorAll('.side-btn')[1])"><span class="icon icon-18"><svg><use href="#ic-home"/></svg></span><div class="nav-label">Home</div></div>
-        <div class="nav-item active"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item" onclick="show('s-rooms',document.querySelectorAll('.side-btn')[4])"><span class="icon icon-18"><svg><use href="#ic-live"/></svg></span><div class="nav-label">Live</div></div>
-        <div class="nav-item" onclick="show('s-devo',document.querySelectorAll('.side-btn')[7])"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile',document.querySelectorAll('.side-btn')[9])"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item active" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
       </div>
     </div>
 
@@ -1087,11 +1098,10 @@ html, body {
         <div style="height:16px"></div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item" onclick="show('s-home',document.querySelectorAll('.side-btn')[1])"><span class="icon icon-18"><svg><use href="#ic-home"/></svg></span><div class="nav-label">Home</div></div>
-        <div class="nav-item active"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item" onclick="show('s-rooms',document.querySelectorAll('.side-btn')[4])"><span class="icon icon-18"><svg><use href="#ic-live"/></svg></span><div class="nav-label">Live</div></div>
-        <div class="nav-item" onclick="show('s-devo',document.querySelectorAll('.side-btn')[7])"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile',document.querySelectorAll('.side-btn')[9])"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item active" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
       </div>
     </div>
 
@@ -1156,11 +1166,10 @@ html, body {
         <div style="height:16px"></div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item" onclick="show('s-home',document.querySelectorAll('.side-btn')[1])"><span class="icon icon-18"><svg><use href="#ic-home"/></svg></span><div class="nav-label">Home</div></div>
-        <div class="nav-item" onclick="show('s-pray',document.querySelectorAll('.side-btn')[2])"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item active"><span class="icon icon-18"><svg><use href="#ic-live"/></svg></span><div class="nav-label">Live</div></div>
-        <div class="nav-item" onclick="show('s-devo',document.querySelectorAll('.side-btn')[7])"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile',document.querySelectorAll('.side-btn')[9])"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
       </div>
     </div>
 
@@ -1370,84 +1379,93 @@ html, body {
     <div class="phone-screen" id="s-devo">
       <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
       <div class="app-screen" style="padding:0">
-        <div class="devo-today-header">
-          <div class="devo-today-top">
-            <div class="devo-today-plans">Plans</div>
-            <div class="devo-today-plan">
-              <div class="devo-today-plan-name">Trusting God Through Uncertainty</div>
-              <div class="devo-today-plan-meta">Day 12 of 30 · 2 plans</div>
-            </div>
-            <div class="devo-today-icon"><span class="icon icon-16"><svg><use href="#ic-restart"/></svg></span></div>
-            <div class="devo-today-streak"><span class="icon icon-12"><svg><use href="#ic-flame"/></svg></span> 12</div>
-          </div>
-          <div class="devo-today-progress"><span></span></div>
+        <div style="padding:16px 22px 8px">
+          <div style="font-size:22px;font-weight:700;color:var(--text);letter-spacing:-.3px">My Devotionals</div>
         </div>
-
-        <div class="devo-week" style="margin-bottom:8px">
-          <div class="week-days">
-            <div class="week-day done"><div class="wd-plan">10</div><div class="wd-name">Sun</div><div class="wd-num">24</div><div class="wd-dot"></div></div>
-            <div class="week-day done"><div class="wd-plan">11</div><div class="wd-name">Mon</div><div class="wd-num">25</div><div class="wd-dot"></div></div>
-            <div class="week-day today"><div class="wd-plan">12</div><div class="wd-name">Tue</div><div class="wd-num">26</div><div class="wd-dot"></div></div>
-            <div class="week-day"><div class="wd-plan">13</div><div class="wd-name">Wed</div><div class="wd-num">27</div><div class="wd-dot"></div></div>
-            <div class="week-day"><div class="wd-plan">14</div><div class="wd-name">Thu</div><div class="wd-num">28</div><div class="wd-dot"></div></div>
+        <div style="margin:4px 16px 12px;padding:14px 16px;border-radius:18px;background:rgba(176,125,32,.12);border:1px solid rgba(176,125,32,.28)">
+          <div style="font-size:10px;letter-spacing:.12em;color:var(--gold);font-weight:600">TODAY'S VERSE</div>
+          <div style="font-size:16px;font-weight:600;color:var(--text);margin-top:8px;line-height:1.35">“Seek the Lord while he may be found.”</div>
+          <div style="font-size:11px;color:var(--gold);margin-top:8px">ISAIAH 55:6</div>
+        </div>
+        <div style="margin:0 16px 14px;padding:14px;border-radius:16px;background:rgba(176,125,32,.1);border:1px solid rgba(176,125,32,.28);display:flex;align-items:center;gap:12px">
+          <div style="width:36px;height:36px;border-radius:12px;background:var(--gold);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600">+</div>
+          <div style="flex:1">
+            <div style="font-size:15px;font-weight:700;color:var(--text)">Create New Plan</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">AI-generated scripture, reflection & prayer</div>
           </div>
         </div>
-
-        <div class="devo-read">
-          <div class="devo-read-meta">
-            <div style="display:flex;align-items:center;gap:8px">
-              <div class="pill pill-gold" style="font-size:10px;padding:4px 10px">Today</div>
-              <div class="devo-read-date">Tuesday, August 27</div>
+        <div style="margin:0 16px 10px;padding:12px;border-radius:16px;background:#fff;border:1px solid rgba(176,125,32,.28);display:flex;align-items:center;gap:12px;cursor:pointer" onclick="show('s-devo-plan',document.querySelectorAll('.side-btn')[14])">
+          <div style="width:76px;height:76px;border-radius:14px;background:#faf6ef;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <div style="width:22px;height:22px;border-radius:11px;border:2px solid #2c2417"></div>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <div style="font-size:14px;font-weight:700;color:var(--text)">Trusting God</div>
+              <div style="font-size:10px;font-weight:600;color:var(--gold);background:rgba(176,125,32,.12);border-radius:6px;padding:2px 6px">Day 12</div>
             </div>
+            <div style="font-size:11px;color:var(--text3);margin:4px 0 8px">Faith</div>
+            <div style="height:4px;border-radius:2px;background:rgba(44,36,23,.08)"><div style="width:40%;height:4px;border-radius:2px;background:var(--gold)"></div></div>
           </div>
-          <div class="devo-read-title">Peace That Holds</div>
-          <div class="devo-verse-card">
-            <div class="devo-verse-top">
-              <div class="pill pill-gold" style="font-size:10px;padding:4px 12px">Scripture</div>
-              <div class="devo-today-icon" style="width:36px;height:36px"><span class="icon icon-14"><svg><use href="#ic-share"/></svg></span></div>
+        </div>
+        <div style="margin:0 16px 10px;padding:12px;border-radius:16px;background:#fff;border:1px solid rgba(44,36,23,.08);display:flex;align-items:center;gap:12px">
+          <div style="width:76px;height:76px;border-radius:14px;background:#faf6ef;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <div style="width:18px;height:18px;border-radius:9px;background:#c4b5a0"></div>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <div style="font-size:14px;font-weight:700;color:var(--text)">Peace That Holds</div>
+              <div style="font-size:10px;font-weight:600;color:#6b8f71">Complete</div>
             </div>
-            <div class="devo-verse-text">“Peace I leave with you; my peace I give to you. I do not give to you as the world gives.”</div>
-            <div class="devo-verse-ref">— John 14:27</div>
-          </div>
-          <div class="devo-section-label">Reflection</div>
-          <div class="devo-reflection">Jesus offers a peace that does not depend on circumstances. Today, rest in the gift already given — not the calm you have to manufacture.</div>
-          <div class="devo-section-label">Prayer</div>
-          <div class="devo-prayer-card">
-            <span class="icon icon-16" style="color:var(--sage);margin-top:2px"><svg><use href="#ic-pray"/></svg></span>
-            <div>Lord, quiet my striving. Let Your peace settle over what I cannot control, and teach me to receive rather than grasp.</div>
-          </div>
-          <div class="devo-read-actions">
-            <div class="devo-read-act gold"><span class="icon icon-14"><svg><use href="#ic-audio"/></svg></span> Listen</div>
-            <div class="devo-read-act"><span class="icon icon-14"><svg><use href="#ic-share"/></svg></span> Share</div>
-            <div class="devo-read-act icon-only"><span class="icon icon-16"><svg><use href="#ic-book"/></svg></span></div>
-          </div>
-          <div style="margin-top:16px;background:var(--gold);color:#fff;border-radius:50px;padding:14px 24px;text-align:center;font-size:14px;font-weight:600">Mark as Complete</div>
-          <div style="margin-top:22px;padding-top:16px;border-top:1px solid rgba(44,36,23,.08)">
-            <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">Share today’s reading</div>
-            <div style="font-size:12px;color:var(--text3);margin-bottom:12px">Three cards — scripture, reflection, and prayer.</div>
-            <div class="verse-share-cards">
-              <div class="verse-share-card">
-                <div class="verse-share-card-label">Scripture · 1/3</div>
-                <div class="verse-share-card-body">“Peace I leave with you; my peace I give to you.”</div>
-              </div>
-              <div class="verse-share-card">
-                <div class="verse-share-card-label">Reflection · 2/3</div>
-                <div class="verse-share-card-body">A peace that does not depend on circumstances.</div>
-              </div>
-              <div class="verse-share-card">
-                <div class="verse-share-card-label">Prayer · 3/3</div>
-                <div class="verse-share-card-body">Lord, quiet my striving and teach me to receive.</div>
-              </div>
-            </div>
+            <div style="font-size:11px;color:var(--text3);margin:4px 0 8px">Peace</div>
+            <div style="height:4px;border-radius:2px;background:rgba(44,36,23,.08)"><div style="width:100%;height:4px;border-radius:2px;background:#6b8f71"></div></div>
           </div>
         </div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item" onclick="show('s-home',document.querySelectorAll('.side-btn')[1])"><span class="icon icon-18"><svg><use href="#ic-home"/></svg></span><div class="nav-label">Home</div></div>
-        <div class="nav-item" onclick="show('s-pray',document.querySelectorAll('.side-btn')[2])"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item" onclick="show('s-rooms',document.querySelectorAll('.side-btn')[4])"><span class="icon icon-18"><svg><use href="#ic-live"/></svg></span><div class="nav-label">Live</div></div>
-        <div class="nav-item active"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile',document.querySelectorAll('.side-btn')[9])"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
+        <div class="nav-item active" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+      </div>
+    </div>
+
+    <!-- DEVOTIONAL PLAN -->
+    <div class="phone-screen" id="s-devo-plan">
+      <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
+      <div class="app-screen" style="padding:0">
+        <div style="padding:16px 22px 14px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="color:var(--gold);font-size:16px;font-weight:600;cursor:pointer" onclick="show('s-devo',document.querySelectorAll('.side-btn')[7])">‹ Plans</div>
+            <div style="display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:999px;background:rgba(176,125,32,.12);border:1px solid rgba(176,125,32,.28);color:var(--gold);font-size:14px;font-weight:600"><span class="icon icon-12"><svg><use href="#ic-calendar"/></svg></span> 2 days</div>
+          </div>
+          <div style="font-size:22px;font-weight:700;color:var(--text);letter-spacing:-.3px;margin-top:14px;line-height:1.25">Principles of Good Prayer</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;margin-bottom:16px">
+            <div style="font-size:15px;color:var(--text2)">Day 2 of 14</div>
+            <div style="font-size:15px;color:var(--text3)">↻ Restart</div>
+          </div>
+          <div style="height:5px;border-radius:3px;background:rgba(44,36,23,.08)"><div style="width:14%;height:5px;border-radius:3px;background:var(--gold)"></div></div>
+        </div>
+        <div class="devo-week" style="margin-bottom:8px">
+          <div class="week-days">
+            <div class="week-day done"><div class="wd-plan">1</div><div class="wd-name">Fri</div><div class="wd-num">13</div><div class="wd-dot"></div></div>
+            <div class="week-day today"><div class="wd-plan">2</div><div class="wd-name">Sat</div><div class="wd-num">14</div><div class="wd-dot"></div></div>
+            <div class="week-day"><div class="wd-plan">3</div><div class="wd-name">Sun</div><div class="wd-num">15</div><div class="wd-dot"></div></div>
+            <div class="week-day"><div class="wd-plan">4</div><div class="wd-name">Mon</div><div class="wd-num">16</div><div class="wd-dot"></div></div>
+          </div>
+        </div>
+        <div class="devo-read">
+          <div class="devo-read-title">Seek God’s Kingdom First</div>
+          <div class="devo-verse-card">
+            <div class="devo-verse-text">“Thy kingdom come. Thy will be done, as in heaven, so on earth.”</div>
+            <div class="devo-verse-ref">— Matthew 6:10</div>
+          </div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
+        <div class="nav-item active" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
       </div>
     </div>
 
@@ -1503,6 +1521,15 @@ html, body {
           <div class="ps-item"><span class="icon icon-18" style="color:var(--gold);margin-bottom:4px"><svg><use href="#ic-groups"/></svg></span><div class="ps-num">4</div><div class="ps-lbl">Groups</div></div>
           <div class="ps-item"><span class="icon icon-18" style="color:var(--gold);margin-bottom:4px"><svg><use href="#ic-flame"/></svg></span><div class="ps-num">23</div><div class="ps-lbl">Streak</div></div>
           <div class="ps-item"><span class="icon icon-18" style="color:var(--gold);margin-bottom:4px"><svg><use href="#ic-book"/></svg></span><div class="ps-num">3</div><div class="ps-lbl">Plans</div></div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-title">Activity</div>
+          <div class="setting-row">
+            <div class="setting-icon-wrap"><span class="icon icon-16"><svg><use href="#ic-bell"/></svg></span></div>
+            <div class="setting-label">Activity</div>
+            <span style="font-size:13px;color:var(--text3)">Prayer wall and group chats</span>
+          </div>
         </div>
 
         <div class="settings-section">
@@ -1579,11 +1606,10 @@ html, body {
         <div style="height:16px"></div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item" onclick="show('s-home',document.querySelectorAll('.side-btn')[1])"><span class="icon icon-18"><svg><use href="#ic-home"/></svg></span><div class="nav-label">Home</div></div>
-        <div class="nav-item" onclick="show('s-pray',document.querySelectorAll('.side-btn')[2])"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item" onclick="show('s-rooms',document.querySelectorAll('.side-btn')[4])"><span class="icon icon-18"><svg><use href="#ic-live"/></svg></span><div class="nav-label">Live</div></div>
-        <div class="nav-item" onclick="show('s-devo',document.querySelectorAll('.side-btn')[7])"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item active"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item active" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
       </div>
     </div>
 
@@ -1639,18 +1665,37 @@ html, body {
       </div>
     </div>
 
+    <!-- PRAY HUB -->
+    <div class="phone-screen active" id="s-pray-hub">
+      <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
+      <div class="app-screen" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding-bottom:88px">
+        <div style="font-size:11px;letter-spacing:.16em;color:var(--gold);font-weight:600">HOLY GROUND</div>
+        <div style="width:168px;height:168px;border-radius:84px;margin-top:22px;border:8px solid rgba(232,196,122,.85);background:#2a2118;box-shadow:0 0 0 10px rgba(176,125,32,.18);display:flex;align-items:center;justify-content:center">
+          <div style="width:70px;height:90px;border-radius:40px 40px 18px 18px;background:linear-gradient(#fff6d8,#e8a23a 45%,#3d4a32)"></div>
+        </div>
+        <div style="font-size:13px;color:var(--text3);margin-top:22px;padding:0 28px;line-height:1.5">The bush burned, and it was not consumed.</div>
+        <div style="font-size:11px;letter-spacing:.12em;color:var(--gold);margin-top:8px">EXODUS 3</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:28px">Drag the halo down</div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item active"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+      </div>
+    </div>
+
   </div><!-- /phone -->
 
   <!-- RIGHT INFO -->
   <div style="display:flex;flex-direction:column;gap:10px;max-width:180px">
     <div style="color:rgba(80,60,30,.4);font-size:10px;letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px">Screens · Expo app</div>
     <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Login</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Auth entry · sign in / sign up</div></div>
-    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Home</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Verse hero, global prayer, stats, groups</div></div>
-    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Pray tab</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">My Groups · Join group by invite code · Prayer Wall</div></div>
-    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Live tab</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Prayer rooms list · live &amp; scheduled</div></div>
-    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Devotional</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Today’s reading · 3-card share pack</div></div>
-    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Activity</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Bell hub · wall shortcut + group chats</div></div>
-    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Profile</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Account, prefs, sign out</div></div>
+    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Pray</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Burning-bush halo · each person gets one look: ember, dawn, wilderness, or midnight</div></div>
+    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Groups tab</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Your groups only · create and join</div></div>
+    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Devotional</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Landing is today’s verse and the plan cards, artwork on the left. A plan opens with the title on its own line, the day count and Restart beneath it, and the streak beside Plans.</div></div>
+    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Activity</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Opened from Profile</div></div>
+    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Profile</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Activity, account, prefs, sign out</div></div>
     <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Verse Reader</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Explainer + 4-card share pack</div></div>
   </div>
 

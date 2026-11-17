@@ -86,6 +86,12 @@ export const prayerApi = {
     request<any>(`/api/prayer/daily-prayer/${date}/interactions`),
   share: (date: string) =>
     request<any>(`/api/prayer/daily-prayer/${date}/share`, { method: 'POST' }),
+  /** One-off prayer. The server does not store it as today's global prayer. */
+  personal: (topic: string, scripture?: string) =>
+    request<{ success: boolean; data: { content: string } }>('/api/prayer/personal', {
+      method: 'POST',
+      body: JSON.stringify({ topic, scripture: scripture ?? '' }),
+    }),
 };
 
 export type VerseContextOriginalWord = {
@@ -360,6 +366,7 @@ export const privatePrayerRequestApi = {
     description: string;
     preferred_language: string;
     wants_live_call: boolean;
+    preferred_at: string;
     availability: PrayerAvailabilityWindow[];
   }) =>
     request<{ success: boolean; data: PrivatePrayerRequest }>('/api/prayer/private-request', {

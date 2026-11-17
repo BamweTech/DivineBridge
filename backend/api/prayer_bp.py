@@ -42,6 +42,28 @@ def get_prayer(date):
         return jsonify({"error": "Failed to get prayer"}), 500
 
 
+@prayer_bp.route("/personal", methods=["POST"])
+@limiter.limit("10 per hour")
+@require_auth
+def personal_prayer():
+    """Write a personal prayer and return it. Today's global prayer is left untouched."""
+    try:
+        data = request.get_json(silent=True) or {}
+        topic = sanitize_string(data.get("topic") or "", max_length=200)
+        scripture = sanitize_string(data.get("scripture") or "", max_length=300)
+        if not isinstance(topic, str) or len(topic) < 3:
+            return jsonify({"success": False, "error": "Tell us what you want to pray about"}), 400
+        if not isinstance(scripture, str):
+            scripture = ""
+        content = current_app.prayer_generator.generate_personal_prayer(topic, scripture)
+        return jsonify({"success": True, "data": {"content": content}}), 200
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception:
+        logger.error("Failed to write a personal prayer", exc_info=True)
+        return jsonify({"success": False, "error": "Could not write a prayer"}), 500
+
+
 @prayer_bp.route("/generate-prayer", methods=["POST"])
 def generate_prayer():
     try:
@@ -310,6 +332,7 @@ def submit_private_prayer_request():
             data.get("preferred_language"),
             bool(data.get("wants_live_call")),
             data.get("availability", []),
+            data.get("preferred_at"),
         )
         return jsonify({"success": True, "data": result}), 201
     except ValueError as exc:

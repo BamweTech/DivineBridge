@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -34,11 +34,17 @@ export default function PrayerRequestsScreen() {
   const queryClient = useQueryClient();
   const isFocused = useIsFocused();
   const profile = useAuthStore((state) => state.profile);
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
   const [description, setDescription] = useState('');
   const [language, setLanguage] = useState(profile?.preferredPrayerLanguage || 'English');
   const [needsCall, setNeedsCall] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(true);
+  const [showForm, setShowForm] = useState(mode === 'compose');
+
+  useEffect(() => {
+    if (mode === 'compose') setShowForm(true);
+    if (mode === 'inbox') setShowForm(false);
+  }, [mode]);
 
   const slots = useMemo(
     () => Array.from({ length: 7 }, (_, day) =>
@@ -64,6 +70,7 @@ export default function PrayerRequestsScreen() {
       description: description.trim(),
       preferred_language: language,
       wants_live_call: needsCall,
+      preferred_at: selectedSlot ?? '',
       availability: needsCall && selectedSlot ? toAvailability(selectedSlot) : [],
     }),
     onSuccess: () => {
@@ -113,8 +120,8 @@ export default function PrayerRequestsScreen() {
       Alert.alert('Tell us a little more', 'Please write at least 10 characters so a leader can pray with you.');
       return;
     }
-    if (needsCall && !selectedSlot) {
-      Alert.alert('Choose a time', 'Select a time when you would be available for a 15-minute prayer call.');
+    if (!selectedSlot) {
+      Alert.alert('Choose a time', 'Select when you would like to be prayed for.');
       return;
     }
     submit.mutate();
@@ -146,8 +153,8 @@ export default function PrayerRequestsScreen() {
           <Icon name="back" size={22} color={THEME_COLORS.text2} />
         </Pressable>
         <View style={{ flex: 1 }}>
-          <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 23 }}>Private prayer</Text>
-          <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 2 }}>Matched with a prayer leader in your language</Text>
+          <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 23 }}>{showForm ? 'Request prayer' : 'Request Prayers'}</Text>
+          <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 2 }}>Matched with a prayer warrior in your language</Text>
         </View>
       </View>
 
@@ -175,26 +182,22 @@ export default function PrayerRequestsScreen() {
             ))}
           </View>
 
+          <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('600'), fontSize: 13, marginTop: 18, marginBottom: 8 }}>When should we pray for you?</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {slots.map((slot) => (
+              <Pressable key={slot} onPress={() => setSelectedSlot(slot)} style={{ width: '31%', paddingVertical: 9, paddingHorizontal: 5, borderRadius: 10, backgroundColor: selectedSlot === slot ? THEME_COLORS.sageDim : THEME_COLORS.bg3, borderWidth: 1, borderColor: selectedSlot === slot ? 'rgba(74,124,94,0.35)' : THEME_COLORS.border }}>
+                <Text style={{ color: selectedSlot === slot ? THEME_COLORS.sage : THEME_COLORS.text2, ...iosFontStyle('500'), fontSize: 10, textAlign: 'center' }}>{formatSlot(slot)}</Text>
+              </Pressable>
+            ))}
+          </View>
+
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 }}>
             <View style={{ flex: 1 }}>
               <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('600'), fontSize: 14 }}>Live voice prayer</Text>
-              <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 2 }}>Optional · a private 15-minute call</Text>
+              <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 2 }}>Optional · a private 15-minute call at that time</Text>
             </View>
             <Switch value={needsCall} onValueChange={setNeedsCall} trackColor={{ false: THEME_COLORS.bg3, true: THEME_COLORS.goldDim }} thumbColor={needsCall ? THEME_COLORS.gold : THEME_COLORS.text3} />
           </View>
-
-          {needsCall && (
-            <View style={{ marginTop: 14 }}>
-              <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('600'), fontSize: 13, marginBottom: 8 }}>Choose one time you are available</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {slots.map((slot) => (
-                  <Pressable key={slot} onPress={() => setSelectedSlot(slot)} style={{ width: '31%', paddingVertical: 9, paddingHorizontal: 5, borderRadius: 10, backgroundColor: selectedSlot === slot ? THEME_COLORS.sageDim : THEME_COLORS.bg3, borderWidth: 1, borderColor: selectedSlot === slot ? 'rgba(74,124,94,0.35)' : THEME_COLORS.border }}>
-                    <Text style={{ color: selectedSlot === slot ? THEME_COLORS.sage : THEME_COLORS.text2, ...iosFontStyle('500'), fontSize: 10, textAlign: 'center' }}>{formatSlot(slot)}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          )}
           <Button label={submit.isPending ? 'Sending…' : 'Send private request'} onPress={submitRequest} isLoading={submit.isPending} fullWidth style={{ marginTop: 22 }} />
         </View>
       ) : (
@@ -216,7 +219,7 @@ export default function PrayerRequestsScreen() {
             setDescription(item.description);
             setLanguage(item.preferred_language);
             setNeedsCall(item.wants_live_call);
-            setSelectedSlot(dayjs(item.availability[0]?.start_at).isAfter(dayjs()) ? item.availability[0]?.start_at ?? null : null);
+            setSelectedSlot(dayjs(item.preferred_at || item.availability[0]?.start_at).isAfter(dayjs()) ? (item.preferred_at || item.availability[0]?.start_at || null) : null);
             setShowForm(true);
           }}
         />
@@ -276,6 +279,7 @@ function RequestCard({ request, onClaim, onJoin, onResubmit, onCancel, onPray, c
       </View>
       <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('400'), fontSize: 13, lineHeight: 20, marginTop: 8 }}>{request.description}</Text>
       {(request.prayer_count ?? 0) > 0 && <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 8 }}>{request.prayer_count} prayer{request.prayer_count === 1 ? '' : 's'} recorded</Text>}
+      {request.preferred_at && <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 10 }}>Pray around {formatSlot(request.preferred_at)}</Text>}
       {request.scheduled_at && <Text style={{ color: THEME_COLORS.sage, ...iosFontStyle('500'), fontSize: 12, marginTop: 10 }}>Call scheduled · {formatSlot(request.scheduled_at)}</Text>}
       {leader && request.wants_live_call && firstSlot && <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 10 }}>Available: {formatSlot(firstSlot)}</Text>}
       {leader || canReport ? (

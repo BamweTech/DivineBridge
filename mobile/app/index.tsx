@@ -32,7 +32,7 @@ const SLIDES = [
     bgHint: 'rgba(176,125,32,0.06)',
     title: 'Pray Together.\nAnywhere.',
     italicWord: 'Anywhere.',
-    body: 'Join small prayer groups, attend live rooms, and grow daily with an AI-powered devotional plan.',
+    body: 'Join small prayer groups, ask for prayer, and grow daily with an AI-powered devotional plan.',
     verse: '"Where two or three gather in my name, I am there among them."',
     verseRef: '— Matthew 18:20',
   },

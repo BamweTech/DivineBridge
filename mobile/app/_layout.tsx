@@ -230,9 +230,9 @@ function AuthGuard() {
     if (!user && !inAuthGroup && !atRoot) {
       router.replace('/(auth)/login');
     } else if (user && inAuthGroup) {
-      router.replace('/(tabs)/home');
+      router.replace('/(tabs)/pray' as never);
     } else if (user && atRoot) {
-      router.replace('/(tabs)/home');
+      router.replace('/(tabs)/pray' as never);
     }
   }, [user, isInitialized, segments]);
 

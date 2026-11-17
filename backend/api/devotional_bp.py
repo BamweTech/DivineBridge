@@ -243,7 +243,7 @@ def _generate_plan_batched(client, theme: str, duration: int, tradition: str) ->
         batch_start = batch_end + 1
 
     return {
-        "title": f"{theme} — {duration}-Day Plan",
+        "title": theme,
         "theme": theme,
         "days": all_days,
     }
@@ -283,7 +283,7 @@ def generate_devotional():
             logger.info("Serving devotional from template cache: %s", key)
             plan_id = str(uuid.uuid4())
             plan_data = {
-                "title": f"{theme} — {duration}-Day Plan",
+                "title": theme,
                 "theme": theme,
                 "days": cached["days"],
             }
@@ -360,7 +360,7 @@ def generate_devotional():
     doc = {
         "plan_id": plan_id,
         "uid": uid,
-        "title": plan_data.get("title", f"{theme} — {duration}-Day Plan"),
+        "title": plan_data.get("title") or theme,
         "theme": theme,
         "duration": duration,
         "days": _fresh_schedule_days(plan_data["days"]),
@@ -512,6 +512,60 @@ def save_journal(plan_id: str):
 
 _DEVOTIONAL_SHARE_SECTIONS = frozenset({"scripture", "reflection", "prayer"})
 _PLAN_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
+
+
+def _owned_plan(plan_id: str):
+    """Return the plan dict if the caller owns it, else a Flask error tuple."""
+    if not _PLAN_ID_RE.match(plan_id or ""):
+        return None, (jsonify({"success": False, "error": "Invalid plan id"}), 400)
+    db = get_firestore_client()
+    snap = db.collection("devotional_plans").document(plan_id).get()
+    if not snap.exists:
+        return None, (jsonify({"success": False, "error": "Plan not found"}), 404)
+    plan = snap.to_dict() or {}
+    if plan.get("uid") != g.user_id:
+        return None, (jsonify({"success": False, "error": "Forbidden"}), 403)
+    return plan, None
+
+
+@devotional_bp.route("/<plan_id>/art", methods=["GET"])
+@require_auth
+def devotional_art(plan_id):
+    """Minimal theme artwork for one plan. Generated once, then cached."""
+    plan, err = _owned_plan(plan_id)
+    if err:
+        return err
+
+    force = request.args.get("force", "false").lower() == "true"
+    try:
+        if not force:
+            cached = current_app.storage_handler.get_devotional_art(plan_id)
+            if cached:
+                from io import BytesIO
+
+                return send_file(
+                    BytesIO(cached),
+                    mimetype="image/jpeg",
+                    as_attachment=False,
+                    download_name=f"divine_bridge_plan_{plan_id}.jpg",
+                )
+
+        from backend.services.prayer.devotional_art import render_devotional_art
+
+        theme = (plan.get("theme") or plan.get("title") or "Faith").strip()
+        image_data = render_devotional_art(theme, plan_id)
+        image_bytes = image_data.getvalue()
+        current_app.storage_handler.save_devotional_art(plan_id, image_bytes)
+        image_data.seek(0)
+        return send_file(
+            image_data,
+            mimetype="image/jpeg",
+            as_attachment=False,
+            download_name=f"divine_bridge_plan_{plan_id}.jpg",
+        )
+    except Exception as exc:
+        logger.error("Error generating devotional art: %s", exc, exc_info=True)
+        return jsonify({"success": False, "error": "Failed to generate plan art"}), 500
 
 
 def _owned_plan_day(plan_id: str, day: int):

@@ -21,7 +21,7 @@ export default function ActivityScreen() {
 
   function goToPrayerWall() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.replace('/(tabs)/groups?tab=prayer-wall' as any);
+    router.replace('/prayer-wall' as never);
   }
 
   function goToGroupChat(groupId: string) {
