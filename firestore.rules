@@ -14,10 +14,10 @@ service cloud.firestore {
       // Leaders are provisioned by trusted server/admin tooling, never by a
       // profile edit from the mobile client.
       allow create: if request.auth != null && request.auth.uid == userId &&
-                    !request.resource.data.keys().hasAny(['is_prayer_leader', 'prayer_languages']);
+                    !request.resource.data.keys().hasAny(['is_prayer_leader', 'prayer_languages', 'prayer_availability', 'is_admin']);
       allow update: if request.auth != null && request.auth.uid == userId &&
                     !request.resource.data.diff(resource.data).affectedKeys()
-                      .hasAny(['is_prayer_leader', 'prayer_languages']);
+                      .hasAny(['is_prayer_leader', 'prayer_languages', 'prayer_availability', 'is_admin']);
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
     
@@ -269,6 +269,11 @@ service cloud.firestore {
     // endpoints. This prevents direct clients from viewing request descriptions,
     // assigning themselves as leaders, or racing the transactional claim.
     match /private_prayer_requests/{requestId} {
+      allow read, write: if false;
+    }
+
+    // Applications are written by the API. Clients cannot enroll themselves.
+    match /prayer_warrior_applications/{userId} {
       allow read, write: if false;
     }
     

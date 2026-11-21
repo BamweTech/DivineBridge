@@ -7,24 +7,25 @@ The Divine Bridge mobile app built with Expo ~54, React Native, and TypeScript.
 File-based routing under `app/`:
 
 - `app/_layout.tsx` — Root Stack with auth guard, providers (QueryClient, GroupUnread, LiveRooms).
-- `app/(tabs)/_layout.tsx` — Tab bar: Pray (landing), Groups, Devotional, Profile. Home and Live stay as hidden routes.
-- `app/(tabs)/pray.tsx` — Burning-bush halo. Drag down to open prayer tools (requests, timer, reminder, today's prayer, scheduled private matches, wall, personal generator, Voice Link).
+- `app/(tabs)/_layout.tsx` — Tab bar: Pray (landing), Groups, Devotional, Profile. Home and Live stay as hidden routes. The Profile tab shows the account photo when one is saved, and the person icon otherwise.
+- `app/(tabs)/pray.tsx` — Burning-bush halo. Tap the circle or drag it down to open a two-column prayer dashboard. A full-width card at the top, Enroll as Prayer Warrior, stays pinned while the dashboard cards scroll. Its gold border eases brighter and softer until the person applies. It invites people to apply unless they are already enrolled. The bottom tabs stay visible on that dashboard and on the pages it opens. Switching to another tab and coming back keeps the open prayer page.
+- `app/(tabs)/prayer-warrior.tsx` — Application to enroll as a prayer warrior. Languages are English, Spanish, and Kirundi. Church name is optional. Weekly time ranges are required. One range can cover several days, and a day can have more than one range. Matching uses them. Submitting stores a pending application and does not grant access.
+- `app/(tabs)/prayer-warrior-review.tsx` — Admin review of pending prayer-warrior applications, opened from Profile. Accept enrolls the person. Decline does not. Visible to `dev@bamwe.com`, `kubjca@gmail.com`, and any account the server has marked `is_admin`.
 - `app/(tabs)/devotional.tsx` — Landing is today's scripture and the plan cards. A plan opens on its own reading, without the daily verse.
 - `app/(tabs)/groups.tsx` — Prayer Groups tab: your groups, create, and join. Unread badge lives here.
-- `app/prayer-wall.tsx` — Public Prayer Wall, opened from the Pray menu.
-- `app/request-prayer.tsx` — Chooses a public wall post or a private warrior request.
-- `app/prayer-requests.tsx` — Private request form (`mode=compose`) and the requester plus warrior inbox (`mode=inbox`).
-- `app/scheduled-prayer.tsx` — Upcoming private matches. Requesters see their times; warriors see assigned calls.
-- `app/todays-prayer.tsx` — The global daily prayer.
-- `app/prayer-timer.tsx` — Personal quiet-time timer.
-- `app/prayer-reminder.tsx` — Daily local prayer reminder.
-- `app/personal-prayer.tsx` — One-off AI prayer. It is not saved.
+- `app/(tabs)/prayer-wall.tsx` — Public Prayer Wall, opened from the Pray menu.
+- `app/(tabs)/request-prayer.tsx` — Chooses a public wall post or a private warrior request.
+- `app/(tabs)/prayer-requests.tsx` — Private request form (`mode=compose`) and the requester plus warrior inbox (`mode=inbox`). The inbox title is Prayer Request. The form offers English, Spanish, and Kirundi, with a date selector and a 15-minute time selector. Every request schedules a live call at that time if a warrior is matched.
+- `app/(tabs)/scheduled-prayer.tsx` — Upcoming private matches. Requesters see their times; warriors see assigned calls.
+- `app/(tabs)/todays-prayer.tsx` — The global daily prayer.
+- `app/(tabs)/prayer-timer.tsx` — Personal quiet-time timer.
+- `app/(tabs)/prayer-reminder.tsx` — Daily local prayer reminder.
+- `app/(tabs)/personal-prayer.tsx` — One-off AI prayer. It is not saved.
 - `app/(auth)/` — Login, register screens.
-- `app/room/[id].tsx` — Live prayer room (dynamic route).
-- `app/voice-call/[id].tsx` — 1:1 voice link call (share web URL; mute/speaker/end).
-- `app/group/[id].tsx` — Group detail (dynamic route).
-- `app/activity.tsx` — Activity feed.
-- `app/prayer-requests.tsx` — Private prayer matching: requester submission/status and approved leader inbox.
+- `app/room/[id].tsx` — Live prayer room (dynamic route). Full screen, without the tab bar.
+- `app/voice-call/[id].tsx` — 1:1 voice link call (share web URL; mute/speaker/end). Full screen, without the tab bar.
+- `app/(tabs)/group/[id].tsx` — Group detail (dynamic route). The bottom tabs stay visible.
+- `app/(tabs)/activity.tsx` — Activity feed. The bottom tabs stay visible.
 - `app/verse-reader.tsx` — Daily verse explainer (context / meaning / application). Share opens a 4-card image pack.
 
 To add a new screen, create a file in `app/` and register in the nearest `_layout.tsx` if custom options are needed.

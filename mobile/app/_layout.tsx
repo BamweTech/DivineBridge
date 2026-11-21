@@ -53,6 +53,9 @@ import { GroupUnreadProvider } from '@/features/groups/contexts/GroupUnreadConte
 import { LiveRoomsProvider } from '@/features/groups/contexts/LiveRoomsContext';
 import { GroupCallNotificationOverlay } from '@/features/groups/components/GroupCallNotificationOverlay';
 import { useGroupChatNotifications } from '@/features/groups/hooks/useGroupChatNotifications';
+import { getActiveGroup } from '@/lib/activeGroupStore';
+import { dismissGroupChatNotifications } from '@/lib/groupChatNotify';
+import { ensureNotificationPresentationHandler } from '@/lib/notificationHandler';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { usePushToken } from '@/hooks/usePushToken';
 import { groupApi } from '@/services/api';
@@ -65,6 +68,7 @@ import BrandedSplashOverlay from '@/components/BrandedSplashOverlay';
 // Persisted Expo token auto-upload warns on launch when the iOS binary
 // has no aps-environment entitlement. We register explicitly in usePushToken.
 Notifications.setAutoServerRegistrationEnabledAsync(false).catch(() => {});
+ensureNotificationPresentationHandler();
 
 console.log('[DivineBridge] _layout.tsx: JS runtime started');
 
@@ -297,7 +301,10 @@ function RootLayoutInner() {
 
   useEffect(() => {
     const sub = Notifications.addNotificationReceivedListener((notification) => {
-      const data = notification.request.content.data;
+      const data = notification.request.content.data as Record<string, unknown> | undefined;
+      if (data?.type === 'group_chat' && typeof data.groupId === 'string' && getActiveGroup() === data.groupId) {
+        void dismissGroupChatNotifications(data.groupId);
+      }
       if (data?.type === 'private_prayer_request') {
         void queryClient.invalidateQueries({ queryKey: ['private-prayer-requests'] });
       }
@@ -390,18 +397,6 @@ function RootLayoutInner() {
             <Stack.Screen
               name="room/[id]"
               options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
-            />
-            <Stack.Screen
-              name="group/[id]"
-              options={{ animation: 'slide_from_right' }}
-            />
-            <Stack.Screen
-              name="activity"
-              options={{ animation: 'slide_from_right' }}
-            />
-            <Stack.Screen
-              name="prayer-requests"
-              options={{ animation: 'slide_from_right' }}
             />
             <Stack.Screen
               name="verse-reader"

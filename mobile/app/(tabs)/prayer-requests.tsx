@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, RefreshControl, ScrollView, Switch, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,12 +17,38 @@ import { promptReportContent } from '@/lib/contentSafety';
 import { useAuthStore } from '@/stores/authStore';
 import type { PrivatePrayerRequest } from '@/types';
 
-const LANGUAGES = ['English', 'French', 'Spanish', 'Kinyarwanda', 'Swahili', 'Portuguese'];
-const HOURS = [9, 12, 18];
+const LANGUAGES = ['English', 'Spanish', 'Kirundi'] as const;
+
+function upcomingQuarter(from = dayjs()) {
+  const cleared = from.second(0).millisecond(0);
+  const remainder = cleared.minute() % 15;
+  const next = remainder === 0 ? cleared : cleared.add(15 - remainder, 'minute');
+  return next.isAfter(from) ? next : next.add(15, 'minute');
+}
+
+function offeredLanguage(value?: string) {
+  return LANGUAGES.find((item) => item.toLowerCase() === (value || '').toLowerCase()) ?? 'English';
+}
+
+function mergePreferredTime(current: Date, picked: Date, mode: 'date' | 'time') {
+  const base = dayjs(current);
+  const next = dayjs(picked);
+  let merged = mode === 'date'
+    ? base.year(next.year()).month(next.month()).date(next.date())
+    : base.hour(next.hour()).minute(next.minute());
+  const remainder = merged.minute() % 15;
+  if (remainder !== 0) merged = merged.add(15 - remainder, 'minute');
+  merged = merged.second(0).millisecond(0);
+  const earliest = upcomingQuarter();
+  const latest = dayjs().add(7, 'day').subtract(15, 'minute');
+  if (!merged.isAfter(earliest.subtract(1, 'second'))) return earliest.toDate();
+  if (merged.isAfter(latest)) return latest.toDate();
+  return merged.toDate();
+}
 
 function toAvailability(slot: string) {
   const start = dayjs(slot);
-  return [{ start_at: start.toISOString(), end_at: start.add(30, 'minute').toISOString() }];
+  return [{ start_at: start.toISOString(), end_at: start.add(15, 'minute').toISOString() }];
 }
 
 function formatSlot(slot: string) {
@@ -36,9 +63,10 @@ export default function PrayerRequestsScreen() {
   const profile = useAuthStore((state) => state.profile);
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const [description, setDescription] = useState('');
-  const [language, setLanguage] = useState(profile?.preferredPrayerLanguage || 'English');
-  const [needsCall, setNeedsCall] = useState(false);
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [language, setLanguage] = useState<(typeof LANGUAGES)[number]>(offeredLanguage(profile?.preferredPrayerLanguage));
+  const [preferredAt, setPreferredAt] = useState(() => upcomingQuarter().toDate());
+  const [picker, setPicker] = useState<'date' | 'time' | null>(null);
+  const [pickerTick, setPickerTick] = useState(0);
   const [showForm, setShowForm] = useState(mode === 'compose');
 
   useEffect(() => {
@@ -46,12 +74,12 @@ export default function PrayerRequestsScreen() {
     if (mode === 'inbox') setShowForm(false);
   }, [mode]);
 
-  const slots = useMemo(
-    () => Array.from({ length: 7 }, (_, day) =>
-      HOURS.map((hour) => dayjs().startOf('day').add(day, 'day').hour(hour).minute(0).second(0).millisecond(0).toISOString())
-    ).flat().filter((slot) => dayjs(slot).isAfter(dayjs())),
-    []
-  );
+  useEffect(() => {
+    if (!picker || Platform.OS !== 'ios') return;
+    const id = setTimeout(() => setPicker(null), 3000);
+    return () => clearTimeout(id);
+  }, [picker, pickerTick]);
+
   const requestsQuery = useQuery({
     queryKey: ['private-prayer-requests'],
     queryFn: privatePrayerRequestApi.list,
@@ -69,16 +97,16 @@ export default function PrayerRequestsScreen() {
     mutationFn: () => privatePrayerRequestApi.submit({
       description: description.trim(),
       preferred_language: language,
-      wants_live_call: needsCall,
-      preferred_at: selectedSlot ?? '',
-      availability: needsCall && selectedSlot ? toAvailability(selectedSlot) : [],
+      wants_live_call: true,
+      preferred_at: preferredAt.toISOString(),
+      availability: toAvailability(preferredAt.toISOString()),
     }),
     onSuccess: () => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ['private-prayer-requests'] });
       setDescription('');
-      setNeedsCall(false);
-      setSelectedSlot(null);
+      setPreferredAt(upcomingQuarter().toDate());
+      setPicker(null);
       setShowForm(false);
     },
     onError: (error: Error) => Alert.alert('Could not submit request', error.message),
@@ -120,8 +148,8 @@ export default function PrayerRequestsScreen() {
       Alert.alert('Tell us a little more', 'Please write at least 10 characters so a leader can pray with you.');
       return;
     }
-    if (!selectedSlot) {
-      Alert.alert('Choose a time', 'Select when you would like to be prayed for.');
+    if (!dayjs(preferredAt).isAfter(dayjs()) || dayjs(preferredAt).isAfter(dayjs().add(7, 'day').subtract(15, 'minute'))) {
+      Alert.alert('Choose a time', 'Select a date and time within the next seven days.');
       return;
     }
     submit.mutate();
@@ -145,7 +173,7 @@ export default function PrayerRequestsScreen() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}
-      contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 22, paddingBottom: insets.bottom + 36 }}
+      contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 22, paddingBottom: insets.bottom + 96 }}
       refreshControl={<RefreshControl refreshing={requestsQuery.isRefetching} onRefresh={() => void requestsQuery.refetch()} tintColor={THEME_COLORS.gold} />}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20 }}>
@@ -153,15 +181,15 @@ export default function PrayerRequestsScreen() {
           <Icon name="back" size={22} color={THEME_COLORS.text2} />
         </Pressable>
         <View style={{ flex: 1 }}>
-          <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 23 }}>{showForm ? 'Request prayer' : 'Request Prayers'}</Text>
-          <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 2 }}>Matched with a prayer warrior in your language</Text>
+          <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 23 }}>{showForm ? 'Request prayer' : 'Prayer Request'}</Text>
+          <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 2 }}>A live call at your chosen time, if a warrior is matched</Text>
         </View>
       </View>
 
       {showForm ? (
         <View style={{ backgroundColor: THEME_COLORS.bg2, borderRadius: 20, borderWidth: 1, borderColor: THEME_COLORS.border, padding: 18 }}>
           <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('600'), fontSize: 17, marginBottom: 6 }}>How can we pray for you?</Text>
-          <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, lineHeight: 18, marginBottom: 14 }}>Only an eligible prayer leader will see this. Requests expire after two days.</Text>
+          <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, lineHeight: 18, marginBottom: 14 }}>If we find a matching prayer warrior, this schedules a live prayer call at the time you choose.</Text>
           <TextInput
             value={description}
             onChangeText={setDescription}
@@ -183,21 +211,50 @@ export default function PrayerRequestsScreen() {
           </View>
 
           <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('600'), fontSize: 13, marginTop: 18, marginBottom: 8 }}>When should we pray for you?</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {slots.map((slot) => (
-              <Pressable key={slot} onPress={() => setSelectedSlot(slot)} style={{ width: '31%', paddingVertical: 9, paddingHorizontal: 5, borderRadius: 10, backgroundColor: selectedSlot === slot ? THEME_COLORS.sageDim : THEME_COLORS.bg3, borderWidth: 1, borderColor: selectedSlot === slot ? 'rgba(74,124,94,0.35)' : THEME_COLORS.border }}>
-                <Text style={{ color: selectedSlot === slot ? THEME_COLORS.sage : THEME_COLORS.text2, ...iosFontStyle('500'), fontSize: 10, textAlign: 'center' }}>{formatSlot(slot)}</Text>
-              </Pressable>
-            ))}
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Pressable
+              onPress={() => setPicker((current) => (current === 'date' ? null : 'date'))}
+              accessibilityRole="button"
+              accessibilityLabel="Choose a date"
+              style={{ flex: 1, borderRadius: 14, backgroundColor: picker === 'date' ? THEME_COLORS.goldDim : THEME_COLORS.bg3, borderWidth: 1, borderColor: picker === 'date' ? THEME_COLORS.goldBorder : THEME_COLORS.border, paddingHorizontal: 12, paddingVertical: 12 }}
+            >
+              <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('500'), fontSize: 11 }}>Date</Text>
+              <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('600'), fontSize: 15, marginTop: 4 }}>{dayjs(preferredAt).format('ddd, MMM D')}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setPicker((current) => (current === 'time' ? null : 'time'))}
+              accessibilityRole="button"
+              accessibilityLabel="Choose a time"
+              style={{ flex: 1, borderRadius: 14, backgroundColor: picker === 'time' ? THEME_COLORS.goldDim : THEME_COLORS.bg3, borderWidth: 1, borderColor: picker === 'time' ? THEME_COLORS.goldBorder : THEME_COLORS.border, paddingHorizontal: 12, paddingVertical: 12 }}
+            >
+              <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('500'), fontSize: 11 }}>Time</Text>
+              <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('600'), fontSize: 15, marginTop: 4 }}>{dayjs(preferredAt).format('h:mm A')}</Text>
+            </Pressable>
           </View>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('600'), fontSize: 14 }}>Live voice prayer</Text>
-              <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 2 }}>Optional · a private 15-minute call at that time</Text>
-            </View>
-            <Switch value={needsCall} onValueChange={setNeedsCall} trackColor={{ false: THEME_COLORS.bg3, true: THEME_COLORS.goldDim }} thumbColor={needsCall ? THEME_COLORS.gold : THEME_COLORS.text3} />
-          </View>
+          {picker ? (
+            <DateTimePicker
+              value={preferredAt}
+              mode={picker}
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              minuteInterval={15}
+              minimumDate={new Date()}
+              maximumDate={dayjs().add(7, 'day').subtract(15, 'minute').toDate()}
+              themeVariant="light"
+              accentColor={THEME_COLORS.gold}
+              onChange={(event: DateTimePickerEvent, date?: Date) => {
+                if (Platform.OS === 'android') setPicker(null);
+                if (event.type === 'dismissed' || !date) return;
+                setPreferredAt((current) => {
+                  const next = mergePreferredTime(current, date, picker);
+                  return Math.abs(next.getTime() - current.getTime()) < 1000 ? current : next;
+                });
+                setPickerTick((tick) => tick + 1);
+              }}
+            />
+          ) : null}
+          <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('400'), fontSize: 13, lineHeight: 19, marginTop: 14 }}>
+            If a matching prayer warrior accepts, a live call is scheduled at this time.
+          </Text>
           <Button label={submit.isPending ? 'Sending…' : 'Send private request'} onPress={submitRequest} isLoading={submit.isPending} fullWidth style={{ marginTop: 22 }} />
         </View>
       ) : (
@@ -217,9 +274,10 @@ export default function PrayerRequestsScreen() {
           cancelling={cancel.isPending}
           onResubmit={() => {
             setDescription(item.description);
-            setLanguage(item.preferred_language);
-            setNeedsCall(item.wants_live_call);
-            setSelectedSlot(dayjs(item.preferred_at || item.availability[0]?.start_at).isAfter(dayjs()) ? (item.preferred_at || item.availability[0]?.start_at || null) : null);
+            setLanguage(offeredLanguage(item.preferred_language));
+            const saved = dayjs(item.preferred_at || item.availability[0]?.start_at);
+            setPreferredAt(saved.isAfter(dayjs()) ? saved.toDate() : upcomingQuarter().toDate());
+            setPicker(null);
             setShowForm(true);
           }}
         />
@@ -279,7 +337,11 @@ function RequestCard({ request, onClaim, onJoin, onResubmit, onCancel, onPray, c
       </View>
       <Text style={{ color: THEME_COLORS.text2, ...iosFontStyle('400'), fontSize: 13, lineHeight: 20, marginTop: 8 }}>{request.description}</Text>
       {(request.prayer_count ?? 0) > 0 && <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 8 }}>{request.prayer_count} prayer{request.prayer_count === 1 ? '' : 's'} recorded</Text>}
-      {request.preferred_at && <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 10 }}>Pray around {formatSlot(request.preferred_at)}</Text>}
+      {!leader && request.wants_live_call && request.preferred_at && !request.scheduled_at && (
+        <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 10 }}>
+          Live call at {formatSlot(request.preferred_at)} if a prayer warrior is matched.
+        </Text>
+      )}
       {request.scheduled_at && <Text style={{ color: THEME_COLORS.sage, ...iosFontStyle('500'), fontSize: 12, marginTop: 10 }}>Call scheduled · {formatSlot(request.scheduled_at)}</Text>}
       {leader && request.wants_live_call && firstSlot && <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 10 }}>Available: {formatSlot(firstSlot)}</Text>}
       {leader || canReport ? (

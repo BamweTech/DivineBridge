@@ -582,7 +582,7 @@ export function PrayerWallFeed({
           data={feed}
           keyExtractor={keyExtractor}
           renderItem={renderItem}
-          contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 4, paddingBottom: 120 }}
+          contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 4, paddingBottom: 150 }}
           refreshControl={<RefreshControl refreshing={isFetching} onRefresh={handleRefresh} tintColor={THEME_COLORS.gold} />}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={

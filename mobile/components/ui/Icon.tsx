@@ -82,6 +82,7 @@ export type IconName =
   | 'sparkle'
   | 'compass'
   | 'dove'
+  | 'kneel'
   | 'waves'
   | 'voice-note'
   | 'pause'
@@ -495,6 +496,17 @@ const Icon: React.FC<IconProps> = ({
         <Path {...s} d="M20 5c-2-2-5-2-7 0L7 11l5 5 6-6c2-2 2-5 0-7z" />
         <Path {...s} d="M12 16l2 5" />
         <Circle fill={color} stroke="none" cx="17" cy="7" r="1" />
+      </G>
+    ),
+
+    kneel: (
+      <G>
+        <Circle {...s} cx="10" cy="4.4" r="2.2" />
+        <Path {...s} d="M10 6.7v5.2" />
+        <Path {...s} d="M10 8.6c1.8-1.6 3.6-1.2 4.2.2" />
+        <Path {...s} d="M10 11.9l4.2 5.2" />
+        <Path {...s} d="M14.2 17.1H6.2" />
+        <Path {...s} d="M4.5 19.4h15" />
       </G>
     ),
 

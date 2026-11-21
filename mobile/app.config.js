@@ -164,6 +164,7 @@ export default {
       ['./plugins/withOptionalIosPush.js', { enabled: ENABLE_IOS_PUSH }],
       '@sentry/react-native/expo',
       'expo-web-browser',
+      '@react-native-community/datetimepicker',
     ],
     experiments: {
       typedRoutes: true,

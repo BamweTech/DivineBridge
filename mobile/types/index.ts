@@ -27,6 +27,8 @@ export interface UserProfile {
   groups?: string[];
   /** User ids this account has blocked. Mirrors Firestore `blocked_user_ids`. */
   blockedUserIds?: string[];
+  /** Set by the server for allowlisted administrators. */
+  isAdmin?: boolean;
 }
 
 // ─── Private Prayer Matching ──────────────────────────────────────────────────

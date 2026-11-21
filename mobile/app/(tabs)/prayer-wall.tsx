@@ -21,7 +21,7 @@ export default function PrayerWallScreen() {
 
   if (showCompose) {
     return (
-      <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg, paddingTop: insets.top + 8 }}>
+      <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg, paddingTop: insets.top + 8, paddingBottom: insets.bottom + 70 }}>
         <ComposeModal onClose={() => setShowCompose(false)} onPosted={() => setShowCompose(false)} />
       </View>
     );

@@ -6,6 +6,7 @@ import {
   TextInput,
   Pressable,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Alert,
   Modal,
@@ -16,7 +17,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
@@ -30,7 +31,6 @@ import {
   useGroupDetails,
   useGroupMembers,
   useGroupLiveRoom,
-  useGroupChatLastReads,
   firestoreTimestampMs,
 } from '@/features/groups/hooks/useGroups';
 import { uploadGroupChatFile } from '@/lib/groupChatUpload';
@@ -40,6 +40,7 @@ import { groupApi, roomApi } from '@/services/api';
 import { promptBlockUser, promptReportContent } from '@/lib/contentSafety';
 import { isWebRTCAvailable } from '@/lib/sfu';
 import { setActiveGroup } from '@/lib/activeGroupStore';
+import { dismissGroupChatNotifications } from '@/lib/groupChatNotify';
 import { GroupLiveAvPanel } from '@/features/groups/components/GroupLiveAvPanel';
 import { GroupMembersSheet } from '@/features/groups/components/GroupMembersSheet';
 import { VoiceRecorder } from '@/features/groups/components/VoiceRecorder';
@@ -158,8 +159,7 @@ export default function GroupScreen() {
   const { members, isLoading: isLoadingMembers } = useGroupMembers(id!);
   const groupLiveRoom = useGroupLiveRoom(id!);
   const { messages, isLoading: isLoadingChat, sendMessage, toggleReaction, deleteMessage } = useGroupChat(id!);
-  const { markGroupChatRead, unreadCountByGroup } = useGroupUnread();
-  const { reads, isReadsReady } = useGroupChatLastReads();
+  const { markGroupChatRead, unreadCountByGroup, reads, isReadsReady } = useGroupUnread();
   const [text, setText] = useState('');
   const [isSendingMain, setIsSendingMain] = useState(false);
   const [showInviteSheet, setShowInviteSheet] = useState(false);
@@ -182,6 +182,7 @@ export default function GroupScreen() {
   const [fsChatText, setFsChatText] = useState('');
   const [isSendingFs, setIsSendingFs] = useState(false);
   const [showAttachTray, setShowAttachTray] = useState<'main' | 'fs' | null>(null);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [videoViewer, setVideoViewer] = useState<ViewerMedia | null>(null);
   const [imageViewerOpen, setImageViewerOpen] = useState<{
     items: ChatImageGalleryItem[];
@@ -228,6 +229,24 @@ export default function GroupScreen() {
     setActiveGroup(id ?? null);
     return () => setActiveGroup(null);
   }, [id]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, () => setKeyboardOpen(true));
+    const hide = Keyboard.addListener(hideEvent, () => setKeyboardOpen(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!id) return;
+      void dismissGroupChatNotifications(id);
+    }, [id]),
+  );
 
   const participants = prayer.room?.participants ?? [];
   const currentParticipant = participants.find((p) => p.user_id === user?.uid);
@@ -1002,16 +1021,13 @@ export default function GroupScreen() {
 
   const invertedChatItems = useMemo(() => [...chatItems].reverse(), [chatItems]);
 
-  const didMarkReadOnMountRef = useRef(false);
   useEffect(() => {
-    if (didMarkReadOnMountRef.current || !id || displayedMessages.length === 0) return;
-    if (firstUnreadIndex < 0) {
-      didMarkReadOnMountRef.current = true;
-      const last = displayedMessages[displayedMessages.length - 1];
-      const ts = last ? firestoreTimestampMs(last.timestamp) : undefined;
-      if (ts) void markGroupChatRead(id, ts);
-    }
-  }, [id, displayedMessages, firstUnreadIndex, markGroupChatRead]);
+    if (!id || !isNearBottom || displayedMessages.length === 0) return;
+    const last = displayedMessages[displayedMessages.length - 1];
+    const ts = last ? firestoreTimestampMs(last.timestamp) : 0;
+    if (!ts || ts <= lastReadAt) return;
+    void markGroupChatRead(id, ts);
+  }, [id, isNearBottom, displayedMessages, lastReadAt, markGroupChatRead]);
 
   const chatEmptyComponent = useMemo(() => (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: THEME_COLORS.bg, transform: [{ scaleY: -1 }] }}>
@@ -1380,7 +1396,7 @@ export default function GroupScreen() {
         {replyTarget && <ReplyComposerBanner target={replyTarget} onCancel={() => setReplyTarget(null)} />}
         <View style={{
           flexDirection: 'row', alignItems: 'center',
-          padding: 12, paddingBottom: insets.bottom + 8, gap: 8,
+          padding: 12, paddingBottom: insets.bottom + (keyboardOpen ? 8 : 78), gap: 8,
           backgroundColor: THEME_COLORS.bg,
         }}>
           <Pressable

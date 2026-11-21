@@ -23,7 +23,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { useAuthStore } from '@/stores/authStore';
 import { THEME_COLORS, ROOM_MODES, MESSAGE_TYPES } from '@/lib/constants';
 import { iosFontStyle, iosFontStyleItalic } from '@/lib/typography';
-import { presentPrayerRoomBackgroundNotice } from '@/lib/roomChatNotify';
+import { dismissRoomChatNotifications, presentPrayerRoomBackgroundNotice } from '@/lib/roomChatNotify';
 import Icon from '@/components/ui/Icon';
 import type { Participant } from '@/types';
 import dayjs from 'dayjs';
@@ -258,8 +258,10 @@ export default function RoomScreen() {
   }, [isJoined]);
 
   useEffect(() => {
-    if (showChat) setChatUnread(0);
-  }, [showChat]);
+    if (!showChat || !id) return;
+    setChatUnread(0);
+    void dismissRoomChatNotifications(id);
+  }, [showChat, id]);
 
   useEffect(() => {
     if (!roomToast) return;
@@ -288,7 +290,7 @@ export default function RoomScreen() {
       if (isSystem) {
         setRoomToast({ text: m.message, variant: 'system' });
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        void presentPrayerRoomBackgroundNotice('Prayer room', m.message);
+        void presentPrayerRoomBackgroundNotice('Prayer room', m.message, id);
         if (!showChat) setChatUnread((c) => c + 1);
         continue;
       }
@@ -296,7 +298,7 @@ export default function RoomScreen() {
       if (!showChat) {
         setRoomToast({ text: `${m.user_name}: ${preview}`, variant: 'chat' });
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        void presentPrayerRoomBackgroundNotice(m.user_name, preview);
+        void presentPrayerRoomBackgroundNotice(m.user_name, preview, id);
         setChatUnread((c) => c + 1);
       } else {
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

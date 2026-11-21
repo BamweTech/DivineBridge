@@ -395,6 +395,50 @@ export const privatePrayerRequestApi = {
     ),
 };
 
+export type PrayerWarriorAvailability = {
+  timezone: string;
+  slots: { weekday: string; start_minute: number; end_minute: number }[];
+};
+
+export type PrayerWarriorApplication = {
+  status: 'none' | 'pending' | 'enrolled';
+  languages: string[];
+  note: string;
+  church: string;
+  availability: PrayerWarriorAvailability;
+  submitted_at: string | null;
+};
+
+export type WarriorApplicationReview = {
+  user_id: string;
+  first_name: string;
+  languages: string[];
+  note: string;
+  church: string;
+  availability: PrayerWarriorAvailability;
+  status: string;
+  submitted_at: string | null;
+};
+
+export const prayerWarriorApi = {
+  get: () =>
+    request<{ success: boolean; data: PrayerWarriorApplication }>('/api/prayer/warrior-application'),
+  submit: (body: { languages: string[]; note: string; church?: string; availability: PrayerWarriorAvailability }) =>
+    request<{ success: boolean; data: PrayerWarriorApplication }>('/api/prayer/warrior-application', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  markAdmin: () =>
+    request<{ success: boolean; data: { is_admin: boolean } }>('/api/prayer/admin-access', { method: 'POST' }),
+  listApplications: () =>
+    request<{ success: boolean; data: WarriorApplicationReview[] }>('/api/prayer/warrior-applications'),
+  reviewApplication: (userId: string, decision: 'accept' | 'decline') =>
+    request<{ success: boolean; data: { user_id: string; status: string } }>(
+      `/api/prayer/warrior-applications/${encodeURIComponent(userId)}/review`,
+      { method: 'POST', body: JSON.stringify({ decision }) },
+    ),
+};
+
 // ─── Profile (business card fields; same contract as web profile) ────────────
 
 export const profileApi = {

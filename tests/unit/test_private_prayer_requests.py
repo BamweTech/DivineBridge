@@ -102,12 +102,27 @@ def test_availability_rejects_windows_outside_next_week():
 
 
 def test_notifies_only_eligible_leaders_of_private_request_changes():
+    wednesday_evening = {
+        "timezone": "UTC",
+        "slots": [{"weekday": "wed", "start_minute": 18 * 60, "end_minute": 20 * 60}],
+    }
     english_leader = _FakeDocument(
-        {"is_prayer_leader": True, "prayer_languages": ["english"]},
+        {"is_prayer_leader": True, "prayer_languages": ["english"], "prayer_availability": wednesday_evening},
         doc_id="english-leader",
     )
+    busy_leader = _FakeDocument(
+        {
+            "is_prayer_leader": True,
+            "prayer_languages": ["english"],
+            "prayer_availability": {
+                "timezone": "UTC",
+                "slots": [{"weekday": "wed", "start_minute": 19 * 60, "end_minute": 20 * 60}],
+            },
+        },
+        doc_id="busy-leader",
+    )
     french_leader = _FakeDocument(
-        {"is_prayer_leader": True, "prayer_languages": ["french"]},
+        {"is_prayer_leader": True, "prayer_languages": ["french"], "prayer_availability": wednesday_evening},
         doc_id="french-leader",
     )
     db = _FakeDb(
@@ -115,6 +130,7 @@ def test_notifies_only_eligible_leaders_of_private_request_changes():
             "users": _FakeCollection(
                 {
                     "english-leader": english_leader,
+                    "busy-leader": busy_leader,
                     "french-leader": french_leader,
                 }
             )
@@ -125,7 +141,11 @@ def test_notifies_only_eligible_leaders_of_private_request_changes():
         private_requests._notify_eligible_leaders(
             db,
             "request-1",
-            {"preferred_language": "english", "status": "cancelled"},
+            {
+                "preferred_language": "english",
+                "status": "cancelled",
+                "preferred_at": datetime(2026, 11, 18, 18, 15),
+            },
             "Prayer request cancelled",
             "This request is no longer available in your inbox.",
             "cancelled",
@@ -282,3 +302,164 @@ def test_preferred_at_rejects_a_past_time():
 
     with pytest.raises(ValueError):
         private_requests._parse_preferred_at(when.isoformat())
+
+
+class _SettableDocument(_FakeDocument):
+    def set(self, data, merge=False):
+        if merge and self.data:
+            merged = dict(self.data)
+            merged.update(data)
+            self.data = merged
+        else:
+            self.data = dict(data)
+        self.exists = True
+
+
+class _MutableCollection(_FakeCollection):
+    def document(self, doc_id):
+        if doc_id not in self.documents:
+            self.documents[doc_id] = _SettableDocument(None, doc_id)
+        return self.documents[doc_id]
+
+
+def test_warrior_application_stays_pending_until_an_admin_enrolls_the_person():
+    users = _MutableCollection({"member": _SettableDocument({"firstName": "Aline"}, "member")})
+    applications = _MutableCollection({})
+    db = _FakeDb({"users": users, "prayer_warrior_applications": applications})
+    user = {"user_id": "member", "user_name": "Aline", "is_anonymous": False}
+
+    assert private_requests.get_warrior_application(db, "member")["status"] == "none"
+    result = private_requests.submit_warrior_application(
+        db,
+        user,
+        ["Spanish", "spanish", "Kirundi"],
+        "I can pray with people in Spanish and Kirundi.",
+        "Grace Chapel",
+        {
+            "timezone": "America/Chicago",
+            "slots": [
+                {"weekday": "wed", "start_minute": 9 * 60, "end_minute": 11 * 60},
+                {"weekday": "wed", "start_minute": 18 * 60, "end_minute": 20 * 60},
+                {"weekday": "wed", "start_minute": 18 * 60, "end_minute": 20 * 60},
+            ],
+        },
+    )
+
+    assert result["status"] == "pending"
+    assert result["languages"] == ["spanish", "kirundi"]
+    assert result["church"] == "Grace Chapel"
+    assert result["availability"]["slots"] == [
+        {"weekday": "wed", "start_minute": 9 * 60, "end_minute": 11 * 60},
+        {"weekday": "wed", "start_minute": 18 * 60, "end_minute": 20 * 60},
+    ]
+    stored = applications.documents["member"].data
+    assert stored["status"] == "pending"
+    assert stored["church"] == "Grace Chapel"
+    assert users.documents["member"].data["prayer_availability"]["timezone"] == "America/Chicago"
+    assert users.documents["member"].data["firstName"] == "Aline"
+    assert "is_prayer_leader" not in users.documents["member"].data
+
+
+def test_warrior_range_must_end_later_the_same_day():
+    with pytest.raises(ValueError, match="later the same day"):
+        private_requests._parse_warrior_availability(
+            {
+                "timezone": "UTC",
+                "slots": [{"weekday": "wed", "start_minute": 4 * 60, "end_minute": 3 * 60}],
+            }
+        )
+
+
+def test_warrior_availability_uses_the_warrior_local_time():
+    # 00:15 UTC on Thursday is 18:15 Wednesday in Chicago during standard time.
+    when = datetime(2026, 11, 19, 0, 15)
+    profile = {
+        "prayer_availability": {
+            "timezone": "America/Chicago",
+            "slots": [
+                {"weekday": "wed", "start_minute": 9 * 60, "end_minute": 11 * 60},
+                {"weekday": "wed", "start_minute": 18 * 60, "end_minute": 20 * 60},
+            ],
+        }
+    }
+
+    assert private_requests._available_for_call(profile, when) is True
+    assert private_requests._available_for_call(profile, when.replace(hour=2, minute=0)) is False
+    assert private_requests._available_for_call({}, when) is False
+
+
+def test_allowlisted_admin_is_marked_and_can_accept_or_decline():
+    users = _MutableCollection(
+        {
+            "admin": _SettableDocument({"email": "dev@bamwe.com"}, "admin"),
+            "applicant": _SettableDocument({"firstName": "Aline"}, "applicant"),
+            "other": _SettableDocument({"firstName": "No"}, "other"),
+        }
+    )
+    applications = _MutableCollection(
+        {
+            "applicant": _SettableDocument(
+                {
+                    "status": "pending",
+                    "first_name": "Aline",
+                    "languages": ["spanish"],
+                    "note": "I can pray on Wednesday evenings.",
+                    "church": "Grace Chapel",
+                    "availability": {
+                        "timezone": "America/Chicago",
+                        "slots": [{"weekday": "wed", "start_minute": 18 * 60, "end_minute": 20 * 60}],
+                    },
+                    "submitted_at": datetime(2026, 11, 19, 12, 0),
+                },
+                "applicant",
+            ),
+            "other": _SettableDocument({"status": "declined", "languages": ["english"]}, "other"),
+        }
+    )
+    db = _FakeDb({"users": users, "prayer_warrior_applications": applications})
+
+    assert private_requests.is_platform_admin({"email": " Kubjca@gmail.com "}) is True
+    assert private_requests.is_platform_admin({"email": "person@example.com"}) is False
+    assert private_requests.mark_platform_admin(db, {"user_id": "admin", "email": "dev@bamwe.com"}) is True
+    assert users.documents["admin"].data["is_admin"] is True
+
+    pending = private_requests.list_pending_warrior_applications(db)
+    assert [item["user_id"] for item in pending] == ["applicant"]
+    assert pending[0]["church"] == "Grace Chapel"
+
+    declined = private_requests.review_warrior_application(db, "admin", "applicant", "decline")
+    assert declined["status"] == "declined"
+    assert "is_prayer_leader" not in users.documents["applicant"].data
+
+    applications.documents["applicant"].data["status"] = "pending"
+    accepted = private_requests.review_warrior_application(db, "admin", "applicant", "accept")
+    assert accepted["status"] == "enrolled"
+    assert users.documents["applicant"].data["is_prayer_leader"] is True
+    assert users.documents["applicant"].data["prayer_languages"] == ["spanish"]
+    assert users.documents["applicant"].data["firstName"] == "Aline"
+
+    with pytest.raises(ValueError, match="already been reviewed"):
+        private_requests.review_warrior_application(db, "admin", "applicant", "accept")
+    with pytest.raises(ValueError, match="Application not found"):
+        private_requests.review_warrior_application(db, "admin", "missing", "decline")
+
+
+def test_enrolled_warrior_cannot_apply_again():
+    db = _FakeDb(
+        {
+            "users": _MutableCollection(
+                {"leader": _SettableDocument({"is_prayer_leader": True, "prayer_languages": ["english"]}, "leader")}
+            ),
+            "prayer_warrior_applications": _MutableCollection({}),
+        }
+    )
+
+    status = private_requests.get_warrior_application(db, "leader")
+    assert status["status"] == "enrolled"
+    with pytest.raises(RuntimeError):
+        private_requests.submit_warrior_application(
+            db,
+            {"user_id": "leader", "user_name": "Leader"},
+            ["english"],
+            "I already serve as a prayer warrior.",
+        )

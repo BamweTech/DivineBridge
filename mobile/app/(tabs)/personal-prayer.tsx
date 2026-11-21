@@ -40,7 +40,7 @@ export default function PersonalPrayerScreen() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}
-      contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: 22, paddingBottom: insets.bottom + 36 }}
+      contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: 22, paddingBottom: insets.bottom + 96 }}
       keyboardShouldPersistTaps="handled"
     >
       <Pressable onPress={() => router.back()} hitSlop={12} style={{ marginBottom: 16 }}>

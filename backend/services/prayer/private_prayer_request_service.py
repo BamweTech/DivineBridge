@@ -5,6 +5,7 @@ requests need transactional claiming, restricted access, and short-lived state.
 """
 
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 import logging
 import uuid
 
@@ -16,9 +17,14 @@ from backend.integrations.push_service import send_push_to_user
 logger = logging.getLogger(__name__)
 
 COLLECTION = "private_prayer_requests"
+APPLICATIONS = "prayer_warrior_applications"
 REQUEST_TTL = timedelta(days=2)
 CALL_DURATION_MINUTES = 15
 MAX_DESCRIPTION_LENGTH = 500
+MAX_CHURCH_LENGTH = 80
+WEEKDAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+PLATFORM_ADMIN_EMAILS = frozenset({"dev@bamwe.com", "kubjca@gmail.com"})
+WARRIOR_LANGUAGES = ("english", "spanish", "kirundi")
 
 
 def _now():
@@ -138,7 +144,7 @@ def _notify_eligible_leaders(db, request_id, request_data, title, body, event, e
             continue
         leader = leader_doc.to_dict() or {}
         languages = [str(item).lower() for item in leader.get("prayer_languages", [])]
-        if language in languages:
+        if language in languages and _available_for_call(leader, request_data.get("preferred_at")):
             _send(
                 leader_doc.id,
                 title,
@@ -165,7 +171,11 @@ def create_request(db, user, description, preferred_language, wants_live_call, a
         raise ValueError("Choose a preferred language")
 
     parsed_preferred = _parse_preferred_at(preferred_at)
-    parsed_availability = _parse_availability(availability) if wants_live_call else []
+    call_end = parsed_preferred + timedelta(minutes=CALL_DURATION_MINUTES)
+    if call_end > _now() + timedelta(days=7):
+        raise ValueError("Choose a time within the next seven days")
+    # Every private request schedules a live call at the chosen time when a warrior accepts.
+    parsed_availability = [{"start_at": parsed_preferred, "end_at": call_end}]
     requester_id = user["user_id"]
     profile = _get_profile(db, requester_id)
     now = _now()
@@ -175,7 +185,7 @@ def create_request(db, user, description, preferred_language, wants_live_call, a
         "requester_first_name": _first_name(profile, user.get("user_name")),
         "description": description,
         "preferred_language": language,
-        "wants_live_call": bool(wants_live_call),
+        "wants_live_call": True,
         "preferred_at": parsed_preferred,
         "availability": parsed_availability,
         "status": "active",
@@ -198,7 +208,7 @@ def create_request(db, user, description, preferred_language, wants_live_call, a
         request_ref.id,
         data,
         "New prayer request",
-        "A prayer request is available in a language you serve.",
+        "A live prayer call is waiting in a language you serve.",
         "created",
         exclude_ids=(requester_id,),
     )
@@ -216,7 +226,7 @@ def list_for_user(db, user_id):
             data = doc.to_dict() or {}
             if _as_naive_utc(data.get("expires_at")) and _as_naive_utc(data["expires_at"]) <= now:
                 continue
-            if data.get("preferred_language") in languages:
+            if data.get("preferred_language") in languages and _available_for_call(profile, data.get("preferred_at")):
                 items.append(_request_payload(doc.id, data, user_id, leader_view=True))
     for doc in db.collection(COLLECTION).where("requester_id", "==", user_id).stream():
         item = _request_payload(doc.id, doc.to_dict() or {}, user_id)
@@ -260,6 +270,8 @@ def claim_request(db, request_id, leader, slot_start):
                 raise ValueError("Choose one of the available times") from exc
             if not any(window["start_at"] == scheduled_at for window in data.get("availability", [])):
                 raise ValueError("Choose one of the available times")
+            if not _available_for_call(leader_profile, scheduled_at):
+                raise PermissionError("This call is outside the times you are available")
         transaction.update(
             request_ref,
             {
@@ -482,6 +494,224 @@ def open_scheduled_call(db, request_id, user_id):
         "room_code": data["room_code"],
         "duration_minutes": CALL_DURATION_MINUTES,
     }
+
+
+def _empty_availability():
+    return {"timezone": "", "slots": []}
+
+
+def _quarter_minute(value, latest):
+    try:
+        minute = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Choose a time in 15-minute steps") from exc
+    if minute < 0 or minute > latest or minute % 15 != 0:
+        raise ValueError("Choose a time in 15-minute steps")
+    return minute
+
+
+def _parse_warrior_availability(raw):
+    """Weekly ranges. The same day may carry more than one range."""
+    if not isinstance(raw, dict):
+        raise ValueError("Choose at least one time range you can take a call")
+    timezone_name = str(raw.get("timezone") or "").strip()
+    if not timezone_name or len(timezone_name) > 64:
+        raise ValueError("Choose a timezone for your available times")
+    try:
+        ZoneInfo(timezone_name)
+    except Exception as exc:
+        raise ValueError("Choose a timezone for your available times") from exc
+    slots_in = raw.get("slots")
+    if not isinstance(slots_in, list) or not slots_in:
+        raise ValueError("Choose at least one time range you can take a call")
+    cleaned = []
+    seen = set()
+    for slot in slots_in[:14]:
+        if not isinstance(slot, dict):
+            raise ValueError("Choose a valid time range")
+        weekday = str(slot.get("weekday") or "").strip().lower()[:3]
+        if weekday not in WEEKDAYS:
+            raise ValueError("Choose a day of the week")
+        start = _quarter_minute(slot.get("start_minute"), (24 * 60) - 15)
+        end = _quarter_minute(slot.get("end_minute"), 24 * 60)
+        if end <= start:
+            raise ValueError("The end time has to be later the same day")
+        if end - start < CALL_DURATION_MINUTES:
+            raise ValueError("Each range must be at least 15 minutes")
+        key = (weekday, start, end)
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append({"weekday": weekday, "start_minute": start, "end_minute": end})
+    if not cleaned:
+        raise ValueError("Choose at least one time range you can take a call")
+    return {"timezone": timezone_name, "slots": cleaned}
+
+
+def _available_for_call(profile, preferred_at):
+    """True when the 15-minute call fits inside one of this warrior's ranges."""
+    availability = (profile or {}).get("prayer_availability") or {}
+    preferred = _as_naive_utc(preferred_at)
+    slots = availability.get("slots") if isinstance(availability, dict) else None
+    if not preferred or not slots:
+        return False
+    try:
+        zone = ZoneInfo(str(availability.get("timezone") or ""))
+    except Exception:
+        return False
+    local = preferred.replace(tzinfo=timezone.utc).astimezone(zone)
+    weekday = WEEKDAYS[local.weekday()]
+    minute = local.hour * 60 + local.minute
+    return any(
+        isinstance(slot, dict)
+        and slot.get("weekday") == weekday
+        and int(slot.get("start_minute", 1)) <= minute
+        and minute + CALL_DURATION_MINUTES <= int(slot.get("end_minute", 0))
+        for slot in slots
+    )
+
+
+def _application_payload(status, languages, note, submitted_at, church="", availability=None):
+    return {
+        "status": status,
+        "languages": languages,
+        "note": note or "",
+        "church": church or "",
+        "availability": availability or _empty_availability(),
+        "submitted_at": _serialize(submitted_at) if submitted_at else None,
+    }
+
+
+def get_warrior_application(db, user_id):
+    """Return whether this person is enrolled, waiting, or has not applied."""
+    profile = _get_profile(db, user_id)
+    if profile.get("is_prayer_leader") is True:
+        languages = [str(item).lower() for item in profile.get("prayer_languages", [])]
+        return _application_payload("enrolled", languages, "", None, availability=profile.get("prayer_availability"))
+    snapshot = db.collection(APPLICATIONS).document(user_id).get()
+    if not snapshot.exists:
+        return _application_payload("none", [], "", None)
+    data = snapshot.to_dict() or {}
+    return _application_payload(
+        data.get("status") or "pending",
+        data.get("languages") or [],
+        data.get("note"),
+        data.get("submitted_at"),
+        data.get("church"),
+        data.get("availability"),
+    )
+
+
+def submit_warrior_application(db, user, languages, note, church="", availability=None):
+    """Store a pending application. Enrollment stays an admin grant."""
+    if user.get("is_anonymous"):
+        raise PermissionError("Sign in is required to apply as a prayer warrior")
+    user_id = user["user_id"]
+    profile = _get_profile(db, user_id)
+    if profile.get("is_prayer_leader") is True:
+        raise RuntimeError("You are already a prayer warrior")
+    cleaned = []
+    for item in languages or []:
+        language = str(item).strip().lower()
+        if language not in WARRIOR_LANGUAGES:
+            raise ValueError("Choose English, Spanish, or Kirundi")
+        if language not in cleaned:
+            cleaned.append(language)
+    if not cleaned:
+        raise ValueError("Choose at least one language")
+    note = (note or "").strip()
+    if len(note) < 10 or len(note) > MAX_DESCRIPTION_LENGTH:
+        raise ValueError("Tell us a little about yourself in 10 to 500 characters")
+    church = (church or "").strip()
+    if len(church) > MAX_CHURCH_LENGTH:
+        raise ValueError("Church name must be 80 characters or fewer")
+    parsed_availability = _parse_warrior_availability(availability)
+    now = _now()
+    ref = db.collection(APPLICATIONS).document(user_id)
+    existing = ref.get()
+    submitted_at = now
+    if existing.exists:
+        previous = existing.to_dict() or {}
+        submitted_at = previous.get("submitted_at") or now
+    ref.set(
+        {
+            "user_id": user_id,
+            "first_name": _first_name(profile, user.get("user_name")),
+            "languages": cleaned,
+            "note": note,
+            "church": church,
+            "availability": parsed_availability,
+            "status": "pending",
+            "submitted_at": submitted_at,
+            "updated_at": now,
+        }
+    )
+    db.collection("users").document(user_id).set({"prayer_availability": parsed_availability}, merge=True)
+    return _application_payload("pending", cleaned, note, submitted_at, church, parsed_availability)
+
+
+def is_platform_admin(user):
+    email = str((user or {}).get("email") or "").strip().lower()
+    return email in PLATFORM_ADMIN_EMAILS
+
+
+def mark_platform_admin(db, user):
+    """Remember that this allowlisted account is an admin."""
+    if not is_platform_admin(user):
+        return False
+    db.collection("users").document(user["user_id"]).set({"is_admin": True}, merge=True)
+    return True
+
+
+def list_pending_warrior_applications(db):
+    """Applications still waiting for an admin to accept or decline."""
+    items = []
+    for doc in db.collection(APPLICATIONS).stream():
+        data = doc.to_dict() or {}
+        if data.get("status") != "pending":
+            continue
+        items.append(
+            {
+                "user_id": doc.id,
+                "first_name": data.get("first_name") or "",
+                "languages": list(data.get("languages") or []),
+                "note": data.get("note") or "",
+                "church": data.get("church") or "",
+                "availability": data.get("availability") or _empty_availability(),
+                "status": "pending",
+                "submitted_at": _serialize(data.get("submitted_at")),
+            }
+        )
+    items.sort(key=lambda item: item.get("submitted_at") or "")
+    return items
+
+
+def review_warrior_application(db, reviewer_id, applicant_id, decision):
+    """Accept grants prayer-warrior access. Decline leaves the person unenrolled."""
+    if decision not in ("accept", "decline"):
+        raise ValueError("Choose accept or decline")
+    ref = db.collection(APPLICATIONS).document(applicant_id)
+    snapshot = ref.get()
+    if not snapshot.exists:
+        raise ValueError("Application not found")
+    data = snapshot.to_dict() or {}
+    if data.get("status") != "pending":
+        raise ValueError("This application has already been reviewed")
+    now = _now()
+    if decision == "accept":
+        db.collection("users").document(applicant_id).set(
+            {
+                "is_prayer_leader": True,
+                "prayer_languages": list(data.get("languages") or []),
+                "prayer_availability": data.get("availability") or _empty_availability(),
+            },
+            merge=True,
+        )
+        status = "enrolled"
+    else:
+        status = "declined"
+    ref.set({"status": status, "reviewed_at": now, "reviewed_by": reviewer_id}, merge=True)
+    return {"user_id": applicant_id, "status": status}
 
 
 def send_due_call_reminders(db):

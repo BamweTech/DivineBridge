@@ -280,6 +280,15 @@
       <circle cx="12" cy="12" r="10"/>
       <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
     </symbol>
+    <!-- Person kneeling in prayer -->
+    <symbol id="ic-kneel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="10" cy="4.4" r="2.2"/>
+      <path d="M10 6.7v5.2"/>
+      <path d="M10 8.6c1.8-1.6 3.6-1.2 4.2.2"/>
+      <path d="M10 11.9l4.2 5.2"/>
+      <path d="M14.2 17.1H6.2"/>
+      <path d="M4.5 19.4h15"/>
+    </symbol>
     <!-- Dove / peace -->
     <symbol id="ic-dove" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
       <path d="M12 21C6 21 2 17 2 12c0-3.5 2-6.5 5-8"/>
@@ -681,6 +690,8 @@ html, body {
 .speaker-bubble { aspect-ratio: 1; border-radius: 22px; background: var(--bg2); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; position: relative; overflow: hidden; cursor: pointer; }
 .speaker-bubble.speaking { border-color: var(--sage); box-shadow: 0 0 0 2px rgba(74,124,94,.18); animation: speaking-pulse 2s ease infinite; }
 @keyframes speaking-pulse { 0%,100%{box-shadow:0 0 0 2px rgba(74,124,94,.18)} 50%{box-shadow:0 0 0 4px rgba(74,124,94,.1)} }
+@keyframes enroll-pulse { 0%,100%{border-color:rgba(176,125,32,.28)} 50%{border-color:rgba(176,125,32,.7)} }
+.enroll-pulse { animation: enroll-pulse 3.6s ease-in-out infinite; }
 .speaker-av { width: 30px; height: 30px; border-radius: 10px; background: var(--bg3); display: flex; align-items: center; justify-content: center; color: var(--text2); }
 .speaker-name { font-size: 9px; color: var(--text2); font-weight: 500; }
 .speaker-mic-ico { position: absolute; bottom: 7px; right: 7px; color: var(--text3); opacity:.6; }
@@ -822,7 +833,7 @@ html, body {
 /* ===================== SCREEN 7: PROFILE ===================== */
 .profile-hero { padding: 16px 22px 24px; text-align: center; }
 .profile-av-wrap { position: relative; display: inline-block; margin-bottom: 14px; }
-.profile-av { width: 80px; height: 80px; border-radius: 26px; background: var(--bg3); display: flex; align-items: center; justify-content: center; border: 2px solid var(--border2); box-shadow: 0 4px 16px rgba(44,36,23,.1); color: var(--gold); }
+.profile-av { width: 80px; height: 80px; border-radius: 40px; background: var(--bg3); display: flex; align-items: center; justify-content: center; border: 2px solid var(--border2); box-shadow: 0 4px 16px rgba(44,36,23,.1); color: var(--gold); }
 .profile-edit-btn { position: absolute; bottom: -4px; right: -4px; width: 24px; height: 24px; border-radius: 8px; background: var(--gold); display: flex; align-items: center; justify-content: center; cursor: pointer; color:#fff; }
 .profile-name { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
 .profile-role { font-size: 12px; color: var(--text3); }
@@ -878,6 +889,9 @@ html, body {
       <button class="side-btn" onclick="show('s-verse-reader',this)">Verse Reader</button>
       <button class="side-btn active" onclick="show('s-pray-hub',this)">Pray</button>
       <button class="side-btn" onclick="show('s-devo-plan',this)">Plan reading</button>
+      <button class="side-btn" onclick="show('s-pray-menu',this)">Pray menu</button>
+      <button class="side-btn" onclick="show('s-prayer-warrior',this)">Prayer warrior</button>
+      <button class="side-btn" onclick="show('s-warrior-review',this)">Warrior review</button>
     </div>
     <div style="margin-top:24px;padding:14px;background:rgba(176,125,32,.07);border:1px solid rgba(176,125,32,.18);border-radius:12px;max-width:160px">
       <div style="font-size:10px;color:#9a6d18;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Divine Bridge</div>
@@ -1272,17 +1286,28 @@ html, body {
         </div>
         <div class="group-glass" style="margin:0 0 16px;padding:16px">
           <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px">How can we pray for you?</div>
-          <div style="font-size:12px;color:var(--text3);line-height:1.5;margin-bottom:12px">Only an eligible prayer leader sees this. Requests expire after two days.</div>
+          <div style="font-size:12px;color:var(--text3);line-height:1.5;margin-bottom:12px">If we find a matching prayer warrior, this schedules a live prayer call at the time you choose.</div>
           <div style="height:76px;border:1px solid var(--border);border-radius:12px;background:var(--bg3);padding:10px;font-size:13px;color:var(--text2)">Please pray for peace and wisdom as I make a difficult family decision.</div>
           <div style="font-size:12px;font-weight:600;color:var(--text2);margin:16px 0 8px">Preferred prayer language</div>
-          <div style="display:flex;gap:7px;flex-wrap:wrap"><span class="pill pill-gold">English</span><span class="pill">French</span><span class="pill">Spanish</span><span class="pill">Kinyarwanda</span></div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px"><div><div style="font-size:14px;font-weight:600;color:var(--text)">Live voice prayer</div><div style="font-size:12px;color:var(--text3);margin-top:2px">Optional · private 15-minute call</div></div><div class="toggle"></div></div>
+          <div style="display:flex;gap:7px;flex-wrap:wrap"><span class="pill pill-gold">English</span><span class="pill">Spanish</span><span class="pill">Kirundi</span></div>
+          <div style="font-size:12px;font-weight:600;color:var(--text2);margin:16px 0 8px">When should we pray for you?</div>
+          <div style="display:flex;gap:8px">
+            <div style="flex:1;border:1px solid var(--border);border-radius:12px;background:var(--bg3);padding:10px 12px"><div style="font-size:11px;color:var(--text3)">Date</div><div style="font-size:15px;font-weight:600;color:var(--text);margin-top:4px">Wed, Nov 18</div></div>
+            <div style="flex:1;border:1px solid var(--border);border-radius:12px;background:var(--bg3);padding:10px 12px"><div style="font-size:11px;color:var(--text3)">Time</div><div style="font-size:15px;font-weight:600;color:var(--text);margin-top:4px">6:15 PM</div></div>
+          </div>
+          <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-top:14px">If a matching prayer warrior accepts, a live call is scheduled at this time.</div>
           <button class="btn btn-fill" style="width:100%;justify-content:center;margin-top:18px">Send private request</button>
         </div>
         <div class="sec-header" style="padding:0 0 10px"><div class="sec-title">Your requests</div></div>
         <div class="group-glass" style="margin:0 0 10px;padding:14px"><div style="display:flex;justify-content:space-between"><b style="font-size:14px;color:var(--text)">Prayer request</b><span class="pill pill-sage">Scheduled</span></div><div style="font-size:12px;line-height:1.5;color:var(--text2);margin:8px 0">Please pray for peace and wisdom as I make a difficult family decision.</div><div style="font-size:12px;color:var(--sage);font-weight:600">Call scheduled · Tue, Mar 18 · 6:00 PM</div><button class="btn btn-fill" style="width:100%;justify-content:center;margin-top:12px">Join prayer call</button><button class="btn btn-outline" style="width:100%;justify-content:center;margin-top:8px">I prayed for you · 3</button><button class="btn" style="width:100%;justify-content:center;margin-top:8px;color:var(--rose)">Cancel request</button></div>
         <div class="sec-header" style="padding:16px 0 10px"><div class="sec-title">Prayer leader inbox</div></div>
         <div class="group-glass" style="margin:0;padding:14px"><div style="display:flex;justify-content:space-between"><b style="font-size:14px;color:var(--text)">Maria's request</b><span class="pill pill-gold">English</span></div><div style="font-size:12px;line-height:1.5;color:var(--text2);margin:8px 0">Praying for strength and healing for my family.</div><div style="font-size:12px;color:var(--text3)">Available · Wed, Mar 19 · 12:00 PM</div><button class="btn btn-outline" style="width:100%;justify-content:center;margin-top:12px">Accept &amp; schedule call</button><button class="btn btn-outline" style="width:100%;justify-content:center;margin-top:8px">I prayed for you · 1</button></div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item active" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
       </div>
     </div>
 
@@ -1373,6 +1398,12 @@ html, body {
         <div class="msg-act-btn msg-send"><span class="icon icon-10"><svg><use href="#ic-send"/></svg></span></div>
       </div>
       <div style="height:8px;background:var(--bg)"></div>
+      <div class="bottom-nav">
+        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item active" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+      </div>
     </div>
 
     <!-- DEVOTIONAL -->
@@ -1497,6 +1528,12 @@ html, body {
           <div style="flex:1"><div style="font-size:15px;font-weight:600;color:var(--text)">Thursday Night Study</div><div style="font-size:12px;color:var(--rose)">3 unread messages</div></div>
         </div>
       </div>
+      <div class="bottom-nav">
+        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item active" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+      </div>
     </div>
 
     <!-- PROFILE -->
@@ -1529,6 +1566,15 @@ html, body {
             <div class="setting-icon-wrap"><span class="icon icon-16"><svg><use href="#ic-bell"/></svg></span></div>
             <div class="setting-label">Activity</div>
             <span style="font-size:13px;color:var(--text3)">Prayer wall and group chats</span>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-title">Admin</div>
+          <div class="setting-row" onclick="show('s-warrior-review',document.querySelectorAll('.side-btn')[17])" style="cursor:pointer">
+            <div class="setting-icon-wrap"><span class="icon icon-16"><svg><use href="#ic-kneel"/></svg></span></div>
+            <div class="setting-label">Prayer warriors</div>
+            <span style="font-size:13px;color:var(--text3)">Review applications</span>
           </div>
         </div>
 
@@ -1666,16 +1712,125 @@ html, body {
     </div>
 
     <!-- PRAY HUB -->
+    <!-- PRAY MENU -->
+    <div class="phone-screen" id="s-pray-menu">
+      <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
+      <div style="padding:16px 18px 0;flex:none">
+        <div style="color:var(--gold);font-size:16px;font-weight:600;cursor:pointer" onclick="show('s-pray-hub',document.querySelectorAll('.side-btn')[13])">‹ Holy ground</div>
+        <div style="font-size:22px;font-weight:700;color:var(--text);margin-top:12px">Prayer</div>
+        <div style="font-size:14px;color:var(--text3);margin-top:4px;margin-bottom:16px">Choose where to begin</div>
+        <div class="enroll-pulse" onclick="show('s-prayer-warrior',document.querySelectorAll('.side-btn')[16])" style="background:#fff;border:1px solid rgba(176,125,32,.35);border-radius:22px;padding:16px;margin-bottom:12px;display:flex;gap:12px;align-items:center;cursor:pointer">
+          <div style="width:40px;height:40px;border-radius:14px;background:rgba(176,125,32,.12);flex:none;display:flex;align-items:center;justify-content:center;color:var(--gold)"><span class="icon icon-20"><svg><use href="#ic-kneel"/></svg></span></div>
+          <div><div style="font-size:15px;font-weight:600">Enroll as Prayer Warrior</div><div style="font-size:12px;color:var(--text3);margin-top:4px;line-height:1.4">Pray with people who ask for a private prayer.</div></div>
+        </div>
+      </div>
+      <div class="app-screen" style="padding:4px 18px 88px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="background:#fff;border:1px solid rgba(44,36,23,.06);border-radius:22px;padding:16px;min-height:148px;text-align:center"><div style="width:52px;height:52px;border-radius:18px;background:rgba(176,125,32,.22);margin:0 auto 14px"></div><div style="font-size:15px;font-weight:600">Prayer Request</div><div style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.4">Your requests and the warrior inbox</div></div>
+          <div style="background:#fff;border:1px solid rgba(44,36,23,.06);border-radius:22px;padding:16px;min-height:148px;text-align:center"><div style="width:52px;height:52px;border-radius:18px;background:rgba(176,125,32,.22);margin:0 auto 14px"></div><div style="font-size:15px;font-weight:600">Today's Prayer</div><div style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.4">The global prayer for today</div></div>
+          <div style="background:#fff;border:1px solid rgba(44,36,23,.06);border-radius:22px;padding:16px;min-height:148px;text-align:center"><div style="width:52px;height:52px;border-radius:18px;background:rgba(176,125,32,.22);margin:0 auto 14px"></div><div style="font-size:15px;font-weight:600">Scheduled prayer</div><div style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.4">Upcoming private matches</div></div>
+          <div style="background:#fff;border:1px solid rgba(44,36,23,.06);border-radius:22px;padding:16px;min-height:148px;text-align:center"><div style="width:52px;height:52px;border-radius:18px;background:rgba(176,125,32,.22);margin:0 auto 14px"></div><div style="font-size:15px;font-weight:600">Prayer Wall</div><div style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.4">Public prayer requests</div></div>
+          <div style="background:#fff;border:1px solid rgba(44,36,23,.06);border-radius:22px;padding:16px;min-height:148px;text-align:center"><div style="width:52px;height:52px;border-radius:18px;background:rgba(176,125,32,.22);margin:0 auto 14px"></div><div style="font-size:15px;font-weight:600">Prayer reminder</div><div style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.4">A daily time to come and pray</div></div>
+          <div style="background:#fff;border:1px solid rgba(44,36,23,.06);border-radius:22px;padding:16px;min-height:148px;text-align:center"><div style="width:52px;height:52px;border-radius:18px;background:rgba(176,125,32,.22);margin:0 auto 14px"></div><div style="font-size:15px;font-weight:600">Prayer timer</div><div style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.4">Start and stop a quiet time</div></div>
+          <div style="background:#fff;border:1px solid rgba(44,36,23,.06);border-radius:22px;padding:16px;min-height:148px;text-align:center"><div style="width:52px;height:52px;border-radius:18px;background:rgba(176,125,32,.22);margin:0 auto 14px"></div><div style="font-size:15px;font-weight:600">Personal Prayer Generator</div><div style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.4">A prayer for what is on your heart</div></div>
+          <div style="background:#fff;border:1px solid rgba(44,36,23,.06);border-radius:22px;padding:16px;min-height:148px;text-align:center"><div style="width:52px;height:52px;border-radius:18px;background:rgba(176,125,32,.22);margin:0 auto 14px"></div><div style="font-size:15px;font-weight:600">Voice Link</div><div style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.4">Start a private voice call</div></div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item active" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+      </div>
+    </div>
+
+    <!-- PRAYER WARRIOR APPLICATION -->
+    <div class="phone-screen" id="s-prayer-warrior">
+      <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
+      <div class="app-screen" style="padding:16px 18px 88px">
+        <div style="color:var(--gold);font-size:16px;font-weight:600;cursor:pointer" onclick="show('s-pray-menu',document.querySelectorAll('.side-btn')[15])">‹ Prayer</div>
+        <div style="font-size:22px;font-weight:700;color:var(--text);margin-top:12px">Enroll as Prayer Warrior</div>
+        <div style="font-size:12px;color:var(--text);margin-top:8px;line-height:1.35">We pray for others because God asks us to carry one another. Someone may be too weary to pray, and our prayer stands with them.</div>
+        <div style="font-size:12px;font-style:italic;color:var(--text2);margin-top:6px;line-height:1.35">“Therefore confess your sins to each other and pray for each other so that you may be healed. The prayer of a righteous person is powerful and effective.”</div>
+        <div style="font-size:10px;letter-spacing:.12em;color:var(--gold);margin-top:4px">JAMES 5:16</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.35">We review each application before you are enrolled.</div>
+        <div style="background:#fff;border:1px solid rgba(44,36,23,.06);border-radius:20px;padding:16px;margin-top:16px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px">Languages you can pray in</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <span style="padding:7px 12px;border-radius:20px;background:rgba(176,125,32,.12);color:var(--gold);font-size:13px">English</span>
+            <span style="padding:7px 12px;border-radius:20px;background:var(--bg3);font-size:13px">Spanish</span>
+            <span style="padding:7px 12px;border-radius:20px;background:var(--bg3);font-size:13px">Kirundi</span>
+          </div>
+          <div style="font-size:13px;font-weight:600;margin:16px 0 4px">When can you take a call?</div>
+          <div style="font-size:12px;color:var(--text3);line-height:1.45;margin-bottom:8px">Tap every day this range repeats. Add another range when the hours are different.</div>
+          <div style="font-size:14px;font-weight:600;margin-bottom:8px">Wed, Fri</div>
+          <div style="display:flex;gap:4px;margin-bottom:8px">
+            <span style="flex:1;text-align:center;padding:7px 0;border-radius:10px;background:var(--bg3);font-size:12px">S</span>
+            <span style="flex:1;text-align:center;padding:7px 0;border-radius:10px;background:var(--bg3);font-size:12px">M</span>
+            <span style="flex:1;text-align:center;padding:7px 0;border-radius:10px;background:var(--bg3);font-size:12px">T</span>
+            <span style="flex:1;text-align:center;padding:7px 0;border-radius:10px;background:rgba(176,125,32,.12);color:var(--gold);font-size:12px">W</span>
+            <span style="flex:1;text-align:center;padding:7px 0;border-radius:10px;background:var(--bg3);font-size:12px">T</span>
+            <span style="flex:1;text-align:center;padding:7px 0;border-radius:10px;background:rgba(176,125,32,.12);color:var(--gold);font-size:12px">F</span>
+            <span style="flex:1;text-align:center;padding:7px 0;border-radius:10px;background:var(--bg3);font-size:12px">S</span>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <div style="flex:1;border-radius:14px;background:var(--bg3);border:1px solid var(--border);padding:10px 12px"><div style="font-size:11px;color:var(--text3)">Start</div><div style="font-size:15px;font-weight:600;margin-top:2px">6:00 PM</div></div>
+            <div style="flex:1;border-radius:14px;background:var(--bg3);border:1px solid var(--border);padding:10px 12px"><div style="font-size:11px;color:var(--text3)">End</div><div style="font-size:15px;font-weight:600;margin-top:2px">8:00 PM</div></div>
+          </div>
+          <div style="color:var(--gold);font-size:13px;font-weight:600;margin-bottom:4px">Add another range</div>
+          <div style="font-size:13px;font-weight:600;margin:16px 0 8px">Church you attend <span style="font-weight:400;color:var(--text3)">· Optional</span></div>
+          <div style="border-radius:14px;background:var(--bg3);border:1px solid var(--border);padding:12px;color:var(--text3);font-size:13px">Name of your church</div>
+          <div style="font-size:13px;font-weight:600;margin:16px 0 8px">Why do you want to serve?</div>
+          <div style="min-height:88px;border-radius:14px;background:var(--bg3);border:1px solid var(--border);padding:12px;color:var(--text3);font-size:13px">A short note about how you hope to pray with people</div>
+          <div style="margin-top:16px;background:var(--gold);color:#fff;text-align:center;border-radius:24px;padding:12px;font-weight:600">Submit application</div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item active" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+      </div>
+    </div>
+
+    <!-- PRAYER WARRIOR REVIEW -->
+    <div class="phone-screen" id="s-warrior-review">
+      <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
+      <div class="app-screen" style="padding:16px 18px 88px">
+        <div style="color:var(--text2);font-size:16px;font-weight:600;cursor:pointer" onclick="show('s-profile',document.querySelectorAll('.side-btn')[9])">‹ Profile</div>
+        <div style="font-size:22px;font-weight:700;color:var(--text);margin-top:12px">Prayer warriors</div>
+        <div style="font-size:13px;color:var(--text3);margin-top:6px;line-height:1.4">Accept an application to enroll them. Decline leaves them unenrolled.</div>
+        <div style="background:#fff;border:1px solid rgba(44,36,23,.06);border-radius:20px;padding:16px;margin-top:16px">
+          <div style="font-size:17px;font-weight:700">Aline</div>
+          <div style="font-size:13px;color:var(--text2);margin-top:6px">Spanish, Kirundi</div>
+          <div style="font-size:13px;color:var(--text3);margin-top:4px">Grace Chapel</div>
+          <div style="font-size:14px;line-height:1.4;margin-top:10px">I can pray with people on Wednesday evenings.</div>
+          <div style="font-size:13px;color:var(--text2);margin-top:10px;line-height:1.4">Wed 6:00 PM–8:00 PM</div>
+          <div style="display:flex;gap:10px;margin-top:14px">
+            <div style="flex:1;text-align:center;border-radius:24px;padding:10px;background:var(--bg3);font-weight:600">Decline</div>
+            <div style="flex:1;text-align:center;border-radius:24px;padding:10px;background:var(--gold);color:#fff;font-weight:600">Accept</div>
+          </div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item active" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+      </div>
+    </div>
+
+    <!-- PRAY · HOLY GROUND -->
     <div class="phone-screen active" id="s-pray-hub">
       <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
       <div class="app-screen" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding-bottom:88px">
         <div style="font-size:11px;letter-spacing:.16em;color:var(--gold);font-weight:600">HOLY GROUND</div>
-        <div style="width:168px;height:168px;border-radius:84px;margin-top:22px;border:8px solid rgba(232,196,122,.85);background:#2a2118;box-shadow:0 0 0 10px rgba(176,125,32,.18);display:flex;align-items:center;justify-content:center">
+        <div style="width:168px;height:168px;border-radius:84px;margin-top:22px;border:8px solid rgba(232,196,122,.85);background:#2a2118;box-shadow:0 0 0 10px rgba(176,125,32,.18);display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="show('s-pray-menu',document.querySelectorAll('.side-btn')[15])">
           <div style="width:70px;height:90px;border-radius:40px 40px 18px 18px;background:linear-gradient(#fff6d8,#e8a23a 45%,#3d4a32)"></div>
         </div>
         <div style="font-size:13px;color:var(--text3);margin-top:22px;padding:0 28px;line-height:1.5">The bush burned, and it was not consumed.</div>
         <div style="font-size:11px;letter-spacing:.12em;color:var(--gold);margin-top:8px">EXODUS 3</div>
-        <div style="font-size:12px;color:var(--text3);margin-top:28px">Drag the halo down</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:28px">Tap the halo, or drag it down</div>
       </div>
       <div class="bottom-nav">
         <div class="nav-item active"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
@@ -1691,11 +1846,11 @@ html, body {
   <div style="display:flex;flex-direction:column;gap:10px;max-width:180px">
     <div style="color:rgba(80,60,30,.4);font-size:10px;letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px">Screens · Expo app</div>
     <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Login</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Auth entry · sign in / sign up</div></div>
-    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Pray</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Burning-bush halo · each person gets one look: ember, dawn, wilderness, or midnight</div></div>
+    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Pray</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Tap the halo or drag it down. A card at the top invites people to apply as a prayer warrior. Prayer tools stay in the two-column dashboard.</div></div>
     <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Groups tab</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Your groups only · create and join</div></div>
     <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Devotional</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Landing is today’s verse and the plan cards, artwork on the left. A plan opens with the title on its own line, the day count and Restart beneath it, and the streak beside Plans.</div></div>
     <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Activity</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Opened from Profile</div></div>
-    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Profile</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Activity, account, prefs, sign out</div></div>
+    <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Profile</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Activity, account, prefs, sign out. Admins also see Prayer warriors.</div></div>
     <div style="background:rgba(255,255,255,.6);border:1px solid rgba(180,160,120,.18);border-radius:10px;padding:10px 12px"><div style="font-size:10px;color:#9a6d18;margin-bottom:4px">Verse Reader</div><div style="font-size:10px;color:rgba(60,45,25,.45);line-height:1.6">Explainer + 4-card share pack</div></div>
   </div>
 

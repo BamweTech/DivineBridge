@@ -50,7 +50,7 @@ export default function ScheduledPrayerScreen() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}
-      contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: 22, paddingBottom: insets.bottom + 36 }}
+      contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: 22, paddingBottom: insets.bottom + 96 }}
       refreshControl={<RefreshControl refreshing={requestsQuery.isRefetching} onRefresh={() => void requestsQuery.refetch()} tintColor={THEME_COLORS.gold} />}
     >
       <Pressable onPress={() => router.back()} hitSlop={12} style={{ marginBottom: 16 }}>
@@ -58,7 +58,7 @@ export default function ScheduledPrayerScreen() {
       </Pressable>
       <Text style={{ ...TYPE.title2, color: THEME_COLORS.text }}>Scheduled prayer</Text>
       <Text style={{ ...TYPE.footnote, color: THEME_COLORS.text3, marginTop: 6, marginBottom: 20 }}>
-        Upcoming private matches. Open requests waiting for a warrior stay in Request Prayers.
+        Upcoming private matches. Open requests waiting for a warrior stay in Prayer Request.
       </Text>
 
       <Section title="Your requests" empty="When you ask for private prayer, the time you chose shows up here." items={mine} onJoin={(id) => openCall.mutate(id)} joining={openCall.isPending} />

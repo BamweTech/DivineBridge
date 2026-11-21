@@ -30,8 +30,14 @@ import { Avatar } from '@/components/ui/Avatar';
 import Icon from '@/components/ui/Icon';
 import type { IconName } from '@/components/ui/Icon';
 import type { DevotionalPlan } from '@/types';
-import { emailPrefsApi, profileApi } from '@/services/api';
+import { emailPrefsApi, prayerWarriorApi, profileApi } from '@/services/api';
 import { syncDailyVerseReminder } from '@/lib/dailyVerseReminder';
+
+const PLATFORM_ADMINS = new Set(['dev@bamwe.com', 'kubjca@gmail.com']);
+
+function canReviewWarriors(email?: string | null, isAdmin?: boolean) {
+  return Boolean(isAdmin) || PLATFORM_ADMINS.has((email || '').trim().toLowerCase());
+}
 
 function SettingRow({
   iconName,
@@ -139,6 +145,20 @@ export default function ProfileScreen() {
   const [sessionReminders, setSessionReminders] = useState(false);
   const [prefBusy, setPrefBusy] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const showWarriorReview = canReviewWarriors(user?.email, profile?.isAdmin);
+
+  useEffect(() => {
+    if (!showWarriorReview || profile?.isAdmin) return;
+    let active = true;
+    prayerWarriorApi.markAdmin()
+      .then(() => {
+        if (active) return refreshProfile();
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [showWarriorReview, profile?.isAdmin, refreshProfile]);
 
   useEffect(() => {
     if (!user) return;
@@ -430,24 +450,13 @@ export default function ProfileScreen() {
       <Animated.View entering={FadeInDown.delay(0).duration(400)} style={{ alignItems: 'center', marginBottom: 24 }}>
         <View style={{ position: 'relative', marginBottom: 14 }}>
           <Pressable onPress={pickProfilePhoto} disabled={uploadingPhoto}>
-            <View
-              style={{
-                width: 80,
-                height: 80,
-                borderRadius: 26,
-                backgroundColor: THEME_COLORS.bg3,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderWidth: 0,
-                overflow: 'hidden',
-              }}
-            >
-              {uploadingPhoto ? (
+            {uploadingPhoto ? (
+              <View style={{ width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center' }}>
                 <ActivityIndicator size="small" color={THEME_COLORS.gold} />
-              ) : (
-                <Avatar name={getDisplayName(profile, user)} photoUrl={profile?.photoURL} size={80} />
-              )}
-            </View>
+              </View>
+            ) : (
+              <Avatar name={getDisplayName(profile, user)} photoUrl={profile?.photoURL} size={80} />
+            )}
           </Pressable>
           <Pressable
             onPress={pickProfilePhoto}
@@ -531,6 +540,18 @@ export default function ProfileScreen() {
           onPress={() => router.push('/activity')}
         />
       </Animated.View>
+
+      {showWarriorReview ? (
+        <Animated.View entering={FadeInDown.delay(110).duration(400)} style={{ marginBottom: 20 }}>
+          <SectionTitle>Admin</SectionTitle>
+          <SettingRow
+            iconName="kneel"
+            label="Prayer warriors"
+            value="Review applications"
+            onPress={() => router.push('/prayer-warrior-review' as never)}
+          />
+        </Animated.View>
+      ) : null}
 
       <Animated.View entering={FadeInDown.delay(120).duration(400)} style={{ marginBottom: 20 }}>
         <SectionTitle>Account</SectionTitle>

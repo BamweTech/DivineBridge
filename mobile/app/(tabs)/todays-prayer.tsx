@@ -58,7 +58,7 @@ export default function TodaysPrayerScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}>
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: 22, paddingBottom: insets.bottom + 32 }}>
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: 22, paddingBottom: insets.bottom + 96 }}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={{ marginBottom: 16 }}>
           <Icon name="back" size={22} color={THEME_COLORS.text2} />
         </Pressable>

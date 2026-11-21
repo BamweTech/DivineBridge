@@ -43,6 +43,11 @@ def test_verse_api_contract_endpoints_are_registered():
     assert _fixture_pairs("api-verse.json") <= _registered_pairs(app)
 
 
+def test_prayer_warrior_application_endpoints_are_registered():
+    app = create_app()
+    assert _fixture_pairs("api-prayer.json") <= _registered_pairs(app)
+
+
 def test_devotional_api_contract_endpoints_are_registered():
     app = create_app()
     assert _fixture_pairs("api-devotional.json") <= _registered_pairs(app)

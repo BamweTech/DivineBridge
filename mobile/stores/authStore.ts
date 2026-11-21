@@ -64,6 +64,7 @@ function normalizeProfile(uid: string, data: Record<string, unknown>): UserProfi
     blockedUserIds: Array.isArray(data.blocked_user_ids)
       ? data.blocked_user_ids.filter((id): id is string => typeof id === 'string' && id.length > 0)
       : [],
+    isAdmin: data.is_admin === true,
   };
 }
 

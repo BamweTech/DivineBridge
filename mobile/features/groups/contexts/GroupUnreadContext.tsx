@@ -13,6 +13,8 @@ export type GroupUnreadContextValue = {
   totalUnread: number;
   unreadCountByGroup: Record<string, number>;
   unreadByGroup: Record<string, boolean>;
+  reads: Record<string, number>;
+  isReadsReady: boolean;
   markGroupChatRead: (groupId: string, atLeastTimestamp?: number) => Promise<void>;
 };
 
@@ -22,7 +24,7 @@ export function GroupUnreadProvider({ children }: { children: React.ReactNode })
   const { user } = useAuthStore();
   const { groups, isLoading: isLoadingGroups } = useMyGroups();
   const groupIds = useMemo(() => groups.map((g) => g.group_id), [groups]);
-  const { reads, markGroupChatRead } = useGroupChatLastReads();
+  const { reads, isReadsReady, markGroupChatRead } = useGroupChatLastReads();
   const unreadCountByGroup = useGroupUnreadCounts(groupIds, reads);
 
   const { totalUnread, unreadByGroup } = useMemo(() => {
@@ -47,9 +49,11 @@ export function GroupUnreadProvider({ children }: { children: React.ReactNode })
       totalUnread,
       unreadCountByGroup,
       unreadByGroup,
+      reads,
+      isReadsReady,
       markGroupChatRead,
     }),
-    [groups, isLoadingGroups, totalUnread, unreadCountByGroup, unreadByGroup, markGroupChatRead]
+    [groups, isLoadingGroups, totalUnread, unreadCountByGroup, unreadByGroup, reads, isReadsReady, markGroupChatRead]
   );
 
   return <GroupUnreadContext.Provider value={value}>{children}</GroupUnreadContext.Provider>;

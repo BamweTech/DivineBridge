@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db } from '@/lib/firebase';
 import { COLLECTIONS } from '@/lib/constants';
 import { useAuthStore } from '@/stores/authStore';
+import { dismissGroupChatNotifications } from '@/lib/groupChatNotify';
 import { useLiveRoomsContext } from '@/features/groups/contexts/LiveRoomsContext';
 import { groupApi } from '@/services/api';
 import { getDisplayName } from '@/lib/userDisplayName';
@@ -515,6 +516,10 @@ export function useGroupChatLastReads() {
       ref,
       (snap) => {
         const next = parseReadsMap(snap.data()?.group_chat_last_read_at);
+        const cached = readsMemoryCache.get(uid) ?? {};
+        for (const [groupId, readAt] of Object.entries(cached)) {
+          if ((next[groupId] ?? 0) < readAt) next[groupId] = readAt;
+        }
         readsMemoryCache.set(uid, next);
         setReads(next);
         setIsReadsReady(true);
@@ -528,7 +533,17 @@ export function useGroupChatLastReads() {
     async (groupId: string, atLeastTimestamp?: number) => {
       if (!user?.uid) return;
       const t = atLeastTimestamp ?? Date.now();
-      const ref = doc(db, COLLECTIONS.USERS, user.uid);
+      const uid = user.uid;
+      const cached = readsMemoryCache.get(uid) ?? {};
+      const nextTs = Math.max(cached[groupId] ?? 0, t);
+      void dismissGroupChatNotifications(groupId);
+      if (nextTs === (cached[groupId] ?? 0)) return;
+
+      const next = { ...cached, [groupId]: nextTs };
+      readsMemoryCache.set(uid, next);
+      setReads(next);
+
+      const ref = doc(db, COLLECTIONS.USERS, uid);
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(ref);
         const rawReads = snap.data()?.group_chat_last_read_at;

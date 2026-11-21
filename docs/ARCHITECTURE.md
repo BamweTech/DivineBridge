@@ -152,7 +152,7 @@ Constants in [mobile/lib/constants.ts](../mobile/lib/constants.ts): **group call
 
 ### Navigation
 
-- **expo-router** file-based routes under [mobile/app/](../mobile/app/): tab shell (home, devotional, groups, rooms, profile), auth routes under `(auth)/`, live room `room/[id]`, group `group/[id]`, and [mobile/app/activity.tsx](../mobile/app/activity.tsx).
+- **expo-router** file-based routes under [mobile/app/](../mobile/app/): tab shell (Pray, Groups, Devotional, Profile). Inner pages such as group chat, activity, and the prayer tools live inside that tab shell so the bottom bar stays visible. Auth routes are under `(auth)/`. Live room `room/[id]` and voice calls stay full screen.
 
 ### Data and auth
 
@@ -203,7 +203,7 @@ Authoritative security rules: [firestore.rules](../firestore.rules). Below is a 
 
 **Firebase Realtime Database** is used for **low-latency** live-room concerns on the web client (and related mobile hooks) — paths are managed in client code (e.g. [web/static/js/prayer-room.js](../web/static/js/prayer-room.js)).
 
-**Private prayer matching:** `private_prayer_requests` is server-only in Firestore. Trusted server/admin tooling grants a leader `is_prayer_leader: true` and `prayer_languages: string[]`; mobile profile writes cannot modify either field. Requests expire after 48 hours, the first eligible leader claims through a Firestore transaction, requesters can cancel an active/claimed/scheduled request, and authorized participants can record an anonymous prayer count.
+**Private prayer matching:** `private_prayer_requests` is server-only in Firestore. People apply from the Pray dashboard with weekly time ranges when they can take a call, including more than one range on the same day. Applications live in `prayer_warrior_applications` and stay pending until an admin accepts them from Profile. Accepting grants `is_prayer_leader: true` and copies `prayer_languages`. The current admins are `dev@bamwe.com` and `kubjca@gmail.com`, stored as `users.is_admin`. Clients cannot write that flag. The server also stores `users.prayer_availability`. A private request is offered only to a leader who serves the language and whose range can hold the 15-minute call. Mobile profile writes cannot modify either field. Requests expire after 48 hours, the first eligible leader claims through a Firestore transaction, requesters can cancel an active/claimed/scheduled request, and authorized participants can record an anonymous prayer count.
 
 **Object storage:** User-generated and generated assets (e.g. images) via [backend/integrations/storage_handler.py](../backend/integrations/storage_handler.py) to **Google Cloud Storage**.
 
@@ -231,11 +231,11 @@ User journeys and screenshots-level detail: **[USER_FEATURES_DOCUMENTATION.md](U
 | Verse explainer share cards | Four themed 9:16 JPEGs (verse, context, meaning, application) from [backend/services/prayer/image_generator.py](../backend/services/prayer/image_generator.py) via `GET /api/today-verse/explainer-image/<section>`. Cached in GCS by verse slug. Opened from the verse-reader share button. |
 | Disaster / SEO pages | [backend/api/seo/](../backend/api/seo/), [backend/services/disaster/](../backend/services/disaster/) |
 | Prayer requests | [backend/api/prayer_bp.py](../backend/api/prayer_bp.py), [backend/services/prayer/content_moderator.py](../backend/services/prayer/content_moderator.py) |
-| Private prayer matching | [backend/services/prayer/private_prayer_request_service.py](../backend/services/prayer/private_prayer_request_service.py), [backend/api/prayer_bp.py](../backend/api/prayer_bp.py), [mobile/app/prayer-requests.tsx](../mobile/app/prayer-requests.tsx) |
+| Private prayer matching | [backend/services/prayer/private_prayer_request_service.py](../backend/services/prayer/private_prayer_request_service.py), [backend/api/prayer_bp.py](../backend/api/prayer_bp.py), [mobile/app/(tabs)/prayer-requests.tsx](../mobile/app/(tabs)/prayer-requests.tsx) |
 | Testimonies | [backend/api/testimony_bp.py](../backend/api/testimony_bp.py) |
 | Live prayer room (web) | [web/static/js/prayer-room.js](../web/static/js/prayer-room.js), [web/static/js/sfu-client.js](../web/static/js/sfu-client.js) |
 | Live room (mobile) | [mobile/app/room/[id].tsx](../mobile/app/room/[id].tsx), [mobile/lib/sfu.ts](../mobile/lib/sfu.ts), [mobile/hooks/usePrayerRoom.ts](../mobile/hooks/usePrayerRoom.ts) |
-| Groups | [backend/api/groups_bp.py](../backend/api/groups_bp.py), [mobile/app/(tabs)/groups.tsx](../mobile/app/(tabs)/groups.tsx), [mobile/app/group/[id].tsx](../mobile/app/group/[id].tsx) |
+| Groups | [backend/api/groups_bp.py](../backend/api/groups_bp.py), [mobile/app/(tabs)/groups.tsx](../mobile/app/(tabs)/groups.tsx), [mobile/app/(tabs)/group/[id].tsx](../mobile/app/(tabs)/group/[id].tsx) |
 | Devotional plans | [backend/api/devotional_bp.py](../backend/api/devotional_bp.py), [mobile/app/(tabs)/devotional.tsx](../mobile/app/(tabs)/devotional.tsx) |
 | Devotional share cards | Three themed 9:16 JPEGs (scripture, reflection, prayer) from [backend/services/prayer/image_generator.py](../backend/services/prayer/image_generator.py) via `GET /api/devotional/<plan_id>/day/<day>/share-image/<section>`. Same canvas as the verse explainer pack. |
 | Auth and profile | [backend/api/auth_bp.py](../backend/api/auth_bp.py), [backend/integrations/firebase_auth.py](../backend/integrations/firebase_auth.py), [mobile/app/(auth)/](../mobile/app/(auth)/) |

@@ -13,10 +13,16 @@ from backend.services.prayer.private_prayer_request_service import (
     claim_request,
     create_request,
     expire_requests,
+    get_warrior_application,
+    is_platform_admin,
+    list_pending_warrior_applications,
     list_for_user,
+    mark_platform_admin,
+    review_warrior_application,
     open_scheduled_call,
     record_prayer,
     send_due_call_reminders,
+    submit_warrior_application,
 )
 
 logger = logging.getLogger(__name__)
@@ -355,6 +361,120 @@ def get_private_prayer_requests():
     except Exception:
         logger.error("Failed to list private prayer requests", exc_info=True)
         return jsonify({"success": False, "error": "Failed to load prayer requests"}), 500
+
+
+@prayer_bp.route("/warrior-application", methods=["GET"])
+@require_auth
+def get_prayer_warrior_application():
+    """Tell the signed-in person whether they can apply, are waiting, or are enrolled."""
+    try:
+        result = get_warrior_application(get_firestore_client(), g.user_id)
+        return jsonify({"success": True, "data": result}), 200
+    except Exception:
+        logger.error("Failed to load prayer warrior application", exc_info=True)
+        return jsonify({"success": False, "error": "Failed to load application"}), 500
+
+
+@prayer_bp.route("/warrior-application", methods=["POST"])
+@limiter.limit("5 per hour")
+@require_auth
+def submit_prayer_warrior_application():
+    """Accept an application. This does not grant prayer-warrior access."""
+    try:
+        data = request.get_json(silent=True) or {}
+        note = sanitize_string(data.get("note"), max_length=500)
+        church = sanitize_string(data.get("church") or "", max_length=80)
+        if not isinstance(church, str):
+            church = ""
+        if len(note) < 10:
+            return jsonify({"success": False, "error": "Tell us a little about yourself in 10 to 500 characters"}), 400
+        from backend.services.prayer.content_moderator import get_content_moderator
+
+        moderator = get_content_moderator()
+        approved, reason, _ = moderator.moderate_content(
+            "Prayer warrior application", note, "prayer warrior application"
+        )
+        if not approved:
+            return jsonify({"success": False, "error": "Content not approved", "reason": reason}), 400
+        if church:
+            approved, reason, _ = moderator.moderate_content(
+                "Prayer warrior church", church, "prayer warrior application"
+            )
+            if not approved:
+                return jsonify({"success": False, "error": "Content not approved", "reason": reason}), 400
+        result = submit_warrior_application(
+            get_firestore_client(),
+            g.user,
+            data.get("languages") or [],
+            note,
+            church,
+            data.get("availability"),
+        )
+        return jsonify({"success": True, "data": result}), 201
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except PermissionError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 403
+    except RuntimeError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception:
+        logger.error("Failed to submit prayer warrior application", exc_info=True)
+        return jsonify({"success": False, "error": "Failed to submit application"}), 500
+
+
+def _admin_required():
+    if not is_platform_admin(g.user):
+        return jsonify({"success": False, "error": "Admin access is required"}), 403
+    mark_platform_admin(get_firestore_client(), g.user)
+    return None
+
+
+@prayer_bp.route("/admin-access", methods=["POST"])
+@require_auth
+def claim_prayer_admin_access():
+    """Mark an allowlisted account as admin and tell the app whether the dashboard is available."""
+    allowed = is_platform_admin(g.user)
+    if allowed:
+        mark_platform_admin(get_firestore_client(), g.user)
+    return jsonify({"success": True, "data": {"is_admin": allowed}}), 200
+
+
+@prayer_bp.route("/warrior-applications", methods=["GET"])
+@require_auth
+def list_prayer_warrior_applications():
+    """Pending prayer-warrior applications for an admin to review."""
+    denied = _admin_required()
+    if denied:
+        return denied
+    try:
+        applications = list_pending_warrior_applications(get_firestore_client())
+        return jsonify({"success": True, "data": applications}), 200
+    except Exception:
+        logger.error("Failed to list prayer warrior applications", exc_info=True)
+        return jsonify({"success": False, "error": "Failed to load applications"}), 500
+
+
+@prayer_bp.route("/warrior-applications/<applicant_id>/review", methods=["POST"])
+@require_auth
+def review_prayer_warrior_application(applicant_id):
+    """Accept or decline one prayer-warrior application."""
+    denied = _admin_required()
+    if denied:
+        return denied
+    try:
+        data = request.get_json(silent=True) or {}
+        result = review_warrior_application(
+            get_firestore_client(),
+            g.user_id,
+            applicant_id,
+            str(data.get("decision") or "").strip().lower(),
+        )
+        return jsonify({"success": True, "data": result}), 200
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception:
+        logger.error("Failed to review prayer warrior application", exc_info=True)
+        return jsonify({"success": False, "error": "Failed to review application"}), 500
 
 
 @prayer_bp.route("/private-request/<request_id>/claim", methods=["POST"])

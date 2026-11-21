@@ -43,3 +43,23 @@ export async function presentGroupChatNotification(
     trigger: null,
   });
 }
+
+function presentedGroupId(data: Record<string, unknown> | undefined): string | null {
+  if (data?.type !== 'group_chat') return null;
+  return typeof data.groupId === 'string' && data.groupId ? data.groupId : null;
+}
+
+/** Remove this group's message alerts from the tray without waiting on the server. */
+export async function dismissGroupChatNotifications(groupId: string): Promise<void> {
+  if (!groupId) return;
+  try {
+    const presented = await Notifications.getPresentedNotificationsAsync();
+    await Promise.all(
+      presented
+        .filter((item) => presentedGroupId(item.request.content.data as Record<string, unknown>) === groupId)
+        .map((item) => Notifications.dismissNotificationAsync(item.request.identifier)),
+    );
+  } catch {
+    // The tray is unavailable when notification permission was never granted.
+  }
+}

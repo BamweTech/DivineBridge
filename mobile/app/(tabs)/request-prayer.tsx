@@ -10,7 +10,7 @@ export default function RequestPrayerScreen() {
   const router = useRouter();
 
   return (
-    <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg, paddingTop: insets.top + 12, paddingHorizontal: 22 }}>
+    <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg, paddingTop: insets.top + 12, paddingHorizontal: 22, paddingBottom: insets.bottom + 70 }}>
       <Pressable onPress={() => router.back()} hitSlop={12} style={{ marginBottom: 18 }}>
         <Icon name="back" size={22} color={THEME_COLORS.text2} />
       </Pressable>
@@ -38,7 +38,7 @@ export default function RequestPrayerScreen() {
         <Icon name="lock" size={22} color={THEME_COLORS.sage} />
         <View style={{ flex: 1 }}>
           <Text style={title}>Private</Text>
-          <Text style={detail}>A warrior who speaks your language, at a time you choose. A live call is optional.</Text>
+          <Text style={detail}>A warrior who speaks your language. If one accepts, a live call is scheduled at the time you choose.</Text>
         </View>
         <Icon name="chevron-r" size={16} color={THEME_COLORS.text3} />
       </Pressable>

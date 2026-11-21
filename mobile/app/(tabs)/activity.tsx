@@ -34,7 +34,7 @@ export default function ActivityScreen() {
       <ScrollView
         contentContainerStyle={{
           paddingTop: insets.top + 12,
-          paddingBottom: insets.bottom + 32,
+          paddingBottom: insets.bottom + 96,
           paddingHorizontal: 22,
         }}
         showsVerticalScrollIndicator={false}

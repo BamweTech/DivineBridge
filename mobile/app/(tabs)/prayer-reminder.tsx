@@ -65,7 +65,7 @@ export default function PrayerReminderScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg, paddingTop: insets.top + 12, paddingHorizontal: 22 }}>
+    <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg, paddingTop: insets.top + 12, paddingHorizontal: 22, paddingBottom: insets.bottom + 70 }}>
       <Pressable onPress={() => router.back()} hitSlop={12}>
         <Icon name="back" size={22} color={THEME_COLORS.text2} />
       </Pressable>
