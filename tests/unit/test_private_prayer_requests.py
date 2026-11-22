@@ -41,12 +41,19 @@ class _FakeDocument:
     def to_dict(self):
         return dict(self.data) if self.data is not None else None
 
+    def delete(self):
+        self.exists = False
+        self.data = None
+        self.was_deleted = True
+
 
 class _FakeCollection:
     def __init__(self, documents):
         self.documents = documents
 
     def document(self, doc_id):
+        if doc_id not in self.documents:
+            return _FakeDocument(None, doc_id)
         return self.documents[doc_id]
 
     def where(self, *_args):
@@ -270,6 +277,39 @@ def test_requester_cancellation_ends_created_private_call():
     assert result["status"] == "cancelled"
     assert request.data["status"] == "cancelled"
     assert room.data["is_active"] is False
+
+
+def test_requester_can_delete_a_previous_request_and_an_active_one_ends_the_call():
+    finished = _FakeDocument({"requester_id": "requester", "status": "expired"})
+    scheduled = _FakeDocument(
+        {"requester_id": "requester", "leader_id": "leader", "status": "scheduled", "room_id": "room-1"},
+        doc_id="request-2",
+    )
+    kept = _FakeDocument({"requester_id": "requester", "status": "completed"}, doc_id="request-3")
+    room = _FakeDocument({"is_active": True}, doc_id="room-1")
+    db = _FakeDb(
+        {
+            private_requests.COLLECTION: _FakeCollection(
+                {"request-1": finished, "request-2": scheduled, "request-3": kept}
+            ),
+            "prayer_rooms": _FakeCollection({"room-1": room}),
+            "users": _FakeCollection({"leader": _FakeDocument({})}),
+        }
+    )
+
+    with patch.object(private_requests.firestore, "transactional", new=lambda fn: fn), patch.object(
+        private_requests, "_send"
+    ):
+        private_requests.delete_request(db, "request-1", "requester")
+        private_requests.delete_request(db, "request-2", "requester")
+        with pytest.raises(PermissionError):
+            private_requests.delete_request(db, "request-3", "leader")
+
+    assert finished.was_deleted is True
+    assert scheduled.was_deleted is True
+    assert room.data["is_active"] is False
+    with pytest.raises(LookupError):
+        private_requests.delete_request(db, "missing", "requester")
 
 
 def test_private_prayer_count_requires_authorized_participant():

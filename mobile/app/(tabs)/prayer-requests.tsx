@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
@@ -18,6 +19,17 @@ import { useAuthStore } from '@/stores/authStore';
 import type { PrivatePrayerRequest } from '@/types';
 
 const LANGUAGES = ['English', 'Spanish', 'Kirundi'] as const;
+const MENU_WIDTH = 0.78;
+
+function MenuLines() {
+  return (
+    <View style={{ width: 22, height: 16, justifyContent: 'space-between' }}>
+      {[0, 1, 2].map((line) => (
+        <View key={line} style={{ height: 2, borderRadius: 1, backgroundColor: THEME_COLORS.text2 }} />
+      ))}
+    </View>
+  );
+}
 
 function upcomingQuarter(from = dayjs()) {
   const cleared = from.second(0).millisecond(0);
@@ -57,6 +69,8 @@ function formatSlot(slot: string) {
 
 export default function PrayerRequestsScreen() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const slide = useSharedValue(0);
   const router = useRouter();
   const queryClient = useQueryClient();
   const isFocused = useIsFocused();
@@ -68,6 +82,8 @@ export default function PrayerRequestsScreen() {
   const [picker, setPicker] = useState<'date' | 'time' | null>(null);
   const [pickerTick, setPickerTick] = useState(0);
   const [showForm, setShowForm] = useState(mode === 'compose');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
 
   useEffect(() => {
     if (mode === 'compose') setShowForm(true);
@@ -101,13 +117,21 @@ export default function PrayerRequestsScreen() {
       preferred_at: preferredAt.toISOString(),
       availability: toAvailability(preferredAt.toISOString()),
     }),
-    onSuccess: () => {
+    onSuccess: (result) => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      queryClient.setQueryData(
+        ['private-prayer-requests'],
+        (current: { success: boolean; data: PrivatePrayerRequest[]; is_prayer_leader: boolean } | undefined) => {
+          if (!current) return current;
+          return { ...current, data: [result.data, ...current.data.filter((item) => item.id !== result.data.id)] };
+        },
+      );
       queryClient.invalidateQueries({ queryKey: ['private-prayer-requests'] });
       setDescription('');
       setPreferredAt(upcomingQuarter().toDate());
       setPicker(null);
       setShowForm(false);
+      setOpenId(result.data.id);
     },
     onError: (error: Error) => Alert.alert('Could not submit request', error.message),
   });
@@ -137,6 +161,20 @@ export default function PrayerRequestsScreen() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['private-prayer-requests'] }),
     onError: (error: Error) => Alert.alert('Could not cancel request', error.message),
   });
+  const remove = useMutation({
+    mutationFn: privatePrayerRequestApi.remove,
+    onSuccess: (_result, requestId) => {
+      queryClient.setQueryData(
+        ['private-prayer-requests'],
+        (current: { success: boolean; data: PrivatePrayerRequest[]; is_prayer_leader: boolean } | undefined) => {
+          if (!current) return current;
+          return { ...current, data: current.data.filter((item) => item.id !== requestId) };
+        },
+      );
+      if (openId === requestId) setOpenId(null);
+    },
+    onError: (error: Error) => Alert.alert('Could not delete request', error.message),
+  });
   const pray = useMutation({
     mutationFn: privatePrayerRequestApi.pray,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['private-prayer-requests'] }),
@@ -158,6 +196,35 @@ export default function PrayerRequestsScreen() {
   const myRequests = requests.filter((item) => item.viewer_role === 'requester');
   const leaderRequests = isLeader ? requests.filter((item) => item.available_to_lead) : [];
   const assignedRequests = isLeader ? requests.filter((item) => item.viewer_role === 'leader') : [];
+  const openRequest = myRequests.find((item) => item.id === openId) ?? null;
+  const menuWidth = width * MENU_WIDTH;
+  const pageStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: slide.value * -menuWidth }],
+  }));
+
+  function openMenu() {
+    setMenuOpen(true);
+    slide.value = withTiming(1, { duration: 280 });
+  }
+
+  function closeMenu() {
+    slide.value = withTiming(0, { duration: 260 }, (finished) => {
+      if (finished) runOnJS(setMenuOpen)(false);
+    });
+  }
+
+  function openFromMenu(request: PrivatePrayerRequest) {
+    setOpenId(request.id);
+    setShowForm(false);
+    closeMenu();
+  }
+
+  function confirmRemove(requestId: string) {
+    Alert.alert('Delete this prayer request?', 'This removes it from your previous requests. An active or scheduled request is cancelled too.', [
+      { text: 'Keep request', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => remove.mutate(requestId) },
+    ]);
+  }
 
   function confirmCancel(requestId: string) {
     Alert.alert(
@@ -171,19 +238,72 @@ export default function PrayerRequestsScreen() {
   }
 
   return (
+    <View style={{ flex: 1, backgroundColor: '#fff', overflow: 'hidden' }}>
+      <View style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: menuWidth, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }}>
+        <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('600'), fontSize: 17, paddingHorizontal: 18, paddingBottom: 8 }}>
+          Previous requests
+        </Text>
+        {requestsQuery.isLoading ? (
+          <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 13, paddingHorizontal: 18, paddingTop: 8 }}>Loading your requests…</Text>
+        ) : myRequests.length === 0 ? (
+          <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 13, paddingHorizontal: 18, paddingTop: 8 }}>Your private prayer requests will appear here.</Text>
+        ) : (
+          <ScrollView>
+            {myRequests.map((item) => {
+              const when = item.preferred_at || item.created_at;
+              return (
+                <Pressable
+                  key={item.id}
+                  onPress={() => openFromMenu(item)}
+                  accessibilityRole="button"
+                  style={{
+                    paddingHorizontal: 18,
+                    paddingVertical: 14,
+                    borderTopWidth: 1,
+                    borderTopColor: THEME_COLORS.border,
+                    backgroundColor: item.id === openId ? THEME_COLORS.goldDim : '#fff',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text numberOfLines={2} style={{ color: THEME_COLORS.text, ...iosFontStyle('600'), fontSize: 16 }}>{item.description}</Text>
+                    <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 2, textTransform: 'capitalize' }}>
+                      {item.status.replace('_', ' ')}{when ? ` · ${dayjs(when).format('MMM D, YYYY')}` : ''}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => confirmRemove(item.id)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Delete request"
+                  >
+                    <Icon name="trash" size={16} color={THEME_COLORS.rose} />
+                  </Pressable>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        )}
+      </View>
+      <Animated.View style={[{ flex: 1, backgroundColor: THEME_COLORS.bg }, pageStyle, pageShadow]}>
     <ScrollView
-      style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}
+      style={{ flex: 1 }}
       contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 22, paddingBottom: insets.bottom + 96 }}
       refreshControl={<RefreshControl refreshing={requestsQuery.isRefetching} onRefresh={() => void requestsQuery.refetch()} tintColor={THEME_COLORS.gold} />}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20 }}>
-        <Pressable onPress={() => router.back()} hitSlop={12}>
+        <Pressable onPress={() => router.back()} hitSlop={12} accessibilityRole="button" accessibilityLabel="Back">
           <Icon name="back" size={22} color={THEME_COLORS.text2} />
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 23 }}>{showForm ? 'Request prayer' : 'Prayer Request'}</Text>
           <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 12, marginTop: 2 }}>A live call at your chosen time, if a warrior is matched</Text>
         </View>
+        <Pressable onPress={openMenu} hitSlop={12} accessibilityRole="button" accessibilityLabel="Previous requests">
+          <MenuLines />
+        </Pressable>
       </View>
 
       {showForm ? (
@@ -261,27 +381,27 @@ export default function PrayerRequestsScreen() {
         <Button label="New private request" onPress={() => setShowForm(true)} fullWidth />
       )}
 
-      <Text style={{ color: THEME_COLORS.text, ...iosFontStyle('700'), fontSize: 17, marginTop: 26, marginBottom: 10 }}>Your requests</Text>
-      {myRequests.length === 0 ? (
-        <Text style={{ color: THEME_COLORS.text3, ...iosFontStyle('400'), fontSize: 13 }}>Your private prayer requests will appear here.</Text>
-      ) : myRequests.map((item) => (
-        <RequestCard
-          key={item.id}
-          request={item}
-          onJoin={() => openCall.mutate(item.id)}
-          joining={openCall.isPending}
-          onCancel={() => confirmCancel(item.id)}
-          cancelling={cancel.isPending}
-          onResubmit={() => {
-            setDescription(item.description);
-            setLanguage(offeredLanguage(item.preferred_language));
-            const saved = dayjs(item.preferred_at || item.availability[0]?.start_at);
-            setPreferredAt(saved.isAfter(dayjs()) ? saved.toDate() : upcomingQuarter().toDate());
-            setPicker(null);
-            setShowForm(true);
-          }}
-        />
-      ))}
+      {openRequest ? (
+        <View style={{ marginTop: 22 }}>
+          <RequestCard
+            request={openRequest}
+            onJoin={() => openCall.mutate(openRequest.id)}
+            joining={openCall.isPending}
+            onCancel={() => confirmCancel(openRequest.id)}
+            cancelling={cancel.isPending}
+            onDelete={() => confirmRemove(openRequest.id)}
+            deleting={remove.isPending}
+            onResubmit={() => {
+              setDescription(openRequest.description);
+              setLanguage(offeredLanguage(openRequest.preferred_language));
+              const saved = dayjs(openRequest.preferred_at || openRequest.availability[0]?.start_at);
+              setPreferredAt(saved.isAfter(dayjs()) ? saved.toDate() : upcomingQuarter().toDate());
+              setPicker(null);
+              setShowForm(true);
+            }}
+          />
+        </View>
+      ) : null}
 
       {isLeader && (
         <>
@@ -311,19 +431,34 @@ export default function PrayerRequestsScreen() {
         </>
       )}
     </ScrollView>
+    {menuOpen ? (
+      <Pressable accessibilityLabel="Close previous requests" onPress={closeMenu} style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }} />
+    ) : null}
+      </Animated.View>
+    </View>
   );
 }
 
-function RequestCard({ request, onClaim, onJoin, onResubmit, onCancel, onPray, claiming, joining, cancelling, praying, leader, canReport }: {
+const pageShadow = {
+  shadowColor: '#2c2417',
+  shadowOffset: { width: 8, height: 0 },
+  shadowOpacity: 0.12,
+  shadowRadius: 16,
+  elevation: 8,
+};
+
+function RequestCard({ request, onClaim, onJoin, onResubmit, onCancel, onDelete, onPray, claiming, joining, cancelling, deleting, praying, leader, canReport }: {
   request: PrivatePrayerRequest;
   onClaim?: (slotStart?: string) => void;
   onJoin?: () => void;
   onResubmit?: () => void;
   onCancel?: () => void;
+  onDelete?: () => void;
   onPray?: () => void;
   claiming?: boolean;
   joining?: boolean;
   cancelling?: boolean;
+  deleting?: boolean;
   praying?: boolean;
   leader?: boolean;
   canReport?: boolean;
@@ -362,6 +497,7 @@ function RequestCard({ request, onClaim, onJoin, onResubmit, onCancel, onPray, c
       {request.status === 'scheduled' && onJoin && <Button label={joining ? 'Opening…' : 'Join prayer call'} onPress={onJoin} isLoading={joining} fullWidth style={{ marginTop: 14 }} />}
       {onPray && !['cancelled', 'expired'].includes(request.status) && <Button label={praying ? 'Saving…' : `I prayed for you${request.prayer_count ? ` · ${request.prayer_count}` : ''}`} onPress={onPray} isLoading={praying} variant="secondary" fullWidth style={{ marginTop: 10 }} />}
       {onCancel && ['active', 'claimed', 'scheduled'].includes(request.status) && <Button label={cancelling ? 'Cancelling…' : 'Cancel request'} onPress={onCancel} isLoading={cancelling} variant="ghost" fullWidth style={{ marginTop: 8 }} />}
+      {onDelete && <Button label={deleting ? 'Deleting…' : 'Delete'} onPress={onDelete} isLoading={deleting} variant="ghost" fullWidth style={{ marginTop: 8 }} />}
       {request.status === 'expired' && (
         <>
           <Text style={{ color: THEME_COLORS.rose, ...iosFontStyle('500'), fontSize: 12, marginTop: 10 }}>This request expired. You can submit it again.</Text>

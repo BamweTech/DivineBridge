@@ -375,6 +375,24 @@ def cancel_request(db, request_id, requester_id):
     return _request_payload(request_id, data, requester_id)
 
 
+def delete_request(db, request_id, requester_id):
+    """Remove one of the requester's previous requests.
+
+    An active, claimed, or scheduled request is cancelled first so a matched
+    call ends before the record disappears.
+    """
+    request_ref = db.collection(COLLECTION).document(request_id)
+    snapshot = request_ref.get()
+    if not snapshot.exists:
+        raise LookupError("Prayer request not found")
+    data = snapshot.to_dict() or {}
+    if data.get("requester_id") != requester_id:
+        raise PermissionError("Only the requester can delete this prayer request")
+    if data.get("status") in {"active", "claimed", "scheduled"}:
+        cancel_request(db, request_id, requester_id)
+    request_ref.delete()
+
+
 def record_prayer(db, request_id, user_id):
     """Increment the private request's anonymous/count-only prayer total."""
     request_ref = db.collection(COLLECTION).document(request_id)

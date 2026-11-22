@@ -5,6 +5,9 @@
     {"path": "/api/prayer/warrior-application", "methods": ["GET", "POST"]},
     {"path": "/api/prayer/admin-access", "methods": ["POST"]},
     {"path": "/api/prayer/warrior-applications", "methods": ["GET"]},
-    {"path": "/api/prayer/warrior-applications/<applicant_id>/review", "methods": ["POST"]}
+    {"path": "/api/prayer/warrior-applications/<applicant_id>/review", "methods": ["POST"]},
+    {"path": "/api/prayer/personal", "methods": ["GET", "POST"]},
+    {"path": "/api/prayer/personal/<prayer_id>", "methods": ["DELETE"]},
+    {"path": "/api/prayer/private-request/<request_id>", "methods": ["DELETE"]}
   ]
 }

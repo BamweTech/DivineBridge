@@ -15,12 +15,12 @@ File-based routing under `app/`:
 - `app/(tabs)/groups.tsx` — Prayer Groups tab: your groups, create, and join. Unread badge lives here.
 - `app/(tabs)/prayer-wall.tsx` — Public Prayer Wall, opened from the Pray menu.
 - `app/(tabs)/request-prayer.tsx` — Chooses a public wall post or a private warrior request.
-- `app/(tabs)/prayer-requests.tsx` — Private request form (`mode=compose`) and the requester plus warrior inbox (`mode=inbox`). The inbox title is Prayer Request. The form offers English, Spanish, and Kirundi, with a date selector and a 15-minute time selector. Every request schedules a live call at that time if a warrior is matched.
+- `app/(tabs)/prayer-requests.tsx` — Private request form (`mode=compose`) and the requester plus warrior inbox (`mode=inbox`). The inbox title is Prayer Request. The form offers English, Spanish, and Kirundi, with a date selector and a 15-minute time selector. Every request schedules a live call at that time if a warrior is matched. The three-line menu slides the page to the left and lists previous requests. Choosing one slides the page back and opens that request in full. The requester can delete a previous request. The prayer leader inbox stays on the page.
 - `app/(tabs)/scheduled-prayer.tsx` — Upcoming private matches. Requesters see their times; warriors see assigned calls.
 - `app/(tabs)/todays-prayer.tsx` — The global daily prayer.
 - `app/(tabs)/prayer-timer.tsx` — Personal quiet-time timer.
 - `app/(tabs)/prayer-reminder.tsx` — Daily local prayer reminder.
-- `app/(tabs)/personal-prayer.tsx` — One-off AI prayer. It is not saved.
+- `app/(tabs)/personal-prayer.tsx` — Personal prayer generator. Each prayer is saved for that person and is not editable. The three-line menu slides the page to the left and lists previous prayers there. Choosing one slides the page back and opens that prayer in full. It does not replace today's global prayer. The same generation search names one to three comforting references from any book of the Bible. Their World English Bible text is shown above the prayer.
 - `app/(auth)/` — Login, register screens.
 - `app/room/[id].tsx` — Live prayer room (dynamic route). Full screen, without the tab bar.
 - `app/voice-call/[id].tsx` — 1:1 voice link call (share web URL; mute/speaker/end). Full screen, without the tab bar.

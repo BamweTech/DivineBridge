@@ -7,10 +7,17 @@ from backend.core.input_validation import validate_request, sanitize_string
 from backend.core.auth.decorators import verify_cloud_scheduler
 from backend.core.auth.helpers import get_user_from_session, require_auth
 from backend.integrations.firebase_auth import get_firestore_client
+from backend.services.prayer.bible_verse_lookup import lookup_bible_verses
+from backend.services.prayer.personal_prayer_service import (
+    delete_personal_prayer,
+    list_personal_prayers,
+    save_personal_prayer,
+)
 from backend.services.prayer.qa_wall_filters import is_hidden_production_test_wall_item
 from backend.services.prayer.private_prayer_request_service import (
     cancel_request,
     claim_request,
+    delete_request,
     create_request,
     expire_requests,
     get_warrior_application,
@@ -48,11 +55,23 @@ def get_prayer(date):
         return jsonify({"error": "Failed to get prayer"}), 500
 
 
+@prayer_bp.route("/personal", methods=["GET"])
+@require_auth
+def list_saved_personal_prayers():
+    """Saved personal prayers for the signed-in person."""
+    try:
+        prayers = list_personal_prayers(get_firestore_client(), g.user_id)
+        return jsonify({"success": True, "data": prayers}), 200
+    except Exception:
+        logger.error("Failed to list personal prayers", exc_info=True)
+        return jsonify({"success": False, "error": "Could not load prayers"}), 500
+
+
 @prayer_bp.route("/personal", methods=["POST"])
 @limiter.limit("10 per hour")
 @require_auth
 def personal_prayer():
-    """Write a personal prayer and return it. Today's global prayer is left untouched."""
+    """Write a personal prayer, save it for this person, and leave today's global prayer untouched."""
     try:
         data = request.get_json(silent=True) or {}
         topic = sanitize_string(data.get("topic") or "", max_length=200)
@@ -61,13 +80,36 @@ def personal_prayer():
             return jsonify({"success": False, "error": "Tell us what you want to pray about"}), 400
         if not isinstance(scripture, str):
             scripture = ""
-        content = current_app.prayer_generator.generate_personal_prayer(topic, scripture)
-        return jsonify({"success": True, "data": {"content": content}}), 200
+        written = current_app.prayer_generator.generate_personal_prayer(topic, scripture)
+        verses = lookup_bible_verses(written["references"])
+        saved = save_personal_prayer(
+            get_firestore_client(),
+            g.user_id,
+            topic,
+            scripture,
+            written["content"],
+            verses,
+        )
+        return jsonify({"success": True, "data": saved}), 201
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
     except Exception:
         logger.error("Failed to write a personal prayer", exc_info=True)
         return jsonify({"success": False, "error": "Could not write a prayer"}), 500
+
+
+@prayer_bp.route("/personal/<prayer_id>", methods=["DELETE"])
+@require_auth
+def remove_personal_prayer(prayer_id):
+    """Delete one saved personal prayer. The text cannot be edited."""
+    try:
+        delete_personal_prayer(get_firestore_client(), g.user_id, prayer_id)
+        return jsonify({"success": True}), 200
+    except LookupError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 404
+    except Exception:
+        logger.error("Failed to delete a personal prayer", exc_info=True)
+        return jsonify({"success": False, "error": "Could not delete the prayer"}), 500
 
 
 @prayer_bp.route("/generate-prayer", methods=["POST"])
@@ -532,6 +574,22 @@ def cancel_private_prayer_request(request_id):
     except Exception:
         logger.error("Failed to cancel private prayer request", exc_info=True)
         return jsonify({"success": False, "error": "Failed to cancel prayer request"}), 500
+
+
+@prayer_bp.route("/private-request/<request_id>", methods=["DELETE"])
+@require_auth
+def remove_private_prayer_request(request_id):
+    """Remove one previous request belonging to the signed-in requester."""
+    try:
+        delete_request(get_firestore_client(), request_id, g.user_id)
+        return jsonify({"success": True}), 200
+    except LookupError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 404
+    except PermissionError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 403
+    except Exception:
+        logger.error("Failed to delete private prayer request", exc_info=True)
+        return jsonify({"success": False, "error": "Failed to delete prayer request"}), 500
 
 
 @prayer_bp.route("/private-request/<request_id>/pray", methods=["POST"])

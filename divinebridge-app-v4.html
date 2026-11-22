@@ -892,6 +892,7 @@ html, body {
       <button class="side-btn" onclick="show('s-pray-menu',this)">Pray menu</button>
       <button class="side-btn" onclick="show('s-prayer-warrior',this)">Prayer warrior</button>
       <button class="side-btn" onclick="show('s-warrior-review',this)">Warrior review</button>
+      <button class="side-btn" onclick="show('s-personal-prayer',this)">Personal prayer</button>
     </div>
     <div style="margin-top:24px;padding:14px;background:rgba(176,125,32,.07);border:1px solid rgba(176,125,32,.18);border-radius:12px;max-width:160px">
       <div style="font-size:10px;color:#9a6d18;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Divine Bridge</div>
@@ -1279,10 +1280,17 @@ html, body {
     <!-- PRIVATE PRAYER MATCHING -->
     <div class="phone-screen" id="s-private-prayer">
       <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
-      <div class="app-screen" style="padding:16px 20px 28px;overflow:auto">
+      <div style="flex:1;position:relative;overflow:hidden;min-height:0">
+        <div style="position:absolute;top:0;bottom:0;right:0;width:78%;background:#fff;padding-top:18px">
+          <div style="padding:4px 16px 12px;font-size:16px;font-weight:700">Previous requests</div>
+          <div onclick="closePrayerRequestMenu()" style="padding:12px 16px;border-top:1px solid rgba(44,36,23,.08);background:rgba(176,125,32,.12);cursor:pointer;display:flex;align-items:center;gap:12px"><div style="flex:1"><div style="font-weight:600">Peace and wisdom for a family decision</div><div style="font-size:12px;color:var(--text3);margin-top:2px;text-transform:capitalize">Scheduled · Nov 18, 2026</div></div><div style="color:#b05a50;font-weight:600;font-size:13px">Delete</div></div>
+          <div onclick="closePrayerRequestMenu()" style="padding:12px 16px;border-top:1px solid rgba(44,36,23,.08);cursor:pointer;display:flex;align-items:center;gap:12px"><div style="flex:1"><div style="font-weight:600">Strength and healing for my family</div><div style="font-size:12px;color:var(--text3);margin-top:2px;text-transform:capitalize">Active · Nov 12, 2026</div></div><div style="color:#b05a50;font-weight:600;font-size:13px">Delete</div></div>
+        </div>
+        <div id="prayer-request-window" class="app-screen" style="position:absolute;inset:0;padding:16px 20px 88px;transition:transform .28s ease;background:var(--bg);box-shadow:8px 0 16px rgba(44,36,23,.12)">
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
           <div class="live-back" onclick="show('s-wall',document.querySelectorAll('.side-btn')[3])"><span class="icon icon-16"><svg><use href="#ic-back"/></svg></span></div>
-          <div><div style="font-size:23px;font-weight:700;color:var(--text)">Private prayer</div><div style="font-size:12px;color:var(--text3);margin-top:2px">Matched with a leader in your language</div></div>
+          <div style="flex:1"><div style="font-size:23px;font-weight:700;color:var(--text)">Private prayer</div><div style="font-size:12px;color:var(--text3);margin-top:2px">Matched with a leader in your language</div></div>
+          <div onclick="event.stopPropagation(); togglePrayerRequestMenu()" style="width:22px;height:16px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer" aria-label="Previous requests"><span style="height:2px;background:#6b5c48;border-radius:1px"></span><span style="height:2px;background:#6b5c48;border-radius:1px"></span><span style="height:2px;background:#6b5c48;border-radius:1px"></span></div>
         </div>
         <div class="group-glass" style="margin:0 0 16px;padding:16px">
           <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px">How can we pray for you?</div>
@@ -1298,10 +1306,11 @@ html, body {
           <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-top:14px">If a matching prayer warrior accepts, a live call is scheduled at this time.</div>
           <button class="btn btn-fill" style="width:100%;justify-content:center;margin-top:18px">Send private request</button>
         </div>
-        <div class="sec-header" style="padding:0 0 10px"><div class="sec-title">Your requests</div></div>
-        <div class="group-glass" style="margin:0 0 10px;padding:14px"><div style="display:flex;justify-content:space-between"><b style="font-size:14px;color:var(--text)">Prayer request</b><span class="pill pill-sage">Scheduled</span></div><div style="font-size:12px;line-height:1.5;color:var(--text2);margin:8px 0">Please pray for peace and wisdom as I make a difficult family decision.</div><div style="font-size:12px;color:var(--sage);font-weight:600">Call scheduled · Tue, Mar 18 · 6:00 PM</div><button class="btn btn-fill" style="width:100%;justify-content:center;margin-top:12px">Join prayer call</button><button class="btn btn-outline" style="width:100%;justify-content:center;margin-top:8px">I prayed for you · 3</button><button class="btn" style="width:100%;justify-content:center;margin-top:8px;color:var(--rose)">Cancel request</button></div>
+        <div class="group-glass" style="margin:22px 0 10px;padding:14px"><div style="display:flex;justify-content:space-between"><b style="font-size:14px;color:var(--text)">Prayer request</b><span class="pill pill-sage">Scheduled</span></div><div style="font-size:12px;line-height:1.5;color:var(--text2);margin:8px 0">Please pray for peace and wisdom as I make a difficult family decision.</div><div style="font-size:12px;color:var(--sage);font-weight:600">Call scheduled · Tue, Mar 18 · 6:00 PM</div><button class="btn btn-fill" style="width:100%;justify-content:center;margin-top:12px">Join prayer call</button><button class="btn btn-outline" style="width:100%;justify-content:center;margin-top:8px">I prayed for you · 3</button><button class="btn" style="width:100%;justify-content:center;margin-top:8px;color:var(--rose)">Cancel request</button><button class="btn" style="width:100%;justify-content:center;margin-top:8px;color:var(--rose)">Delete</button></div>
         <div class="sec-header" style="padding:16px 0 10px"><div class="sec-title">Prayer leader inbox</div></div>
         <div class="group-glass" style="margin:0;padding:14px"><div style="display:flex;justify-content:space-between"><b style="font-size:14px;color:var(--text)">Maria's request</b><span class="pill pill-gold">English</span></div><div style="font-size:12px;line-height:1.5;color:var(--text2);margin:8px 0">Praying for strength and healing for my family.</div><div style="font-size:12px;color:var(--text3)">Available · Wed, Mar 19 · 12:00 PM</div><button class="btn btn-outline" style="width:100%;justify-content:center;margin-top:12px">Accept &amp; schedule call</button><button class="btn btn-outline" style="width:100%;justify-content:center;margin-top:8px">I prayed for you · 1</button></div>
+        <div id="prayer-request-shade" onclick="closePrayerRequestMenu()" style="display:none;position:absolute;inset:0"></div>
+        </div>
       </div>
       <div class="bottom-nav">
         <div class="nav-item active" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
@@ -1711,6 +1720,52 @@ html, body {
       </div>
     </div>
 
+    <!-- PERSONAL PRAYER -->
+    <div class="phone-screen" id="s-personal-prayer">
+      <div class="status-bar"><span class="status-time">9:41</span><div class="status-icons"><div class="sig-bars"><span style="height:4px"></span><span style="height:6px"></span><span style="height:8px"></span><span style="height:10px"></span></div><div class="bat"><div class="bat-fill"></div></div></div></div>
+      <div style="flex:1;position:relative;overflow:hidden;min-height:0">
+        <div style="position:absolute;top:0;bottom:0;right:0;width:78%;background:#fff;padding-top:18px">
+          <div style="padding:4px 16px 12px;font-size:16px;font-weight:700">Previous prayers</div>
+          <div onclick="closePersonalPrayerMenu()" style="padding:12px 16px;border-top:1px solid rgba(44,36,23,.08);background:rgba(176,125,32,.12);cursor:pointer"><div style="font-weight:600">Peace</div><div style="font-size:12px;color:var(--text3);margin-top:2px">Nov 20, 2026</div></div>
+          <div onclick="closePersonalPrayerMenu()" style="padding:12px 16px;border-top:1px solid rgba(44,36,23,.08);cursor:pointer"><div style="font-weight:600">Hope</div><div style="font-size:12px;color:var(--text3);margin-top:2px">Nov 18, 2026</div></div>
+        </div>
+        <div id="personal-prayer-window" class="app-screen" style="position:absolute;inset:0;padding:16px 18px 88px;transition:transform .28s ease;background:var(--bg);box-shadow:8px 0 16px rgba(44,36,23,.12)">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div style="color:var(--gold);font-size:16px;font-weight:600;cursor:pointer" onclick="show('s-pray-menu',document.querySelectorAll('.side-btn')[15])">‹ Prayer</div>
+          <div onclick="event.stopPropagation(); togglePersonalPrayerMenu()" style="width:22px;height:16px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer" aria-label="Previous prayers"><span style="height:2px;background:#6b5c48;border-radius:1px"></span><span style="height:2px;background:#6b5c48;border-radius:1px"></span><span style="height:2px;background:#6b5c48;border-radius:1px"></span></div>
+        </div>
+        <div style="display:inline-flex;align-items:center;gap:5px;background:var(--violet-dim);border:1px solid rgba(112,64,184,.2);border-radius:50px;padding:4px 12px;margin-top:12px;color:var(--violet);font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase"><span class="icon icon-10"><svg><use href="#ic-sparkle"/></svg></span>AI-generated</div>
+        <div style="font-size:22px;font-weight:700;color:var(--text);margin-top:10px">Personal prayer</div>
+        <div style="font-size:13px;color:var(--text3);margin-top:6px;line-height:1.4">A prayer written for you. It is saved so you can read it again, and you can delete it.</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:16px;font-weight:600">What is on your heart?</div>
+        <div style="margin-top:8px;border-radius:14px;background:var(--bg3);padding:14px;color:var(--text3);font-size:15px;line-height:1.35;min-height:144px">Peace for a hard conversation</div>
+        <div style="margin-top:14px;text-align:center;border-radius:24px;padding:12px;background:var(--gold);color:#fff;font-weight:600">Submit</div>
+        <div style="background:#fff;border:1px solid rgba(44,36,23,.06);border-radius:18px;padding:16px;margin-top:22px">
+          <div style="display:inline-flex;align-items:center;gap:5px;background:var(--violet-dim);border:1px solid rgba(112,64,184,.2);border-radius:50px;padding:3px 10px;color:var(--violet);font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase"><span class="icon icon-10"><svg><use href="#ic-sparkle"/></svg></span>AI-generated</div>
+          <div style="font-size:16px;font-weight:600;margin-top:8px">Peace</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:4px">Nov 20, 2026</div>
+          <div style="margin-top:12px">
+            <div style="font-size:12px;color:var(--gold);font-weight:600">Psalm 23:1-2 · WEB</div>
+            <div style="font-size:14px;line-height:1.45;margin-top:4px">The Lord is my shepherd; I shall not want.</div>
+          </div>
+          <div style="font-size:14px;line-height:1.45;margin-top:12px">Heavenly Father, grant peace for this conversation. Amen.</div>
+          <div style="display:flex;gap:16px;margin-top:12px;align-items:center">
+            <div style="color:var(--gold);font-weight:600;font-size:14px">Listen</div>
+            <div style="color:var(--gold);font-weight:600;font-size:14px">Copy</div>
+            <div style="margin-left:auto;color:#b05a50;font-weight:600;font-size:14px">Delete</div>
+          </div>
+        </div>
+        <div id="personal-prayer-shade" onclick="closePersonalPrayerMenu()" style="display:none;position:absolute;inset:0"></div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item active" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+      </div>
+    </div>
+
     <!-- PRAY HUB -->
     <!-- PRAY MENU -->
     <div class="phone-screen" id="s-pray-menu">
@@ -1732,7 +1787,7 @@ html, body {
           <div style="background:#fff;border:1px solid rgba(44,36,23,.06);border-radius:22px;padding:16px;min-height:148px;text-align:center"><div style="width:52px;height:52px;border-radius:18px;background:rgba(176,125,32,.22);margin:0 auto 14px"></div><div style="font-size:15px;font-weight:600">Prayer Wall</div><div style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.4">Public prayer requests</div></div>
           <div style="background:#fff;border:1px solid rgba(44,36,23,.06);border-radius:22px;padding:16px;min-height:148px;text-align:center"><div style="width:52px;height:52px;border-radius:18px;background:rgba(176,125,32,.22);margin:0 auto 14px"></div><div style="font-size:15px;font-weight:600">Prayer reminder</div><div style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.4">A daily time to come and pray</div></div>
           <div style="background:#fff;border:1px solid rgba(44,36,23,.06);border-radius:22px;padding:16px;min-height:148px;text-align:center"><div style="width:52px;height:52px;border-radius:18px;background:rgba(176,125,32,.22);margin:0 auto 14px"></div><div style="font-size:15px;font-weight:600">Prayer timer</div><div style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.4">Start and stop a quiet time</div></div>
-          <div style="background:#fff;border:1px solid rgba(44,36,23,.06);border-radius:22px;padding:16px;min-height:148px;text-align:center"><div style="width:52px;height:52px;border-radius:18px;background:rgba(176,125,32,.22);margin:0 auto 14px"></div><div style="font-size:15px;font-weight:600">Personal Prayer Generator</div><div style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.4">A prayer for what is on your heart</div></div>
+          <div onclick="show('s-personal-prayer',document.querySelectorAll('.side-btn')[18])" style="background:#fff;border:1px solid rgba(44,36,23,.06);border-radius:22px;padding:16px;min-height:148px;text-align:center;cursor:pointer"><div style="width:52px;height:52px;border-radius:18px;background:rgba(176,125,32,.22);margin:0 auto 14px"></div><div style="font-size:15px;font-weight:600">Personal Prayer Generator</div><div style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.4">Write a prayer and keep it</div></div>
           <div style="background:#fff;border:1px solid rgba(44,36,23,.06);border-radius:22px;padding:16px;min-height:148px;text-align:center"><div style="width:52px;height:52px;border-radius:18px;background:rgba(176,125,32,.22);margin:0 auto 14px"></div><div style="font-size:15px;font-weight:600">Voice Link</div><div style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.4">Start a private voice call</div></div>
         </div>
       </div>
@@ -1857,6 +1912,40 @@ html, body {
 </div><!-- /stage -->
 
 <script>
+function togglePrayerRequestMenu() {
+  var w = document.getElementById('prayer-request-window');
+  var shade = document.getElementById('prayer-request-shade');
+  if (!w || !shade) return;
+  var open = w.dataset.open === '1';
+  w.dataset.open = open ? '0' : '1';
+  w.style.transform = open ? 'translateX(0)' : 'translateX(-78%)';
+  shade.style.display = open ? 'none' : 'block';
+}
+function closePrayerRequestMenu() {
+  var w = document.getElementById('prayer-request-window');
+  var shade = document.getElementById('prayer-request-shade');
+  if (!w || !shade) return;
+  w.dataset.open = '0';
+  w.style.transform = 'translateX(0)';
+  shade.style.display = 'none';
+}
+function togglePersonalPrayerMenu() {
+  var w = document.getElementById('personal-prayer-window');
+  var shade = document.getElementById('personal-prayer-shade');
+  if (!w || !shade) return;
+  var open = w.dataset.open === '1';
+  w.dataset.open = open ? '0' : '1';
+  w.style.transform = open ? 'translateX(0)' : 'translateX(-78%)';
+  shade.style.display = open ? 'none' : 'block';
+}
+function closePersonalPrayerMenu() {
+  var w = document.getElementById('personal-prayer-window');
+  var shade = document.getElementById('personal-prayer-shade');
+  if (!w || !shade) return;
+  w.dataset.open = '0';
+  w.style.transform = 'translateX(0)';
+  shade.style.display = 'none';
+}
 function show(id, btn) {
   document.querySelectorAll('.phone-screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');

@@ -107,7 +107,7 @@ const MENU: MenuItem[] = [
   { key: 'wall', label: 'Prayer Wall', detail: 'Public prayer requests', icon: 'church', href: '/prayer-wall' },
   { key: 'reminder', label: 'Prayer reminder', detail: 'A daily time to come and pray', icon: 'bell', href: '/prayer-reminder' },
   { key: 'timer', label: 'Prayer timer', detail: 'Start and stop a quiet time', icon: 'play', href: '/prayer-timer' },
-  { key: 'generator', label: 'Personal Prayer Generator', detail: 'A prayer for what is on your heart', icon: 'sparkle', href: '/personal-prayer' },
+  { key: 'generator', label: 'Personal Prayer Generator', detail: 'Write a prayer and keep it', icon: 'sparkle', href: '/personal-prayer' },
   { key: 'voice', label: 'Voice Link', detail: 'Start a private voice call', icon: 'audio', action: 'voice' },
 ];
 

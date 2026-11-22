@@ -349,32 +349,72 @@ Fix this and output ONLY the corrected paragraph."""
         return updated
 
     def generate_personal_prayer(self, topic, scripture=""):
-        """Write a one-off prayer. This never reads or writes today's stored prayer."""
+        """Write a personal prayer and name up to three comforting Bible references.
+
+        The verse wording is loaded later from a public-domain Bible, so this
+        search can name any book, chapter, and verse. It never reads or writes
+        today's stored prayer.
+        """
         import re
 
         topic = (topic or "").strip()
         scripture = (scripture or "").strip()
         if len(topic) < 3:
             raise ValueError("Tell us what you want to pray about")
-        scripture_line = f"\nWeave in this scripture if it fits: {scripture}" if scripture else ""
+        scripture_line = f"\nThe person asked to include this scripture if it fits: {scripture}" if scripture else ""
         prompt = f"""You are writing a personal Christian prayer for one person. This is not a global news prayer and must not mention current events.
 
 Topic: {topic}{scripture_line}
 
-Rules:
+In this same search, choose 1 to 3 comforting Bible passages that fit the topic. Any book of the Bible is allowed. Each line is one reference: a single verse, or a range of at most three consecutive verses, with the book, chapter, and verse. Do not write the verse text. If you cannot find a fitting passage, write NONE under VERSES.
+
+Return exactly this shape and nothing else:
+VERSES:
+John 14:27
+PRAYER:
+the prayer
+
+Prayer rules:
 - 80 to 140 words
 - Begin with "Heavenly Father"
 - End with "Amen."
 - Write words the person can pray aloud
+- Do not quote the verse text inside the prayer
 - No citations, no <think> tags, no commentary
-- Return only the prayer
 """
         response = self.client.query(prompt) or ""
         text = re.sub(r"<think>.*?</think>", "", response, flags=re.DOTALL | re.IGNORECASE)
-        text = self._remove_citations(text)
-        if len(text) < 20:
+        content, references = self._split_personal_prayer(text)
+        content = self._remove_citations(content)
+        if len(content) < 20:
             raise ValueError("Could not write a prayer")
-        return text
+        return {"content": content, "references": references}
+
+    def _split_personal_prayer(self, text):
+        """Separate up to three Bible references from the prayer body."""
+        import re
+
+        from backend.services.prayer.bible_verse_lookup import normalize_reference
+
+        prayer = (text or "").strip()
+        verse_block = ""
+        marker = re.search(r"(?im)^PRAYER:\s*", prayer)
+        if marker:
+            verse_block = prayer[: marker.start()]
+            prayer = prayer[marker.end() :].strip()
+            verses_marker = re.search(r"(?im)^VERSES:\s*", verse_block)
+            if verses_marker:
+                verse_block = verse_block[verses_marker.end() :]
+        references = []
+        if verse_block.strip().upper() != "NONE":
+            for line in verse_block.splitlines():
+                line = re.sub(r"^\d+[\.\)]\s*", "", line.strip())
+                reference = normalize_reference(line)
+                if reference and reference not in references:
+                    references.append(reference)
+                if len(references) == 3:
+                    break
+        return prayer.strip(), references
 
     def generate_prayer(self, max_retries=5):
         """Generate a new prayer and save it to storage with retry logic.

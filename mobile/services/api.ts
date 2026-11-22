@@ -86,12 +86,25 @@ export const prayerApi = {
     request<any>(`/api/prayer/daily-prayer/${date}/interactions`),
   share: (date: string) =>
     request<any>(`/api/prayer/daily-prayer/${date}/share`, { method: 'POST' }),
-  /** One-off prayer. The server does not store it as today's global prayer. */
+  /** Writes a prayer and saves it for this person. Today's global prayer is left untouched. */
   personal: (topic: string, scripture?: string) =>
-    request<{ success: boolean; data: { content: string } }>('/api/prayer/personal', {
+    request<{ success: boolean; data: SavedPersonalPrayer }>('/api/prayer/personal', {
       method: 'POST',
       body: JSON.stringify({ topic, scripture: scripture ?? '' }),
     }),
+  listPersonal: () =>
+    request<{ success: boolean; data: SavedPersonalPrayer[] }>('/api/prayer/personal'),
+  deletePersonal: (id: string) =>
+    request<{ success: boolean }>(`/api/prayer/personal/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+};
+
+export type SavedPersonalPrayer = {
+  id: string;
+  topic: string;
+  scripture: string;
+  verses?: { text: string; reference: string; translation?: string }[];
+  content: string;
+  created_at: string | null;
 };
 
 export type VerseContextOriginalWord = {
@@ -383,6 +396,10 @@ export const privatePrayerRequestApi = {
       `/api/prayer/private-request/${requestId}/cancel`,
       { method: 'POST' }
     ),
+  remove: (requestId: string) =>
+    request<{ success: boolean }>(`/api/prayer/private-request/${encodeURIComponent(requestId)}`, {
+      method: 'DELETE',
+    }),
   pray: (requestId: string) =>
     request<{ success: boolean; data: { prayer_count: number } }>(
       `/api/prayer/private-request/${requestId}/pray`,

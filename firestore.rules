@@ -276,6 +276,11 @@ service cloud.firestore {
     match /prayer_warrior_applications/{userId} {
       allow read, write: if false;
     }
+
+    // Saved personal prayers are written by the API. Clients cannot edit them.
+    match /personal_prayers/{prayerId} {
+      allow read, write: if false;
+    }
     
     // User interactions - users can only access their own data
     match /user_interactions/{userId} {
