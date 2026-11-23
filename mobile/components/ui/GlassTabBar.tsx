@@ -1,41 +1,51 @@
-import { View, Platform } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { View } from 'react-native';
 
 /**
- * Tab-bar background. Lives behind the icons and labels so the tab bar
- * itself ends up looking like an iOS ultra-glass surface — the spec's
- * "`saturate(200%) blur(40px)`" equivalent.
- *
- * Designed to slot into expo-router's `Tabs.tabBarBackground` option:
- *   `tabBarBackground: () => <GlassTabBar />`
- *
- * The component fills its parent (the tab bar). We do not apply a border
- * here — the tab bar's `tabBarStyle.borderTopColor` continues to draw the
- * 1px hairline so the bar reads as separated from content.
+ * Floating tab-bar surface. A rounded glass capsule with a light cream wash
+ * so the screen stays visible through it, plus a hairline and a top highlight.
+ * The shadow lives on the outer view so the clipped fill does not cut it off.
  */
 
-const ANDROID_BLUR_METHOD = Platform.OS === 'android' && (Platform.Version as number) >= 31
-  ? 'dimezisBlurView'
-  : 'none';
+export const FLOATING_TAB_RADIUS = 32;
 
 export function GlassTabBar() {
   return (
-    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
-      <BlurView
-        intensity={95}
-        tint="light"
-        experimentalBlurMethod={ANDROID_BLUR_METHOD}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-      />
-      {/* Thin cream tint over the blur — just enough to keep icons legible
-          on top of scrolling content without smothering the blur. */}
+    <View
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        borderRadius: FLOATING_TAB_RADIUS,
+        backgroundColor: 'transparent',
+        boxShadow: '0 10px 24px rgba(44,36,23,0.16)',
+      }}
+    >
       <View
         style={{
-          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(250,246,239,0.28)',
-          pointerEvents: 'none',
+          flex: 1,
+          borderRadius: FLOATING_TAB_RADIUS,
+          overflow: 'hidden',
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.72)',
         }}
-      />
+      >
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(255,253,247,0.16)',
+          }}
+        />
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute', top: 0, left: 12, right: 12, height: 1,
+            backgroundColor: 'rgba(255,255,255,0.85)',
+          }}
+        />
+      </View>
     </View>
   );
 }

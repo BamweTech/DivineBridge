@@ -7,7 +7,7 @@ The Divine Bridge mobile app built with Expo ~54, React Native, and TypeScript.
 File-based routing under `app/`:
 
 - `app/_layout.tsx` — Root Stack with auth guard, providers (QueryClient, GroupUnread, LiveRooms).
-- `app/(tabs)/_layout.tsx` — Tab bar: Pray (landing), Groups, Devotional, Profile. Home and Live stay as hidden routes. The Profile tab shows the account photo when one is saved, and the person icon otherwise.
+- `app/(tabs)/_layout.tsx` — Tab bar: Pray (landing), Groups, Devotional, Profile. A floating glass capsule with icons only, centered, and no names under them. Home and Live stay as hidden routes. The Profile tab shows the account photo when one is saved, and the person icon otherwise.
 - `app/(tabs)/pray.tsx` — Burning-bush halo. Tap the circle or drag it down to open a two-column prayer dashboard. A full-width card at the top, Enroll as Prayer Warrior, stays pinned while the dashboard cards scroll. Its gold border eases brighter and softer until the person applies. It invites people to apply unless they are already enrolled. The bottom tabs stay visible on that dashboard and on the pages it opens. Switching to another tab and coming back keeps the open prayer page.
 - `app/(tabs)/prayer-warrior.tsx` — Application to enroll as a prayer warrior. Languages are English, Spanish, and Kirundi. Church name is optional. Weekly time ranges are required. One range can cover several days, and a day can have more than one range. Matching uses them. Submitting stores a pending application and does not grant access.
 - `app/(tabs)/prayer-warrior-review.tsx` — Admin review of pending prayer-warrior applications, opened from Profile. Accept enrolls the person. Decline does not. Visible to `dev@bamwe.com`, `kubjca@gmail.com`, and any account the server has marked `is_admin`.
@@ -92,7 +92,7 @@ Cream-tinted iOS-style glass via `expo-blur`. All four live under `components/ui
 - **`GlassCard`** — backdrop blur + cream tint + hairline border + top-edge highlight. Tones: `default | warm | gold | sage | rose`. Intensities: `subtle | card | bar | heavy`.
 - **`GlassActionBar`** — bottom-anchored action toolbar (the verse hero's row of Listen / Like / Share).
 - **`GlassPill`** — small frosted pill for cap labels, notification bell, status chips.
-- **`GlassTabBar`** — slotted into expo-router via `tabBarBackground={() => <GlassTabBar />}` with `tabBarStyle.position: 'absolute'` so content scrolls under it.
+- **`GlassTabBar`** — floating glass capsule slotted into expo-router via `tabBarBackground={() => <GlassTabBar />}` with `tabBarStyle.position: 'absolute'` so content scrolls under it.
 
 ## Conventions
 

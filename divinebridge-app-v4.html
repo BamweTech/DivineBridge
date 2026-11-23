@@ -432,19 +432,23 @@ html, body {
 .bat-fill { position:absolute; inset:1.5px; right:4px; background:currentColor; border-radius:1px; }
 
 .bottom-nav {
-  position: absolute; bottom: 0; left: 0; right: 0; height: 80px;
-  background: rgba(250,246,239,.97); backdrop-filter: blur(20px);
-  border-top: 1px solid var(--border);
+  position: absolute; bottom: 18px; left: 16px; right: 16px; height: 64px;
+  background: rgba(255,253,247,.16);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid rgba(255,255,255,.75);
+  border-radius: 32px;
+  box-shadow: 0 10px 28px rgba(44,36,23,.14), inset 0 1px 0 rgba(255,255,255,.85);
   display: flex; align-items: center; justify-content: space-around;
-  padding: 0 8px 12px; z-index: 100;
+  padding: 0 8px; z-index: 100;
 }
 .nav-item {
-  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  display: flex; align-items: center; justify-content: center;
   padding: 8px 12px; border-radius: 14px;
   cursor: pointer; transition: background .2s; flex: 1; color: var(--text3);
 }
 .nav-item.active { background: var(--gold-dim); color: var(--gold); }
-.nav-label { font-size: 9px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; }
+.nav-item .icon-22 { width: 24px; height: 24px; }
 
 .pill {
   display: inline-flex; align-items: center; gap: 5px;
@@ -1014,10 +1018,10 @@ html, body {
         <div style="height:16px"></div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item active" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
-        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item active" onclick="show('s-pray-hub')"><span class="icon icon-22"><svg><use href="#ic-pray-bridge"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-22"><svg><use href="#ic-gathering"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-22"><svg><use href="#ic-book"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-22"><svg><use href="#ic-profile"/></svg></span></div>
       </div>
     </div>
 
@@ -1068,10 +1072,10 @@ html, body {
         <div style="height:16px"></div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item active" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
-        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-22"><svg><use href="#ic-pray-bridge"/></svg></span></div>
+        <div class="nav-item active" onclick="show('s-pray')"><span class="icon icon-22"><svg><use href="#ic-gathering"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-22"><svg><use href="#ic-book"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-22"><svg><use href="#ic-profile"/></svg></span></div>
       </div>
     </div>
 
@@ -1113,10 +1117,10 @@ html, body {
         <div style="height:16px"></div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item active" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
-        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item active" onclick="show('s-pray-hub')"><span class="icon icon-22"><svg><use href="#ic-pray-bridge"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-22"><svg><use href="#ic-gathering"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-22"><svg><use href="#ic-book"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-22"><svg><use href="#ic-profile"/></svg></span></div>
       </div>
     </div>
 
@@ -1181,10 +1185,10 @@ html, body {
         <div style="height:16px"></div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
-        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-22"><svg><use href="#ic-pray-bridge"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-22"><svg><use href="#ic-gathering"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-22"><svg><use href="#ic-book"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-22"><svg><use href="#ic-profile"/></svg></span></div>
       </div>
     </div>
 
@@ -1313,10 +1317,10 @@ html, body {
         </div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item active" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
-        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item active" onclick="show('s-pray-hub')"><span class="icon icon-22"><svg><use href="#ic-pray-bridge"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-22"><svg><use href="#ic-gathering"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-22"><svg><use href="#ic-book"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-22"><svg><use href="#ic-profile"/></svg></span></div>
       </div>
     </div>
 
@@ -1408,10 +1412,10 @@ html, body {
       </div>
       <div style="height:8px;background:var(--bg)"></div>
       <div class="bottom-nav">
-        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item active" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
-        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-22"><svg><use href="#ic-pray-bridge"/></svg></span></div>
+        <div class="nav-item active" onclick="show('s-pray')"><span class="icon icon-22"><svg><use href="#ic-gathering"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-22"><svg><use href="#ic-book"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-22"><svg><use href="#ic-profile"/></svg></span></div>
       </div>
     </div>
 
@@ -1462,10 +1466,10 @@ html, body {
         </div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
-        <div class="nav-item active" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-22"><svg><use href="#ic-pray-bridge"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-22"><svg><use href="#ic-gathering"/></svg></span></div>
+        <div class="nav-item active" onclick="show('s-devo')"><span class="icon icon-22"><svg><use href="#ic-book"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-22"><svg><use href="#ic-profile"/></svg></span></div>
       </div>
     </div>
 
@@ -1502,10 +1506,10 @@ html, body {
         </div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
-        <div class="nav-item active" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-22"><svg><use href="#ic-pray-bridge"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-22"><svg><use href="#ic-gathering"/></svg></span></div>
+        <div class="nav-item active" onclick="show('s-devo')"><span class="icon icon-22"><svg><use href="#ic-book"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-22"><svg><use href="#ic-profile"/></svg></span></div>
       </div>
     </div>
 
@@ -1538,10 +1542,10 @@ html, body {
         </div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
-        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item active" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-22"><svg><use href="#ic-pray-bridge"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-22"><svg><use href="#ic-gathering"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-22"><svg><use href="#ic-book"/></svg></span></div>
+        <div class="nav-item active" onclick="show('s-profile')"><span class="icon icon-22"><svg><use href="#ic-profile"/></svg></span></div>
       </div>
     </div>
 
@@ -1661,10 +1665,10 @@ html, body {
         <div style="height:16px"></div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
-        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item active" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-22"><svg><use href="#ic-pray-bridge"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-22"><svg><use href="#ic-gathering"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-22"><svg><use href="#ic-book"/></svg></span></div>
+        <div class="nav-item active" onclick="show('s-profile')"><span class="icon icon-22"><svg><use href="#ic-profile"/></svg></span></div>
       </div>
     </div>
 
@@ -1759,10 +1763,10 @@ html, body {
         </div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item active" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
-        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item active" onclick="show('s-pray-hub')"><span class="icon icon-22"><svg><use href="#ic-pray-bridge"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-22"><svg><use href="#ic-gathering"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-22"><svg><use href="#ic-book"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-22"><svg><use href="#ic-profile"/></svg></span></div>
       </div>
     </div>
 
@@ -1792,10 +1796,10 @@ html, body {
         </div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item active" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
-        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item active" onclick="show('s-pray-hub')"><span class="icon icon-22"><svg><use href="#ic-pray-bridge"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-22"><svg><use href="#ic-gathering"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-22"><svg><use href="#ic-book"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-22"><svg><use href="#ic-profile"/></svg></span></div>
       </div>
     </div>
 
@@ -1841,10 +1845,10 @@ html, body {
         </div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item active" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
-        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item active" onclick="show('s-pray-hub')"><span class="icon icon-22"><svg><use href="#ic-pray-bridge"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-22"><svg><use href="#ic-gathering"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-22"><svg><use href="#ic-book"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-22"><svg><use href="#ic-profile"/></svg></span></div>
       </div>
     </div>
 
@@ -1868,10 +1872,10 @@ html, body {
         </div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
-        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item active" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item" onclick="show('s-pray-hub')"><span class="icon icon-22"><svg><use href="#ic-pray-bridge"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-22"><svg><use href="#ic-gathering"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-22"><svg><use href="#ic-book"/></svg></span></div>
+        <div class="nav-item active" onclick="show('s-profile')"><span class="icon icon-22"><svg><use href="#ic-profile"/></svg></span></div>
       </div>
     </div>
 
@@ -1888,10 +1892,10 @@ html, body {
         <div style="font-size:12px;color:var(--text3);margin-top:28px">Tap the halo, or drag it down</div>
       </div>
       <div class="bottom-nav">
-        <div class="nav-item active"><span class="icon icon-18"><svg><use href="#ic-pray-bridge"/></svg></span><div class="nav-label">Pray</div></div>
-        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-18"><svg><use href="#ic-gathering"/></svg></span><div class="nav-label">Groups</div></div>
-        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-18"><svg><use href="#ic-book"/></svg></span><div class="nav-label">Devotional</div></div>
-        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-18"><svg><use href="#ic-profile"/></svg></span><div class="nav-label">Profile</div></div>
+        <div class="nav-item active"><span class="icon icon-22"><svg><use href="#ic-pray-bridge"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-pray')"><span class="icon icon-22"><svg><use href="#ic-gathering"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-devo')"><span class="icon icon-22"><svg><use href="#ic-book"/></svg></span></div>
+        <div class="nav-item" onclick="show('s-profile')"><span class="icon icon-22"><svg><use href="#ic-profile"/></svg></span></div>
       </div>
     </div>
 

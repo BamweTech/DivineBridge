@@ -204,7 +204,7 @@ export default function PrayScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: THEME_COLORS.bg }}>
       <View style={{ position: 'absolute', top: -80, right: -60, width: 280, height: 280, borderRadius: 140, backgroundColor: concept.washTop }} />
-      <View style={{ position: 'absolute', bottom: 80, left: -80, width: 240, height: 240, borderRadius: 120, backgroundColor: concept.washBottom }} />
+      <View style={{ position: 'absolute', bottom: -36, left: -80, width: 240, height: 240, borderRadius: 120, backgroundColor: concept.washBottom }} />
 
       {!menuOpen ? (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: insets.top }}>

@@ -12,7 +12,7 @@ import { THEME_COLORS } from '@/lib/constants';
 import { iosFont } from '@/lib/typography';
 import Icon from '@/components/ui/Icon';
 import type { IconName } from '@/components/ui/Icon';
-import { GlassTabBar } from '@/components/ui/GlassTabBar';
+import { FLOATING_TAB_RADIUS, GlassTabBar } from '@/components/ui/GlassTabBar';
 import { useGroupUnread } from '@/features/groups/contexts/GroupUnreadContext';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -72,17 +72,16 @@ function tabOwnsPath(name: string, pathname: string): boolean {
 }
 
 /** Base icon size (dp); spring scale differentiates focused vs idle. */
-const ICON_BASE = 27;
+const ICON_BASE = 31;
+const PHOTO_SIZE = 30;
 
 function TabBarIcon({
   icon,
-  label,
   focused,
   badgeCount,
   photoUrl,
 }: {
   icon: IconName;
-  label: string;
   focused: boolean;
   badgeCount?: number;
   photoUrl?: string;
@@ -107,12 +106,11 @@ function TabBarIcon({
   return (
     <View
       style={{
+        flex: 1,
+        alignSelf: 'stretch',
         alignItems: 'center',
-        justifyContent: 'flex-start',
-        paddingTop: 2,
-        paddingBottom: 4,
+        justifyContent: 'center',
         width: SLOT_W,
-        minHeight: 48,
       }}
     >
       <Animated.View style={[{ alignItems: 'center', justifyContent: 'center' }, iconStyle]}>
@@ -120,7 +118,7 @@ function TabBarIcon({
           {photoUrl && !photoFailed ? (
             <View
               style={{
-                borderRadius: 15,
+                borderRadius: PHOTO_SIZE / 2 + 2,
                 borderWidth: focused ? 2 : 1,
                 borderColor: focused ? THEME_COLORS.gold : 'rgba(44,36,23,0.16)',
                 padding: 1,
@@ -128,7 +126,7 @@ function TabBarIcon({
             >
               <Image
                 source={{ uri: photoUrl }}
-                style={{ width: 26, height: 26, borderRadius: 13 }}
+                style={{ width: PHOTO_SIZE, height: PHOTO_SIZE, borderRadius: PHOTO_SIZE / 2 }}
                 contentFit="cover"
                 onError={() => setPhotoFailed(true)}
                 accessibilityIgnoresInvertColors
@@ -164,25 +162,6 @@ function TabBarIcon({
           ) : null}
         </View>
       </Animated.View>
-      <Text
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.8}
-        allowFontScaling={false}
-        style={{
-          color: focused ? THEME_COLORS.gold : THEME_COLORS.text3,
-          fontFamily: iosFont(focused ? '600' : '400'),
-          fontWeight: focused ? '600' : '400',
-          fontSize: 9,
-          marginTop: 6,
-          letterSpacing: 0.4,
-          textTransform: 'uppercase',
-          textAlign: 'center',
-          width: SLOT_W,
-        }}
-      >
-        {label}
-      </Text>
     </View>
   );
 }
@@ -202,21 +181,23 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          // Background is rendered by `tabBarBackground` (GlassTabBar). Keep
-          // this transparent so the BlurView actually shows the content
-          // scrolling underneath.
+          // Background is the floating glass capsule from `tabBarBackground`.
           backgroundColor: 'transparent',
           position: 'absolute',
-          borderTopColor: 'rgba(44,36,23,0.06)',
-          borderTopWidth: 0.5,
-          height: 70 + insets.bottom,
-          paddingBottom: insets.bottom,
-          paddingTop: 10,
+          borderTopWidth: 0,
+          start: 16,
+          end: 16,
+          bottom: insets.bottom > 0 ? Math.max(insets.bottom - 14, 16) : 12,
+          height: FLOATING_TAB_RADIUS * 2,
+          paddingTop: 12,
+          paddingBottom: 0,
+          borderRadius: FLOATING_TAB_RADIUS,
           elevation: 0,
           shadowOpacity: 0,
         },
         tabBarBackground: () => <GlassTabBar />,
         tabBarShowLabel: false,
+        tabBarItemStyle: { justifyContent: 'center', alignItems: 'center' },
         tabBarHideOnKeyboard: true,
       }}
     >
@@ -240,10 +221,10 @@ export default function TabsLayout() {
               : undefined
           }
           options={{
+            tabBarAccessibilityLabel: tab.label,
             tabBarIcon: ({ focused }) => (
               <TabBarIcon
                 icon={tab.icon}
-                label={tab.label}
                 focused={focused || tabOwnsPath(tab.name, pathname)}
                 badgeCount={tab.name === 'groups' ? totalUnread : undefined}
                 photoUrl={tab.name === 'profile' ? profilePhoto || undefined : undefined}
